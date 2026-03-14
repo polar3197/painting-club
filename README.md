@@ -68,3 +68,4 @@ For Docker Compose defaults, see `.env.example`.
 ## Notes
 - API container runs migrations before starting Uvicorn.
 - `nginx` proxies `/api/*` to FastAPI and `/` to the React app.
+# painting-club
