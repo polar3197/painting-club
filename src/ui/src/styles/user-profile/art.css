@@ -1,7 +1,12 @@
 
 
 .art {
-    flex: 32;
+    flex: 64;
     width: 100%;
-    background-color: rgb(254, 254, 208);
+    background-color: rgb(255, 250, 245);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 90px;
+    font-size: 28px;
 }

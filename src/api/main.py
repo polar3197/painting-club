@@ -1,44 +1,79 @@
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
+from typing import Optional, List
+
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from jose import JWTError, jwt
 from typing import List
 import uuid
 
-from db.db_ops import create_member, login_user, get_members
+from db.db_ops import (
+    db_create_member, 
+    db_create_full_member,
+    db_login_user, 
+    db_get_members, 
+    db_get_profile, 
+    db_search_members,
+    db_add_medium,
+    db_get_search_options,
+)
+    
 from db.session import get_db
 from db.db_manager import init_db, empty_db
 from db.models import Member
 
-from api.auth import create_token
+from api.auth import create_token, decode_token
+
+
+bearer = HTTPBearer()
 
 class MemberIn(BaseModel):
     username: str
     password: str
+
+class FullMemberIn(BaseModel):
+    username: str
+    password: str
+    bio: str
+    city: str
+    firstname: str
+    lastname: str
 
 class MemberOut(BaseModel):
     id: uuid.UUID
     username: str
 
 class Profile(BaseModel):
-    first_name: str
-    last_name: str
-    media: List[str]   # just a list of media that the member works with
-    bio: str
+    username: str
+    firstname: str | None
+    lastname: str | None
+    media: List[str] = []
+    city: str | None
+    bio: str | None
+    is_owner: bool = False
 
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-# create members table
+class MemberFilters(BaseModel):
+    uname: str | None
+    city: str | None
+
+class AddMedia(BaseModel):
+    username: str | None
+    medium: str | None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    await init_db()
     yield
-    # empty_db()
+    # await empty_db()
 
 app = FastAPI(lifespan=lifespan, title="painting-club", root_path="/api")
 
@@ -48,31 +83,105 @@ def health() -> dict[str, str]:
 
 # ====================== MEMBER DETAILS =========================
 
-# create new member
-@app.post("/members/new", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
-def create_member_endpoint(payload: MemberIn, db: Session = Depends(get_db)) -> MemberOut:
+async def get_current_member(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: AsyncSession = Depends(get_db)):
+    member_id = decode_token(credentials.credentials)
+    result = await db.execute(select(Member).filter(Member.id == member_id))
+    member = result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=401)
+    return member
+
+@app.post("/members/newfull", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
+async def create_member_endpoint(payload: FullMemberIn, db: AsyncSession = Depends(get_db)) -> MemberOut:
     try:
-        member = create_member(db, payload.username, payload.password)
+        member = await db_create_full_member(db, payload.username, payload.password, payload.bio, payload.city, payload.firstname, payload.lastname)
         return MemberOut(id=member.id, username=member.username)
     except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Username already exists")
+    
+@app.post("/members/new", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
+async def create_full_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(get_db)) -> MemberOut:
+    try:
+        member = await db_create_member(db, payload.username, payload.password)
+        return MemberOut(id=member.id, username=member.username)
+    except IntegrityError:
+        await db.rollback()
         raise HTTPException(status_code=409, detail="Username already exists")
 
-# login existing member
 @app.post("/members/login", response_model=Token)
-def login_member_endpoint(payload: MemberIn, db: Session = Depends(get_db)) -> Token:
-    # will return JWT token
-    member = login_user(db, payload.username, payload.password)
+async def login_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(get_db)) -> Token:
+    member = await db_login_user(db, payload.username, payload.password)
     if not member:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_token(member)
     return Token(access_token=token)
 
-# return list of all members
-@app.get("/members", response_model=list[MemberOut])
-def list_members(db: Session = Depends(get_db)) -> list[MemberOut]:
-    members = get_members(db)
-    print(members)
-    return [MemberOut(id=m.id, username=m.username) for m in members]
+# @app.get("/members", response_model=list[MemberOut])
+# async def list_members(db: AsyncSession = Depends(get_db)) -> list[MemberOut]:
+#     members = await get_members(db)
+#     return [MemberOut(id=m.id, username=m.username) for m in members]
 
-@app.get("members/{username}")
-async def get_member(userna: str) -> Profile:
+@app.get("/members/search-options")
+async def get_search_options(db: AsyncSession = Depends(get_db)):
+    unique_usernames, unique_cities = await db_get_search_options(db)
+    if not unique_usernames and not unique_cities:
+      raise HTTPException(status_code=404)
+    return unique_usernames, unique_cities
+
+@app.get("/members/{username}/profile")
+async def get_profile(username: str, db: AsyncSession = Depends(get_db), current_member: Member = Depends(get_current_member)) -> Profile:
+    result = await db_get_profile(db, username)
+    if not result:
+        raise HTTPException(status_code=404)
+    member_row, media = result
+
+    is_owner = (member_row.username == current_member.username)
+
+    return Profile(
+        username=member_row.username,
+        firstname=member_row.firstname,
+        lastname=member_row.lastname,
+        bio=member_row.bio or "",
+        city=member_row.city,
+        media=media,
+        is_owner=is_owner,
+    )
+
+@app.get("/members")
+async def search_members(
+    city: str = None,
+    uname: str = None,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member)
+) -> List[Profile]:
+
+    results = await db_search_members(
+        db=db,
+        city=city if city else None,
+        uname=uname if uname else None,
+    )
+    if not results:
+        raise HTTPException(status_code=404)
+
+    profiles = []
+    for result in results:
+        member_row = result
+        is_owner = (member_row.username == current_member.username)
+        profile = Profile(
+            username=member_row.username,
+            firstname=member_row.firstname,
+            lastname=member_row.lastname,
+            bio=member_row.bio or "",
+            city=member_row.city,
+            is_owner=is_owner,
+        )
+        profiles.append(profile)
+    print(profiles)
+    return profiles
+    
+
+@app.post("/members/addmedia")
+async def login_member_endpoint(payload: AddMedia, db: AsyncSession = Depends(get_db)):
+    success = await db_add_medium(db, payload.username, payload.medium)
+    return success

@@ -1,15 +1,12 @@
 # src/db/base.py
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base
 from config import PostgreSQLConfig
 
 pgconf = PostgreSQLConfig()
-# DATABASE_URL = pgconf.connection_string_sync.replace('db:', 'localhost:')
-DATABASE_URL = pgconf.connection_string_sync
+DATABASE_URL = pgconf.connection_string  # postgresql+asyncpg://
 print(DATABASE_URL)
 
-# Create engine
-engine = create_engine(DATABASE_URL, echo=True)  # echo=True shows SQL queries
+engine = create_async_engine(DATABASE_URL, echo=True)
 
-# Create Base class for models
 Base = declarative_base()

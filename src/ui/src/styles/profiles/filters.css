@@ -1,0 +1,12 @@
+
+
+.filter-bar {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 9vh;
+    width: 100%;
+    border-bottom: 1px black solid;
+    background-color: rgb(255, 250, 245);
+}

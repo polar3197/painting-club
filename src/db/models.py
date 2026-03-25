@@ -11,11 +11,18 @@ class Member(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = Column(String(50), unique=True, nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), unique=True)
     firstname = Column(String(255))
     lastname = Column(String(255))
     password_hash = Column(String(255), nullable=False)
+    city = Column(String(255))
     bio = Column(Text)
+
+    # favorite piece you made
+    # favorite medium
+    # biggest art inspo atm
+    # favorite quote
+    # sun moon rising
 
 
 class Media(Base):
@@ -40,3 +47,11 @@ class Art(Base):
     name = Column(String(300))
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
     creator_id = Column(UUID(as_uuid=True), ForeignKey('members.id'), nullable=False)
+
+# class Group(Base):
+#     __tablename__ = "group"
+
+#     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+#     name = Column(Text)
+#     location = Column(String(255))
+#     # 3NF roles, type

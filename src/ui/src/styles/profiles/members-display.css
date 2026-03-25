@@ -1,0 +1,35 @@
+
+
+.members-display {
+    flex: 1;
+    width: 100%;
+    background-color: rgb(255, 250, 245);
+
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-content: start;
+    row-gap: 20px;
+    column-gap: 20px;
+    padding: 30px;
+}
+
+.member-card {
+    height: 200px;
+    display: flex;
+    flex-direction: row;
+    border: 1px black solid;
+    background-color: white;
+    padding: 10px;
+}
+
+.member-card:hover {
+    background-color: rgb(212, 237, 245);
+}
+
+.member-deets {
+    flex: 70;
+}
+
+.member-pic {
+    flex: 30;
+}

@@ -1,13 +1,12 @@
 
-.profile-wrapper {
-    background-color: orange;
+.page-wrapper {
     display: flex;
     width: 100vw;
-    height: 100vh;
+    height: 100%;
 }
 
-.profile-body {
-    flex: 100;
+.page-body {
+    flex: 100; /* balances out with sidebar */
     display: flex;
     flex-direction: column;
     overflow-y: auto;

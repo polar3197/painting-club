@@ -1,6 +1,7 @@
+from fastapi import HTTPException
 import os
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from jose import ExpiredSignatureError, JWTError, jwt
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 
 from db.models import Member
@@ -12,6 +13,20 @@ def create_token(member: Member):
 
     payload = {
         "sub": str(member.id),
-        "exp": (datetime.utcnow() + timedelta(hours=2)).timestamp()
+        "exp": datetime.now(timezone.utc) + timedelta(hours=2)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=HASH_ALGORITHM)
+
+def decode_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[HASH_ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user_id
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+

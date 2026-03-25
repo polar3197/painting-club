@@ -1,0 +1,16 @@
+Things I didnt know how to do:
+1. change the requests function to handle lists
+2. plug an image
+3. insert into existing row in db
+4. insert into db using sqlalchemy
+5. pass the set hook into the component
+
+Next steps:
+1. prettify user deets
+2. make user deets editable and persist into db
+	- upon 'end edit'
+3. finish profiles section
+4. build media toggle
+5. implement portfolio vs. profile view toggle
+6. trigger logout on token expiration
+

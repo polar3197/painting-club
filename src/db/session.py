@@ -1,30 +1,9 @@
 # src/db/session.py
-from sqlalchemy.orm import sessionmaker, Session
-from contextlib import contextmanager
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from db.database import engine
 
-# Create session factory
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
-# Dependency for FastAPI
-def get_db():
-    """Dependency for FastAPI routes"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Context manager for scripts
-@contextmanager
-def get_db_session():
-    """Context manager for standalone scripts"""
-    session = SessionLocal()
-    try:
+async def get_db():
+    async with AsyncSessionLocal() as session:
         yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
