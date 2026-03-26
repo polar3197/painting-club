@@ -4,13 +4,17 @@ import { Profile } from "../../api";
 import "../../styles/user-profile/media-bar.css";
 
 const MediaBar = (
-  { profile, setSelectedMedium }: 
-  { profile: Profile; setSelectedMedium: Dispatch<SetStateAction<string | null>> }
+  { profile, selectedMedium, setSelectedMedium }: 
+  { profile: Profile; selectedMedium : string | null; setSelectedMedium: Dispatch<SetStateAction<string | null>> }
 ) => {
   return (
     <div className="media-bar">
       {profile.media.map((medium) => (
-        <div onClick={() => setSelectedMedium(medium)} key={medium} className="media-element" >
+        <div 
+          onClick={() => setSelectedMedium(medium)} 
+          key={medium} 
+          className={`media-element ${medium == selectedMedium ? "selected" : ""}`}
+        >
           {medium}
         </div>
       ))}

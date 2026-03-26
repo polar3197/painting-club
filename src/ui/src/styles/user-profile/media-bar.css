@@ -6,30 +6,27 @@
     flex: 3;
     gap: 10px;
     width: 100%;
-    background-color: rgb(250, 244, 202);
+    background-color: rgb(255, 250, 245);
     border-top: 1px black solid;
     border-bottom: 1px black solid;
     justify-content: center;
+    padding: 5px 10px 5px 10px;
     align-items: center;
 }
 
 .media-element {
     flex: 1;
     text-align: center;
-    border-left: 1px black solid;
-    border-right: 1px black solid;
+    border: 1px black solid;
     cursor: pointer;
+    background-color: rgb(250, 244, 202);
 }
 
-.media-element:first-child {
-    border-left: transparent;
-}
-
-.media-element:last-child {
-    border-right: transparent;
+.media-element.selected {
+    background-color: rgb(238, 190, 100);
 }
 
 .media-element:hover {
-    background-color: rgb(212, 237, 245);
+    background-color: rgb(238, 190, 100);
 }
 

@@ -29,7 +29,7 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     <div className={`sidebar ${isOpen ? "open" : "closed"}`}>
       <div className={`sidebar-title ${isOpen ? "open" : "closed"}`}>
         {isOpen ?
-          "-•Painting Club•-"
+          "-• Painting Club •-"
           : "PC"}
       </div>
       <div

@@ -54,7 +54,7 @@
 }
 
 .sidebar-toggle:hover {
-    background-color: lightblue;
+    background-color: rgb(254, 78, 78)
 }
 
 .sidebar-toggle.open {
@@ -70,13 +70,15 @@
 }
 
 .sidebar-element.closed {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 99.9%;
+    height: 5.5%;
+    /* width: 2.25rem;
+    height: 2.25rem; */
 }
 
 .sidebar-element.open {
-    width: 90%;
-    height: 5%;
+    width: 99.9%;
+    height: 5.5%;
 }
 
 .sidebar-element button {

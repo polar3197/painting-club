@@ -23,7 +23,7 @@
     width: 400px;
     padding: 4px;
     border: 1px black solid;
-    background-color: aliceblue;
+    background-color: rgb(250, 244, 202);
 }
 
 .select-item {
@@ -32,6 +32,7 @@
     align-items: center;
     border: 1px black solid;
     margin: 4px;
+    background-color: white;
 }
 
 .select-item:hover {

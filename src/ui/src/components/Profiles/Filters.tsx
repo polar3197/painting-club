@@ -1,6 +1,6 @@
 import { Dispatch, SetStateAction, useState } from "react";
-import { useOptions } from "../hooks/useOptions";
-import { SelectTextBox } from "../components/Utils.tsx/Dropdown";
+import { useOptions } from "../../hooks/useOptions";
+import { SelectTextBox } from "../Utils/Dropdown";
 
 
 const Filters = (

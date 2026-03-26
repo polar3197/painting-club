@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useMembers } from "../../hooks/useMembers";
 import { Profile } from "../../api";
 import { useNavigate } from "react-router-dom";
-import Filters from "../../Profiles/Filters";
+import Filters from "../Profiles/Filters";
 import "../../styles/profiles/members-display.css";
 import "../../styles/profiles/filters.css";
 
@@ -24,7 +24,7 @@ const MemberCard = (
         <p>{member.city}</p>
       </div>
       <div className='member-pic'>
-        <p>placeholder for image</p>
+        <img src={`/imgs/${member.username}.png`} width="130" height="155"/>
       </div>
     </div>
   );
