@@ -10,7 +10,6 @@ const UserProfile = () => {
   const { username } = useParams();
   const [profile, setProfile, error, loading] = useProfile(username);
   
-  const [editMode, setEditMode] = useState<boolean>(false);
   const [selectedMedium, setSelectedMedium] = useState<string | null>(null)
 
   useEffect(() => {
@@ -32,8 +31,6 @@ const UserProfile = () => {
       <UserDetails
         profile={profile}
         setProfile={setProfile}
-        editMode={editMode}
-        setEditMode={setEditMode}
       />
       <MediaBar 
         profile={profile}

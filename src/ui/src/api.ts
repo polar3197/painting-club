@@ -6,8 +6,12 @@ interface RequestOptions extends RequestInit {
 }
 
 async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: {
+      ...(!isFormData && { "Content-Type": "application/json" }),
+      ...(options.headers || {}),
+    },
     ...options,
   });
 
@@ -15,8 +19,8 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    const detail = (data as { detail?: string })?.detail || `Request failed with status ${response.status}`;
-    throw new Error(detail);
+    const detail = (data as any)?.detail;
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail) || `Request failed with status ${response.status}`);
   }
 
   return data;
@@ -39,6 +43,31 @@ export interface Profile {
   bio:string;
   is_owner: boolean;
   media: string[];
+}
+
+export interface Visual2D {
+  username: string;
+  medium: string;
+  title: string;
+  date?: string;
+  location?: string;
+  song?: string;
+  height?: number | null;
+  width?: number | null;
+  file: File;
+}
+
+export interface Visual2DOut {
+  id: string;
+  username: string;
+  medium: string;
+  title: string;
+  date: string
+  location: string;
+  song: string;
+  height: number;
+  width: number;
+  file_path: string;
 }
 
 export function getHealth(): Promise<unknown> {
@@ -81,8 +110,29 @@ export function get_members(city: string, uname: string, token: string | null): 
   return members;
 }
 
-export function get_search_options(token: string | null): Promise<[string[], string[]]> {
-    return request("/members/search-options", {                                                                                               
-      headers: { Authorization: `Bearer ${token}` },
-    }) as Promise<[string[], string[]]>;                                                                                                      
-  } 
+export function get_search_options(): Promise<[string[], string[]]> {
+  return request("/members/search-options") as Promise<[string[], string[]]>;                                                                                                      
+} 
+
+export function add_new_visual_2d(token: string | null, payload: Visual2D) {
+  const fd = new FormData();
+  fd.append("username", payload.username);
+  fd.append("medium", payload.medium);
+  fd.append("title", payload.title);
+  if (payload.date) fd.append("date", payload.date);
+  if (payload.location) fd.append("location", payload.location);
+  if (payload.song) fd.append("song", payload.song);
+  if (payload.width != null) fd.append("width", String(payload.width));
+  if (payload.height != null) fd.append("height", String(payload.height));
+  fd.append("file", payload.file);
+
+  return request("/art/upload/visual-2d", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function get_members_visual_2d(username: string, medium: string): Promise<Visual2DOut[]> {
+  return request(`/members/${username}/art/${medium}`) as Promise<Visual2DOut[]>;
+}

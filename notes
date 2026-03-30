@@ -1,15 +1,20 @@
-Things I didnt know how to do:
-1. change the requests function to handle lists
-2. plug an image
-3. insert into existing row in db
-4. insert into db using sqlalchemy
-5. pass the set hook into the component
 
+SMALL FEATURES:
+1. add profile pic formatting (Cropper) and upload window
+2. prettify user account page and allow images to zoom in on click
+3. L/R arrow button flicks through art upon zoomedn
 
-NEW FEATURES:
+3. docs page
+4. enable deleting an art piece (soft delete? hide from view? where does it go?)
+5. secret word to access announcements
+
+MEDIUM FEATURES:
+1. fix search to scan names and usernames and cities even without prefix
+2. add upload for profile picture and use Cropper
+
+BIG FEATURES:
 1. inbox for artists (all app internal, maybe notifies email if set)
-2. secret word to access announcements
-3. add upload for profile picture and use Cropper
-4. add portfolio vs profile view (portfolio is sleek and for showing off, profile is for the community)
-5. add logout button
-6. add painting club ethos docs
+2. add portfolio vs profile view (portfolio is sleek and for showing off, profile is for the community)
+3. comment section on artworks
+4. groups
+

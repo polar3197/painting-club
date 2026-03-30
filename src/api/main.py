@@ -1,8 +1,10 @@
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from contextlib import asynccontextmanager
 from typing import Optional, List
+from pathlib import Path
+import magic
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +23,8 @@ from db.db_ops import (
     db_search_members,
     db_add_medium,
     db_get_search_options,
+    db_add_visual_2d,
+    db_get_visual_2d,
 )
     
 from db.session import get_db
@@ -68,6 +72,17 @@ class MemberFilters(BaseModel):
 class AddMedia(BaseModel):
     username: str | None
     medium: str | None
+
+class Visual2DOut(BaseModel):
+  id: uuid.UUID
+  title: str
+  date: date | None
+  location: str | None
+  song: str | None
+  height: float | None
+  width: float | None
+  file_path: str
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -148,6 +163,33 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         is_owner=is_owner,
     )
 
+@app.get("/members/{username}/art/{medium}", response_model=list[Visual2DOut])
+async def get_visual_2d(
+    username: str, 
+    medium: str, 
+    db: AsyncSession = Depends(get_db), 
+) -> list[Visual2DOut]:
+    results = await db_get_visual_2d(db, username, medium)
+    if results is None:
+        raise HTTPException(status_code=404)
+    
+    visual_2ds = []
+    for result in results:
+        visual_2d_row = result
+        visual_2d = Visual2DOut (
+            id=visual_2d_row.id,
+            title=visual_2d_row.title,
+            date=visual_2d_row.date,
+            location=visual_2d_row.location,
+            song=visual_2d_row.song,
+            height=visual_2d_row.height,
+            width=visual_2d_row.width,
+            file_path=visual_2d_row.file_path,
+        )
+        visual_2ds.append(visual_2d)
+    print(visual_2ds)
+    return visual_2ds
+
 @app.get("/members")
 async def search_members(
     city: str = None,
@@ -185,3 +227,38 @@ async def search_members(
 async def login_member_endpoint(payload: AddMedia, db: AsyncSession = Depends(get_db)):
     success = await db_add_medium(db, payload.username, payload.medium)
     return success
+
+@app.post("/art/upload/visual-2d")
+async def upload_visual_2d(
+    username: str = Form(...),
+    medium: str = Form(...),
+    title: str = Form(...),
+    date: date | None = Form(None),
+    location: str | None = Form(None),
+    song: str | None = Form(None),
+    width: int | None = Form(None),
+    height: int | None = Form(None),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    # verify file type
+    contents = await file.read()
+    mime = magic.from_buffer(contents, mime=True)
+    if mime != file.content_type:
+        raise HTTPException(status_code=400, detail=f"File type mismatch: stated {file.content_type}, actual {mime}")
+
+    file_ext = file.filename.split('.')[-1]
+    safe_title = title.replace(" ", "_")                                                                                                        
+    file_path = f"/static/art/{username}/{medium}/{safe_title}.{file_ext}"
+
+    # save the file to the filepath
+    path = Path(f"/app{file_path}")
+    path.parent.mkdir(parents=True, exist_ok=True)                                                                                      
+    path.write_bytes(contents) 
+
+    try:
+        await db_add_visual_2d(db=db, username=username, medium=medium, title=title, date=date, location=location, song=song, width=width, height=height, file_path=file_path)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return {"file_path": file_path}

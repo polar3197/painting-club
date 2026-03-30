@@ -15,6 +15,10 @@
   border: transparent;
 }
 
+.login-container input {
+  color: black;
+}
+
 .login-footer button {
   background-color: transparent;
   border: 1px black solid;

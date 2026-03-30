@@ -1,7 +1,7 @@
 .announcements {
   position: absolute;
-  top: 40vh;
-  right: 15vw;
+  bottom: 4rem;
+  left: 45rem;
   z-index: 1;
   width: 25vw;
   height: 50vh;

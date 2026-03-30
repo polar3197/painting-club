@@ -1,60 +1,105 @@
 
 
 .user-deets {
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    flex: 24;
-    min-height: 320px;
+    min-height: 50vh;
+    height: 50vh;
     width: 100%;
-    padding: 8px;
     background-color: rgb(255, 250, 245);
+    padding: 10px; 
 }
 
 .top-bar {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
-    height: 30px;
-}
-
-.edit-button {
-    padding: 2px 5px 2px 5px;
-}
-
-.edit-button:hover {
-    background-color: lightgreen;
-    cursor: pointer;
-}
-
-.edit-button:active {
-    background-color: rgb(123, 201, 97);
-    cursor: pointer;
-    transform: scale(.98);
+    justify-content: end;
 }
 
 .user-body {
     flex: 1;
     display: flex;
-    flex-direction: row;
     justify-content: space-between;
-    padding: 10px 20px 0px 20px;
-    gap: 40%;
-}
-
-.user-fields {
-    display: flex;
-    flex-direction: column;
-    flex: 7;
     gap: 10px;
-    padding: 30px 0 0 5px;
+    flex-direction: row;
+    padding: 10px 20px 0px 20px;
 }
 
 .user-profile-pic {
-    height: 90%;
-    flex: 4;
+    width: 20%;
     border: 1px black solid;
+    border-radius: 5px;
+    cursor: pointer;
 }
 
-.user-profile-pic img { width: 100%; height: 100%; object-fit: cover; }
+.user-profile-pic img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    border-radius: 5px;
+}
 
+
+.user-fields {
+    position: relative;
+    width: 75%;
+    display: flex;
+    flex-direction: row;
+    border-radius: 5px;
+    border: 1px solid black;
+    padding: 10px;
+}
+
+.uf-left {
+    width: 30%;
+    height: 100%;
+    border-right: 1px black solid;
+    padding: 0 10px 0 0;
+}
+
+.user-name {
+    display: flex;
+    align-items: center;
+    font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 24px;
+}
+
+.user-field-element {
+    display: flex;
+    flex-direction: column;
+    font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+}
+
+.uf-right {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 70%;
+    height: 100%;
+    padding: 10px 10px 0 10px;
+}
+
+.question-wrapper {
+    display: flex;
+    flex-direction: column;
+    padding: 5px 0 5px 10px;
+    border-bottom: 1px solid black;
+}
+
+.question-wrapper:last-child {
+    border-bottom: transparent;
+}
+
+.question {
+    display: flex;
+    width: auto;
+    border-bottom: 1px black solid;
+    font-style: bold;
+}
+
+.answer {
+    display: flex;
+    width: 100%;
+}

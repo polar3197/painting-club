@@ -11,19 +11,26 @@
     row-gap: 20px;
     column-gap: 20px;
     padding: 30px;
+    box-sizing: border-box;
 }
 
 .member-card {
-    height: 200px;
+    /* height: 250px;
+    width: 250px; */
+    /* aspect-ratio: 1; */
     display: flex;
+    align-items: center;                                                                                                                    
+    justify-content: center;
     flex-direction: row;
+
     border: 1px black solid;
+    /* border-radius: 50%; */
     background-color: white;
     padding: 10px;
 }
 
 .member-card:hover {
-    background-color: rgb(212, 237, 245);
+    background-color: rgb(238, 190, 100);
 }
 
 .member-deets {

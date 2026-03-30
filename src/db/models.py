@@ -1,5 +1,5 @@
 # src/db/models.py
-from sqlalchemy import Column, String, Text, ForeignKey
+from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -39,14 +39,30 @@ class Media_Members(Base):
     member_id = Column(UUID(as_uuid=True), ForeignKey('members.id'), primary_key=True)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), primary_key=True)
 
-
 class Art(Base):
     __tablename__ = "art"
-
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(300))
-    media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
     creator_id = Column(UUID(as_uuid=True), ForeignKey('members.id'), nullable=False)
+    media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
+    title = Column(String(300), default="Untitled")
+    date = Column(Date)
+    file_path = Column(String(300))
+    type = Column(String(50), nullable=False)  # discriminator column
+
+    __mapper_args__ = {"polymorphic_on": type}
+
+
+class Visual2D(Art):
+    __tablename__ = "visual_2d"
+
+    id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
+    width = Column(Numeric(6, 2))                                                                                                               
+    height = Column(Numeric(6, 2))
+    song = Column(String(255))
+    location = Column(String(255))
+
+    __mapper_args__ = {"polymorphic_identity": "visual_2d"}
+    
 
 # class Group(Base):
 #     __tablename__ = "group"

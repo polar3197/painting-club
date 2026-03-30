@@ -17,6 +17,36 @@
     /* box-shadow: rgba(0, 0, 0, 0.4) 0px 2px 4px, rgba(0, 0, 0, 0.3) 0px 7px 13px -3px, rgba(0, 0, 0, 0.2) 0px -3px 0px inset; */
 }
 
+.blowup-backdrop {                                                                                                                          
+    position: fixed;                                                                                                                      
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 100;                                                                                                                           
+    display: flex;                                                                                                                          
+    align-items: center;                                                                                                                    
+    justify-content: center;                                                                                                                
+}
+
+.blowup-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    overflow: hidden;
+
+    width: auto;
+    height: 85vh;
+
+    border: 2px rgb(2, 2, 2) solid;
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
+}
+
+.blowup-dialog img {
+    height: 100%;
+}
+
 .exit button {
     display: flex;
     justify-content: center;
@@ -119,12 +149,21 @@
     border-bottom: 1px black solid;
 }
 
-.painting-feeling {
+.painting-width {
     position: absolute;
-    width: 560px;
+    width: 120px;
     height: 20px;
-    bottom: 40px;
-    left: 20px;
+    top: 240px;
+    right: 150px;
+    border-bottom: 1px black solid;
+}
+
+.painting-height {
+    position: absolute;
+    width: 120px;
+    height: 20px;
+    top: 240px;
+    right: 20px;
     border-bottom: 1px black solid;
 }
 

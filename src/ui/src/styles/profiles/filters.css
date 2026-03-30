@@ -5,7 +5,8 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 9vh;
+    height: 15vh;
+    min-height: 50px;
     width: 100%;
     border-bottom: 1px black solid;
     background-color: rgb(255, 250, 245);

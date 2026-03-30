@@ -14,6 +14,7 @@
     position: absolute;
     top: 10px;
     right: 10px;
+    border-radius: 50%;
 }
 
 .add button {
@@ -21,14 +22,18 @@
     border: 1px black solid;
     height: 25px;
     width: 25px;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
 }
 
 .add button:hover {
     background-color: rgb(238, 190, 100);
+    transform: scale(1.1);
 }
 
 .add button:active {
     background-color: rgb(238, 190, 100);
+    transform: scale(1);
 }
 
 .add button:focus {
@@ -37,8 +42,41 @@
 
 .art {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     justify-content: center;
-    padding: 25px;
-    height: 10px;
+    padding: 15px;
+}
+
+.art-element {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    /* min-height: 40px; */
+    border: 1px black solid;
+    padding: 10px;
+    cursor: pointer;
+}
+
+.art-visual {                                                                                                                               
+    width: 40%;                                                                                                                            
+    aspect-ratio: auto;                                                                 
+}                                                                                                                                           
+                
+.art-visual img {                                                                                                                           
+    width: 100%;
+    height: auto;                                                                                                                           
+    display: block;
+    border: 2px black solid;
+}
+
+.art-details {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 15px;
+}
+
+.art-detail-header {
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: 600;
 }

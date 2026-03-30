@@ -1,6 +1,7 @@
 import { Dispatch, SetStateAction, useState } from "react";
 import { useOptions } from "../../hooks/useOptions";
 import { SelectTextBox } from "../Utils/Dropdown";
+import "../../styles/profiles/filters.css";
 
 
 const Filters = (

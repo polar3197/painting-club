@@ -9,7 +9,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth()!; 
+  const { currentUser, logout } = useAuth()!; 
   console.log("CU: ", currentUser);
   
   const gotoMe = () => {
@@ -17,44 +17,60 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   };
 
   const gotoProfiles = () => {
-    console.log("go to profiles")
+    console.log("go to profiles");
     navigate(`/members`);
   };
 
   const gotoGroups = () => {
-    console.log("go to groups")
+    console.log("go to groups");
   };
+
+  const gotoDocs = () => {
+    navigate("/ethos");
+  };
+
+  const gotoLogout = () => {
+    logout(); // removes token from sessionStorage
+    navigate("/landing-page");
+  }
 
   return (
     <div className={`sidebar ${isOpen ? "open" : "closed"}`}>
-      <div className={`sidebar-title ${isOpen ? "open" : "closed"}`}>
-        {isOpen ?
-          "-• Painting Club •-"
-          : "PC"}
+      <div className="sidebar-top">
+        <div className={`sidebar-title ${isOpen ? "open" : "closed"}`}
+          onClick={toggleSidebar}
+        >
+          {isOpen ?
+            "-• Painting Club •-"
+            : "PC"}
+        </div>
+        <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
+          {isOpen ? 
+            <button onClick={gotoMe}>Me</button> 
+            : <button onClick={gotoMe}>&#10038;</button>}
+        </div>
+        <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
+          {isOpen ? 
+            <button onClick={gotoProfiles}>Profiles</button> 
+            : <button onClick={gotoProfiles}>∑</button>}
+        </div>
+        <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
+          {isOpen ? 
+            <button onClick={gotoGroups}>Groups</button> 
+            : <button onClick={gotoGroups}>&#9675;</button>}
+        </div>
       </div>
-      <div
-        className={`sidebar-toggle ${isOpen ? "open" : "closed"}`}
-        onClick={toggleSidebar}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleSidebar()}
-      >
-        <p>~</p>
-      </div>
-      <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
-        {isOpen ? 
-          <button onClick={gotoMe}>Me</button> 
-          : <button onClick={gotoMe}>&#10038;</button>}
-      </div>
-      <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
-        {isOpen ? 
-          <button onClick={gotoProfiles}>Profiles</button> 
-          : <button onClick={gotoProfiles}>∑</button>}
-      </div>
-      <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
-        {isOpen ? 
-          <button onClick={gotoGroups}>Groups</button> 
-          : <button onClick={gotoGroups}>&#9675;</button>}
+      <div className="sidebar-bottom">
+        <div className={`sidebar-element docs ${isOpen ? "open" : "closed"}`}>
+          {isOpen ? 
+            <button onClick={gotoDocs}>Docs</button> 
+            : <button onClick={gotoDocs}>¶</button>}
+        </div>
+        <div className={`sidebar-element logout ${isOpen ? "open" : "closed"}`}>
+          {isOpen ? 
+            <button onClick={gotoLogout}>Logout</button> 
+            : <button onClick={gotoLogout}>≤</button>}
+        </div>
       </div>
     </div>
   );

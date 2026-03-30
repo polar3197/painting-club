@@ -44,7 +44,7 @@ const Profiles = () => {
     <div className='members-display'>
       {(members.length > 0) ? 
         members.map(member => (
-          <MemberCard member={member} />
+          <MemberCard key={member.username} member={member} />
         ))
         :
         <p>No members found :(</p>

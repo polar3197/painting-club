@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import bcrypt
 
-from db.models import Member, Media, Media_Members
+from db.models import Member, Media, Media_Members, Visual2D
 
 async def db_get_members(db: AsyncSession):
     result = await db.execute(select(Member))
@@ -90,6 +90,8 @@ async def db_add_medium(db: AsyncSession, username: str, medium: str) -> bool:
     query = select(Member.id).filter(Member.username==username)
     result = await db.execute(query)
     member_id = result.scalars().first()
+    if not member_id:
+        raise ValueError(f"Member '{username}' not found")
 
     # check media exists
     query = select(Media).filter(Media.name==medium)
@@ -116,3 +118,52 @@ async def db_add_medium(db: AsyncSession, username: str, medium: str) -> bool:
         await db.refresh(new_mapping)
 
     return True
+
+async def db_get_visual_2d(db: AsyncSession, username: str, medium: str):
+    member_result = await db.execute(select(Member.id).filter(Member.username == username))
+    member_id = member_result.scalars().first()
+    if not member_id:
+        return None
+
+    media_result = await db.execute(select(Media.id).filter(Media.name == medium))
+    media_id = media_result.scalars().first()
+    if not media_id:
+        return None
+
+    result = await db.execute(
+        select(Visual2D)
+        .filter(Visual2D.creator_id == member_id, Visual2D.media_id == media_id)
+    )
+    return result.scalars().all()
+
+async def db_add_visual_2d(db: AsyncSession, username: str, medium: str, title: str, file_path: str, date=None, location: str | None = None, song: str | None = None, width: int | None = None, height: int | None = None) -> bool:
+    # find member_id, media_id
+    member_result = await db.execute(select(Member.id).filter(Member.username==username))
+    member_id = member_result.scalars().first()
+    if not member_id:
+        raise ValueError(f"Member '{username}' not found")
+
+    media_result = await db.execute(select(Media.id).filter(Media.name==medium))
+    media_id = media_result.scalars().first()
+    if not media_id:
+        raise ValueError(f"Medium '{medium}' not found")
+
+    # use this to create the entry in Art
+    new_art = Visual2D(
+        title=title,
+        date=date,
+        creator_id=member_id,
+        media_id=media_id,
+        location=location,
+        song=song,
+        width=width,
+        height=height,
+        file_path=file_path,
+    )
+    db.add(new_art)
+    await db.commit()
+    await db.refresh(new_art)
+
+    return True
+
+# async def db_hard_delete_visual_2d(db: AsyncSession, id: str):

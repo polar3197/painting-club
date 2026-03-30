@@ -18,7 +18,7 @@ export function useOptions() {
         const [fetchedUsernames, fetchedCities] = await get_search_options(token);
         setUsernames(fetchedUsernames);
         setCities(fetchedCities);
-        console.log("usernames: ", usernames, "cities: ", cities);
+        console.log("usernames: ", fetchedUsernames, "cities: ", fetchedCities);
       } catch (err) {
         console.log("fetch error: ", err);
         setError(err as Error);

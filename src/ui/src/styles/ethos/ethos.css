@@ -1,0 +1,27 @@
+
+
+.ethos-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    background-color: rgb(250, 244, 202);
+    padding: 10px 0 10px 0;
+    overflow-y: auto;
+    gap: 5px
+}
+
+/* .exit {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+} */
+
+.ethos-page {
+    width: 8.25in;
+    height: 10.67in;
+    background-color: white;
+    border: 1px black solid;
+}

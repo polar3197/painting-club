@@ -4,7 +4,9 @@ import { login_user } from "../../api";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-export default function Login() {
+export default function Login(
+  { bottom, left } : { bottom : number; left: number; }
+) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [member, setMember] = useState(true);
@@ -24,24 +26,18 @@ export default function Login() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // Placeholder form for future auth wiring.
-    const payload = {
-      username: username,
-      password: password,
-    };
-
-    // axios api interface handles HTTP errors for now
-    const response = await login_user(payload);
-
-    // store the users username and token for profile access and member rights
-    login(username, response.access_token);
-
-    // figure out how to navigate to logged in users Profile and how to
-    navigate(`/members/${username}/profile`);
+    const payload = { username, password };
+    try {
+      const response = await login_user(payload);
+      login(username, response.access_token);
+      navigate(`/members/${username}/profile`);
+    } catch (err) {
+      alert((err as Error).message);
+    }
   };
 
   return (
-    <div className="login-container">
+    <div className="login-container" style={{ bottom: `${bottom}rem`, left: `${left}rem`}}>
       <div className="login-body">
         {member && (
           <form className="user-form" onSubmit={handleSubmit}>

@@ -17,8 +17,8 @@
 
 .title {
   position: absolute;
-  top: 7vh;
-  left: 15vw;
+  bottom: 35rem;
+  left: 10rem;
   z-index: 1;
   font-size: 3vw;
 }
