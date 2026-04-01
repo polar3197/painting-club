@@ -1,13 +1,20 @@
 
+.media-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    background-color: rgb(255, 250, 245);
+    border-top: 1px black solid;
+    border-bottom: 1px black solid;
+    justify-content: center;
+}
 
 .media-bar {
     display: flex;
     flex-direction: row;
-    flex: 3;
     gap: 10px;
     width: 100%;
     background-color: rgb(255, 250, 245);
-    border-top: 1px black solid;
     border-bottom: 1px black solid;
     justify-content: center;
     padding: 5px 10px 5px 10px;
@@ -30,3 +37,73 @@
     background-color: rgb(238, 190, 100);
 }
 
+
+.keywords {
+    display: flex;
+    flex-direction: row;
+    justify-content: start;
+    align-items: center;
+    height: 3rem;
+    padding: 5px;
+    gap: 6px;
+}
+
+.keyword-select-wrapper {
+    width: 10%;
+    height: 100%;
+    border-right: 1px black solid;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 5px;
+    overflow: visible;
+}
+
+.keyword-bubbles-wrapper {
+    width: 90%;
+    height: 100%;
+    overflow-x: auto;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: start;
+    align-items: center;
+    gap: 10px;
+    padding: 3px;
+}
+
+.bubble {
+    display: flex;
+    flex-direction: row;
+    border: 2px  #009514d2 solid;
+    background-color: rgb(0, 255, 153);
+    border-radius: 15px;
+    height: 80%;
+    padding: 4px;
+    gap: 6px;
+}
+
+.bubble-name {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80%;
+    padding: 4px;
+    font-size: 18px;
+}
+
+.bubble-x {
+    display: flex;
+    justify-content: center;
+    border-radius: 50%;
+    align-items: center;
+    width: 20%;
+    cursor: pointer;
+    background-color: white;
+}
+
+.bubble-x:hover {
+    background-color: rgb(241, 99, 99);
+}

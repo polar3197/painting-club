@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 export default function Login(
-  { bottom, left } : { bottom : number; left: number; }
+  { bottom, left, background_color } : { bottom : number; left: number; background_color: string; }
 ) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +37,7 @@ export default function Login(
   };
 
   return (
-    <div className="login-container" style={{ bottom: `${bottom}rem`, left: `${left}rem`}}>
+    <div className="login-container" style={{ bottom: `${bottom}rem`, left: `${left}rem`, backgroundColor: `${background_color}`}}>
       <div className="login-body">
         {member && (
           <form className="user-form" onSubmit={handleSubmit}>

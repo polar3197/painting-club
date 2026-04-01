@@ -16,6 +16,7 @@ class Member(Base):
     lastname = Column(String(255))
     password_hash = Column(String(255), nullable=False)
     city = Column(String(255))
+    state = Column(String(255))
     bio = Column(Text)
 
     # favorite piece you made
@@ -59,10 +60,25 @@ class Visual2D(Art):
     width = Column(Numeric(6, 2))                                                                                                               
     height = Column(Numeric(6, 2))
     song = Column(String(255))
+    song_artist = Column(String(255))
     location = Column(String(255))
 
     __mapper_args__ = {"polymorphic_identity": "visual_2d"}
     
+class Prompt(Base):
+    # list of questions for members to choose from on their page
+    __tablename__ = "prompt"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    question = Column(String(255))
+
+class Prompt_Records(Base):
+    # a join table to connect users to the prompt they chose and their answer
+    __tablename__ = "prompt_records"
+
+    member_id = Column(UUID(as_uuid=True), ForeignKey('members.id'), primary_key=True)
+    prompt_id = Column(UUID(as_uuid=True), ForeignKey('prompt.id'), primary_key=True)
+    response = Column(String(300))
 
 # class Group(Base):
 #     __tablename__ = "group"

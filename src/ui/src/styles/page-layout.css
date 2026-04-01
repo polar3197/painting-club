@@ -7,7 +7,7 @@
 }
 
 .page-body {
-    flex: 100; /* balances out with sidebar */
+    flex: 1; /* balances out with sidebar */
     display: flex;
     flex-direction: column;
     overflow-y: auto;

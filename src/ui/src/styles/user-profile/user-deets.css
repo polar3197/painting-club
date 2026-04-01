@@ -29,7 +29,8 @@
 
 .user-profile-pic {
     width: 20%;
-    border: 1px black solid;
+    border: 5px rgb(238, 190, 100) solid;
+    box-shadow: 0 0 0 1px black;
     border-radius: 5px;
     cursor: pointer;
 }
@@ -38,12 +39,12 @@
     width: 100%; 
     height: 100%; 
     object-fit: cover; 
-    border-radius: 5px;
+    /* border-radius: 5px; */
 }
 
 
 .user-fields {
-    position: relative;
+    /* position: relative; */
     width: 75%;
     display: flex;
     flex-direction: row;
@@ -53,6 +54,7 @@
 }
 
 .uf-left {
+    position: relative;
     width: 30%;
     height: 100%;
     border-right: 1px black solid;
@@ -66,17 +68,34 @@
     font-size: 24px;
 }
 
+.user-location {
+    display: flex;
+    align-items: center;
+    font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+}
+
 .user-field-element {
     display: flex;
     flex-direction: column;
     font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
 }
 
-.submit {
+.submit-profile {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
+    bottom: 0;
+    right: 3px;
     border: 1px solid black;
+    background-color: lightgreen;
+    cursor: pointer;
+}
+
+.submit-profile:hover {
+    transform: scale(1.05);
+}
+
+.submit-profile:active {
+    background-color: rgb(119, 197, 119);
+    transform: scale(.95);
 }
 
 .uf-right {

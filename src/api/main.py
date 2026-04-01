@@ -1,28 +1,48 @@
 from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from datetime import datetime, timedelta, date
+from datetime import date
 from contextlib import asynccontextmanager
 from typing import Optional, List
 from pathlib import Path
 import magic
 
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from jose import JWTError, jwt
 from typing import List
-import uuid
 
-from db.db_ops import (
+from api.models import (
+    MemberIn,
+    FullMemberIn,
+    MemberOut,
+    Profile,
+    ProfileUpdate,
+    Token,
+    MemberFilters,
+    AddMedia,
+    Visual2DOut,
+)
+
+from db.db_ops.members import (
     db_create_member, 
     db_create_full_member,
     db_login_user, 
     db_get_members, 
-    db_get_profile, 
+)
+
+from db.db_ops.profile import (
+    db_get_profile,
+    db_update_profile,
+)
+
+from db.db_ops.search import (
     db_search_members,
-    db_add_medium,
     db_get_search_options,
+)
+
+from db.db_ops.media import (
+    db_add_medium,
     db_add_visual_2d,
     db_get_visual_2d,
 )
@@ -35,53 +55,6 @@ from api.auth import create_token, decode_token
 
 
 bearer = HTTPBearer()
-
-class MemberIn(BaseModel):
-    username: str
-    password: str
-
-class FullMemberIn(BaseModel):
-    username: str
-    password: str
-    bio: str
-    city: str
-    firstname: str
-    lastname: str
-
-class MemberOut(BaseModel):
-    id: uuid.UUID
-    username: str
-
-class Profile(BaseModel):
-    username: str
-    firstname: str | None
-    lastname: str | None
-    media: List[str] = []
-    city: str | None
-    bio: str | None
-    is_owner: bool = False
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-class MemberFilters(BaseModel):
-    uname: str | None
-    city: str | None
-
-class AddMedia(BaseModel):
-    username: str | None
-    medium: str | None
-
-class Visual2DOut(BaseModel):
-  id: uuid.UUID
-  title: str
-  date: date | None
-  location: str | None
-  song: str | None
-  height: float | None
-  width: float | None
-  file_path: str
 
 
 @asynccontextmanager
@@ -109,7 +82,7 @@ async def get_current_member(credentials: HTTPAuthorizationCredentials = Depends
 @app.post("/members/newfull", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
 async def create_member_endpoint(payload: FullMemberIn, db: AsyncSession = Depends(get_db)) -> MemberOut:
     try:
-        member = await db_create_full_member(db, payload.username, payload.password, payload.bio, payload.city, payload.firstname, payload.lastname)
+        member = await db_create_full_member(db, payload.username, payload.password, payload.bio, payload.city, payload.state, payload.firstname, payload.lastname)
         return MemberOut(id=member.id, username=member.username)
     except IntegrityError:
         await db.rollback()
@@ -159,9 +132,25 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         lastname=member_row.lastname,
         bio=member_row.bio or "",
         city=member_row.city,
+        state=member_row.state,
         media=media,
         is_owner=is_owner,
     )
+
+@app.patch("/members/{username}/update-profile")
+async def update_profile(
+    username: str, 
+    updated_profile: ProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if current_member.username != username:
+        raise HTTPException(status_code=403)
+    member = await db_update_profile(db, username=username, payload=updated_profile)
+    if not member:
+        raise HTTPException(status_code=404)
+    return {"ok": True}
+
 
 @app.get("/members/{username}/art/{medium}", response_model=list[Visual2DOut])
 async def get_visual_2d(
@@ -216,6 +205,7 @@ async def search_members(
             lastname=member_row.lastname,
             bio=member_row.bio or "",
             city=member_row.city,
+            state=member_row.state,
             is_owner=is_owner,
         )
         profiles.append(profile)

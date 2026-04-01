@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useMembers } from "../../hooks/useMembers";
 import { Profile } from "../../api";
 import { useNavigate } from "react-router-dom";
-import Filters from "../Profiles/Filters";
+import CentralFilter from "../Profiles/CentralFilter";
 import "../../styles/profiles/members-display.css";
 import "../../styles/profiles/filters.css";
 
@@ -21,7 +21,7 @@ const MemberCard = (
       <div className='member-deets'>
         <p>@{member.username}</p>
         <p>{member.firstname} {member.lastname}</p>
-        <p>{member.city}</p>
+        <p>{member.city}, {member.state}</p>
       </div>
       <div className='member-pic'>
         <img src={`/imgs/${member.username}.png`} width="130" height="155"/>
@@ -33,11 +33,14 @@ const MemberCard = (
 const Profiles = () => {
   const [city, setCity] = useState<string>("");
   const [username, setUsername] = useState<string>("");
+
+  // const [searchSoFar, setSearchSoFar] = useState<string>("");
+  // const []
   const [members, error, loading] = useMembers(city, username);
 
   return (
     <>
-    <Filters 
+    <CentralFilter
       setUsername={setUsername}
       setCity={setCity}
     />

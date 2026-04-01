@@ -11,11 +11,8 @@ export function useOptions() {
 
   useEffect(() => {
     const fetchOptions = async () => {
-      
-      const token = sessionStorage.getItem("token");
-      console.log(token);
       try {
-        const [fetchedUsernames, fetchedCities] = await get_search_options(token);
+        const [fetchedUsernames, fetchedCities] = await get_search_options();
         setUsernames(fetchedUsernames);
         setCities(fetchedCities);
         console.log("usernames: ", fetchedUsernames, "cities: ", fetchedCities);

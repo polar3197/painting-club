@@ -23,7 +23,7 @@ const PaintingForm = ({ onDataChange }: { onDataChange: (data: Record<string, an
             />
             {form.files ?
                 <img src={URL.createObjectURL(form.files)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                : "drop a painting"
+                : "drop your art here"
             }
         </div>
         <div className="painting-title">

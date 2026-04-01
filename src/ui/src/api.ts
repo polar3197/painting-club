@@ -7,12 +7,12 @@ interface RequestOptions extends RequestInit {
 
 async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      ...(!isFormData && { "Content-Type": "application/json" }),
-      ...(options.headers || {}),
-    },
-    ...options,
+  const response = await fetch(`${API_BASE}${path}`, {                                                                                        
+    ...options, 
+    headers: {                                                                                                                              
+        ...(!isFormData && { "Content-Type": "application/json" }),
+        ...(options.headers || {}),                                                                                                         
+    },          
   });
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
@@ -40,6 +40,7 @@ export interface Profile {
   firstname: string;
   lastname: string;
   city: string;
+  state: string;
   bio:string;
   is_owner: boolean;
   media: string[];
@@ -100,6 +101,14 @@ export function get_profile(username: string, token: string | null): Promise<Pro
 
 export function get_profiles(): Promise<Profile[]> {
   return request(`/members/all/profile`) as Promise<Profile[]>;
+}
+
+export function update_profile(username: string, payload: Profile, token: string | null) {
+  return request(`/members/${username}/update-profile`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function get_members(city: string, uname: string, token: string | null): Promise<Profile[]> {

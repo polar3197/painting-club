@@ -15,7 +15,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username }
         if (!formData) return;
         const token = sessionStorage.getItem("token");
 
-        if (selectedMedium == "painting" ||
+        if (selectedMedium == "drawing" ||
             selectedMedium == "acrylic" ||
             selectedMedium == "watercolor" ||
             selectedMedium == "oil" ||
@@ -46,7 +46,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username }
             <div className="submit">
                 <button onClick={() => addArt()}>submit</button>
             </div>
-            {(selectedMedium == "painting" || 
+            {(selectedMedium == "drawing" || 
                 selectedMedium == "acrylic" ||
                 selectedMedium == "watercolor" ||
                 selectedMedium == "stained glass" ||

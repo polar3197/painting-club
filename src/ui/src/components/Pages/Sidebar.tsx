@@ -47,17 +47,23 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
         <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
           {isOpen ? 
             <button onClick={gotoMe}>Me</button> 
-            : <button onClick={gotoMe}>&#10038;</button>}
+            : <button onClick={gotoMe}>
+                <img src={"/imgs/me.png"} width="100%" height="100%"></img>
+              </button>}
         </div>
         <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
           {isOpen ? 
             <button onClick={gotoProfiles}>Profiles</button> 
-            : <button onClick={gotoProfiles}>∑</button>}
+            : <button onClick={gotoProfiles}>
+                <img src={"/imgs/profiles.png"} width="100%" height="100%"></img>
+              </button>}
         </div>
         <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
           {isOpen ? 
             <button onClick={gotoGroups}>Groups</button> 
-            : <button onClick={gotoGroups}>&#9675;</button>}
+            : <button onClick={gotoGroups}>
+                <img src={"/imgs/groups.png"} width="100%" height="100%"></img>
+              </button>}
         </div>
       </div>
       <div className="sidebar-bottom">

@@ -19,8 +19,9 @@ const UserDetails = (
     <>
     {isZoomedIn && 
       <ArtZoomIn 
-          imgPath={`/imgs/${profile.username}.png`} 
-          setIsZoomedIn={setIsZoomedIn}
+        isOwner={profile.is_owner}
+        imgPath={`/imgs/${profile.username}.png`} 
+        setIsZoomedIn={setIsZoomedIn}
       />
     }
     

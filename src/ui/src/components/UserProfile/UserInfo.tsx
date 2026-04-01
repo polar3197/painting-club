@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useState } from "react";
-import { Profile } from "../../api";
+import { Profile, update_profile } from "../../api";
 import "../../styles/user-profile/user-deets.css";
 
 
@@ -31,16 +31,17 @@ const UserInfo = (
     }
 ) => {
     const [updateProfile, setUpdateProfile] = useState<boolean>(false);
+    const token = sessionStorage.getItem("token");
 
     const handleUpdateProfile = () => {
         if (profile.is_owner) {
-            setUpdateProfile(true)
+            setUpdateProfile(true);
         }
     }
 
     const handleSumbitProfile = () => {
-        setUpdateProfile(false)
-        // persist info to db
+        setUpdateProfile(false);
+        update_profile(profile.username, profile, token);
     }
 
     return (
@@ -69,17 +70,26 @@ const UserInfo = (
                         </>
                     }
                 </div>
-                <div className="user-field-element" onClick={() => handleUpdateProfile()}>
+                <div className="user-location" onClick={() => handleUpdateProfile()}>
                     {updateProfile ? 
+                    <>
                         <textarea      
                             rows={1}
-                            style={{ height: "100%", fontSize: "1rem" }}
+                            style={{ width: "80%", height: "100%", fontSize: "1rem" }}
                             value={profile.city}
                             placeholder="city"                                                                                                                      
                             onChange={(e) => setProfile({ ...profile, city: e.target.value })}                                                                 
                         />
+                        <textarea      
+                            rows={1}
+                            style={{ width: "20%", height: "100%", fontSize: "1rem" }}
+                            value={profile.state}
+                            placeholder="state"                                                                                                                      
+                            onChange={(e) => setProfile({ ...profile, state: e.target.value })}                                                                 
+                        />
+                    </>
                     :
-                        <p>{profile.city}</p>
+                        <p>{profile.city}, {profile.state}</p>
                     }
                 </div>
                 <br></br>
@@ -101,7 +111,7 @@ const UserInfo = (
                         </>
                     }
                 </div>
-                {updateProfile && <div className="sumbit" onClick={() => handleSumbitProfile()}>submit</div>}
+                {updateProfile && <div className="submit-profile" onClick={() => handleSumbitProfile()}>submit</div>}
             </div>
             <div className="uf-right">
                 <UserQuestion 

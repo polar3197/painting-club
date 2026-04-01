@@ -1,16 +1,16 @@
 
 SMALL FEATURES:
 1. add profile pic formatting (Cropper) and upload window
-2. prettify user account page and allow images to zoom in on click
-3. L/R arrow button flicks through art upon zoomedn
-
-3. docs page
-4. enable deleting an art piece (soft delete? hide from view? where does it go?)
-5. secret word to access announcements
+2. docs page
 
 MEDIUM FEATURES:
-1. fix search to scan names and usernames and cities even without prefix
-2. add upload for profile picture and use Cropper
+1. SEARCH and KEYWORDS
+	- u/: search users
+	- c/: search cities
+	- m/: search media
+	- s/: search songs
+2. L/R arrow button flicks through art upon zoomedn
+3. enable deleting an art piece (soft delete? hide from view? where does it go?)
 
 BIG FEATURES:
 1. inbox for artists (all app internal, maybe notifies email if set)

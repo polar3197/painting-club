@@ -7,13 +7,14 @@ import { get_members_visual_2d, Visual2DOut } from "../../api";
 
 import '../../styles/user-profile/art.css';
 
-const Visual2DPiece = ({ piece }: { piece: Visual2DOut }) => {
+const Visual2DPiece = ({ isOwner, piece }: { isOwner: boolean; piece: Visual2DOut; }) => {
     const [isZoomedIn, setIsZoomedIn] = useState(false);
 
     return (    
         <>
         {isZoomedIn && 
-            <ArtZoomIn 
+            <ArtZoomIn
+                isOwner={isOwner}
                 imgPath={piece.file_path} 
                 setIsZoomedIn={setIsZoomedIn}
             />
@@ -80,7 +81,7 @@ const Art = ({ profile, selectedMedium } : { profile: Profile; selectedMedium: s
                     selectedMedium == "drawing" ||
                     selectedMedium == "photography") 
                     ?
-                    art.map(piece => <Visual2DPiece key={piece.id} piece={piece} />)
+                    art.map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} />)
                 :
                 `${selectedMedium} is empty atm`}
             </div>
