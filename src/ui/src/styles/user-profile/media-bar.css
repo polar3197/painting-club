@@ -38,7 +38,7 @@
 }
 
 
-.keywords {
+.keywords-bar {
     display: flex;
     flex-direction: row;
     justify-content: start;
@@ -77,10 +77,11 @@
 .bubble {
     display: flex;
     flex-direction: row;
-    border: 2px  #009514d2 solid;
-    background-color: rgb(0, 255, 153);
+    border: 2px blue solid;
+    background-color: rgb(252, 219, 121);
     border-radius: 15px;
     height: 80%;
+    flex-shrink: 0;
     padding: 4px;
     gap: 6px;
 }
@@ -89,7 +90,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 80%;
+    white-space: nowrap;
     padding: 4px;
     font-size: 18px;
 }
@@ -99,7 +100,8 @@
     justify-content: center;
     border-radius: 50%;
     align-items: center;
-    width: 20%;
+    aspect-ratio: 1;
+    height: 100%;
     cursor: pointer;
     background-color: white;
 }

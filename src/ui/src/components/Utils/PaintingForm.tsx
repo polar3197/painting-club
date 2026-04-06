@@ -1,8 +1,28 @@
 import { useState, useRef } from "react";
+import { Visual2DOut } from "../../api";
 
-const PaintingForm = ({ onDataChange }: { onDataChange: (data: Record<string, any>) => void }) => {
-    const [form, setForm] = useState<{ title: string; location: string; date: string; song: string; width: number; height: number; files: File | null; }>
-        ({ title: "", location: "", date: "", song: "", width: null, height: null, files: null });
+const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Record<string, any>) => void; initialData?: Visual2DOut }) => {
+    const [form, setForm] = useState<{
+        title: string;
+        location: string;
+        date: string;
+        song: string;
+        song_artist: string;
+        width: number | null;
+        height: number | null;
+        keywords: string;
+        files: File | null; }>
+        ({
+            title: initialData?.title ?? "",
+            location: initialData?.location ?? "",
+            date: initialData?.date ?? "",
+            song: initialData?.song ?? "",
+            song_artist: initialData?.song_artist ?? "",
+            width: initialData?.width ?? null,
+            height: initialData?.height ?? null,
+            keywords: initialData?.keywords?.join(", ") ?? "",
+            files: null,
+        });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const update = (patch: Record<string, any>) => {
@@ -54,6 +74,11 @@ const PaintingForm = ({ onDataChange }: { onDataChange: (data: Record<string, an
                 placeholder="song"
                 onChange={(e) => update({ song: e.target.value })}
             />
+            <input
+                value={form.song_artist}
+                placeholder="artist"
+                onChange={(e) => update({ song_artist: e.target.value })}
+            />
         </div>
         <div className="painting-width">
             <input
@@ -73,6 +98,13 @@ const PaintingForm = ({ onDataChange }: { onDataChange: (data: Record<string, an
                 step={1}
                 placeholder="height"
                 onChange={(e) => update({ height: e.target.value ? Number(e.target.value) : null })}
+            />
+        </div>
+        <div className="keywords">
+            <input
+                value={form.keywords}
+                placeholder="keywords"
+                onChange={(e) => update({ keywords: e.target.value })}
             />
         </div>
         </>

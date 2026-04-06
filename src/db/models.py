@@ -1,5 +1,6 @@
 # src/db/models.py
-from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric
+from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime
+from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -7,7 +8,7 @@ import uuid
 from db.database import Base
 
 class Member(Base):
-    __tablename__ = "members"
+    __tablename__ = "member"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = Column(String(50), unique=True, nullable=False)
@@ -18,6 +19,7 @@ class Member(Base):
     city = Column(String(255))
     state = Column(String(255))
     bio = Column(Text)
+    role = Column(String(20), nullable=False, default="member")
 
     # favorite piece you made
     # favorite medium
@@ -37,13 +39,13 @@ class Media_Members(Base):
     __tablename__ = "media_members"
 
     # Composite primary key - both columns together form the PK
-    member_id = Column(UUID(as_uuid=True), ForeignKey('members.id'), primary_key=True)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), primary_key=True)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), primary_key=True)
 
 class Art(Base):
     __tablename__ = "art"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    creator_id = Column(UUID(as_uuid=True), ForeignKey('members.id'), nullable=False)
+    creator_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
     title = Column(String(300), default="Untitled")
     date = Column(Date)
@@ -72,11 +74,11 @@ class Prompt(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     question = Column(String(255))
 
-class Prompt_Records(Base):
+class PromptRecords(Base):
     # a join table to connect users to the prompt they chose and their answer
     __tablename__ = "prompt_records"
 
-    member_id = Column(UUID(as_uuid=True), ForeignKey('members.id'), primary_key=True)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), primary_key=True)
     prompt_id = Column(UUID(as_uuid=True), ForeignKey('prompt.id'), primary_key=True)
     response = Column(String(300))
 
@@ -87,3 +89,35 @@ class Prompt_Records(Base):
 #     name = Column(Text)
 #     location = Column(String(255))
 #     # 3NF roles, type
+
+
+# =============================================
+''' Keywords '''
+class Keyword(Base):
+    ''' stores keywords members create to tag their media '''
+    __tablename__ = "keyword"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    keyword = Column(String(64))
+
+class KeywordArt(Base):
+    ''' join table to connect art pieces to their keywords '''
+    __tablename__ = "keyword_art"
+
+    keyword_id = Column(UUID(as_uuid=True), ForeignKey('keyword.id'), primary_key=True)
+    art_id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
+# =============================================
+
+class Application(Base):
+    __tablename__ = "application"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firstname = Column(String(255), nullable=False)
+    lastname = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False)
+    city = Column(String(255))
+    state = Column(String(255))
+    known_member = Column(String(255))
+    reason = Column(Text)
+    status = Column(String(20), nullable=False, default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow)

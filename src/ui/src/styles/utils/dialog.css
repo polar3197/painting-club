@@ -13,8 +13,6 @@
     border: 1px black solid;
     background-color: rgb(255, 250, 245);
     box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
-    /* box-shadow: rgba(0, 0, 0, 0.2) 0px 60px 40px -7px; */
-    /* box-shadow: rgba(0, 0, 0, 0.4) 0px 2px 4px, rgba(0, 0, 0, 0.3) 0px 7px 13px -3px, rgba(0, 0, 0, 0.2) 0px -3px 0px inset; */
 }
 
 .exit button {
@@ -185,6 +183,13 @@
     top: 190px;
     right: 20px;
     border-bottom: 1px black solid;
+    display: flex;
+    gap: 6px;
+}
+
+.painting-song input {
+    width: 50%;
+    min-width: 0;
 }
 
 .painting-width {
@@ -201,6 +206,15 @@
     width: 120px;
     height: 20px;
     top: 240px;
+    right: 20px;
+    border-bottom: 1px black solid;
+}
+
+.keywords {
+    position: absolute;
+    width: 250px;
+    height: 20px;
+    top: 290px;
     right: 20px;
     border-bottom: 1px black solid;
 }

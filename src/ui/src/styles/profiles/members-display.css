@@ -1,12 +1,14 @@
 
-
 .members-display {
     flex: 1;
+    min-height: 0;
     width: 100%;
     background-color: rgb(255, 250, 245);
+    overflow-y: auto;
 
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
+    grid-auto-rows: 180px;
     align-content: start;
     row-gap: 20px;
     column-gap: 20px;
@@ -14,29 +16,84 @@
     box-sizing: border-box;
 }
 
-.member-card {
-    /* height: 250px;
-    width: 250px; */
-    /* aspect-ratio: 1; */
+.display-card {
     display: flex;
-    align-items: center;                                                                                                                    
+    align-items: center;
     justify-content: center;
     flex-direction: row;
-
     border: 1px black solid;
-    /* border-radius: 50%; */
-    background-color: white;
     padding: 10px;
+    cursor: pointer;
+}
+
+.member-card {
+    background-color: white;
 }
 
 .member-card:hover {
     background-color: rgb(238, 190, 100);
 }
 
+.art-card {
+    background-color: rgb(255, 250, 230);
+    align-items: flex-start;
+}
+
+.art-card:hover {
+    background-color: rgb(252, 235, 180);
+}
+
 .member-deets {
     flex: 70;
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+}
+
+.member-deets p:last-child {                                                                                                                
+    margin-top: auto;                                                                                                                       
+}
+
+.member-mediums {
+    font-size: 12px;
+    color: black;
+    font-style: italic;
 }
 
 .member-pic {
     flex: 30;
+}
+
+.art-card-img {
+    flex: 40;
+}
+
+.art-card-img {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.art-card-img img {
+    width: 100%;
+    max-height: 160px;
+    height: auto;
+    object-fit: scale-down;
+    display: block;
+    border: 1px black solid;
+}
+
+.art-card-deets {
+    flex: 60;
+    padding-left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.art-card-creator {
+    color: rgb(100, 100, 200);
+    text-decoration: underline;
+    cursor: pointer;
 }

@@ -3,12 +3,19 @@ import { useState, useEffect } from "react";
 import { Profile } from "../../api";
 import AddArtDialog from "../Utils/AddArtDialog";
 import ArtZoomIn from "../Utils/ArtZoomIn";
-import { get_members_visual_2d, Visual2DOut } from "../../api";
+import { get_members_visual_2d, remove_visual_2d, Visual2DOut } from "../../api";
 
 import '../../styles/user-profile/art.css';
 
-const Visual2DPiece = ({ isOwner, piece }: { isOwner: boolean; piece: Visual2DOut; }) => {
+const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean; piece: Visual2DOut; onRemove: () => void; onEdit: () => void }) => {
     const [isZoomedIn, setIsZoomedIn] = useState(false);
+
+    const removeArt = async (
+        {pieceId} : {pieceId : string}
+    ) => {
+        await remove_visual_2d(pieceId, sessionStorage.getItem("token"));
+        onRemove();
+    }
 
     return (    
         <>
@@ -19,6 +26,7 @@ const Visual2DPiece = ({ isOwner, piece }: { isOwner: boolean; piece: Visual2DOu
                 setIsZoomedIn={setIsZoomedIn}
             />
         }
+        
                          
         <div className="art-element">
             
@@ -27,9 +35,22 @@ const Visual2DPiece = ({ isOwner, piece }: { isOwner: boolean; piece: Visual2DOu
             </div>                                                                                                                          
             <div className="art-details">
                 <p><b>Title: </b> {piece.title}</p> 
-                {piece.date &&  <p><b>Created: </b>{piece.date}</p>}    
-                {piece.song && <p><b>Made listening to: </b>{piece.song}</p>}
-                {piece.width && piece.height && <p><div className="art-detail-header">Dimensions: </div> {piece.width}"x{piece.height}"</p> }                                                                                     
+                {piece.date &&  <p><b>Created: </b>{piece.date}</p>}
+                {piece.location && <p><b>Location: </b>{piece.location}</p>}
+                {piece.song && <p><b>Made listening to: </b>{[piece.song, piece.song_artist].filter(Boolean).join(", ")}</p>}
+                {piece.width && piece.height && <p><b>Dimensions: </b> {piece.width}"x{piece.height}"</p> }                          
+                {piece.keywords && <p><b>keywords: </b>{piece.keywords.join(", ")}</p>}         
+
+                {isOwner && (
+                    <div className="art-element-buttons">
+                        <div className="edit">
+                            <button onClick={() => onEdit()}>edit</button>
+                        </div>
+                        <div className="remove">
+                            <button onClick={() => removeArt({ pieceId: piece.id })}>remove</button>
+                        </div>
+                    </div>
+                )}                                                  
             </div>
         </div>
         </> 
@@ -37,31 +58,33 @@ const Visual2DPiece = ({ isOwner, piece }: { isOwner: boolean; piece: Visual2DOu
 } 
 
 
-const Art = ({ profile, selectedMedium } : { profile: Profile; selectedMedium: string | null; }) => {
+const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, onKeywordsLoaded } : { profile: Profile; selectedMedium: string | null; selectedKeywords: string[]; refresh: number; onRefresh: () => void; onKeywordsLoaded: (keywords: string[]) => void; }) => {
     const [showDialog, setShowDialog] = useState(false);
-    const [art, setArt] = useState<Visual2DOut[]>([])
+    const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
+    const [art, setArt] = useState<Visual2DOut[]>([]);
 
     useEffect(() => {
         const getArt = async() => {
-            // if medium is visual_2d
-            if (selectedMedium == "acrylic" ||
-                selectedMedium == "watercolor" ||
-                selectedMedium == "oil" ||
+            if (selectedMedium == "painting" ||
                 selectedMedium == "drawing" ||
                 selectedMedium == "stained glass" ||
-                selectedMedium == "photography") 
+                selectedMedium == "photography")
             {
                 const data = await get_members_visual_2d(profile.username, selectedMedium);
                 setArt(data);
+                const unique = [...new Set(data.flatMap(p => p.keywords ?? []))];
+                onKeywordsLoaded(unique);
+            } else {
+                onKeywordsLoaded([]);
             }
         }
 
         getArt();
-    }, [selectedMedium]);
+    }, [selectedMedium, refresh]);
 
     return (
         <div className='art-wrapper'>
-            {profile.is_owner && 
+            {profile.is_owner &&
                 <div className="add">
                     <button onClick={() => setShowDialog(true)}>+</button>
                 </div>
@@ -71,17 +94,26 @@ const Art = ({ profile, selectedMedium } : { profile: Profile; selectedMedium: s
                     setShowDialog={setShowDialog}
                     selectedMedium={selectedMedium}
                     username={profile.username}
+                    onSuccess={onRefresh}
+                />
+            }
+            { editingPiece && selectedMedium &&
+                <AddArtDialog
+                    setShowDialog={() => setEditingPiece(null)}
+                    selectedMedium={selectedMedium}
+                    username={profile.username}
+                    onSuccess={onRefresh}
+                    piece={editingPiece}
                 />
             }
             <div className="art">
-                {(selectedMedium == "acrylic" ||
-                    selectedMedium == "watercolor" ||
-                    selectedMedium == "oil" ||
+                {(selectedMedium == "painting" ||
                     selectedMedium == "stained glass" ||
                     selectedMedium == "drawing" ||
-                    selectedMedium == "photography") 
+                    selectedMedium == "photography")
                     ?
-                    art.map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} />)
+                    (selectedKeywords.length > 0 ? art.filter(p => p.keywords?.some(k => selectedKeywords.includes(k))) : art)
+                        .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)
                 :
                 `${selectedMedium} is empty atm`}
             </div>

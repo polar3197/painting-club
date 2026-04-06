@@ -1,24 +1,27 @@
 import "../../styles/announcements.css";
+import { useAuth } from "../../context/AuthContext";
 
 const Announcement = ({ message }: { message: string }) => {
+  const { currentUser } = useAuth()!;
+
   return (
     <div className="announcement-item">
-      <p>{message}</p>
+      <div className={`announcement-content ${!currentUser ? "blurred" : ""}`}>
+          <p>{message}</p>
+      </div>
     </div>
   );
 };
 
-const Announcements = (
-  { bottom, left } : { bottom : number; left: number; }
-) => {
+const Announcements = () => {
   const announcements = [
     "Painting Club meets Sunday 02/15 @ 3pm @ charlie's house for indoor still life",
   ];
 
   return (
-    <div className="announcements" style={{ bottom: `${bottom}rem`, left: `${left}rem`}}>
+    <div className="announcements">
       <h2 className="announcements-header">Announcements</h2>
-      <div className="announcements-body">
+      <div className={"announcements-body"}>
         {announcements.map((a, index) => (
           <Announcement key={index} message={a} />
         ))}

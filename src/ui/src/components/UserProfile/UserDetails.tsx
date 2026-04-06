@@ -5,11 +5,13 @@ import UserInfo from "./UserInfo";
 import "../../styles/user-profile/user-deets.css";
 
 const UserDetails = (
-  { profile, setProfile } 
-  : 
-  { 
-    profile: Profile, 
-    setProfile: Dispatch<SetStateAction<Profile | null>>
+  { profile, setProfile, selectedMedium, selectedKeywords }
+  :
+  {
+    profile: Profile,
+    setProfile: Dispatch<SetStateAction<Profile | null>>;
+    selectedMedium: string | null;
+    selectedKeywords: string[];
   }
   ) => {
 
@@ -27,9 +29,11 @@ const UserDetails = (
     
     <div className="user-deets">
       <div className="user-body">
-        <UserInfo 
+        <UserInfo
           profile={profile}
           setProfile={setProfile}
+          selectedMedium={selectedMedium}
+          selectedKeywords={selectedKeywords}
         />
 
         <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>

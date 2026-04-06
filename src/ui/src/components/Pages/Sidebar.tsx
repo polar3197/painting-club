@@ -1,4 +1,5 @@
 import "../../styles/sidebar.css";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
@@ -7,13 +8,54 @@ interface SidebarProps {
   toggleSidebar: () => void;
 }
 
+const SidebarElement = ({
+  isOpen,
+  label,
+  imgSrc,
+  extraClass,
+  onClick,
+  children,
+}: {
+  isOpen: boolean;
+  label: string;
+  imgSrc?: string;
+  extraClass?: string;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      className={`sidebar-element ${extraClass ?? ""} ${isOpen ? "open" : "closed"}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <button onClick={onClick}>{children}</button>
+      {hovered && !isOpen && (
+        <div className="sidebar-tooltip">
+          {imgSrc && <img src={imgSrc} alt={label} />}
+          <span>{label}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuth()!; 
+  const { currentUser, currentRole, logout } = useAuth()!; 
   console.log("CU: ", currentUser);
+
+  const gotoHome = () => {
+    navigate("/home");
+  };
   
   const gotoMe = () => {
-    navigate(`/members/${currentUser}/profile`);
+    if (currentUser) {
+      navigate(`/members/${currentUser}/profile`);
+    } else {
+      navigate("/not-a-member");
+    }
   };
 
   const gotoProfiles = () => {
@@ -21,8 +63,12 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     navigate(`/members`);
   };
 
-  const gotoGroups = () => {
-    console.log("go to groups");
+  // const gotoGroups = () => {
+  //   console.log("go to groups");
+  // };
+
+  const gotoArt = () => {
+    navigate("/art");
   };
 
   const gotoDocs = () => {
@@ -38,45 +84,34 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     <div className={`sidebar ${isOpen ? "open" : "closed"}`}>
       <div className="sidebar-top">
         <div className={`sidebar-title ${isOpen ? "open" : "closed"}`}
-          onClick={toggleSidebar}
+          onClick={gotoHome}
         >
           {isOpen ?
             "-• Painting Club •-"
             : "PC"}
         </div>
-        <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
-          {isOpen ? 
-            <button onClick={gotoMe}>Me</button> 
-            : <button onClick={gotoMe}>
-                <img src={"/imgs/me.png"} width="100%" height="100%"></img>
-              </button>}
-        </div>
-        <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
-          {isOpen ? 
-            <button onClick={gotoProfiles}>Profiles</button> 
-            : <button onClick={gotoProfiles}>
-                <img src={"/imgs/profiles.png"} width="100%" height="100%"></img>
-              </button>}
-        </div>
-        <div className={`sidebar-element ${isOpen ? "open" : "closed"}`}>
-          {isOpen ? 
-            <button onClick={gotoGroups}>Groups</button> 
-            : <button onClick={gotoGroups}>
-                <img src={"/imgs/groups.png"} width="100%" height="100%"></img>
-              </button>}
-        </div>
+        <SidebarElement isOpen={isOpen} label="me" imgSrc="/imgs/me.png" onClick={gotoMe}>
+          {isOpen ? "Me" : <img src="/imgs/me.png" width="100%" height="100%" />}
+        </SidebarElement>
+        <SidebarElement isOpen={isOpen} label="people" imgSrc="/imgs/profiles.png" onClick={gotoProfiles}>
+          {isOpen ? "People" : <img src="/imgs/profiles.png" width="100%" height="100%" />}
+        </SidebarElement>
+        <SidebarElement isOpen={isOpen} label="art" imgSrc="/imgs/art.png" onClick={gotoArt}>
+          {isOpen ? "Art" : <img src="/imgs/art.png" width="100%" height="100%" />}
+        </SidebarElement>
+        {currentRole === "admin" && (
+          <SidebarElement isOpen={isOpen} label="admin" onClick={() => navigate("/admin")}>
+            {isOpen ? "Admin" : "★"}
+          </SidebarElement>
+        )}
       </div>
       <div className="sidebar-bottom">
-        <div className={`sidebar-element docs ${isOpen ? "open" : "closed"}`}>
-          {isOpen ? 
-            <button onClick={gotoDocs}>Docs</button> 
-            : <button onClick={gotoDocs}>¶</button>}
-        </div>
-        <div className={`sidebar-element logout ${isOpen ? "open" : "closed"}`}>
-          {isOpen ? 
-            <button onClick={gotoLogout}>Logout</button> 
-            : <button onClick={gotoLogout}>≤</button>}
-        </div>
+        <SidebarElement isOpen={isOpen} label="ethos" extraClass="docs" onClick={gotoDocs}>
+          {isOpen ? "Docs" : "¶"}
+        </SidebarElement>
+        <SidebarElement isOpen={isOpen} label="logout" extraClass="logout" onClick={gotoLogout}>
+          {isOpen ? "Logout" : "≤"}
+        </SidebarElement>
       </div>
     </div>
   );

@@ -11,6 +11,9 @@ const UserProfile = () => {
   const [profile, setProfile, error, loading] = useProfile(username);
   
   const [selectedMedium, setSelectedMedium] = useState<string | null>(null)
+  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
+  const [refresh, setRefresh] = useState(0)
+  const [availableKeywords, setAvailableKeywords] = useState<string[]>([])
 
   useEffect(() => {
     const updateMedia = () => {
@@ -31,15 +34,24 @@ const UserProfile = () => {
       <UserDetails
         profile={profile}
         setProfile={setProfile}
+        selectedMedium={selectedMedium}
+        selectedKeywords={selectedKeywords}
       />
-      <MediaBar 
+      <MediaBar
         profile={profile}
         selectedMedium={selectedMedium}
-        setSelectedMedium={setSelectedMedium}
+        setSelectedMedium={(m) => { setSelectedMedium(m); setSelectedKeywords([]); }}
+        selectedKeywords={selectedKeywords}
+        setSelectedKeywords={setSelectedKeywords}
+        availableKeywords={availableKeywords}
       />
-      <Art 
+      <Art
         profile={profile}
         selectedMedium={selectedMedium}
+        selectedKeywords={selectedKeywords}
+        refresh={refresh}
+        onRefresh={() => setRefresh(r => r + 1)}
+        onKeywordsLoaded={setAvailableKeywords}
       />
     </>
 

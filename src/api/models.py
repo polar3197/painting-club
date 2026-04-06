@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import date
+from datetime import date as Date, datetime
 from typing import List
 import uuid
 
@@ -29,6 +29,7 @@ class Profile(BaseModel):
     state: str | None
     bio: str | None
     is_owner: bool = False
+    role: str = "member"
 
 class ProfileUpdate(BaseModel):
     firstname: str | None
@@ -49,12 +50,83 @@ class AddMedia(BaseModel):
     username: str | None
     medium: str | None
 
+class Visual2DIn(BaseModel):
+    username: str
+    medium: str
+    title: str
+    file_path: str
+    date: Date | None = None
+    location: str | None = None
+    song: str | None = None
+    song_artist: str | None = None
+    width: int | None = None
+    height: int | None = None
+    keywords: list[str] | None
+
+class Visual2DUpdate(BaseModel):
+    title: str
+    date: Date | None = None
+    location: str | None = None
+    song: str | None = None
+    song_artist: str | None = None
+    width: int | None = None
+    height: int | None = None
+    keywords: list[str] | None = None
+
+class SearchOptions(BaseModel):
+    usernames: list[str] = []
+    fullnames: list[str] = []
+    cities: list[str] = []
+    keywords: list[str] = []
+    titles: list[str] = []
+    songs: list[str] = []
+    mediums: list[str] = []
+
+class ArtResult(BaseModel):
+    id: str
+    title: str
+    medium: str
+    keywords: list[str] = []
+    song: str | None
+    file_path: str
+    date: str | None = None
+    location: str | None = None
+    creator_username: str
+    creator_city: str | None
+
+class ApplicationIn(BaseModel):
+    firstname: str
+    lastname: str
+    email: str
+    city: str | None = None
+    state: str | None = None
+    known_member: str | None = None
+    reason: str | None = None
+
+class ApplicationOut(BaseModel):
+    id: uuid.UUID
+    firstname: str
+    lastname: str
+    email: str
+    city: str | None
+    state: str | None
+    known_member: str | None
+    reason: str | None
+    status: str
+    created_at: datetime
+
+class ApplicationStatusUpdate(BaseModel):
+    status: str  # "approved" or "rejected"
+
 class Visual2DOut(BaseModel):
-  id: uuid.UUID
-  title: str
-  date: date | None
-  location: str | None
-  song: str | None
-  height: float | None
-  width: float | None
-  file_path: str
+    id: uuid.UUID
+    title: str
+    date: Date | None
+    location: str | None
+    song: str | None
+    song_artist: str | None
+    height: float | None
+    width: float | None
+    keywords: list[str] | None
+    file_path: str
+

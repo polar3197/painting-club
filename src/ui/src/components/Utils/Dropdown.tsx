@@ -1,39 +1,26 @@
 
+import Fuse from "fuse.js";
 import { Dispatch, SetStateAction, useState } from "react";
-import { useOptions } from "../../hooks/useOptions";
 import "../../styles/utils/dropdown.css";
-
-interface OptionQuery {
-    // specifies what the useOptions hook will return from the database
-    entity: string[]; // could be member, media, etc
-    fields: string[]; // for member this could be username, city, etc.
-}
 
 
 export const SelectTextBox = (
-    { setIsOpen, placeholder } : 
-    { 
+    { setIsOpen, placeholder, search, setSearch } :
+    {
         setIsOpen: Dispatch<SetStateAction<boolean>>;
         placeholder: string;
+        search: string;
+        setSearch: (value: string) => void;
     }
 ) => {
-    const [search, setSearch] = useState("");
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const searchSoFar = e.target.value;
-        setSearch(searchSoFar)
-        if (!searchSoFar) {                                                                                                                     
-                                                                                                                                  
-            return;                                                                                                                             
-        }
-    };
-
     return (
         <div className="search-box">
             <input
                 value={search}
-                placeholder={`${placeholder}`}
-                onChange={(e) => {handleSearch(e)}}
+                placeholder={placeholder}
+                onChange={(e) => setSearch(e.target.value)}
                 onFocus={() => setIsOpen(true)}
+                onClick={() => setIsOpen(true)}
                 onBlur={() => setIsOpen(false)}
             />
         </div>
@@ -42,38 +29,39 @@ export const SelectTextBox = (
 
 
 const Dropdown = (
-    { placeholder } : {placeholder: string; }
-    // { fieldsToSet, keyBinds, optionSpec } : 
-    // { fieldsToSet: Dispatch<SetStateAction<string>>[]; 
-    //   keyBinds: string[]; 
-    //   optionSpec: OptionQuery;
-    // }
+    { placeholder, options, onSelect, onInputChange } :
+    { placeholder: string; options: string[]; onSelect: (value: string) => void; onInputChange?: (raw: string) => void; }
 ) => {
-    // generic hook to fetch options from db
-    const options = [ // useOptions(optionSpec);
-        "board",
-        "canvas",
-        "glass",
-        "copper",
-        "watercolor",
-        "acrylic",
-        "paper",
-    ]
-    
     const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState("");
+
+    const handleSearch = (value: string) => {
+        setSearch(value);
+        onInputChange?.(value);
+    };
+
+    // strip prefix for fuzzy matching
+    const query = search.startsWith("m/") ? search.slice(2) : search.startsWith("a/") ? search.slice(2) : search;
+    const filtered = query
+        ? new Fuse(options, { threshold: 0.4 }).search(query).map(r => r.item)
+        : options;
+
     return (
         <div className="dropdown">
-            <SelectTextBox 
+            <SelectTextBox
                 setIsOpen={setIsOpen}
                 placeholder={placeholder}
+                search={search}
+                setSearch={handleSearch}
             />
-            {isOpen && 
-                <div className="select-container">
-                    {options.map(option => (
-                        <div key={option} className="select-item" 
+            {isOpen &&
+                <div className="select-container" onMouseDown={(e) => e.preventDefault()}>
+                    {filtered.map(option => (
+                        <div key={option} className="select-item"
                             onClick={() => {
-                                console.log("option: ", option); 
+                                onSelect(option);
                                 setIsOpen(false);
+                                setSearch("");
                             }}>
                             {option}
                         </div>

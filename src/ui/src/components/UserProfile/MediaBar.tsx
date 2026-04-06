@@ -5,22 +5,39 @@ import Dropdown from "../Utils/Dropdown";
 import "../../styles/user-profile/media-bar.css";
 
 const Keywords = (
-  { selectedMedium } : {selectedMedium : string; }
+  { availableKeywords, selectedMedium, selectedKeywords, setSelectedKeywords } :
+  {
+    availableKeywords: string[];
+    selectedMedium: string;
+    selectedKeywords: string[];
+    setSelectedKeywords: Dispatch<SetStateAction<string[]>>;
+  }
 ) => {
-  const bubbles = ["bubble1", "bubble2", "bubble3"];
+
+  const handleSelect = (value: string) => {
+    if (!selectedKeywords.includes(value)) {
+      setSelectedKeywords(prev => [...prev, value]);
+    }
+  };
+
+  const handleRemove = (value: string) => {
+    setSelectedKeywords(prev => prev.filter(k => k !== value));
+  };
 
   return (
-    <div className="keywords">
+    <div className="keywords-bar">
       <div className="keyword-select-wrapper">
-        <Dropdown placeholder={`filter ${selectedMedium}`}/>
+        <Dropdown
+          placeholder={`filter ${selectedMedium}`}
+          options={availableKeywords.filter(k => !selectedKeywords.includes(k))}
+          onSelect={handleSelect}
+        />
       </div>
       <div className="keyword-bubbles-wrapper">
-        {bubbles.map(bubble_name => (
-          <div className="bubble">
-            <div className="bubble-name" key={bubble_name}>
-              {bubble_name}
-            </div>
-            <div className="bubble-x">x</div>
+        {selectedKeywords.map(keyword => (
+          <div key={keyword} className="bubble">
+            <div className="bubble-name">{keyword}</div>
+            <div className="bubble-x" onClick={() => handleRemove(keyword)}>x</div>
           </div>
         ))}
       </div>
@@ -29,23 +46,35 @@ const Keywords = (
 }
 
 const MediaBar = (
-  { profile, selectedMedium, setSelectedMedium }: 
-  { profile: Profile; selectedMedium : string; setSelectedMedium: Dispatch<SetStateAction<string | null>> }
+  { profile, selectedMedium, setSelectedMedium, selectedKeywords, setSelectedKeywords, availableKeywords }:
+  {
+    profile: Profile;
+    selectedMedium: string;
+    setSelectedMedium: Dispatch<SetStateAction<string | null>>;
+    selectedKeywords: string[];
+    setSelectedKeywords: Dispatch<SetStateAction<string[]>>;
+    availableKeywords: string[];
+  }
 ) => {
   return (
     <div className="media-bar-wrapper">
       <div className="media-bar">
         {profile.media.map((medium) => (
-          <div 
-            onClick={() => setSelectedMedium(medium)} 
-            key={medium} 
+          <div
+            onClick={() => setSelectedMedium(medium)}
+            key={medium}
             className={`media-element ${medium == selectedMedium ? "selected" : ""}`}
           >
             {medium}
           </div>
         ))}
       </div>
-      <Keywords selectedMedium={selectedMedium}/>
+      <Keywords
+        availableKeywords={availableKeywords}
+        selectedMedium={selectedMedium}
+        selectedKeywords={selectedKeywords}
+        setSelectedKeywords={setSelectedKeywords}
+      />
     </div>
   );
 };

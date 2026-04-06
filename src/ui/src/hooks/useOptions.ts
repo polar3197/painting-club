@@ -1,21 +1,17 @@
 
 import { useEffect, useState } from "react";
-import { get_search_options } from "../api";
+import { get_search_options, SearchOptions } from "../api";
 
 export function useOptions() {
-  const [usernames, setUsernames] = useState<string[]>([]);
-  const [cities, setCities] = useState<string[]>([]);
+  const [options, setOptions] = useState<SearchOptions>({ usernames: [], fullnames: [], cities: [], keywords: [], titles: [], songs: [], mediums: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-
 
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [fetchedUsernames, fetchedCities] = await get_search_options();
-        setUsernames(fetchedUsernames);
-        setCities(fetchedCities);
-        console.log("usernames: ", fetchedUsernames, "cities: ", fetchedCities);
+        const data = await get_search_options();
+        setOptions(data);
       } catch (err) {
         console.log("fetch error: ", err);
         setError(err as Error);
@@ -23,9 +19,8 @@ export function useOptions() {
         setLoading(false);
       }
     };
-
     fetchOptions();
   }, []);
 
-  return [usernames, cities, error, loading] as const;
+  return [options, error, loading] as const;
 }

@@ -5,9 +5,19 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 16px;
     height: 10vh;
-    min-height: 5vh;
     width: 100%;
     border-bottom: 1px black solid;
     background-color: rgb(255, 250, 245);
+    padding-left: 30px;
+    box-sizing: border-box;
+}
+
+.filter-header {
+    position: absolute;
+    left: 30px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 24px;
+    white-space: nowrap;
 }

@@ -46,20 +46,16 @@
 .user-fields {
     /* position: relative; */
     width: 75%;
+    height: 100%;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
+
     border-radius: 5px;
     border: 1px solid black;
     padding: 10px;
+    position: relative;
 }
 
-.uf-left {
-    position: relative;
-    width: 30%;
-    height: 100%;
-    border-right: 1px black solid;
-    padding: 0 10px 0 0;
-}
 
 .user-name {
     display: flex;
@@ -77,13 +73,45 @@
 .user-field-element {
     display: flex;
     flex-direction: column;
-    font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 18px;
+}
+
+.user-name textarea {
+    height: 100%;
+    font-size: 1.3rem;
+}
+
+.user-location .user-city {
+    width: 80%;
+    height: 100%;
+    font-size: 1rem;
+}
+
+.user-location .user-state {
+    width: 20%;
+    height: 100%;
+    font-size: 1rem;
+}
+
+.artist-statement-label {
+    display: flex;
+    justify-content: center;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-weight: 500;
+    font-size: 20px;
+}
+
+.user-bio {
+    font-family: system-ui, sans-serif;
+    font-weight: 300;
+    line-height: 1.5;
 }
 
 .submit-profile {
     position: absolute;
-    bottom: 0;
-    right: 3px;
+    bottom: 6px;
+    right: 6px;
     border: 1px solid black;
     background-color: lightgreen;
     cursor: pointer;
@@ -96,38 +124,4 @@
 .submit-profile:active {
     background-color: rgb(119, 197, 119);
     transform: scale(.95);
-}
-
-.uf-right {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    width: 70%;
-    height: 100%;
-    padding: 5px 10px 0 10px;
-}
-
-.question-wrapper {
-    display: flex;
-    flex-direction: column;
-    padding: 5px 0 5px 10px;
-    /* border-bottom: 1px solid black; */
-    border-left: 4px gray double;
-    gap: 5px;
-}
-
-.question-wrapper:last-child {
-    border-bottom: transparent;
-}
-
-.question {
-    display: flex;
-    width: auto;
-    border-bottom: 1px black solid;
-    font-style: bold;
-}
-
-.answer {
-    display: flex;
-    width: 100%;
 }

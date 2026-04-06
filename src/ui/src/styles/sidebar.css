@@ -2,7 +2,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
     /* transition: flex 1s ease; */
     background-color: rgb(250, 244, 202);
     height: 100vh;
@@ -62,24 +62,24 @@
 
 .sidebar-title.closed {
     border-radius: 50%;
-    background-color: rgb(93, 218, 122);
+    background-color: rgb(252, 219, 121);
     border: 2px solid blue;
 }
 
-.sidebar-title.open {
+/* .sidebar-title.open {
     
     transform: scale(1.09);
     background-color: rgb(93, 218, 122);
     color: rgb(0, 0, 0);
-    border-top: 3px solid blue;
-    border-bottom: 3px solid blue;
-}
+    border: 3px solid blue;
+} */
 
 .sidebar-title:hover {
     transform: scale(1.1);
-    background-color: rgb(243, 243, 101);
-    border: 2px solid red;
-    color: rgb(0, 0, 0);
+}
+
+.sidebar-title:active {
+    transform: scale(1.04);
 }
 
 .sidebar-element {
@@ -88,16 +88,15 @@
     align-items: center;
     position: relative;
     border: 1px black solid;
-    
 }
 
 .sidebar-element:active {
-    transform: scale(.99);
+    transform: scale(.98);
 }
 
 .sidebar-element.closed {
     width: 99.9%;
-    height: 2.6rem;
+    height: 2.7rem;
     border-bottom: 2px rgb(0, 0, 0) solid;
     border-left: 2px rgb(0, 0, 0) solid;
 }
@@ -118,7 +117,7 @@
 }
 
 .sidebar-element button:hover {
-    background-color: rgb(238, 190, 100);
+    background-color: rgb(255, 250, 245);
 }
 
 .sidebar-element.docs button:hover {
@@ -127,6 +126,34 @@
 
 .sidebar-element.logout button:hover {
     background-color: lightcoral;
+}
+
+.sidebar-tooltip {
+    position: absolute;
+    left: 110%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 1px solid black;
+    background: rgb(255, 255, 255);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px;
+    gap: 4px;
+    pointer-events: none;
+    z-index: 1000;
+    white-space: nowrap;
+}
+
+.sidebar-tooltip img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+}
+
+.sidebar-tooltip span {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 13px;
 }
 
 input:focus,

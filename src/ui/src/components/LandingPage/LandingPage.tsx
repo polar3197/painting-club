@@ -1,4 +1,4 @@
-import Announcements from "./Announcements";
+import Announcements from "../Utils/Announcements";
 import Login from "./Login";
 import "../../styles/app-layout.css";
 

@@ -1,0 +1,83 @@
+.application-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 480px;
+    height: auto;
+}
+
+.application-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 16px 0;
+}
+
+.application-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 40px 30px 30px 30px;
+}
+
+.application-row {
+    display: flex;
+    gap: 10px;
+}
+
+.application-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+.application-body input,
+.application-body textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    border-bottom: 1px solid black;
+    background: transparent;
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    padding: 4px 0;
+    outline: none;
+    resize: none;
+}
+
+.application-body input::placeholder,
+.application-body textarea::placeholder {
+    color: rgb(160, 160, 160);
+}
+
+.application-submit {
+    margin-top: 8px;
+    align-self: flex-end;
+    border: 1px solid black;
+    padding: 5px 16px;
+    cursor: pointer;
+    font-family: system-ui, sans-serif;
+    font-size: 13px;
+    background-color: rgb(238, 190, 100);
+}
+
+.application-submit:hover {
+    background-color: rgb(210, 160, 70);
+}
+
+.application-error {
+    color: red;
+    font-size: 13px;
+    margin: 0;
+}
+
+.application-submitted {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 8px;
+    padding: 40px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 18px;
+    text-align: center;
+}

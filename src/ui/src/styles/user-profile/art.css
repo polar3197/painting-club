@@ -24,6 +24,7 @@
     width: 25px;
     border-radius: 50%;
     transition: transform 0.2s ease;
+    cursor: pointer;
 }
 
 .add button:hover {
@@ -40,11 +41,69 @@
     outline: none;
 }
 
+.art-element-buttons button {
+    border: 1px black solid;
+    transition: transform 0.2s ease;
+    padding: 3px;
+    cursor: pointer;
+}
+
+.art-element-buttons button:hover {
+    transform: scale(1.02);
+}
+
+.art-element-buttons button:active {
+    transform: scale(1);
+}
+
+.art-element-buttons button:focus {
+    outline: none;
+}
+
+.remove {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+}
+
+.remove button {
+    background-color: lightcoral;
+    border-radius: 5px;
+}
+
+.remove button:hover {
+    background-color: rgb(255, 175, 175);
+}
+
+.remove button:active {
+    background-color: lightcoral;
+}
+
+.edit {
+    position: absolute;
+    bottom: 5px;
+    left: 14px;
+}
+
+.edit button {
+    background-color: lightgreen;
+    border-radius: 5px;
+}
+
+.edit button:hover {
+    background-color: rgb(175, 243, 175);
+}
+
+.remove button:active {
+    background-color: lightgreen;
+}
+
 .art {
     display: flex;
     flex-direction: column;
     justify-content: center;
     padding: 15px;
+    gap: 4px;
 }
 
 .art-element {
@@ -54,12 +113,12 @@
     /* min-height: 40px; */
     border: 1px black solid;
     padding: 10px;
-    cursor: pointer;
 }
 
 .art-visual {                                                                                                                               
     width: 40%;                                                                                                                            
-    aspect-ratio: auto;                                                                 
+    aspect-ratio: auto;
+    cursor: pointer;                                                              
 }                                                                                                                                           
                 
 .art-visual img {                                                                                                                           
@@ -70,13 +129,10 @@
 }
 
 .art-details {
+    position: relative;
     display: flex;
     flex-direction: column;
+    width: 60%;
     gap: 20px;
     padding: 15px;
-}
-
-.art-detail-header {
-    font-family: Arial, Helvetica, sans-serif;
-    font-weight: 600;
 }
