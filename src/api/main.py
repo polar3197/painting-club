@@ -105,17 +105,22 @@ async def get_optional_member(credentials: Optional[HTTPAuthorizationCredentials
     except Exception:
         return None
 
+async def get_admin_member(current_member: Member = Depends(get_current_member)):
+    if current_member.role != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+    return current_member
+
 @app.post("/members/newfull", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
-async def create_member_endpoint(payload: FullMemberIn, db: AsyncSession = Depends(get_db)) -> MemberOut:
+async def create_member_endpoint(payload: FullMemberIn, db: AsyncSession = Depends(get_db), _: Member = Depends(get_admin_member)) -> MemberOut:
     try:
         member = await db_create_full_member(db, payload.username, payload.password, payload.bio, payload.city, payload.state, payload.firstname, payload.lastname)
         return MemberOut(id=member.id, username=member.username)
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=409, detail="Username already exists")
-    
+
 @app.post("/members/new", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
-async def create_full_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(get_db)) -> MemberOut:
+async def create_full_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(get_db), _: Member = Depends(get_admin_member)) -> MemberOut:
     try:
         member = await db_create_member(db, payload.username, payload.password)
         return MemberOut(id=member.id, username=member.username)
@@ -346,11 +351,6 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
 
 
 # ====================== APPLICATIONS =========================
-
-async def get_admin_member(current_member: Member = Depends(get_current_member)):
-    if current_member.role != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
-    return current_member
 
 @app.post("/apply", status_code=status.HTTP_201_CREATED)
 async def submit_application(payload: ApplicationIn, db: AsyncSession = Depends(get_db)):

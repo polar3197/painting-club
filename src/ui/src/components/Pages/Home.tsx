@@ -35,14 +35,17 @@ export default function Home() {
               <br></br>
               <p>I built this space for artists to share their art.</p>
               <br></br>
-              <p>I could've use instagram but I lowkey hate instagram and highkey don't like zuckerberg.</p> 
+              <p>It currently handles photography, painting, drawing, etc. — you get the idea, #2d-static-visual...</p>
               <br></br>
-              <p>With a painting club account you can set you art to be visible to everyone, only members or just yourself.</p> 
+              <p>For friends who film, write, sing, sculpt, and so on and on, I would love to chat about how Painting Club could best display your art form.</p>
               <br></br>
-              <p>This protects content from web crawlers and bots in a way large platforms can't and choose not to.</p>
+              <p>It's true, we can all use instagram, but I lowkey hate instagram and highkey don't like zuckerberg.</p> 
               <br></br>
-              <p>Right now it works for photography and painting, drawing, etc. (you get the idea0)... but in the future I would love to expand to writing, song and film (probably in that order).</p>
+              <p>With a Painting Club account you can set your art to be visible to everyone (fine, but vulnerable to scrapers), only members or just yourself (both safe).</p> 
               <br></br>
+              <p>Small community has benefits. Painting Club can shield content from web crawlers and bots in a way large platforms can't and don't care to try. Privacy/ownership around art is important #eff-altman.</p>
+              <br></br>
+              
             </div>
           </div>
         </div>
