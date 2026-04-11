@@ -1,0 +1,751 @@
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  TextInput,
+  StyleSheet,
+  Alert,
+  Dimensions,
+  LayoutChangeEvent,
+} from 'react-native';
+import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../hooks';
+import {
+  get_members_visual_2d,
+  remove_visual_2d,
+  update_profile,
+  get_search_options,
+  resolveImageUrl,
+  Visual2DOut,
+  Profile,
+} from '../api';
+import Dropdown from '../components/Dropdown';
+import ArtZoomIn from '../components/ArtZoomIn';
+import ArtComments from '../components/ArtComments';
+import AddArtDialog from '../components/AddArtDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+type ProfileRoute = RouteProp<
+  { UserProfile: { username: string; artId?: string; medium?: string } },
+  'UserProfile'
+>;
+
+// --- Visual2DPiece sub-component ---
+function Visual2DPiece({
+  isOwner,
+  piece,
+  onRemove,
+  onEdit,
+  onLayout,
+}: {
+  isOwner: boolean;
+  piece: Visual2DOut;
+  onRemove: () => void;
+  onEdit: () => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
+  const { token } = useAuth();
+  const [isZoomedIn, setIsZoomedIn] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+
+  const removeArt = async () => {
+    await remove_visual_2d(piece.id, token);
+    setShowRemoveConfirm(false);
+    onRemove();
+  };
+
+  return (
+    <>
+      <ConfirmDialog
+        visible={showRemoveConfirm}
+        title="remove art"
+        message={`are you sure you want to remove "${piece.title}"?`}
+        confirmLabel="remove"
+        onConfirm={removeArt}
+        onCancel={() => setShowRemoveConfirm(false)}
+      />
+      {isZoomedIn && (
+        <ArtZoomIn isOwner={isOwner} imgPath={piece.file_path} onClose={() => setIsZoomedIn(false)} />
+      )}
+      {showComments && (
+        <ArtComments piece={piece} onClose={() => setShowComments(false)} />
+      )}
+      <View style={styles.artElement} onLayout={onLayout}>
+        <Pressable
+          style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
+          onPress={() => setIsZoomedIn(true)}
+        >
+          <Image
+            source={{ uri: resolveImageUrl(piece.file_path) }}
+            style={styles.artImage}
+            contentFit="cover"
+          />
+        </Pressable>
+        <View style={styles.artDetails}>
+          <Text style={styles.artTitle}>{piece.title}</Text>
+          {!!piece.date && <Text style={styles.artDetailText}>{piece.date}</Text>}
+          {!!piece.location && (
+            <View style={styles.artDetailRow}>
+              <Image source={require('../../assets/imgs/location.png')} style={styles.detailIcon} />
+              <Text style={styles.artDetailText}>{piece.location}</Text>
+            </View>
+          )}
+          {!!piece.song && (
+            <View style={styles.artDetailRow}>
+              <Image source={require('../../assets/imgs/music.png')} style={styles.detailIcon} />
+              <Text style={styles.artDetailText}>
+                {[piece.song, piece.song_artist].filter(Boolean).join(', ')}
+              </Text>
+            </View>
+          )}
+          {!!piece.width && !!piece.height && (
+            <View style={styles.artDetailRow}>
+              <Image source={require('../../assets/imgs/dimensions.png')} style={styles.detailIcon} />
+              <Text style={styles.artDetailText}>
+                {piece.width}"x{piece.height}"
+              </Text>
+            </View>
+          )}
+          {piece.keywords && piece.keywords.length > 0 && (
+            <Text style={styles.artDetailText}>
+              <Text style={{ fontWeight: '700' }}>keywords: </Text>
+              {piece.keywords.join(', ')}
+            </Text>
+          )}
+          <View style={styles.artFooter}>
+            {isOwner ? (
+              <View style={styles.artButtons}>
+                <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
+                  <Text style={styles.artBtnText}>edit</Text>
+                </Pressable>
+                {piece.comments_enabled && (
+                  <Pressable
+                    style={[styles.artBtn, styles.commentsBtn]}
+                    onPress={() => setShowComments(true)}
+                  >
+                    <Text style={styles.artBtnText}>comments</Text>
+                  </Pressable>
+                )}
+                <Pressable style={[styles.artBtn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+                  <Text style={styles.artBtnText}>remove</Text>
+                </Pressable>
+              </View>
+            ) : (
+              piece.comments_enabled && (
+                <View style={styles.artButtons}>
+                  <Pressable
+                    style={[styles.artBtn, styles.commentsBtn]}
+                    onPress={() => setShowComments(true)}
+                  >
+                    <Text style={styles.artBtnText}>comments</Text>
+                  </Pressable>
+                </View>
+              )
+            )}
+          </View>
+        </View>
+      </View>
+    </>
+  );
+}
+
+// --- Main UserProfile screen ---
+export default function UserProfile() {
+  const insets = useSafeAreaInsets();
+  const route = useRoute<ProfileRoute>();
+  const navigation = useNavigation<any>();
+  const { currentUser, token } = useAuth();
+
+  const params = route.params as { username?: string; artId?: string; medium?: string } | undefined;
+  const username = params?.username || currentUser || '';
+  const scrollToArtId = params?.artId;
+  const mediumParam = params?.medium;
+
+  const [profile, setProfile, error, loading] = useProfile(username);
+  const [selectedMedium, setSelectedMedium] = useState<string | null>(mediumParam ?? null);
+  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
+  const [availableKeywords, setAvailableKeywords] = useState<string[]>([]);
+  const [art, setArt] = useState<Visual2DOut[]>([]);
+  const [refresh, setRefresh] = useState(0);
+  const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [profileZoom, setProfileZoom] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const artPositions = useRef<Record<string, number>>({});
+  const artSectionY = useRef(0);
+  const [pendingScroll, setPendingScroll] = useState<string | null>(scrollToArtId ?? null);
+
+  // Edit mode state
+  const [editing, setEditing] = useState(false);
+  const [editBio, setEditBio] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editState, setEditState] = useState('');
+
+  useEffect(() => {
+    if (!mediumParam && profile?.media?.[0]) {
+      setSelectedMedium(profile.media[0]);
+    }
+  }, [profile]);
+
+  // Fetch art
+  useEffect(() => {
+    if (!selectedMedium || !username) return;
+    const isV2d =
+      selectedMedium === 'painting' ||
+      selectedMedium === 'drawing' ||
+      selectedMedium === 'stained glass' ||
+      selectedMedium === 'photography';
+    if (isV2d) {
+      get_members_visual_2d(username, selectedMedium)
+        .then((data) => {
+          setArt(data);
+          const unique = [...new Set(data.flatMap((p) => p.keywords ?? []))];
+          setAvailableKeywords(unique);
+        })
+        .catch(() => {
+          setArt([]);
+          setAvailableKeywords([]);
+        });
+    } else {
+      setArt([]);
+      setAvailableKeywords([]);
+    }
+  }, [username, selectedMedium, refresh]);
+
+  const filteredArt = useMemo(() => {
+    if (selectedKeywords.length === 0) return art;
+    return art.filter((p) => p.keywords?.some((k) => selectedKeywords.includes(k)));
+  }, [art, selectedKeywords]);
+
+  const handleArtLayout = useCallback((pieceId: string, e: LayoutChangeEvent) => {
+    const y = e.nativeEvent.layout.y + artSectionY.current;
+    artPositions.current[pieceId] = y;
+    if (pendingScroll && pieceId === pendingScroll) {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ y, animated: true });
+        setPendingScroll(null);
+      }, 300);
+    }
+  }, [pendingScroll]);
+
+  const startEditing = () => {
+    if (!profile) return;
+    setEditBio(profile.bio || '');
+    setEditCity(profile.city || '');
+    setEditState(profile.state || '');
+    setEditing(true);
+  };
+
+  const submitEdit = async () => {
+    if (!profile) return;
+    try {
+      const updated = { ...profile, bio: editBio, city: editCity, state: editState };
+      await update_profile(username, updated, token);
+      setProfile(updated);
+      setEditing(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+  if (error || !profile) {
+    return (
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
+        <Text style={styles.loadingText}>Something went wrong</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView ref={scrollRef} style={[styles.container, { paddingTop: insets.top }]} contentContainerStyle={styles.contentContainer}>
+      {/* Profile zoom */}
+      {profileZoom && (
+        <ArtZoomIn
+          isOwner={profile.is_owner}
+          imgPath={`/imgs/${username}.png`}
+          onClose={() => setProfileZoom(false)}
+        />
+      )}
+
+      {/* Add/Edit dialog */}
+      {showAddDialog && selectedMedium && (
+        <AddArtDialog
+          selectedMedium={selectedMedium}
+          username={username}
+          onSuccess={() => setRefresh((r) => r + 1)}
+          onClose={() => setShowAddDialog(false)}
+        />
+      )}
+      {editingPiece && selectedMedium && (
+        <AddArtDialog
+          selectedMedium={selectedMedium}
+          username={username}
+          onSuccess={() => setRefresh((r) => r + 1)}
+          onClose={() => setEditingPiece(null)}
+          piece={editingPiece}
+        />
+      )}
+
+      {/* ---- UserDetails ---- */}
+      <View style={styles.userDetails}>
+        <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
+          <Image
+            source={{ uri: resolveImageUrl(`/imgs/${username}.png`) }}
+            style={styles.profilePic}
+            contentFit="cover"
+          />
+        </Pressable>
+        <Pressable
+          style={styles.userFields}
+          onPress={profile.is_owner && !editing ? startEditing : undefined}
+        >
+          {!editing ? (
+            <>
+              <Text style={styles.userName}>
+                {profile.firstname} {profile.lastname}
+              </Text>
+              {(profile.city || profile.state) && (
+                <Text style={styles.userLocation}>
+                  {[profile.city, profile.state].filter(Boolean).join(', ')}
+                </Text>
+              )}
+              {selectedMedium && (
+                <Pressable
+                  style={styles.portfolioLink}
+                  onPress={() =>
+                    navigation.navigate('Portfolio', {
+                      username,
+                      medium: selectedMedium,
+                      keywords: selectedKeywords,
+                    })
+                  }
+                >
+                  <Text style={styles.portfolioLinkText}>portfolio view</Text>
+                </Pressable>
+              )}
+              {!!profile.bio && (
+                <View style={styles.bioSection}>
+                  <Text style={styles.bioLabel}>Artist Statement</Text>
+                  <View style={styles.bioHr} />
+                  <Text style={styles.bioText}>{profile.bio}</Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <TextInput
+                style={styles.editNameInput}
+                value={profile.firstname}
+                placeholder="firstname"
+                placeholderTextColor={Colors.textMuted}
+                onChangeText={(v) => setProfile({ ...profile!, firstname: v })}
+              />
+              <TextInput
+                style={styles.editNameInput}
+                value={profile.lastname}
+                placeholder="lastname"
+                placeholderTextColor={Colors.textMuted}
+                onChangeText={(v) => setProfile({ ...profile!, lastname: v })}
+              />
+              <View style={styles.editLocationRow}>
+                <TextInput
+                  style={[styles.editInput, { flex: 3 }]}
+                  value={editCity}
+                  onChangeText={setEditCity}
+                  placeholder="city"
+                  placeholderTextColor={Colors.textMuted}
+                />
+                <TextInput
+                  style={[styles.editInput, { flex: 1 }]}
+                  value={editState}
+                  onChangeText={setEditState}
+                  placeholder="state"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+              <Text style={styles.bioLabel}>artist statement</Text>
+              <TextInput
+                style={[styles.editInput, { minHeight: 120, textAlignVertical: 'top' }]}
+                value={editBio}
+                onChangeText={setEditBio}
+                placeholder="write a bio"
+                placeholderTextColor={Colors.textMuted}
+                multiline
+              />
+              <Pressable style={styles.submitEditBtn} onPress={submitEdit}>
+                <Text style={styles.submitEditBtnText}>submit</Text>
+              </Pressable>
+            </>
+          )}
+        </Pressable>
+      </View>
+
+      {/* ---- MediaBar ---- */}
+      <View style={styles.mediaBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaTabs}>
+          {profile.media?.map((m) => (
+            <Pressable
+              key={m}
+              style={[
+                styles.mediaTab,
+                selectedMedium === m && styles.mediaTabSelected,
+              ]}
+              onPress={() => {
+                setSelectedMedium(m);
+                setSelectedKeywords([]);
+              }}
+            >
+              <Text style={styles.mediaTabText}>{m}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* Keywords sub-bar */}
+        {availableKeywords.length > 0 && (
+          <View style={styles.keywordsBar}>
+            <View style={styles.keywordDropdown}>
+              <Dropdown
+                placeholder="keyword"
+                options={availableKeywords.filter((k) => !selectedKeywords.includes(k))}
+                onSelect={(k) => {
+                  if (!selectedKeywords.includes(k)) {
+                    setSelectedKeywords([...selectedKeywords, k]);
+                  }
+                }}
+              />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.keywordBubbles}>
+              {selectedKeywords.map((k) => (
+                <View key={k} style={styles.keywordBubble}>
+                  <Text style={styles.keywordBubbleText}>{k}</Text>
+                  <Pressable
+                    onPress={() => setSelectedKeywords(selectedKeywords.filter((sk) => sk !== k))}
+                  >
+                    <Text style={styles.keywordRemove}>x</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      {/* ---- Art Section ---- */}
+      <View
+        style={styles.artSection}
+        onLayout={(e) => { artSectionY.current = e.nativeEvent.layout.y; }}
+      >
+        {profile.is_owner && (
+          <Pressable style={styles.addBtn} onPress={() => setShowAddDialog(true)}>
+            <Text style={styles.addBtnText}>+</Text>
+          </Pressable>
+        )}
+
+        {selectedMedium &&
+        (selectedMedium === 'painting' ||
+          selectedMedium === 'drawing' ||
+          selectedMedium === 'stained glass' ||
+          selectedMedium === 'photography') ? (
+          filteredArt.map((piece) => (
+            <Visual2DPiece
+              key={piece.id}
+              isOwner={profile.is_owner}
+              piece={piece}
+              onRemove={() => setRefresh((r) => r + 1)}
+              onEdit={() => setEditingPiece(piece)}
+              onLayout={(e) => handleArtLayout(piece.id, e)}
+            />
+          ))
+        ) : (
+          <Text style={styles.emptyText}>{selectedMedium} is empty atm</Text>
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.mainBg,
+  },
+  contentContainer: {
+    paddingBottom: 40,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.mainBg,
+  },
+  loadingText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+  },
+
+  // UserDetails
+  userDetails: {
+    flexDirection: 'row',
+    padding: 10,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  userFields: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 5,
+    padding: 10,
+  },
+  userName: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.lg,
+  },
+  userLocation: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    marginTop: 2,
+  },
+  bioSection: {
+    marginTop: 12,
+  },
+  bioLabel: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  bioHr: {
+    height: 1,
+    backgroundColor: '#000',
+    marginBottom: 8,
+  },
+  bioText: {
+    fontWeight: '300',
+    lineHeight: 22,
+  },
+  editNameInput: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  editLocationRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  editInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    paddingVertical: 6,
+  },
+  submitEditBtn: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'lightgreen',
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  submitEditBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+  },
+  portfolioLink: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+  },
+  portfolioLinkText: {
+    fontSize: FontSizes.xxs,
+  },
+  profilePicContainer: {
+    width: SCREEN_WIDTH * 0.22,
+  },
+  profilePic: {
+    width: SCREEN_WIDTH * 0.22,
+    height: SCREEN_WIDTH * 0.28,
+    borderWidth: 5,
+    borderColor: Colors.primaryGold,
+    borderRadius: 5,
+  },
+
+  // MediaBar
+  mediaBar: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  mediaTabs: {
+    flexDirection: 'row',
+  },
+  mediaTab: {
+    backgroundColor: Colors.secondary,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 6,
+  },
+  mediaTabSelected: {
+    backgroundColor: Colors.primaryGold,
+  },
+  mediaTabText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+  },
+  keywordsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  keywordDropdown: {
+    width: '25%',
+    marginRight: 8,
+  },
+  keywordBubbles: {
+    flexDirection: 'row',
+  },
+  keywordBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.accentGolden,
+    borderWidth: 2,
+    borderColor: Colors.blue,
+    borderRadius: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginRight: 6,
+  },
+  keywordBubbleText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.tiny,
+    marginRight: 4,
+  },
+  keywordRemove: {
+    fontSize: FontSizes.tiny,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+
+  // Art Section
+  artSection: {
+    padding: 16,
+  },
+  addBtn: {
+    width: 25,
+    height: 25,
+    borderRadius: 9999,
+    backgroundColor: Colors.secondary,
+    borderWidth: 1,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addBtnText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+  },
+  emptyText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.textTertiary,
+    padding: 20,
+  },
+
+  // Art element
+  artElement: {
+    marginBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    paddingBottom: 16,
+  },
+  artVisual: {
+    width: '100%',
+    aspectRatio: 1,
+    marginBottom: 10,
+  },
+  artImage: {
+    width: '100%',
+    height: '100%',
+  },
+  artDetails: {
+    paddingHorizontal: 4,
+  },
+  artTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxl,
+    marginBottom: 6,
+  },
+  artDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 6,
+  },
+  artDetailText: {
+    fontSize: FontSizes.xs,
+    marginBottom: 4,
+  },
+  artFooter: {
+    marginTop: 10,
+  },
+  artButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  artBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  artBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+  },
+  editBtn: {
+    backgroundColor: Colors.greenBright,
+  },
+  commentsBtn: {
+    backgroundColor: Colors.secondary,
+  },
+  removeBtn: {
+    backgroundColor: Colors.redLight,
+  },
+});

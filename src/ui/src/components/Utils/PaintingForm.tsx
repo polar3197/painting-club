@@ -11,6 +11,7 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
         width: number | null;
         height: number | null;
         keywords: string;
+        comments_enabled: boolean;
         files: File | null; }>
         ({
             title: initialData?.title ?? "",
@@ -21,6 +22,7 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
             width: initialData?.width ?? null,
             height: initialData?.height ?? null,
             keywords: initialData?.keywords?.join(", ") ?? "",
+            comments_enabled: initialData?.comments_enabled ?? false,
             files: null,
         });
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +108,18 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
                 placeholder="keywords"
                 onChange={(e) => update({ keywords: e.target.value })}
             />
+        </div>
+        <div className="painting-comments-toggle">
+            <label htmlFor="comments-toggle">comments</label>
+            <input
+                id="comments-toggle"
+                type="checkbox"
+                checked={form.comments_enabled}
+                onChange={(e) => update({ comments_enabled: e.target.checked })}
+            />
+            <div className="toggle-track" onClick={() => update({ comments_enabled: !form.comments_enabled })}>
+                <div className="toggle-thumb" />
+            </div>
         </div>
         </>
     );

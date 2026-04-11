@@ -12,7 +12,20 @@ const isVisual2D = (medium: string) =>
 const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, piece }
     : { setShowDialog : Dispatch<SetStateAction<boolean>>; selectedMedium : string; username : string; onSuccess: () => void; piece?: Visual2DOut; }
 ) => {
-    const [formData, setFormData] = useState<Record<string, any> | null>(null);
+    const [formData, setFormData] = useState<Record<string, any> | null>(
+        piece ? {
+            title: piece.title ?? "",
+            location: piece.location ?? "",
+            date: piece.date ?? "",
+            song: piece.song ?? "",
+            song_artist: piece.song_artist ?? "",
+            width: piece.width ?? null,
+            height: piece.height ?? null,
+            keywords: piece.keywords?.join(", ") ?? "",
+            comments_enabled: piece.comments_enabled ?? false,
+            files: null,
+        } : null
+    );
 
     const submit = async () => {
         if (!formData) return;
@@ -29,6 +42,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, piec
                     width: formData.width,
                     height: formData.height,
                     keywords: formData.keywords ? formData.keywords.split(",").map((k: string) => k.trim()).filter(Boolean) : null,
+                    comments_enabled: formData.comments_enabled,
                 });
             } else {
                 await add_new_visual_2d(token, {
@@ -42,6 +56,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, piec
                     width: formData.width,
                     height: formData.height,
                     keywords: formData.keywords,
+                    comments_enabled: formData.comments_enabled,
                     file: formData.files,
                 });
             }

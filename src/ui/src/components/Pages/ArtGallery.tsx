@@ -4,30 +4,25 @@ import { useOptions } from "../../hooks/useOptions";
 import { ArtResult, search_art } from "../../api";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
-import ArtZoomIn from "../Utils/ArtZoomIn";
 import "../../styles/profiles/members-display.css";
 
 const ArtCard = ({ piece }: { piece: ArtResult }) => {
   const navigate = useNavigate();
-  const [zoomed, setZoomed] = useState(false);
   return (
-    <>
-      {zoomed && <ArtZoomIn isOwner={false} imgPath={piece.file_path} setIsZoomedIn={setZoomed} />}
-      <div className='display-card art-card' onClick={() => setZoomed(true)}>
-        <div className='art-card-img'>
-          <img src={piece.file_path} alt={piece.title} />
-        </div>
-        <div className='art-card-deets'>
-          <p><b>{piece.title}</b></p>
-          <p>{piece.medium}</p>
-          <p onClick={(e) => { e.stopPropagation(); navigate(`/members/${piece.creator_username}/profile`); }} className="art-card-creator">
-            @{piece.creator_username}
-          </p>
-          {piece.location && <p>{piece.location}</p>}
-          {piece.keywords.length > 0 && <p>{piece.keywords.join(", ")}</p>}
-        </div>
+    <div className='display-card art-card' onClick={() => navigate(`/members/${piece.creator_username}/profile?artId=${piece.id}&medium=${encodeURIComponent(piece.medium)}`)}>
+      <div className='art-card-img'>
+        <img src={piece.file_path} alt={piece.title} />
       </div>
-    </>
+      <div className='art-card-deets'>
+        <p><b>{piece.title}</b></p>
+        <p>{piece.medium}</p>
+        <p onClick={(e) => { e.stopPropagation(); navigate(`/members/${piece.creator_username}/profile`); }} className="art-card-creator">
+          @{piece.creator_username}
+        </p>
+        {piece.location && <p>{piece.location}</p>}
+        {piece.keywords.length > 0 && <p>{piece.keywords.join(", ")}</p>}
+      </div>
+    </div>
   );
 };
 

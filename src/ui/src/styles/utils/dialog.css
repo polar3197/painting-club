@@ -218,4 +218,48 @@
     right: 20px;
     border-bottom: 1px black solid;
 }
+
+.painting-comments-toggle {
+    position: absolute;
+    top: 330px;
+    right: 20px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.painting-comments-toggle input[type="checkbox"] {
+    display: none;
+}
+
+.toggle-track {
+    width: 36px;
+    height: 18px;
+    border: 1px solid black;
+    background-color: rgb(255, 175, 175);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    background-color: rgb(252, 219, 121);
+    border: 1px black solid;
+    transition: left 0.15s ease;
+}
+
+input[type="checkbox"]:checked + .toggle-track {
+    background-color: rgb(189, 240, 189);
+}
+
+input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
+    left: 20px;
+}
 /* ========================================= */

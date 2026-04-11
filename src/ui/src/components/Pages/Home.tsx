@@ -31,9 +31,11 @@ export default function Home() {
           </div>
           <div className="home-left-content">
             <div className="painting-club-message">
-              <p>Welcome to Painting Club</p>
+              <p>Welcome to Painting Club.</p>
               <br></br>
               <p>I built this space for artists to share their art.</p>
+              <br></br>
+              <p>The goal is to center art and sincerity. There are no likes nor algorithm. Just friends, art and conversations.</p>
               <br></br>
               <p>It currently handles photography, painting, drawing, etc. — you get the idea, #2d-static-visual...</p>
               <br></br>
@@ -41,10 +43,10 @@ export default function Home() {
               <br></br>
               <p>It's true, we can all use instagram, but I lowkey hate instagram and highkey don't like zuckerberg.</p> 
               <br></br>
-              <p>With a Painting Club account you can set your art to be visible to everyone (fine, but vulnerable to scrapers), only members or just yourself (both safe).</p> 
-              <br></br>
+              <p>With a Painting Club account you can create custom portfolios with a few clicks and share them with anyone you want. You could also opt to hide all of your art so that only other members see it. Either way, your pick!</p> 
+              {/* <br></br>
               <p>Small community has benefits. Painting Club can shield content from web crawlers and bots in a way large platforms can't and don't care to try. Privacy/ownership around art is important #eff-altman.</p>
-              <br></br>
+              <br></br> */}
               
             </div>
           </div>

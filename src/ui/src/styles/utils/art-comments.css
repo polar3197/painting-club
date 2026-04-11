@@ -1,0 +1,161 @@
+.art-comments-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.art-comments-panel {
+    width: 66vw;
+    height: 80vh;
+    display: flex;
+    flex-direction: row;
+    border: 1px black solid;
+    background-color: rgb(255, 250, 245);
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
+}
+
+.art-comments-image {
+    width: 50%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-right: 1px black solid;
+    background-color: rgb(250, 244, 202);
+}
+
+.art-comments-image img {
+    width: 95%;
+    height: auto;
+    object-fit: contain;
+    border: 2px black solid;
+}
+
+.art-comments-section {
+    width: 50%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.art-comments-header {
+    border-bottom: 1px solid black;
+    padding: 10px 16px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 20px;
+}
+
+.art-comments-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 10px;
+}
+
+.art-comment-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 6px;
+    width: 100%;
+}
+
+.art-comment-row--own {
+    justify-content: flex-end;
+}
+
+.art-comment-row--other {
+    justify-content: flex-start;
+}
+
+.art-comment-label {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex-shrink: 0;
+    max-width: 80px;
+    cursor: pointer;
+}
+
+.art-comment-row--own .art-comment-label {
+    align-items: flex-end;
+}
+
+.art-comment-label-name {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: #000;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.art-comment-label-username {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10px;
+    color: #888;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.art-comment {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 15px;
+    border: 1px solid black;
+    background-color: rgb(250, 244, 202);
+    padding: 4px 8px;
+    width: 66%;
+    word-wrap: break-word;
+}
+
+.art-comments-input-bar {
+    border-top: 1px solid black;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.art-comments-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+}
+
+.art-comments-submit {
+    border: 1px solid black;
+    background-color: rgb(189, 240, 189);
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+    padding: 0;
+}
+
+.art-comments-submit:hover {
+    background-color: rgb(100, 202, 100);
+}
+
+.art-comments-submit:active {
+    background-color: rgb(189, 240, 189);
+    transform: scale(0.95);
+}

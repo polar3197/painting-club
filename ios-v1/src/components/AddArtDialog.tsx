@@ -1,0 +1,171 @@
+import React, { useState, useRef } from 'react';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions } from 'react-native';
+import { useAuth } from '../context/AuthContext';
+import { add_new_visual_2d, update_visual_2d, Visual2DOut } from '../api';
+import PaintingForm from './PaintingForm';
+import { Colors, Fonts, FontSizes } from '../constants/theme';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const isVisual2D = (medium: string) =>
+  medium === 'drawing' || medium === 'painting' || medium === 'stained glass' || medium === 'photography';
+
+interface AddArtDialogProps {
+  selectedMedium: string;
+  username: string;
+  onSuccess: () => void;
+  onClose: () => void;
+  piece?: Visual2DOut;
+}
+
+export default function AddArtDialog({ selectedMedium, username, onSuccess, onClose, piece }: AddArtDialogProps) {
+  const { token } = useAuth();
+  const [formData, setFormData] = useState<Record<string, any> | null>(
+    piece
+      ? {
+          title: piece.title ?? '',
+          location: piece.location ?? '',
+          date: piece.date ?? '',
+          song: piece.song ?? '',
+          song_artist: piece.song_artist ?? '',
+          width: piece.width ?? null,
+          height: piece.height ?? null,
+          keywords: piece.keywords?.join(', ') ?? '',
+          comments_enabled: piece.comments_enabled ?? false,
+          file: null,
+        }
+      : null
+  );
+
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10,
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 120) {
+          Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 200, useNativeDriver: true }).start(onClose);
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
+
+  const submit = async () => {
+    if (!formData) return;
+    try {
+      if (isVisual2D(selectedMedium)) {
+        if (piece) {
+          await update_visual_2d(piece.id, token, {
+            title: formData.title,
+            location: formData.location,
+            song: formData.song,
+            song_artist: formData.song_artist,
+            date: formData.date || null,
+            width: formData.width,
+            height: formData.height,
+            keywords: formData.keywords
+              ? formData.keywords
+                  .split(',')
+                  .map((k: string) => k.trim())
+                  .filter(Boolean)
+              : null,
+            comments_enabled: formData.comments_enabled,
+          });
+        } else {
+          if (!formData.file) {
+            Alert.alert('Missing', 'Please select an image.');
+            return;
+          }
+          await add_new_visual_2d(token, {
+            username,
+            medium: selectedMedium,
+            title: formData.title,
+            location: formData.location,
+            song: formData.song,
+            song_artist: formData.song_artist,
+            date: formData.date,
+            width: formData.width,
+            height: formData.height,
+            keywords: formData.keywords,
+            comments_enabled: formData.comments_enabled,
+            file: formData.file,
+          });
+        }
+      }
+      onClose();
+      onSuccess();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Something went wrong');
+    }
+  };
+
+  return (
+    <Modal transparent visible animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} />
+      <Animated.View style={[styles.panel, { transform: [{ translateY }] }]}>
+        <View {...panResponder.panHandlers} style={styles.swipeHandle}>
+          <View style={styles.swipeBar} />
+        </View>
+        <ScrollView style={styles.formArea} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formContent}>
+          {isVisual2D(selectedMedium) && (
+            <PaintingForm onDataChange={setFormData} initialData={piece} />
+          )}
+        </ScrollView>
+        <Pressable style={styles.submitBtn} onPress={submit}>
+          <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
+        </Pressable>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  backdrop: {
+    height: 60,
+  },
+  panel: {
+    flex: 1,
+    backgroundColor: Colors.mainBg,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderTopWidth: 1,
+    borderColor: '#000',
+  },
+  swipeHandle: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  swipeBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.textMuted,
+  },
+  formArea: {
+    flex: 1,
+  },
+  formContent: {
+    padding: 16,
+    paddingBottom: 80,
+  },
+  submitBtn: {
+    position: 'absolute',
+    bottom: 30,
+    right: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.greenBright,
+  },
+  submitBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+  },
+});

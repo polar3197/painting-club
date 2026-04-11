@@ -1,5 +1,5 @@
 # src/db/models.py
-from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime
+from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -50,6 +50,7 @@ class Art(Base):
     title = Column(String(300), default="Untitled")
     date = Column(Date)
     file_path = Column(String(300))
+    comments_enabled = Column(Boolean, nullable=False, default=False)
     type = Column(String(50), nullable=False)  # discriminator column
 
     __mapper_args__ = {"polymorphic_on": type}
@@ -66,6 +67,12 @@ class Visual2D(Art):
     location = Column(String(255))
 
     __mapper_args__ = {"polymorphic_identity": "visual_2d"}
+
+class WrittenWord(Art):
+    __tablename__ = "written_word"
+
+    id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
+    
     
 class Prompt(Base):
     # list of questions for members to choose from on their page
@@ -107,6 +114,16 @@ class KeywordArt(Base):
     keyword_id = Column(UUID(as_uuid=True), ForeignKey('keyword.id'), primary_key=True)
     art_id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
 # =============================================
+
+class Comment(Base):
+    __tablename__ = "comment"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), nullable=False)
+    username = Column(String(50), ForeignKey('member.username', ondelete='CASCADE'), nullable=False)
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class Application(Base):
     __tablename__ = "application"

@@ -1,6 +1,6 @@
 import "../../styles/sidebar.css";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 interface SidebarProps {
@@ -43,16 +43,22 @@ const SidebarElement = ({
 
 const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   const navigate = useNavigate();
-  const { currentUser, currentRole, logout } = useAuth()!; 
+  const location = useLocation();
+  const { currentUser, currentRole, logout } = useAuth()!;
   console.log("CU: ", currentUser);
 
   const gotoHome = () => {
     navigate("/home");
   };
-  
+
   const gotoMe = () => {
     if (currentUser) {
-      navigate(`/members/${currentUser}/profile`);
+      const target = `/members/${currentUser}/profile`;
+      if (location.pathname === target) {
+        document.getElementById("page-body")?.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        navigate(target);
+      }
     } else {
       navigate("/not-a-member");
     }

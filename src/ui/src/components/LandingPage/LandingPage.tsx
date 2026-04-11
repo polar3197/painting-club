@@ -8,8 +8,8 @@ const MiltonAvery = {
   "login_left": 4,
   "login_bottom": 3,
   // coords are measured in rem from bottom left
-  "title_left": 10,
-  "title_bottom": 35,
+  "title_left": 52,
+  "title_bottom": 29,
   "login_background_color": "transparent",
   // coords are measured in rem from bottom left
   "announcements_left": 45,
@@ -19,11 +19,11 @@ const MiltonAvery = {
 const Hopper = {
   "image": "imgs/hopper-barn.png",
   // coords are measured in rem from bottom left
-  "login_left": 16,
-  "login_bottom": 10,
+  "login_left": 18,
+  "login_bottom": 13,
   // coords are measured in rem from bottom left
-  "title_left": 33,
-  "title_bottom": 26,
+  "title_left": 44,
+  "title_bottom": 31,
   "login_background_color": "rgb(216, 64, 25)",
   // coords are measured in rem from bottom left
   "announcements_left": 55,
@@ -36,8 +36,8 @@ const Diebenkorn = {
   "login_left": 62,
   "login_bottom": 3,
   // coords are measured in rem from bottom left
-  "title_left": 50,
-  "title_bottom": 28,
+  "title_left": 55,
+  "title_bottom": 32,
   "login_background_color": "rgb(238, 114, 72)",
   // coords are measured in rem from bottom left
   "announcements_left": 3,
@@ -47,12 +47,12 @@ const Diebenkorn = {
 const Klimpt = {
   "image": "imgs/klimpt.png",
   // coords are measured in rem from bottom left
-  "login_left": 32,
-  "login_bottom": 16,
+  "login_left": 38,
+  "login_bottom": 22,
   "login_background_color": "lightgreen",
   // coords are measured in rem from bottom left
-  "title_left": 2,
-  "title_bottom": 11,
+  "title_left": 3,
+  "title_bottom": 13,
   // coords are measured in rem from bottom left
   "announcements_left": 3,
   "announcements_bottom": 3

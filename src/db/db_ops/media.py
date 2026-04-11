@@ -84,6 +84,7 @@ async def db_add_visual_2d(
         width: int | None = None,
         height: int | None = None,
         keywords: list[str] | None = None,
+        comments_enabled: bool = False,
     )-> bool:
     # find member_id, media_id
     member_result = await db.execute(select(Member.id).filter(Member.username==username))
@@ -108,6 +109,7 @@ async def db_add_visual_2d(
         width=width,
         height=height,
         file_path=file_path,
+        comments_enabled=comments_enabled,
     )
     db.add(new_art)
     await db.flush()  # gets the id without committing
@@ -141,6 +143,7 @@ async def db_update_visual_2d(
     width: int | None = None,
     height: int | None = None,
     keywords: list[str] | None = None,
+    comments_enabled: bool = False,
 ):
     result = await db.execute(select(Visual2D).filter(Visual2D.id == art_id))
     piece = result.scalar_one_or_none()
@@ -157,6 +160,7 @@ async def db_update_visual_2d(
     piece.song_artist = song_artist
     piece.width = width
     piece.height = height
+    piece.comments_enabled = comments_enabled
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
 

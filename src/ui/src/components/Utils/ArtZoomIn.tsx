@@ -13,12 +13,7 @@ const ArtZoomIn = ({ isOwner, imgPath, setIsZoomedIn }: { isOwner: boolean; imgP
                     setFlip(flip === "flip" ? "unflip" : "flip");
                 }}
             >
-                <div className="card-front">
-                    {isOwner && 
-                        <div className="edit-img">
-                            <button>✎</button>
-                        </div>
-                    }                                      
+                <div className="card-front">                                     
                     <img                                                                                                                        
                         src={imgPath}                                                                                                           
                         alt={"no image"}                                                                                                        

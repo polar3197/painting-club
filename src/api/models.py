@@ -72,6 +72,7 @@ class Visual2DUpdate(BaseModel):
     width: int | None = None
     height: int | None = None
     keywords: list[str] | None = None
+    comments_enabled: bool = False
 
 class SearchOptions(BaseModel):
     usernames: list[str] = []
@@ -118,6 +119,17 @@ class ApplicationOut(BaseModel):
 class ApplicationStatusUpdate(BaseModel):
     status: str  # "approved" or "rejected"
 
+class CommentIn(BaseModel):
+    text: str
+
+class CommentOut(BaseModel):
+    id: uuid.UUID
+    username: str
+    firstname: str | None
+    text: str
+    created_at: datetime
+
+
 class Visual2DOut(BaseModel):
     id: uuid.UUID
     title: str
@@ -129,4 +141,5 @@ class Visual2DOut(BaseModel):
     width: float | None
     keywords: list[str] | None
     file_path: str
+    comments_enabled: bool = False
 

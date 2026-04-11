@@ -28,6 +28,8 @@ from api.models import (
     ApplicationIn,
     ApplicationOut,
     ApplicationStatusUpdate,
+    CommentOut,
+    CommentIn,
 )
 
 from db.db_ops.members import (
@@ -60,6 +62,11 @@ from db.db_ops.media import (
     db_get_visual_2d,
     db_update_visual_2d,
     db_remove_visual_2d,
+)
+
+from db.db_ops.comments import (
+    db_get_comments,
+    db_add_comment,
 )
     
 from db.session import get_db
@@ -214,6 +221,7 @@ async def get_visual_2d(
             width=visual_2d_row.width,
             keywords=keywords,
             file_path=visual_2d_row.file_path,
+            comments_enabled=visual_2d_row.comments_enabled,
         )
         visual_2ds.append(visual_2d)
     print(visual_2ds)
@@ -265,6 +273,13 @@ async def login_member_endpoint(payload: AddMedia, db: AsyncSession = Depends(ge
     success = await db_add_medium(db, payload.username, payload.medium)
     return success
 
+ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf"}
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+
+def sanitize_path_segment(value: str) -> str:
+    import re
+    return re.sub(r"[^\w\-]", "_", value)
+
 @app.post("/art/upload/visual-2d")
 async def upload_visual_2d(
     username: str = Form(...),
@@ -277,23 +292,38 @@ async def upload_visual_2d(
     width: int | None = Form(None),
     height: int | None = Form(None),
     keywords: str | None = Form(None),
+    comments_enabled: bool = Form(False),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
 ):
-    # verify file type
-    contents = await file.read()
+    # verify ownership
+    if current_member.username != username:
+        raise HTTPException(status_code=403, detail="Cannot upload for another user")
+
+    # enforce file size limit
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+
+    # verify file type against allowlist
     mime = magic.from_buffer(contents, mime=True)
+    if mime not in ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
     if mime != file.content_type:
         raise HTTPException(status_code=400, detail=f"File type mismatch: stated {file.content_type}, actual {mime}")
 
-    file_ext = file.filename.split('.')[-1]
-    safe_title = title.replace(" ", "_")                                                                                                        
-    file_path = f"/static/art/{username}/{medium}/{safe_title}.{file_ext}"
+    # sanitize path segments to prevent traversal
+    safe_username = sanitize_path_segment(username)
+    safe_medium = sanitize_path_segment(medium)
+    safe_title = sanitize_path_segment(title)
+    file_ext = sanitize_path_segment(file.filename.split('.')[-1])
+    file_path = f"/static/art/{safe_username}/{safe_medium}/{safe_title}.{file_ext}"
 
     # save the file to the filepath
     path = Path(f"/app{file_path}")
-    path.parent.mkdir(parents=True, exist_ok=True)                                                                                      
-    path.write_bytes(contents) 
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
 
     # parse keywords
     keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
@@ -311,6 +341,7 @@ async def upload_visual_2d(
             height=height,
             keywords=keywords_list,
             file_path=file_path,
+            comments_enabled=comments_enabled,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -337,6 +368,7 @@ async def update_visual_2d(
             width=payload.width,
             height=payload.height,
             keywords=payload.keywords,
+            comments_enabled=payload.comments_enabled,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -349,6 +381,29 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
     await db_remove_visual_2d(art_id=art_id, current_member_id=current_user.id, db=db)
     return
 
+
+# ====================== COMMENTS =========================
+
+@app.get("/art/{art_id}/comments", response_model=list[CommentOut])
+async def get_comments(
+    art_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    rows = await db_get_comments(db, art_id)
+    return [
+        CommentOut(id=c.id, username=c.username, firstname=firstname, text=c.text, created_at=c.created_at)
+        for c, firstname in rows
+    ]
+
+@app.post("/art/{art_id}/comments", response_model=CommentOut, status_code=status.HTTP_201_CREATED)
+async def add_comment(
+    art_id: str,
+    payload: CommentIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    return await db_add_comment(db, art_id, current_member.username, payload.text)
 
 # ====================== APPLICATIONS =========================
 

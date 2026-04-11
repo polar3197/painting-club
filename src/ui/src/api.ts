@@ -102,6 +102,7 @@ export interface Visual2DIn {
   height?: number | null;
   width?: number | null;
   keywords?: string;
+  comments_enabled?: boolean;
   file: File;
 }
 
@@ -118,6 +119,7 @@ export interface Visual2DOut {
   width: number;
   keywords: string[];
   file_path: string;
+  comments_enabled: boolean;
 }
 
 export function getHealth(): Promise<unknown> {
@@ -215,6 +217,7 @@ export function add_new_visual_2d(token: string | null, payload: Visual2DIn) {
   if (payload.width != null) fd.append("width", String(payload.width));
   if (payload.height != null) fd.append("height", String(payload.height));
   if (payload.keywords != null) fd.append("keywords", String(payload.keywords));
+  if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
   fd.append("file", payload.file);
 
   return request("/art/upload/visual-2d", {
@@ -233,6 +236,7 @@ export interface Visual2DUpdatePayload {
   width?: number | null;
   height?: number | null;
   keywords?: string[] | null;
+  comments_enabled?: boolean;
 }
 
 export function update_visual_2d(id: string, token: string | null, payload: Visual2DUpdatePayload) {
@@ -249,4 +253,26 @@ export function remove_visual_2d(id: string, token: string | null) {
 
 export function get_members_visual_2d(username: string, medium: string): Promise<Visual2DOut[]> {
   return request(`/members/${username}/art/${medium}`) as Promise<Visual2DOut[]>;
+}
+
+export interface CommentOut {
+  id: string;
+  username: string;
+  firstname: string | null;
+  text: string;
+  created_at: string;
+}
+
+export function get_comments(art_id: string, token: string | null): Promise<CommentOut[]> {
+  return request(`/art/${art_id}/comments`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<CommentOut[]>;
+}
+
+export function post_comment(art_id: string, text: string, token: string | null): Promise<CommentOut> {
+  return request(`/art/${art_id}/comments`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ text }),
+  }) as Promise<CommentOut>;
 }

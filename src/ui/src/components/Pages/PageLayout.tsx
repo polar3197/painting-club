@@ -12,7 +12,7 @@ const PageLayout = () => {
   return (
     <div className="page-wrapper">
         <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
-        <div className="page-body">
+        <div id="page-body" className="page-body">
             <Outlet />
         </div>
     </div>

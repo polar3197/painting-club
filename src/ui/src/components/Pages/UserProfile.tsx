@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useProfile } from "../../hooks/useProfile";
 import { Profile } from "../../api";
@@ -8,19 +8,19 @@ import Art from "../UserProfile/Art";
 
 const UserProfile = () => {
   const { username } = useParams();
+  const [searchParams] = useSearchParams();
   const [profile, setProfile, error, loading] = useProfile(username);
-  
-  const [selectedMedium, setSelectedMedium] = useState<string | null>(null)
+
+  const scrollToArtId = searchParams.get("artId");
+  const mediumParam = searchParams.get("medium");
+
+  const [selectedMedium, setSelectedMedium] = useState<string | null>(mediumParam ?? null)
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
   const [refresh, setRefresh] = useState(0)
   const [availableKeywords, setAvailableKeywords] = useState<string[]>([])
 
   useEffect(() => {
-    const updateMedia = () => {
-      setSelectedMedium(profile?.media[0] ?? null);
-    };
-
-    updateMedia();
+    if (!mediumParam) setSelectedMedium(profile?.media[0] ?? null);
   }, [profile]);
 
   if (loading) return <p>Loading...</p>;
@@ -52,6 +52,7 @@ const UserProfile = () => {
         refresh={refresh}
         onRefresh={() => setRefresh(r => r + 1)}
         onKeywordsLoaded={setAvailableKeywords}
+        scrollToArtId={scrollToArtId}
       />
     </>
 
