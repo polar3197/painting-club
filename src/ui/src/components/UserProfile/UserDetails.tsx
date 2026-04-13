@@ -1,5 +1,5 @@
 import { Profile, upload_profile_picture } from "../../api";
-import { Dispatch, SetStateAction, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import UserInfo from "./UserInfo";
 import "../../styles/user-profile/user-deets.css";
@@ -16,10 +16,13 @@ const UserDetails = (
   ) => {
 
   const [isZoomedIn, setIsZoomedIn] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imgSrc = profile.profile_pic_path
     ? `${profile.profile_pic_path}?v=${Date.now()}`
-    : null;
+    : `/imgs/${profile.id}.png`;
+
+  useEffect(() => { setImgFailed(false); }, [imgSrc]);
 
   const handleUpload = async (file: File) => {
     const token = sessionStorage.getItem("token");
@@ -32,9 +35,11 @@ const UserDetails = (
     if (file) await handleUpload(file);
   };
 
+  const showEmpty = imgFailed;
+
   return (
     <>
-    {isZoomedIn && imgSrc &&
+    {isZoomedIn && !showEmpty &&
       <ArtZoomIn
         isOwner={profile.is_owner}
         imgPath={imgSrc}
@@ -52,9 +57,14 @@ const UserDetails = (
           selectedKeywords={selectedKeywords}
         />
 
-        {imgSrc ? (
+        {!showEmpty ? (
           <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
-            <img src={imgSrc} width="180" height="200"/>
+            <img
+              src={imgSrc}
+              width="180"
+              height="200"
+              onError={() => setImgFailed(true)}
+            />
           </div>
         ) : (
           <div className="user-profile-pic empty-pic">
