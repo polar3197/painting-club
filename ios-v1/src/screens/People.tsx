@@ -51,7 +51,7 @@ export default function People() {
       onPress={() => navigation.navigate('UserProfile', { username: item.username })}
     >
       <Image
-        source={{ uri: resolveImageUrl(`/imgs/${item.username}.png`) }}
+        source={{ uri: resolveImageUrl(item.profile_pic_path || `/imgs/${item.id}.png`) }}
         style={styles.cardImage}
         contentFit="cover"
       />

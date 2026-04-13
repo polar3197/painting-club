@@ -3,6 +3,7 @@ import {
   View,
   Modal,
   Pressable,
+  Text,
   StyleSheet,
   Animated,
   useWindowDimensions,
@@ -12,12 +13,13 @@ import {
 import { Image } from 'expo-image';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { resolveImageUrl } from '../api';
-import { Colors } from '../constants/theme';
+import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
   isOwner: boolean;
   imgPath: string;
   onClose: () => void;
+  onChangePic?: () => void;
 }
 
 function getDistance(touches: any[]) {
@@ -26,7 +28,7 @@ function getDistance(touches: any[]) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-export default function ArtZoomIn({ isOwner, imgPath, onClose }: ArtZoomInProps) {
+export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [flipped, setFlipped] = useState(false);
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
@@ -181,7 +183,19 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose }: ArtZoomInProps)
               styles.cardBack,
               { transform: [{ perspective: 1000 }, { rotateY: backRotate }], backfaceVisibility: 'hidden' },
             ]}
-          />
+          >
+            {isOwner && onChangePic && (
+              <Pressable
+                style={styles.changePicBtn}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onChangePic();
+                }}
+              >
+                <Text style={styles.changePicBtnText}>change pic</Text>
+              </Pressable>
+            )}
+          </Animated.View>
         </Animated.View>
       </View>
     </Modal>
@@ -205,5 +219,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.secondary,
     borderWidth: 2,
     borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  changePicBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.accentGolden,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  changePicBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: 16,
   },
 });

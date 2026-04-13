@@ -8,6 +8,7 @@ export interface LoginResponse {
 }
 
 export interface Profile {
+  id: string;
   username: string;
   firstname: string;
   lastname: string;
@@ -17,6 +18,7 @@ export interface Profile {
   is_owner: boolean;
   media: string[];
   role: string;
+  profile_pic_path: string | null;
 }
 
 export interface ApplicationIn {

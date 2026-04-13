@@ -33,6 +33,27 @@ export function get_profiles(): Promise<Profile[]> {
   return request('/members/all/profile') as Promise<Profile[]>;
 }
 
+export function upload_profile_picture(
+  file: { uri: string; name: string; type: string },
+  token: string | null,
+): Promise<{ profile_pic_path: string }> {
+  const fd = new FormData();
+  fd.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+  return request('/members/profile-picture', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  }) as Promise<{ profile_pic_path: string }>;
+}
+
+export function update_username(new_username: string, token: string | null): Promise<{ username: string }> {
+  return request('/members/update-username', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username: new_username }),
+  }) as Promise<{ username: string }>;
+}
+
 export function update_profile(username: string, payload: Profile, token: string | null) {
   return request(`/members/${username}/update-profile`, {
     method: 'PATCH',

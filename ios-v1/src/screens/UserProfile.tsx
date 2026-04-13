@@ -16,12 +16,14 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../hooks';
+import * as ImagePicker from 'expo-image-picker';
 import {
   get_members_visual_2d,
   remove_visual_2d,
   update_profile,
   get_search_options,
   resolveImageUrl,
+  upload_profile_picture,
   Visual2DOut,
   Profile,
 } from '../api';
@@ -280,8 +282,21 @@ export default function UserProfile() {
       {profileZoom && (
         <ArtZoomIn
           isOwner={profile.is_owner}
-          imgPath={`/imgs/${username}.png`}
+          imgPath={profile.profile_pic_path || `/imgs/${profile.id}.png`}
           onClose={() => setProfileZoom(false)}
+          onChangePic={profile.is_owner ? async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 1,
+            });
+            if (result.canceled || !result.assets[0]) return;
+            const asset = result.assets[0];
+            const name = asset.uri.split('/').pop() || 'pic.jpg';
+            const type = asset.mimeType || 'image/jpeg';
+            const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
+            setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
+            setProfileZoom(false);
+          } : undefined}
         />
       )}
 
@@ -308,7 +323,7 @@ export default function UserProfile() {
       <View style={styles.userDetails}>
         <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
           <Image
-            source={{ uri: resolveImageUrl(`/imgs/${username}.png`) }}
+            source={{ uri: resolveImageUrl(profile.profile_pic_path || `/imgs/${profile.id}.png`) }}
             style={styles.profilePic}
             contentFit="cover"
           />
