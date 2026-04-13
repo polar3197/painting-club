@@ -120,7 +120,7 @@ class Comment(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), nullable=False)
-    username = Column(String(50), ForeignKey('member.username', ondelete='CASCADE'), nullable=False)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
     text = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -181,6 +181,23 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         role=member_row.role or "member",
     )
 
+@app.patch("/members/update-username")
+async def update_username(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    new_username = (payload.get("username") or "").strip()
+    if not new_username or len(new_username) > 50:
+        raise HTTPException(status_code=400, detail="Invalid username")
+    existing = await db.execute(select(Member).filter(Member.username == new_username))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Username taken")
+    current_member.username = new_username
+    await db.commit()
+    return {"username": new_username}
+
+
 @app.patch("/members/{username}/update-profile")
 async def update_profile(
     username: str, 
@@ -314,11 +331,10 @@ async def upload_visual_2d(
         raise HTTPException(status_code=400, detail=f"File type mismatch: stated {file.content_type}, actual {mime}")
 
     # sanitize path segments to prevent traversal
-    safe_username = sanitize_path_segment(username)
     safe_medium = sanitize_path_segment(medium)
     safe_title = sanitize_path_segment(title)
     file_ext = sanitize_path_segment(file.filename.split('.')[-1])
-    file_path = f"/static/art/{safe_username}/{safe_medium}/{safe_title}.{file_ext}"
+    file_path = f"/static/art/{current_member.id}/{safe_medium}/{safe_title}.{file_ext}"
 
     # save the file to the filepath
     path = Path(f"/app{file_path}")
@@ -392,8 +408,8 @@ async def get_comments(
 ):
     rows = await db_get_comments(db, art_id)
     return [
-        CommentOut(id=c.id, username=c.username, firstname=firstname, text=c.text, created_at=c.created_at)
-        for c, firstname in rows
+        CommentOut(id=c.id, username=username, firstname=firstname, text=c.text, created_at=c.created_at)
+        for c, username, firstname in rows
     ]
 
 @app.post("/art/{art_id}/comments", response_model=CommentOut, status_code=status.HTTP_201_CREATED)
@@ -403,7 +419,7 @@ async def add_comment(
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
 ):
-    return await db_add_comment(db, art_id, current_member.username, payload.text)
+    return await db_add_comment(db, art_id, current_member.id, payload.text)
 
 # ====================== APPLICATIONS =========================
 
