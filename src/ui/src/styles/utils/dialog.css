@@ -116,6 +116,9 @@
       transform: rotateY(180deg);
       border: 2px solid black;
       background: rgb(250, 244, 202);
+      display: flex;
+      align-items: center;
+      justify-content: center;
   }
 
 .edit-img button {
