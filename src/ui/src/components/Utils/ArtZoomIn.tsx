@@ -38,12 +38,15 @@ const ArtZoomIn = ({
                         alt={"no image"}
                     />
                 </div>
-                <div className="card-back" onClick={e => e.stopPropagation()}>
+                <div className="card-back">
                     {isOwner && onChangePic && (
                         <>
                             <button
                                 className="change-pic-btn"
-                                onClick={() => fileInputRef.current?.click()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    fileInputRef.current?.click();
+                                }}
                             >
                                 change pic
                             </button>
