@@ -36,3 +36,11 @@ export function resolveImageUrl(path: string): string {
   if (path.startsWith('http')) return path;
   return `${SERVER_ORIGIN}${path}`;
 }
+
+export function getPortfolioUrl(username: string, medium?: string, keywords?: string[]): string {
+  const params = new URLSearchParams();
+  if (medium) params.set('medium', medium);
+  if (keywords && keywords.length > 0) params.set('keywords', keywords.join(','));
+  const qs = params.toString();
+  return `${SERVER_ORIGIN}/members/${username}/portfolio${qs ? `?${qs}` : ''}`;
+}

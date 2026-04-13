@@ -7,12 +7,13 @@ import {
   StyleSheet,
   Dimensions,
   Image as RNImage,
+  Share,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useProfile } from '../hooks';
-import { get_members_visual_2d, resolveImageUrl, Visual2DOut } from '../api';
+import { get_members_visual_2d, resolveImageUrl, getPortfolioUrl, Visual2DOut } from '../api';
 import ArtZoomIn from '../components/ArtZoomIn';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -120,7 +121,7 @@ export default function Portfolio() {
       )}
 
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.artistName}>
             {profile ? `${profile.firstname} ${profile.lastname}` : username}
           </Text>
@@ -128,6 +129,15 @@ export default function Portfolio() {
             {[medium, ...(keywords || [])].filter(Boolean).join(' / ')}
           </Text>
         </View>
+        <Pressable
+          style={styles.shareBtn}
+          onPress={() => {
+            const url = getPortfolioUrl(username, medium, keywords);
+            Share.share({ url, message: url });
+          }}
+        >
+          <Text style={styles.shareBtnText}>share</Text>
+        </Pressable>
         <Pressable style={styles.profileBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.profileBtnText}>profile view</Text>
         </Pressable>
@@ -171,6 +181,18 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   profileBtnText: {
+    fontSize: FontSizes.xxs,
+  },
+  shareBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: Colors.accentGolden,
+    marginRight: 6,
+  },
+  shareBtnText: {
+    fontFamily: Fonts.serif,
     fontSize: FontSizes.xxs,
   },
   masonry: {
