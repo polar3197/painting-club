@@ -36,6 +36,7 @@ export default function App() {
           <Route path="/admin" element={<Admin />} />
 
           {/* <Route path="/groups" element={<Groups />} /> */}
+          <Route path="/:username" element={<UserProfile />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/landing-page" />} />
