@@ -22,7 +22,7 @@ const UserDetails = (
     {isZoomedIn && 
       <ArtZoomIn 
         isOwner={profile.is_owner}
-        imgPath={`/imgs/${profile.username}.png`} 
+        imgPath={`/imgs/${profile.id}.png`} 
         setIsZoomedIn={setIsZoomedIn}
       />
     }
@@ -37,7 +37,7 @@ const UserDetails = (
         />
 
         <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
-          <img src={`/imgs/${profile.username}.png`} width="180" height="200"/>
+          <img src={`/imgs/${profile.id}.png`} width="180" height="200"/>
         </div>
       </div>
 

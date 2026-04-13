@@ -170,6 +170,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
     is_owner = current_member is not None and (member_row.username == current_member.username)
 
     return Profile(
+        id=member_row.id,
         username=member_row.username,
         firstname=member_row.firstname,
         lastname=member_row.lastname,
@@ -270,6 +271,7 @@ async def search_members(
         )
         media = media_result.scalars().all()
         profile = Profile(
+            id=member_row.id,
             username=member_row.username,
             firstname=member_row.firstname,
             lastname=member_row.lastname,

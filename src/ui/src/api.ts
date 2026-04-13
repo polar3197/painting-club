@@ -36,6 +36,7 @@ export interface LoginResponse {
 }
 
 export interface Profile {
+  id: string;
   username: string;
   firstname: string;
   lastname: string;

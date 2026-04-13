@@ -21,6 +21,7 @@ class MemberOut(BaseModel):
     username: str
 
 class Profile(BaseModel):
+    id: uuid.UUID
     username: str
     firstname: str | None
     lastname: str | None
