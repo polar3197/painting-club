@@ -1,5 +1,5 @@
 import { Profile, upload_profile_picture } from "../../api";
-import { Dispatch, SetStateAction, useState } from 'react';
+import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import UserInfo from "./UserInfo";
 import "../../styles/user-profile/user-deets.css";
@@ -16,9 +16,10 @@ const UserDetails = (
   ) => {
 
   const [isZoomedIn, setIsZoomedIn] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const imgSrc = profile.profile_pic_path
     ? `${profile.profile_pic_path}?v=${Date.now()}`
-    : `/imgs/${profile.id}.png`;
+    : null;
 
   const handleUpload = async (file: File) => {
     const token = sessionStorage.getItem("token");
@@ -26,9 +27,14 @@ const UserDetails = (
     setProfile({ ...profile, profile_pic_path: result.profile_pic_path });
   };
 
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await handleUpload(file);
+  };
+
   return (
     <>
-    {isZoomedIn &&
+    {isZoomedIn && imgSrc &&
       <ArtZoomIn
         isOwner={profile.is_owner}
         imgPath={imgSrc}
@@ -46,9 +52,33 @@ const UserDetails = (
           selectedKeywords={selectedKeywords}
         />
 
-        <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
-          <img src={imgSrc} width="180" height="200"/>
-        </div>
+        {imgSrc ? (
+          <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
+            <img src={imgSrc} width="180" height="200"/>
+          </div>
+        ) : (
+          <div className="user-profile-pic empty-pic">
+            {profile.is_owner ? (
+              <>
+                <button
+                  className="change-pic-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  add pic
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  style={{ display: "none" }}
+                  onChange={handleFileInput}
+                />
+              </>
+            ) : (
+              <span className="empty-pic-label">no pic</span>
+            )}
+          </div>
+        )}
       </div>
 
     </div>
