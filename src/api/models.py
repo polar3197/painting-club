@@ -31,6 +31,7 @@ class Profile(BaseModel):
     bio: str | None
     is_owner: bool = False
     role: str = "member"
+    profile_pic_path: str | None = None
 
 class ProfileUpdate(BaseModel):
     firstname: str | None

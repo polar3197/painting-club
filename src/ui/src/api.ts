@@ -46,6 +46,7 @@ export interface Profile {
   is_owner: boolean;
   media: string[];
   role: string;
+  profile_pic_path: string | null;
 }
 
 export interface ApplicationIn {
@@ -153,6 +154,16 @@ export function get_profile(username: string, token: string | null): Promise<Pro
 
 export function get_profiles(): Promise<Profile[]> {
   return request(`/members/all/profile`) as Promise<Profile[]>;
+}
+
+export function upload_profile_picture(file: File, token: string | null): Promise<{ profile_pic_path: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return request(`/members/profile-picture`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  }) as Promise<{ profile_pic_path: string }>;
 }
 
 export function update_profile(username: string, payload: Profile, token: string | null) {

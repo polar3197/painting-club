@@ -20,6 +20,7 @@ class Member(Base):
     state = Column(String(255))
     bio = Column(Text)
     role = Column(String(20), nullable=False, default="member")
+    profile_pic_path = Column(String(300))
 
     # favorite piece you made
     # favorite medium

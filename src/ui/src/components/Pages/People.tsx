@@ -20,7 +20,7 @@ const MemberCard = ({ member }: { member: Profile }) => {
         )}
       </div>
       <div className='member-pic'>
-        <img src={`/imgs/${member.id}.png`} width="130" height="155"/>
+        <img src={(member.profile_pic_path || `/imgs/${member.id}.png`)} width="130" height="155"/>
       </div>
     </div>
   );

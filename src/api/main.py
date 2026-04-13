@@ -180,6 +180,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         media=media,
         is_owner=is_owner,
         role=member_row.role or "member",
+        profile_pic_path=member_row.profile_pic_path,
     )
 
 @app.patch("/members/update-username")
@@ -298,6 +299,30 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 def sanitize_path_segment(value: str) -> str:
     import re
     return re.sub(r"[^\w\-]", "_", value)
+
+@app.post("/members/profile-picture")
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+    mime = magic.from_buffer(contents, mime=True)
+    if mime not in {"image/png", "image/jpeg", "image/jpg"}:
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+
+    ext = "png" if mime == "image/png" else "jpg"
+    file_path = f"/static/profile/{current_member.id}.{ext}"
+    path = Path(f"/app{file_path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
+
+    current_member.profile_pic_path = file_path
+    await db.commit()
+    return {"profile_pic_path": file_path}
+
 
 @app.post("/art/upload/visual-2d")
 async def upload_visual_2d(
