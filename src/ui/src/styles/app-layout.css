@@ -53,11 +53,12 @@
   }
 
   .title {
-    position: static !important;
+    position: relative !important;
     bottom: auto !important;
     left: auto !important;
     right: auto !important;
     top: auto !important;
+    z-index: 2;
     padding: 1.25rem 1.5rem 0.5rem;
     font-size: 2rem;
   }
