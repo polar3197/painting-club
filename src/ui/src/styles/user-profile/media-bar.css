@@ -121,6 +121,10 @@
 }
 
 @media (max-width: 640px) {
+    .media-bar-wrapper {
+        flex-shrink: 0;
+    }
+
     .media-bar {
         flex-wrap: wrap;
         gap: 6px;

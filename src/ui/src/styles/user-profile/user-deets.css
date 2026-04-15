@@ -208,6 +208,10 @@
 }
 
 @media (max-width: 640px) {
+    .user-deets {
+        flex-shrink: 0;
+    }
+
     .user-body {
         flex-direction: column-reverse;
     }
