@@ -131,10 +131,14 @@
 
 @media (max-width: 640px) {
   .login-container {
-    position: static;
-    width: auto;
+    position: static !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    width: auto !important;
     max-width: 100%;
-    height: auto;
+    height: auto !important;
     margin: 1rem 1.5rem 2rem;
     padding: 0;
     display: flex;

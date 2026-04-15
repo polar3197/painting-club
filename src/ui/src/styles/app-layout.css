@@ -53,10 +53,11 @@
   }
 
   .title {
-    position: static;
-    bottom: auto;
-    left: auto;
-    right: auto;
+    position: static !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
     padding: 1.25rem 1.5rem 0.5rem;
     font-size: 2rem;
   }
