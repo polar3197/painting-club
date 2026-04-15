@@ -5,6 +5,7 @@ from sqlalchemy import select, delete, func, desc, nulls_last
 from db.models import Member, Media, Media_Members, Visual2D, Keyword, KeywordArt, Art
 
 async def db_add_medium(db: AsyncSession, username: str, medium: str) -> bool:
+    username = username.lower()
     # check for user existence
     query = select(Member.id).filter(Member.username==username)
     result = await db.execute(query)
@@ -47,6 +48,7 @@ async def db_get_art_keywords(db: AsyncSession, art_id: str):
 
 
 async def db_get_visual_2d(db: AsyncSession, username: str, medium: str):
+    username = username.lower()
     member_result = await db.execute(select(Member.id).filter(Member.username == username))
     member_id = member_result.scalars().first()
     if not member_id:
@@ -86,6 +88,7 @@ async def db_add_visual_2d(
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
     )-> bool:
+    username = username.lower()
     # find member_id, media_id
     member_result = await db.execute(select(Member.id).filter(Member.username==username))
     member_id = member_result.scalars().first()

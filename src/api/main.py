@@ -189,7 +189,7 @@ async def update_username(
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
 ):
-    new_username = (payload.get("username") or "").strip()
+    new_username = (payload.get("username") or "").strip().lower()
     if not new_username or len(new_username) > 50:
         raise HTTPException(status_code=400, detail="Invalid username")
     existing = await db.execute(select(Member).filter(Member.username == new_username))

@@ -140,9 +140,10 @@ export function createUser(payload: LoginPayload): Promise<unknown> {
 }
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
+  const normalized = { ...payload, username: payload.username.toLowerCase() };
   return request("/members/login", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normalized),
   }) as Promise<LoginResponse>;
 }
 

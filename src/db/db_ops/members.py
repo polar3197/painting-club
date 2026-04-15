@@ -10,6 +10,7 @@ async def db_get_members(db: AsyncSession):
     return result.scalars().all()
 
 async def db_login_user(db: AsyncSession, username: str, password: str):
+    username = username.lower()
     result = await db.execute(select(Member).filter(Member.username == username))
     member = result.scalar_one_or_none()
     if member and bcrypt.checkpw(password.encode(), member.password_hash.encode()):
@@ -17,6 +18,7 @@ async def db_login_user(db: AsyncSession, username: str, password: str):
     return None
 
 async def db_create_member(db: AsyncSession, username: str, password: str) -> Member:
+    username = username.lower()
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
     member = Member(username=username, password_hash=password_hash)
     db.add(member)
@@ -35,9 +37,10 @@ async def db_create_full_member(
         firstname: str,
         lastname: str,
 ) -> Member:
+    username = username.lower()
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
     member = Member(
-        username=username, 
+        username=username,
         password_hash=password_hash, 
         bio=bio, 
         city=city,

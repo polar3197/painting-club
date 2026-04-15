@@ -9,7 +9,7 @@ from db.models import Member, Media, Media_Members, Visual2D, Keyword, KeywordAr
 async def db_search_members(db: AsyncSession, city: str | None, uname: str | None):
     query = select(Member)
     if uname:
-        query = query.filter(Member.username == uname)
+        query = query.filter(Member.username == uname.lower())
     if city:
         query = query.where(Member.city == city)
     result = await db.execute(query)
@@ -33,7 +33,7 @@ async def db_get_search_options(db: AsyncSession, medium: str | None = None, use
             .filter(Media.name == medium)
         )
         if username:
-            kw_query = kw_query.join(Member, Art.creator_id == Member.id).filter(Member.username == username)
+            kw_query = kw_query.join(Member, Art.creator_id == Member.id).filter(Member.username == username.lower())
         queries.append(db.execute(kw_query))
     else:
         queries.append(db.execute(select(Keyword.keyword).distinct()))

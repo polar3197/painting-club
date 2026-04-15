@@ -7,6 +7,7 @@ from db.models import Member, Media, Media_Members
 from api.models import ProfileUpdate
 
 async def db_get_profile(db: AsyncSession, username: str):
+    username = username.lower()
     result = await db.execute(select(Member).filter(Member.username == username))
     member = result.scalar_one_or_none()
     if not member:
@@ -20,6 +21,7 @@ async def db_get_profile(db: AsyncSession, username: str):
     return member, media_result.scalars().all()
 
 async def db_update_profile(db: AsyncSession, username: str, payload: ProfileUpdate):
+    username = username.lower()
     result = await db.execute(select(Member).filter(Member.username == username))
     member = result.scalar_one_or_none()
     if not member:
