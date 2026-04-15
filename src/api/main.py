@@ -477,12 +477,19 @@ async def get_art_thumb(art_id: str, w: int = 512, db: AsyncSession = Depends(ge
 
     thumb_path = Path(f"/app/static/thumbs/{art_id}_{w}.jpg")
     if not thumb_path.exists():
-        thumb_path.parent.mkdir(parents=True, exist_ok=True)
-        img = Image.open(src_abs)
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        img.thumbnail((w, w * 4), Image.LANCZOS)
-        img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+        try:
+            thumb_path.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(src_abs) as img:
+                img.draft("RGB", (w * 2, w * 2))
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                img.thumbnail((w, w * 4), Image.LANCZOS)
+                img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+        except Exception as e:
+            print(f"[thumb] generation failed for {art_id} w={w}: {type(e).__name__}: {e}")
+            if thumb_path.exists():
+                thumb_path.unlink(missing_ok=True)
+            return FileResponse(src_abs, headers=cache_headers)
 
     return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
 
