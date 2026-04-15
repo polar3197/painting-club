@@ -40,7 +40,7 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
                 type="file"
                 ref={fileInputRef}
                 style={{ display: "none" }}
-                accept=".png, .jpg, .jpeg, .pdf"
+                accept=".png, .jpg, .jpeg, .pdf, .heic, .heif"
                 onChange={(e) => update({ files: e.target.files?.[0] ?? null })}
             />
             {form.files ?

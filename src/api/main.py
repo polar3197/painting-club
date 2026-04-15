@@ -4,7 +4,11 @@ from datetime import date
 from contextlib import asynccontextmanager
 from typing import Optional, List
 from pathlib import Path
+import io
 import magic
+from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -293,12 +297,21 @@ async def login_member_endpoint(payload: AddMedia, db: AsyncSession = Depends(ge
     success = await db_add_medium(db, payload.username, payload.medium)
     return success
 
-ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf"}
+ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf", "image/heic", "image/heif"}
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+HEIC_MIMES = {"image/heic", "image/heif"}
 
 def sanitize_path_segment(value: str) -> str:
     import re
     return re.sub(r"[^\w\-]", "_", value)
+
+def heic_to_jpeg_bytes(contents: bytes) -> bytes:
+    img = Image.open(io.BytesIO(contents))
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    return buf.getvalue()
 
 @app.post("/members/profile-picture")
 async def upload_profile_picture(
@@ -310,8 +323,12 @@ async def upload_profile_picture(
     if len(contents) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
     mime = magic.from_buffer(contents, mime=True)
-    if mime not in {"image/png", "image/jpeg", "image/jpg"}:
+    if mime not in {"image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif"}:
         raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+
+    if mime in HEIC_MIMES:
+        contents = heic_to_jpeg_bytes(contents)
+        mime = "image/jpeg"
 
     ext = "png" if mime == "image/png" else "jpg"
     file_path = f"/static/profile/{current_member.id}.{ext}"
@@ -354,13 +371,19 @@ async def upload_visual_2d(
     mime = magic.from_buffer(contents, mime=True)
     if mime not in ALLOWED_MIME_TYPES:
         raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
-    if mime != file.content_type:
-        raise HTTPException(status_code=400, detail=f"File type mismatch: stated {file.content_type}, actual {mime}")
+    original_mime = mime
+    if original_mime != file.content_type:
+        raise HTTPException(status_code=400, detail=f"File type mismatch: stated {file.content_type}, actual {original_mime}")
+
+    if mime in HEIC_MIMES:
+        contents = heic_to_jpeg_bytes(contents)
+        mime = "image/jpeg"
 
     # sanitize path segments to prevent traversal
     safe_medium = sanitize_path_segment(medium)
     safe_title = sanitize_path_segment(title)
-    file_ext = sanitize_path_segment(file.filename.split('.')[-1])
+    ext_by_mime = {"image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "application/pdf": "pdf"}
+    file_ext = ext_by_mime[mime]
     file_path = f"/static/art/{current_member.id}/{safe_medium}/{safe_title}.{file_ext}"
 
     # save the file to the filepath
