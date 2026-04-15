@@ -137,10 +137,10 @@
     right: auto !important;
     top: 40vh !important;
     z-index: 2;
-    width: 78vw !important;
-    max-width: 330px;
-    height: 78vw !important;
-    max-height: 330px;
+    width: 72vw !important;
+    max-width: 300px;
+    height: 72vw !important;
+    max-height: 300px;
     aspect-ratio: 1 / 1;
     margin: 2rem auto;
     padding: 1rem;
@@ -162,7 +162,7 @@
 
   .login-footer button {
     padding: 14px;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 500;
   }
 
@@ -183,19 +183,19 @@
   }
 
   .user-form input {
-    font-size: 22px;
+    font-size: 20px;
     padding: 10px 4px;
     min-height: 48px;
   }
 
   .input-title {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 500;
   }
 
   .user-form button {
     padding: 14px;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 500;
   }
 
@@ -209,6 +209,6 @@
     height: auto;
     flex: 1;
     padding: 14px;
-    font-size: 20px;
+    font-size: 18px;
   }
 }
