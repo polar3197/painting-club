@@ -78,6 +78,7 @@ export default function LandingPage() {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
+                  autoCapitalize="none"
                   placeholderTextColor={Colors.textMuted}
                 />
               </View>

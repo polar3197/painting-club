@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { get_members_visual_2d, Visual2DOut } from "../../api";
+import { get_members_visual_2d, thumbUrl, Visual2DOut } from "../../api";
 import { useProfile } from "../../hooks/useProfile";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import "../../styles/portfolio.css";
@@ -43,7 +43,7 @@ const PortfolioCell = ({
       style={{ gridColumn: `span ${colSpan}`, gridRow: `span ${rowSpan}` }}
       onClick={onClick}
     >
-      <img src={piece.file_path} alt={piece.title} onLoad={handleLoad} />
+      <img src={thumbUrl(piece.id, 512)} alt={piece.title} onLoad={handleLoad} />
       <div className="portfolio-cell-overlay">
         <p>{piece.title}</p>
         {piece.date && <p>{piece.date}</p>}

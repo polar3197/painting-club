@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, TextInput, ScrollView, Pressable, Text, StyleSheet, Keyboard } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Fuse from 'fuse.js';
 import { Colors } from '../constants/theme';
 
@@ -21,14 +22,15 @@ export default function Dropdown({ placeholder, options, onSelect, onInputChange
     fuseRef.current = new Fuse(options, { threshold: 0.4 });
   }, [options]);
 
-  // Close the list whenever the keyboard dismisses (e.g. from scroll-to-dismiss on the parent ScrollView)
-  useEffect(() => {
-    const sub = Keyboard.addListener('keyboardDidHide', () => {
-      setShowList(false);
-      inputRef.current?.blur();
-    });
-    return () => sub.remove();
-  }, []);
+  // Close the list whenever the enclosing screen loses focus (e.g. user switches tabs)
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        setShowList(false);
+        inputRef.current?.blur();
+      };
+    }, [])
+  );
 
   const filtered = query.trim()
     ? fuseRef.current.search(query).map((r) => r.item)
@@ -54,17 +56,11 @@ export default function Dropdown({ placeholder, options, onSelect, onInputChange
         value={query}
         placeholder={placeholder}
         placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
+        autoCorrect={false}
         onChangeText={handleChange}
         onFocus={() => setShowList(true)}
         onBlur={() => setTimeout(() => setShowList(false), 150)}
-        onPressIn={() => {
-          if (showList) {
-            setShowList(false);
-            inputRef.current?.blur();
-          } else {
-            setShowList(true);
-          }
-        }}
       />
       {showList && filtered.length > 0 && (
         <ScrollView style={styles.list} keyboardShouldPersistTaps="handled" nestedScrollEnabled>

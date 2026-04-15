@@ -154,6 +154,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
                 value={input}
                 placeholder="go for it. comment..."
                 placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
                 onChangeText={setInput}
                 onSubmitEditing={submit}
                 returnKeyType="send"

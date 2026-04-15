@@ -1,6 +1,10 @@
 
 const API_BASE = "/api";
 
+export function thumbUrl(artId: string, w: 256 | 512 | 1024 = 512): string {
+  return `${API_BASE}/art/${artId}/thumb?w=${w}`;
+}
+
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }

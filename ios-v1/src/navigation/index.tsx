@@ -145,6 +145,8 @@ function MainTabs() {
           backgroundColor: Colors.secondary,
           borderTopWidth: 1,
           borderTopColor: '#000',
+          height: 90,
+          paddingTop: 8,
         },
       })}
     >

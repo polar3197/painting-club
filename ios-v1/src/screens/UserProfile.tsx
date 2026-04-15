@@ -81,7 +81,6 @@ function Visual2DPiece({
           isOwner={isOwner}
           imgPath={piece.file_path}
           onClose={() => setIsZoomedIn(false)}
-          initialAspect={piece.width && piece.height ? piece.width / piece.height : undefined}
         />
       )}
       {showComments && (
@@ -380,6 +379,7 @@ export default function UserProfile() {
                 value={profile.firstname}
                 placeholder="firstname"
                 placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
                 onChangeText={(v) => setProfile({ ...profile!, firstname: v })}
               />
               <TextInput
@@ -387,6 +387,7 @@ export default function UserProfile() {
                 value={profile.lastname}
                 placeholder="lastname"
                 placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
                 onChangeText={(v) => setProfile({ ...profile!, lastname: v })}
               />
               <View style={styles.editLocationRow}>
@@ -396,6 +397,7 @@ export default function UserProfile() {
                   onChangeText={setEditCity}
                   placeholder="city"
                   placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="none"
                 />
                 <TextInput
                   style={[styles.editInput, { flex: 1 }]}
@@ -403,6 +405,7 @@ export default function UserProfile() {
                   onChangeText={setEditState}
                   placeholder="state"
                   placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="none"
                 />
               </View>
               <Text style={styles.bioLabel}>artist statement</Text>
@@ -410,6 +413,7 @@ export default function UserProfile() {
                 style={[styles.editInput, { minHeight: 120, textAlignVertical: 'top' }]}
                 value={editBio}
                 onChangeText={setEditBio}
+                autoCapitalize="none"
                 placeholder="write a bio"
                 placeholderTextColor={Colors.textMuted}
                 multiline

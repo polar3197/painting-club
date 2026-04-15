@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import date
 from contextlib import asynccontextmanager
@@ -75,7 +76,7 @@ from db.db_ops.comments import (
     
 from db.session import get_db
 from db.db_manager import init_db, empty_db
-from db.models import Member, Media, Media_Members
+from db.models import Member, Media, Media_Members, Art
 
 from api.auth import create_token, decode_token
 
@@ -445,7 +446,45 @@ async def update_visual_2d(
 @app.delete("/art/{art_id}")
 async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
     await db_remove_visual_2d(art_id=art_id, current_member_id=current_user.id, db=db)
+    thumb_dir = Path("/app/static/thumbs")
+    if thumb_dir.exists():
+        for stale in thumb_dir.glob(f"{art_id}_*.jpg"):
+            stale.unlink(missing_ok=True)
     return
+
+
+ALLOWED_THUMB_WIDTHS = {256, 512, 1024}
+
+@app.get("/art/{art_id}/thumb")
+async def get_art_thumb(art_id: str, w: int = 512, db: AsyncSession = Depends(get_db)):
+    if w not in ALLOWED_THUMB_WIDTHS:
+        raise HTTPException(status_code=400, detail=f"width must be one of {sorted(ALLOWED_THUMB_WIDTHS)}")
+
+    result = await db.execute(select(Art.file_path).filter(Art.id == art_id))
+    file_path = result.scalar_one_or_none()
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Art not found")
+
+    src_abs = Path(f"/app{file_path}")
+    if not src_abs.exists():
+        raise HTTPException(status_code=404, detail="Source file missing")
+
+    cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+    # non-image (e.g. PDF) — fall back to original
+    if src_abs.suffix.lower() == ".pdf":
+        return FileResponse(src_abs, headers=cache_headers)
+
+    thumb_path = Path(f"/app/static/thumbs/{art_id}_{w}.jpg")
+    if not thumb_path.exists():
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        img = Image.open(src_abs)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        img.thumbnail((w, w * 4), Image.LANCZOS)
+        img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+
+    return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
 
 
 # ====================== COMMENTS =========================

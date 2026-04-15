@@ -74,6 +74,13 @@ export default function People() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.bannerWrap}>
+        <Image
+          source={require('../../assets/imgs/profiles.png')}
+          style={styles.banner}
+          contentFit="contain"
+        />
+      </View>
       <CentralFilter
         header="members"
         options={allOptions}
@@ -96,6 +103,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.mainBg,
+  },
+  bannerWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  banner: {
+    width: 80,
+    height: 80,
+    transform: [{ scale: 1.375 }],
   },
   list: {
     padding: 20,

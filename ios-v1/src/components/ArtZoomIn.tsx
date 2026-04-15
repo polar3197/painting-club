@@ -5,18 +5,11 @@ import {
   Pressable,
   Text,
   StyleSheet,
-  Animated as RNAnimated,
+  Animated,
   useWindowDimensions,
-  Image as RNImage,
+  PanResponder,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  runOnJS,
-} from 'react-native-reanimated';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { resolveImageUrl } from '../api';
 import { Colors, Fonts } from '../constants/theme';
@@ -26,23 +19,27 @@ interface ArtZoomInProps {
   imgPath: string;
   onClose: () => void;
   onChangePic?: () => void;
-  initialAspect?: number;
 }
 
-export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic, initialAspect }: ArtZoomInProps) {
+function getDistance(touches: any[]) {
+  const dx = touches[0].pageX - touches[1].pageX;
+  const dy = touches[0].pageY - touches[1].pageY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [flipped, setFlipped] = useState(false);
-  const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(
-    initialAspect && initialAspect > 0 ? { w: initialAspect, h: 1 } : null
-  );
-  const rotateAnim = useRef(new RNAnimated.Value(0)).current;
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const savedTranslateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const baseScale = useRef(1);
+  const baseDist = useRef(0);
+  const lastOffset = useRef({ x: 0, y: 0 });
+  const isPinching = useRef(false);
 
   const uri = resolveImageUrl(imgPath);
 
@@ -53,16 +50,12 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic, init
     };
   }, []);
 
-  useEffect(() => {
-    RNImage.getSize(uri, (w, h) => setImgSize({ w, h }), () => setImgSize({ w: 1, h: 1 }));
-  }, [uri]);
-
   const flippedRef = useRef(false);
   const handleFlip = () => {
     const next = !flippedRef.current;
     flippedRef.current = next;
     setFlipped(next);
-    RNAnimated.timing(rotateAnim, {
+    Animated.timing(rotateAnim, {
       toValue: next ? 180 : 0,
       duration: 600,
       useNativeDriver: true,
@@ -74,57 +67,61 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic, init
     onClose();
   };
 
-  const pinch = Gesture.Pinch()
-    .onUpdate((e) => {
-      const next = savedScale.value * e.scale;
-      scale.value = Math.max(1, Math.min(5, next));
+  const resetZoom = () => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true }),
+    ]).start();
+    baseScale.current = 1;
+    lastOffset.current = { x: 0, y: 0 };
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        if (evt.nativeEvent.touches.length === 2) {
+          isPinching.current = true;
+          baseDist.current = getDistance(evt.nativeEvent.touches);
+          baseScale.current = (scale as any).__getValue();
+        }
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const touches = evt.nativeEvent.touches;
+        if (touches.length === 2) {
+          isPinching.current = true;
+          const dist = getDistance(touches);
+          const newScale = Math.max(1, Math.min(5, baseScale.current * (dist / baseDist.current)));
+          scale.setValue(newScale);
+        } else if (touches.length === 1 && !isPinching.current && baseScale.current > 1) {
+          translateX.setValue(lastOffset.current.x + gestureState.dx);
+          translateY.setValue(lastOffset.current.y + gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const currentScale = (scale as any).__getValue();
+        if (isPinching.current) {
+          isPinching.current = false;
+          baseScale.current = currentScale;
+          if (currentScale <= 1.1) {
+            resetZoom();
+          }
+        } else if (currentScale > 1) {
+          lastOffset.current = {
+            x: lastOffset.current.x + gestureState.dx,
+            y: lastOffset.current.y + gestureState.dy,
+          };
+        } else {
+          // Single tap at 1x = flip, unless they dragged
+          if (Math.abs(gestureState.dx) < 5 && Math.abs(gestureState.dy) < 5) {
+            handleFlip();
+          }
+        }
+      },
     })
-    .onEnd(() => {
-      if (scale.value <= 1.1) {
-        scale.value = withSpring(1);
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-        savedScale.value = 1;
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
-      } else {
-        savedScale.value = scale.value;
-      }
-    });
-
-  const pan = Gesture.Pan()
-    .minPointers(1)
-    .maxPointers(1)
-    .onUpdate((e) => {
-      if (savedScale.value > 1) {
-        translateX.value = savedTranslateX.value + e.translationX;
-        translateY.value = savedTranslateY.value + e.translationY;
-      }
-    })
-    .onEnd(() => {
-      if (savedScale.value > 1) {
-        savedTranslateX.value = translateX.value;
-        savedTranslateY.value = translateY.value;
-      }
-    });
-
-  const tap = Gesture.Tap()
-    .maxDistance(5)
-    .onEnd((_e, success) => {
-      if (success && savedScale.value === 1) {
-        runOnJS(handleFlip)();
-      }
-    });
-
-  const outerGesture = Gesture.Simultaneous(pinch, pan);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value },
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-    ],
-  }));
+  ).current;
 
   const frontRotate = rotateAnim.interpolate({
     inputRange: [0, 180],
@@ -136,77 +133,61 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic, init
     outputRange: ['180deg', '360deg'],
   });
 
-  const maxW = screenW * 0.9;
-  const maxH = screenH * 0.85;
-  let displayW = 0;
-  let displayH = 0;
-  if (imgSize) {
-    const ratio = imgSize.w / imgSize.h;
-    if (ratio > maxW / maxH) {
-      displayW = maxW;
-      displayH = maxW / ratio;
-    } else {
-      displayH = maxH;
-      displayW = maxH * ratio;
-    }
-  }
-
   return (
-    <Modal transparent visible animationType="none" onRequestClose={handleClose} supportedOrientations={['portrait', 'landscape']}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Pressable style={styles.backdrop} onPress={handleClose}>
-          <View style={styles.blurOverlay} />
-        </Pressable>
-        <GestureDetector gesture={outerGesture}>
-          <View style={styles.imageWrapper} pointerEvents="box-none" collapsable={false}>
-            {imgSize && (
-              <GestureDetector gesture={tap}>
-                <Animated.View
-                  style={[
-                    {
-                      width: displayW,
-                      height: displayH,
-                    },
-                    animatedStyle,
-                  ]}
-                >
-                  <RNAnimated.View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      { transform: [{ perspective: 1000 }, { rotateY: frontRotate }], backfaceVisibility: 'hidden' },
-                    ]}
-                  >
-                    <Image
-                      source={{ uri }}
-                      style={{ width: '100%', height: '100%' }}
-                      contentFit="contain"
-                    />
-                  </RNAnimated.View>
-                  <RNAnimated.View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      styles.cardBack,
-                      { transform: [{ perspective: 1000 }, { rotateY: backRotate }], backfaceVisibility: 'hidden' },
-                    ]}
-                  >
-                    {isOwner && onChangePic && (
-                      <Pressable
-                        style={styles.changePicBtn}
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          onChangePic();
-                        }}
-                      >
-                        <Text style={styles.changePicBtnText}>change pic</Text>
-                      </Pressable>
-                    )}
-                  </RNAnimated.View>
-                </Animated.View>
-              </GestureDetector>
+    <Modal transparent visible animationType="fade" onRequestClose={handleClose} supportedOrientations={['portrait', 'landscape']}>
+      <Pressable style={styles.backdrop} onPress={handleClose}>
+        <View style={styles.blurOverlay} />
+      </Pressable>
+      <View style={styles.imageWrapper} pointerEvents="box-none">
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={{
+            maxWidth: screenW * 0.9,
+            maxHeight: screenH * 0.85,
+            width: screenW * 0.9,
+            aspectRatio: aspectRatio ?? 1,
+            opacity: aspectRatio ? 1 : 0,
+            transform: [{ scale }, { translateX }, { translateY }],
+          }}
+        >
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { transform: [{ perspective: 1000 }, { rotateY: frontRotate }], backfaceVisibility: 'hidden' },
+            ]}
+          >
+            <Image
+              source={{ uri }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="contain"
+              onLoad={(e) => {
+                const w = (e as any)?.source?.width;
+                const h = (e as any)?.source?.height;
+                if (w && h) setAspectRatio(w / h);
+              }}
+            />
+          </Animated.View>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              styles.cardBack,
+              { transform: [{ perspective: 1000 }, { rotateY: backRotate }], backfaceVisibility: 'hidden' },
+            ]}
+          >
+            {isOwner && onChangePic && (
+              <Pressable
+                style={styles.changePicBtn}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onChangePic();
+                }}
+              >
+                <Text style={styles.changePicBtnText}>change pic</Text>
+              </Pressable>
             )}
-          </View>
-        </GestureDetector>
-      </GestureHandlerRootView>
+          </Animated.View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }

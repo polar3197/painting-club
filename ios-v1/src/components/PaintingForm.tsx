@@ -67,6 +67,7 @@ export default function PaintingForm({ onDataChange, initialData }: PaintingForm
         value={form.title}
         placeholder="title"
         placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
         onChangeText={(v) => update({ title: v })}
       />
       <TextInput
@@ -74,6 +75,7 @@ export default function PaintingForm({ onDataChange, initialData }: PaintingForm
         value={form.location}
         placeholder="location"
         placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
         onChangeText={(v) => update({ location: v })}
       />
       <TextInput
@@ -81,6 +83,7 @@ export default function PaintingForm({ onDataChange, initialData }: PaintingForm
         value={form.date}
         placeholder="date (YYYY-MM-DD)"
         placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
         onChangeText={(v) => update({ date: v })}
       />
       <TextInput
@@ -88,6 +91,7 @@ export default function PaintingForm({ onDataChange, initialData }: PaintingForm
         value={form.song}
         placeholder="song"
         placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
         onChangeText={(v) => update({ song: v })}
       />
       <TextInput
@@ -95,6 +99,7 @@ export default function PaintingForm({ onDataChange, initialData }: PaintingForm
         value={form.song_artist}
         placeholder="artist"
         placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
         onChangeText={(v) => update({ song_artist: v })}
       />
       <TextInput
@@ -118,6 +123,7 @@ export default function PaintingForm({ onDataChange, initialData }: PaintingForm
         value={form.keywords}
         placeholder="keywords (comma separated)"
         placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
         onChangeText={(v) => update({ keywords: v })}
       />
 

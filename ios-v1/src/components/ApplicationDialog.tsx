@@ -78,6 +78,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               onChangeText={setFirstname}
               placeholder="first name *"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
             <TextInput
               style={styles.input}
@@ -85,6 +86,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               onChangeText={setLastname}
               placeholder="last name *"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
             <TextInput
               style={styles.input}
@@ -101,6 +103,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               onChangeText={setCity}
               placeholder="city"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
             <TextInput
               style={styles.input}
@@ -108,6 +111,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               onChangeText={setState}
               placeholder="state"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
             <TextInput
               style={styles.input}
@@ -115,6 +119,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               onChangeText={setKnownMember}
               placeholder="know a member?"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
             <TextInput
               style={[styles.input, styles.multiline]}
@@ -124,6 +129,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               placeholderTextColor={Colors.textMuted}
               multiline
               numberOfLines={4}
+              autoCapitalize="none"
             />
           </ScrollView>
           <Pressable style={styles.submitBtn} onPress={handleSubmit}>

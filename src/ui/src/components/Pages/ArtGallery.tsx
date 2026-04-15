@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Fuse from "fuse.js";
 import { useOptions } from "../../hooks/useOptions";
-import { ArtResult, search_art } from "../../api";
+import { ArtResult, search_art, thumbUrl } from "../../api";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
 import "../../styles/profiles/members-display.css";
@@ -11,7 +11,7 @@ const ArtCard = ({ piece }: { piece: ArtResult }) => {
   return (
     <div className='display-card art-card' onClick={() => navigate(`/members/${piece.creator_username}/profile?artId=${piece.id}&medium=${encodeURIComponent(piece.medium)}`)}>
       <div className='art-card-img'>
-        <img src={piece.file_path} alt={piece.title} />
+        <img src={thumbUrl(piece.id, 512)} alt={piece.title} />
       </div>
       <div className='art-card-deets'>
         <p><b>{piece.title}</b></p>
