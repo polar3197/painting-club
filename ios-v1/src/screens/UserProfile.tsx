@@ -77,7 +77,12 @@ function Visual2DPiece({
         onCancel={() => setShowRemoveConfirm(false)}
       />
       {isZoomedIn && (
-        <ArtZoomIn isOwner={isOwner} imgPath={piece.file_path} onClose={() => setIsZoomedIn(false)} />
+        <ArtZoomIn
+          isOwner={isOwner}
+          imgPath={piece.file_path}
+          onClose={() => setIsZoomedIn(false)}
+          initialAspect={piece.width && piece.height ? piece.width / piece.height : undefined}
+        />
       )}
       {showComments && (
         <ArtComments piece={piece} onClose={() => setShowComments(false)} />

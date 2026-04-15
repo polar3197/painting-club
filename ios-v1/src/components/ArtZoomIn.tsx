@@ -26,12 +26,15 @@ interface ArtZoomInProps {
   imgPath: string;
   onClose: () => void;
   onChangePic?: () => void;
+  initialAspect?: number;
 }
 
-export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: ArtZoomInProps) {
+export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic, initialAspect }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [flipped, setFlipped] = useState(false);
-  const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
+  const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(
+    initialAspect && initialAspect > 0 ? { w: initialAspect, h: 1 } : null
+  );
   const rotateAnim = useRef(new RNAnimated.Value(0)).current;
 
   const scale = useSharedValue(1);
@@ -149,7 +152,7 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
   }
 
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={handleClose} supportedOrientations={['portrait', 'landscape']}>
+    <Modal transparent visible animationType="none" onRequestClose={handleClose} supportedOrientations={['portrait', 'landscape']}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={handleClose}>
           <View style={styles.blurOverlay} />

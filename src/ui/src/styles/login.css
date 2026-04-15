@@ -138,6 +138,18 @@
   justify-content: center;
   color: #444;
   flex: 0 0 auto;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  outline: none;
+}
+
+.user-form .password-toggle:focus,
+.password-toggle:focus,
+.user-form .password-toggle:focus-visible,
+.password-toggle:focus-visible {
+  outline: none;
 }
 
 .user-form .password-toggle:hover,

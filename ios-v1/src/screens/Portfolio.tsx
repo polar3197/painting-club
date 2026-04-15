@@ -117,6 +117,7 @@ export default function Portfolio() {
           isOwner={false}
           imgPath={zoomPiece.file_path}
           onClose={() => setZoomPiece(null)}
+          initialAspect={zoomPiece.width && zoomPiece.height ? zoomPiece.width / zoomPiece.height : undefined}
         />
       )}
 
