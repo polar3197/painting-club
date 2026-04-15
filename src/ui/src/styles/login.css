@@ -137,10 +137,10 @@
     right: auto !important;
     top: 40vh !important;
     z-index: 2;
-    width: 88vw !important;
-    max-width: 380px;
-    height: 88vw !important;
-    max-height: 380px;
+    width: 78vw !important;
+    max-width: 330px;
+    height: 78vw !important;
+    max-height: 330px;
     aspect-ratio: 1 / 1;
     margin: 2rem auto;
     padding: 1rem;
@@ -162,7 +162,7 @@
 
   .login-footer button {
     padding: 14px;
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 500;
   }
 
@@ -178,24 +178,24 @@
   }
 
   .user-form .input-wrapper {
-    grid-template-columns: 80px 1fr;
+    grid-template-columns: 64px 1fr;
     gap: 10px;
   }
 
   .user-form input {
-    font-size: 28px;
+    font-size: 22px;
     padding: 10px 4px;
     min-height: 48px;
   }
 
   .input-title {
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 500;
   }
 
   .user-form button {
     padding: 14px;
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 500;
   }
 
@@ -209,6 +209,6 @@
     height: auto;
     flex: 1;
     padding: 14px;
-    font-size: 24px;
+    font-size: 20px;
   }
 }
