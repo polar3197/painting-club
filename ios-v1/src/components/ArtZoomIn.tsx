@@ -154,49 +154,53 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
         <Pressable style={styles.backdrop} onPress={handleClose}>
           <View style={styles.blurOverlay} />
         </Pressable>
-        <GestureDetector gesture={gesture}>
-          <View style={styles.imageWrapper} collapsable={false}>
-            <Animated.View
-              style={[
-                {
-                  width: displayW,
-                  height: displayH,
-                },
-                animatedStyle,
-              ]}
-            >
-              <RNAnimated.View
-                style={[
-                  StyleSheet.absoluteFill,
-                  { transform: [{ perspective: 1000 }, { rotateY: frontRotate }], backfaceVisibility: 'hidden' },
-                ]}
-              >
-                <Image
-                  source={{ uri }}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="contain"
-                />
-              </RNAnimated.View>
-              <RNAnimated.View
-                style={[
-                  StyleSheet.absoluteFill,
-                  styles.cardBack,
-                  { transform: [{ perspective: 1000 }, { rotateY: backRotate }], backfaceVisibility: 'hidden' },
-                ]}
-              >
-                {isOwner && onChangePic && (
-                  <Pressable
-                    style={styles.changePicBtn}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      onChangePic();
-                    }}
+        <GestureDetector gesture={outerGesture}>
+          <View style={styles.imageWrapper} pointerEvents="box-none" collapsable={false}>
+            {imgSize && (
+              <GestureDetector gesture={tap}>
+                <Animated.View
+                  style={[
+                    {
+                      width: displayW,
+                      height: displayH,
+                    },
+                    animatedStyle,
+                  ]}
+                >
+                  <RNAnimated.View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { transform: [{ perspective: 1000 }, { rotateY: frontRotate }], backfaceVisibility: 'hidden' },
+                    ]}
                   >
-                    <Text style={styles.changePicBtnText}>change pic</Text>
-                  </Pressable>
-                )}
-              </RNAnimated.View>
-            </Animated.View>
+                    <Image
+                      source={{ uri }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="contain"
+                    />
+                  </RNAnimated.View>
+                  <RNAnimated.View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      styles.cardBack,
+                      { transform: [{ perspective: 1000 }, { rotateY: backRotate }], backfaceVisibility: 'hidden' },
+                    ]}
+                  >
+                    {isOwner && onChangePic && (
+                      <Pressable
+                        style={styles.changePicBtn}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          onChangePic();
+                        }}
+                      >
+                        <Text style={styles.changePicBtnText}>change pic</Text>
+                      </Pressable>
+                    )}
+                  </RNAnimated.View>
+                </Animated.View>
+              </GestureDetector>
+            )}
           </View>
         </GestureDetector>
       </GestureHandlerRootView>

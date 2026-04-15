@@ -119,24 +119,31 @@
   box-sizing: border-box;
 }
 
+.user-form .password-toggle,
 .password-toggle {
   position: absolute;
   right: 0;
   bottom: 2px;
   width: 18px;
   height: 18px;
+  min-height: 0;
   background: transparent;
   border: none;
   padding: 0;
+  margin: 0;
+  font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #444;
+  flex: 0 0 auto;
 }
 
+.user-form .password-toggle:hover,
 .password-toggle:hover {
   color: #000;
+  background: transparent;
 }
 
 @media (max-width: 1024px) {
