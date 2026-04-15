@@ -259,11 +259,21 @@
     }
 
     .art-details-footer {
-        flex-wrap: wrap;
-        gap: 6px;
+        gap: 10px;
+    }
+
+    .art-element-buttons {
+        gap: 10px;
+        justify-content: space-between;
     }
 
     .comments-toggle {
-        width: 100%;
+        width: auto;
+        flex: 0 0 auto;
+    }
+
+    .comments-toggle button {
+        padding: 3px 10px;
+        width: auto;
     }
 }

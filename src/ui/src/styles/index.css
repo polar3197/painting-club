@@ -14,4 +14,10 @@ html, body, #root {
   select {
     font-size: 16px;
   }
+
+  button {
+    color: #000;
+    -webkit-appearance: none;
+    appearance: none;
+  }
 }
