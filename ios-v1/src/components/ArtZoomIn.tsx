@@ -113,8 +113,7 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
       }
     });
 
-  const composed = Gesture.Simultaneous(pinch, pan);
-  const gesture = Gesture.Exclusive(tap, composed);
+  const outerGesture = Gesture.Simultaneous(pinch, pan);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -136,8 +135,8 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
 
   const maxW = screenW * 0.9;
   const maxH = screenH * 0.85;
-  let displayW = maxW;
-  let displayH = maxH;
+  let displayW = 0;
+  let displayH = 0;
   if (imgSize) {
     const ratio = imgSize.w / imgSize.h;
     if (ratio > maxW / maxH) {
