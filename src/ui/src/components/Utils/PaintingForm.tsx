@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import heic2any from "heic2any";
 import { Visual2DOut } from "../../api";
 
 const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Record<string, any>) => void; initialData?: Visual2DOut }) => {
@@ -26,11 +27,40 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
             files: null,
         });
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     const update = (patch: Record<string, any>) => {
         const next = { ...form, ...patch };
         setForm(next);
         onDataChange(next);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+        };
+    }, [previewUrl]);
+
+    const handleFileChange = async (file: File | null) => {
+        update({ files: file });
+        if (!file) {
+            setPreviewUrl(null);
+            return;
+        }
+        const isHeic = /\.(heic|heif)$/i.test(file.name)
+            || file.type === "image/heic"
+            || file.type === "image/heif";
+        if (isHeic) {
+            try {
+                const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+                const blob = Array.isArray(result) ? result[0] : result;
+                setPreviewUrl(URL.createObjectURL(blob as Blob));
+            } catch {
+                setPreviewUrl(null);
+            }
+        } else {
+            setPreviewUrl(URL.createObjectURL(file));
+        }
     };
 
     return (
@@ -41,11 +71,13 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
                 ref={fileInputRef}
                 style={{ display: "none" }}
                 accept=".png, .jpg, .jpeg, .pdf, .heic, .heif"
-                onChange={(e) => update({ files: e.target.files?.[0] ?? null })}
+                onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
             />
-            {form.files ?
-                <img src={URL.createObjectURL(form.files)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                : "drop your art here"
+            {form.files && previewUrl ?
+                <img src={previewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                : form.files ?
+                    "converting preview..."
+                    : "drop your art here"
             }
         </div>
         <div className="painting-title">

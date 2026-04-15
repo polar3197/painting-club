@@ -415,7 +415,7 @@ export default function UserProfile() {
 
       {/* ---- MediaBar ---- */}
       <View style={styles.mediaBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaTabs}>
+        <View style={styles.mediaTabs}>
           {profile.media?.map((m) => (
             <Pressable
               key={m}
@@ -431,7 +431,7 @@ export default function UserProfile() {
               <Text style={styles.mediaTabText}>{m}</Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
 
         {/* Keywords sub-bar */}
         <View style={styles.keywordsBar}>
@@ -516,13 +516,14 @@ const styles = StyleSheet.create({
 
   // UserDetails
   userDetails: {
-    flexDirection: 'row',
+    flexDirection: 'column',
+    alignItems: 'center',
     padding: 10,
     paddingHorizontal: 20,
-    gap: 10,
+    gap: 12,
   },
   userFields: {
-    flex: 1,
+    width: '100%',
     borderWidth: 1,
     borderColor: '#000',
     borderRadius: 5,
@@ -602,11 +603,12 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xxs,
   },
   profilePicContainer: {
-    width: SCREEN_WIDTH * 0.22,
+    width: SCREEN_WIDTH * 0.5,
+    alignSelf: 'center',
   },
   profilePic: {
-    width: SCREEN_WIDTH * 0.22,
-    height: SCREEN_WIDTH * 0.28,
+    width: '100%',
+    aspectRatio: 1,
     borderWidth: 5,
     borderColor: Colors.primaryGold,
     borderRadius: 5,
@@ -621,14 +623,19 @@ const styles = StyleSheet.create({
   },
   mediaTabs: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    width: '100%',
   },
   mediaTab: {
+    flexGrow: 1,
+    flexBasis: '40%',
+    alignItems: 'center',
     backgroundColor: Colors.secondary,
     borderWidth: 1,
     borderColor: '#000',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginRight: 6,
   },
   mediaTabSelected: {
     backgroundColor: Colors.primaryGold,
