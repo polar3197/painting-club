@@ -30,7 +30,7 @@ export default function Dropdown({ placeholder, options, onSelect, onInputChange
   };
 
   const handleSelect = (item: string) => {
-    setQuery(item);
+    setQuery('');
     setShowList(false);
     onSelect(item);
   };

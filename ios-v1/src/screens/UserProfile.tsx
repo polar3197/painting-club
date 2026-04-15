@@ -434,8 +434,7 @@ export default function UserProfile() {
         </ScrollView>
 
         {/* Keywords sub-bar */}
-        {availableKeywords.length > 0 && (
-          <View style={styles.keywordsBar}>
+        <View style={styles.keywordsBar}>
             <View style={styles.keywordDropdown}>
               <Dropdown
                 placeholder="keyword"
@@ -459,8 +458,7 @@ export default function UserProfile() {
                 </View>
               ))}
             </ScrollView>
-          </View>
-        )}
+        </View>
       </View>
 
       {/* ---- Art Section ---- */}
