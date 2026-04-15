@@ -177,16 +177,18 @@
   }
 
   .user-form .input-wrapper {
-    grid-template-columns: 36px 1fr;
+    grid-template-columns: 52px 1fr;
+    gap: 6px;
   }
 
   .user-form input {
-    font-size: 16px;
-    padding: 6px 2px;
+    font-size: 18px;
+    padding: 8px 4px;
+    min-height: 36px;
   }
 
   .input-title {
-    font-size: 15px;
+    font-size: 18px;
   }
 
   .user-form button {
