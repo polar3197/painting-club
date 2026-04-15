@@ -116,3 +116,46 @@
 .application-btn.reject:hover {
     background-color: rgb(220, 100, 100);
 }
+
+@media (max-width: 1024px) {
+    .admin-page {
+        padding: 20px;
+    }
+
+    .admin-title {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 640px) {
+    .admin-page {
+        padding: 14px;
+    }
+
+    .admin-title {
+        font-size: 20px;
+        margin-bottom: 16px;
+    }
+
+    .admin-section {
+        margin-bottom: 22px;
+    }
+
+    .application-row-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .application-row-actions {
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .application-name {
+        font-size: 16px;
+    }
+}

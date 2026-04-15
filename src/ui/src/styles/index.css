@@ -7,3 +7,5 @@
 html, body, #root {
   height: 100%;
 }
+
+/* Responsive: no overrides needed — layout is already fluid */

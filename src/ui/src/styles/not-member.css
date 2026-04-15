@@ -55,3 +55,28 @@
 .not-member-btn.secondary:hover {
     background-color: rgb(240, 240, 240);
 }
+
+@media (max-width: 640px) {
+    .not-member-card {
+        padding: 28px 22px;
+        max-width: 90vw;
+    }
+
+    .not-member-heading {
+        font-size: 20px;
+    }
+
+    .not-member-sub {
+        font-size: 14px;
+        text-align: center;
+    }
+
+    .not-member-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .not-member-btn {
+        width: 100%;
+    }
+}

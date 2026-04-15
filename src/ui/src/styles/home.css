@@ -70,5 +70,65 @@
     box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
 }
 
+@media (max-width: 1024px) {
+    .home-left {
+        width: 55%;
+    }
+
+    .home-right {
+        width: 45%;
+    }
+
+    .home-left-title {
+        font-size: 28px;
+        padding: 14px;
+    }
+}
+
+@media (max-width: 640px) {
+    .home {
+        flex-direction: column;
+        height: auto;
+        min-height: 100%;
+    }
+
+    .home-left,
+    .home-right {
+        width: 100%;
+    }
+
+    .home-left {
+        height: auto;
+    }
+
+    .home-right {
+        height: 50vh;
+        justify-content: center;
+    }
+
+    .home-left-top {
+        height: auto;
+        padding: 14px;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .home-left-title {
+        font-size: 22px;
+        padding: 10px 14px;
+    }
+
+    .home-left-content {
+        height: auto;
+        padding: 10px 0 20px 0;
+    }
+
+    .painting-club-message {
+        width: 92%;
+        height: auto;
+        min-height: 40vh;
+        padding: 14px;
+    }
+}
 
 

@@ -22,3 +22,20 @@
   z-index: 1;
   font-size: 3vw;
 }
+
+@media (max-width: 1024px) {
+  .title {
+    bottom: 60%;
+    left: 5rem;
+    font-size: 4vw;
+  }
+}
+
+@media (max-width: 640px) {
+  .title {
+    bottom: 65%;
+    left: 1.5rem;
+    right: 1.5rem;
+    font-size: 7vw;
+  }
+}

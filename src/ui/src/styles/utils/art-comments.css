@@ -159,3 +159,46 @@
     background-color: rgb(189, 240, 189);
     transform: scale(0.95);
 }
+
+@media (max-width: 1024px) {
+    .art-comments-panel {
+        width: 85vw;
+        height: 85vh;
+    }
+}
+
+@media (max-width: 640px) {
+    .art-comments-panel {
+        width: 95vw;
+        height: 90vh;
+        max-width: 95vw;
+        max-height: 90vh;
+        flex-direction: column;
+    }
+
+    .art-comments-image {
+        width: 100%;
+        height: 40%;
+        border-right: none;
+        border-bottom: 1px black solid;
+    }
+
+    .art-comments-section {
+        width: 100%;
+        height: 60%;
+    }
+
+    .art-comments-header {
+        padding: 8px 12px;
+        font-size: 16px;
+    }
+
+    .art-comment {
+        width: 75%;
+        font-size: 14px;
+    }
+
+    .art-comment-label {
+        max-width: 64px;
+    }
+}

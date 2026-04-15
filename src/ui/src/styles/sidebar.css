@@ -163,4 +163,52 @@ button:focus {
     outline: none;
 }
 
+@media (max-width: 1024px) {
+    .sidebar.open {
+        width: 10rem;
+    }
+
+    .sidebar button {
+        width: 5vw;
+        height: 5vw;
+    }
+}
+
+@media (max-width: 640px) {
+    .sidebar {
+        padding-top: 2vh;
+        padding-right: 3px;
+        padding-left: 3px;
+    }
+
+    .sidebar.open {
+        width: 8rem;
+    }
+
+    .sidebar.closed {
+        width: 2.8rem;
+    }
+
+    .sidebar button {
+        width: 7vw;
+        height: 7vw;
+        min-width: 28px;
+        min-height: 28px;
+    }
+
+    .sidebar-title {
+        height: 2.2rem;
+        font-size: 13px;
+    }
+
+    .sidebar-element.closed,
+    .sidebar-element.open {
+        height: 2.2rem;
+    }
+
+    .sidebar-tooltip {
+        display: none;
+    }
+}
+
 

@@ -21,3 +21,32 @@
     font-size: 24px;
     white-space: nowrap;
 }
+
+@media (max-width: 1024px) {
+    .filter-header {
+        font-size: 20px;
+        left: 16px;
+    }
+
+    .filter-bar {
+        padding-left: 16px;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 640px) {
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        height: auto;
+        padding: 10px 16px;
+        gap: 8px;
+    }
+
+    .filter-header {
+        position: static;
+        font-size: 18px;
+        text-align: center;
+    }
+}

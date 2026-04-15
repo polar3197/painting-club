@@ -12,3 +12,5 @@
     flex-direction: column;
     overflow-y: auto;
 }
+
+/* Responsive: no overrides needed — layout is already fluid */

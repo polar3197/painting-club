@@ -60,3 +60,37 @@
     font-family: 'Courier New', Courier, monospace;
     line-height: 20px;
 }
+
+@media (max-width: 1024px) {
+    .ethos-page {
+        width: 90vw;
+        height: auto;
+        min-height: 80vh;
+        padding: 40px 60px;
+    }
+}
+
+@media (max-width: 640px) {
+    .ethos-wrapper {
+        padding: 10px 0;
+    }
+
+    .ethos-page {
+        width: 95vw;
+        max-width: 95vw;
+        height: auto;
+        padding: 30px 20px;
+        gap: 20px;
+    }
+
+    .ethos-title {
+        font-size: 20px;
+    }
+
+    .leave-ethos {
+        top: 10px;
+        left: 10px;
+        height: 26px;
+        width: 26px;
+    }
+}

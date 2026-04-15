@@ -47,3 +47,32 @@
   user-select: none;
   pointer-events: none;
 }
+
+@media (max-width: 1024px) {
+  .announcements {
+    width: 90%;
+    height: 85%;
+  }
+}
+
+@media (max-width: 640px) {
+  .announcements {
+    width: 95%;
+    height: 90%;
+    border-width: 2px;
+  }
+
+  .announcements-header {
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .announcements-body {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .announcement-item {
+    padding: 8px;
+  }
+}

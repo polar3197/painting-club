@@ -107,3 +107,24 @@
 .error {
   color: #b00020;
 }
+
+@media (max-width: 1024px) {
+  .login-container {
+    left: 2rem;
+    bottom: 2rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .login-container {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    width: auto;
+    max-width: calc(100% - 2rem);
+  }
+
+  .user-form {
+    max-width: 100%;
+  }
+}

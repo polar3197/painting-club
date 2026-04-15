@@ -155,3 +155,54 @@
     background-color: rgb(119, 197, 119);
     transform: scale(.95);
 }
+
+@media (max-width: 1024px) {
+    .user-profile-pic {
+        width: 28%;
+    }
+
+    .user-fields {
+        width: 70%;
+    }
+
+    .user-name {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 640px) {
+    .user-deets {
+        height: auto;
+        min-height: 0;
+        padding: 8px;
+    }
+
+    .user-body {
+        flex-direction: column;
+        padding: 8px;
+        gap: 12px;
+    }
+
+    .user-profile-pic {
+        width: 60%;
+        max-width: 200px;
+        align-self: center;
+    }
+
+    .user-fields {
+        width: 100%;
+        padding: 8px;
+    }
+
+    .user-name {
+        font-size: 18px;
+    }
+
+    .user-field-element {
+        font-size: 15px;
+    }
+
+    .artist-statement-label {
+        font-size: 16px;
+    }
+}

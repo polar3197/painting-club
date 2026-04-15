@@ -13,7 +13,7 @@ export default function Home() {
       contentContainerStyle={styles.content}
     >
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>{'-\u2022 Painting Club \u2022-'}</Text>
+        <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>{'-\u2022 Painting Club \u2022-'}</Text>
       </View>
 
       <View style={styles.messageContainer}>

@@ -55,8 +55,10 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
     RNImage.getSize(uri, (w, h) => setImgSize({ w, h }), () => setImgSize({ w: 1, h: 1 }));
   }, [uri]);
 
+  const flippedRef = useRef(false);
   const handleFlip = () => {
-    const next = !flipped;
+    const next = !flippedRef.current;
+    flippedRef.current = next;
     setFlipped(next);
     Animated.timing(rotateAnim, {
       toValue: next ? 180 : 0,

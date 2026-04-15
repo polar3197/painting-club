@@ -48,3 +48,5 @@ textarea:focus,
 button:focus {
     outline: none;
 }
+
+/* Responsive: no overrides needed — layout is already fluid */

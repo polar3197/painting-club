@@ -97,3 +97,30 @@
     text-decoration: underline;
     cursor: pointer;
 }
+
+@media (max-width: 1024px) {
+    .members-display {
+        grid-template-columns: 1fr 1fr;
+        padding: 20px;
+        row-gap: 16px;
+        column-gap: 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    .members-display {
+        grid-template-columns: 1fr;
+        grid-auto-rows: auto;
+        padding: 12px;
+        row-gap: 12px;
+        column-gap: 12px;
+    }
+
+    .display-card {
+        padding: 8px;
+    }
+
+    .art-card-img img {
+        max-height: 140px;
+    }
+}

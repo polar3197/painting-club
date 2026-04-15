@@ -266,3 +266,73 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     left: 20px;
 }
 /* ========================================= */
+
+@media (max-width: 1024px) {
+    .dialog {
+        width: 75vw;
+        height: 85vh;
+    }
+
+    .blowup-wrapper {
+        height: 80vh;
+        max-width: 90vw;
+    }
+}
+
+@media (max-width: 640px) {
+    .dialog {
+        width: 95vw;
+        height: 90vh;
+        max-width: 95vw;
+        max-height: 90vh;
+    }
+
+    .blowup-wrapper {
+        height: 75vh;
+        max-width: 95vw;
+    }
+
+    .card-front img {
+        max-width: 95vw;
+        height: auto;
+        width: 100%;
+    }
+
+    .painting-dropbox {
+        position: static;
+        width: calc(100% - 24px);
+        height: 180px;
+        margin: 12px;
+    }
+
+    .painting-title,
+    .painting-location,
+    .painting-date,
+    .painting-song,
+    .keywords {
+        position: static;
+        width: calc(100% - 24px);
+        margin: 8px 12px 0 12px;
+    }
+
+    .painting-width,
+    .painting-height {
+        position: static;
+        width: calc(50% - 18px);
+        display: inline-block;
+        margin: 8px 6px 0 12px;
+    }
+
+    .painting-height {
+        margin: 8px 12px 0 6px;
+    }
+
+    .painting-comments-toggle {
+        position: static;
+        margin: 12px;
+    }
+
+    .dialog input {
+        font-size: 16px;
+    }
+}

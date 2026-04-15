@@ -23,7 +23,8 @@
         "backgroundColor": "#fffaf5"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.paintingclub.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"

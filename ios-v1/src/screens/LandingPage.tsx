@@ -51,7 +51,9 @@ export default function LandingPage() {
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Text style={styles.title}>-. Painting Club .-</Text>
+        <View style={styles.titleWrap}>
+          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>-. Painting Club .-</Text>
+        </View>
 
         <View style={styles.loginContainer}>
           {!notMember ? (
@@ -124,11 +126,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 30,
   },
+  titleWrap: {
+    backgroundColor: 'lightgreen',
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    marginBottom: 40,
+    ...Shadows.card,
+  },
   title: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xxl,
     color: Colors.black,
-    marginBottom: 40,
     textAlign: 'center',
   },
   loginContainer: {
@@ -147,7 +157,8 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.base,
-    width: 30,
+    width: 40,
+    flexShrink: 0,
   },
   input: {
     flex: 1,
