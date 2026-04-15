@@ -31,11 +31,13 @@ export default function LandingPage() {
   const [showApplication, setShowApplication] = useState(false);
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) return;
+    const normalized = username.trim().toLowerCase();
+    if (!normalized || !password.trim()) return;
     try {
-      const res = await login_user({ username: username.trim(), password: password.trim() });
-      const profile = await get_profile(username.trim(), res.access_token);
+      const res = await login_user({ username: normalized, password: password.trim() });
+      const profile = await get_profile(normalized, res.access_token);
       await auth.login(profile.username, res.access_token, profile.role);
+      (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
       Alert.alert('Login failed', err.message || 'Invalid credentials');
     }
@@ -63,8 +65,9 @@ export default function LandingPage() {
                 <TextInput
                   style={styles.input}
                   value={username}
-                  onChangeText={setUsername}
+                  onChangeText={(v) => setUsername(v.toLowerCase())}
                   autoCapitalize="none"
+                  autoCorrect={false}
                   placeholderTextColor={Colors.textMuted}
                 />
               </View>
@@ -91,7 +94,10 @@ export default function LandingPage() {
                 style={styles.altBtn}
                 onPress={() => {
                   setNotMember(false);
-                  navigation.navigate('NotMember');
+                  (navigation as any).reset({
+                    index: 0,
+                    routes: [{ name: 'Main', state: { routes: [{ name: 'PeopleTab' }] } }],
+                  });
                 }}
               >
                 <Text style={styles.altBtnText}>view artists profiles</Text>

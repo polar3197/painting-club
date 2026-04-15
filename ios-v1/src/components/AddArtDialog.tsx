@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { add_new_visual_2d, update_visual_2d, Visual2DOut } from '../api';
 import PaintingForm from './PaintingForm';
@@ -108,19 +108,32 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <Animated.View style={[styles.panel, { transform: [{ translateY }] }]}>
-        <View {...panResponder.panHandlers} style={styles.swipeHandle}>
-          <View style={styles.swipeBar} />
-        </View>
-        <ScrollView style={styles.formArea} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formContent}>
-          {isVisual2D(selectedMedium) && (
-            <PaintingForm onDataChange={setFormData} initialData={piece} />
-          )}
-        </ScrollView>
-        <Pressable style={styles.submitBtn} onPress={submit}>
-          <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
-        </Pressable>
-      </Animated.View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Animated.View
+          style={[styles.panel, { transform: [{ translateY }] }]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.swipeHandle}>
+            <View style={styles.swipeBar} />
+          </View>
+          <ScrollView
+            style={styles.formArea}
+            contentContainerStyle={styles.formContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {isVisual2D(selectedMedium) && (
+              <PaintingForm onDataChange={setFormData} initialData={piece} />
+            )}
+          </ScrollView>
+          <Pressable style={styles.submitBtn} onPress={submit}>
+            <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
+          </Pressable>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

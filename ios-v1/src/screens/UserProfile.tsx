@@ -277,7 +277,7 @@ export default function UserProfile() {
   }
 
   return (
-    <ScrollView ref={scrollRef} style={[styles.container, { paddingTop: insets.top }]} contentContainerStyle={styles.contentContainer}>
+    <ScrollView ref={scrollRef} style={[styles.container, { paddingTop: insets.top }]} contentContainerStyle={styles.contentContainer} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
       {/* Profile zoom */}
       {profileZoom && (
         <ArtZoomIn
@@ -321,41 +321,45 @@ export default function UserProfile() {
 
       {/* ---- UserDetails ---- */}
       <View style={styles.userDetails}>
-        <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
-          <Image
-            source={{ uri: resolveImageUrl(profile.profile_pic_path || `/imgs/${profile.id}.png`) }}
-            style={styles.profilePic}
-            contentFit="cover"
-          />
-        </Pressable>
         <Pressable
           style={styles.userFields}
           onPress={profile.is_owner && !editing ? startEditing : undefined}
         >
           {!editing ? (
             <>
-              <Text style={styles.userName}>
-                {profile.firstname} {profile.lastname}
-              </Text>
-              {(profile.city || profile.state) && (
-                <Text style={styles.userLocation}>
-                  {[profile.city, profile.state].filter(Boolean).join(', ')}
-                </Text>
-              )}
-              {selectedMedium && (
-                <Pressable
-                  style={styles.portfolioLink}
-                  onPress={() =>
-                    navigation.navigate('Portfolio', {
-                      username,
-                      medium: selectedMedium,
-                      keywords: selectedKeywords,
-                    })
-                  }
-                >
-                  <Text style={styles.portfolioLinkText}>portfolio view</Text>
+              <View style={styles.userTopRow}>
+                <View style={styles.userIdentity}>
+                  <Text style={styles.userName}>
+                    {profile.firstname} {profile.lastname}
+                  </Text>
+                  {(profile.city || profile.state) && (
+                    <Text style={styles.userLocation}>
+                      {[profile.city, profile.state].filter(Boolean).join(', ')}
+                    </Text>
+                  )}
+                  {selectedMedium && (
+                    <Pressable
+                      style={styles.portfolioLink}
+                      onPress={() =>
+                        navigation.navigate('Portfolio', {
+                          username,
+                          medium: selectedMedium,
+                          keywords: selectedKeywords,
+                        })
+                      }
+                    >
+                      <Text style={styles.portfolioLinkText}>portfolio view</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
+                  <Image
+                    source={{ uri: resolveImageUrl(profile.profile_pic_path || `/imgs/${profile.id}.png`) }}
+                    style={styles.profilePic}
+                    contentFit="cover"
+                  />
                 </Pressable>
-              )}
+              </View>
               {!!profile.bio && (
                 <View style={styles.bioSection}>
                   <Text style={styles.bioLabel}>Artist Statement</Text>
@@ -524,9 +528,6 @@ const styles = StyleSheet.create({
   },
   userFields: {
     width: '100%',
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 5,
     padding: 10,
   },
   userName: {
@@ -540,6 +541,11 @@ const styles = StyleSheet.create({
   },
   bioSection: {
     marginTop: 12,
+    marginHorizontal: -8,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 5,
+    padding: 10,
   },
   bioLabel: {
     fontFamily: Fonts.serif,
@@ -602,9 +608,17 @@ const styles = StyleSheet.create({
   portfolioLinkText: {
     fontSize: FontSizes.xxs,
   },
+  userTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  userIdentity: {
+    flex: 1,
+    gap: 4,
+  },
   profilePicContainer: {
-    width: SCREEN_WIDTH * 0.5,
-    alignSelf: 'center',
+    width: SCREEN_WIDTH * 0.32,
   },
   profilePic: {
     width: '100%',
@@ -692,6 +706,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    alignSelf: 'flex-end',
   },
   addBtnText: {
     fontSize: FontSizes.sm,

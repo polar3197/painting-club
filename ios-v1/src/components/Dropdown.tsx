@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, TextInput, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, TextInput, ScrollView, Pressable, Text, StyleSheet, Keyboard } from 'react-native';
 import Fuse from 'fuse.js';
 import { Colors } from '../constants/theme';
 
@@ -13,12 +13,22 @@ interface DropdownProps {
 export default function Dropdown({ placeholder, options, onSelect, onInputChange }: DropdownProps) {
   const [query, setQuery] = useState('');
   const [showList, setShowList] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const fuseRef = useRef(new Fuse(options, { threshold: 0.4 }));
 
   // Update fuse when options change
   React.useEffect(() => {
     fuseRef.current = new Fuse(options, { threshold: 0.4 });
   }, [options]);
+
+  // Close the list whenever the keyboard dismisses (e.g. from scroll-to-dismiss on the parent ScrollView)
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidHide', () => {
+      setShowList(false);
+      inputRef.current?.blur();
+    });
+    return () => sub.remove();
+  }, []);
 
   const filtered = query.trim()
     ? fuseRef.current.search(query).map((r) => r.item)
@@ -32,19 +42,29 @@ export default function Dropdown({ placeholder, options, onSelect, onInputChange
   const handleSelect = (item: string) => {
     setQuery('');
     setShowList(false);
+    inputRef.current?.blur();
     onSelect(item);
   };
 
   return (
     <View style={styles.container}>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={query}
         placeholder={placeholder}
         placeholderTextColor={Colors.textMuted}
         onChangeText={handleChange}
         onFocus={() => setShowList(true)}
-        onBlur={() => setTimeout(() => setShowList(false), 200)}
+        onBlur={() => setTimeout(() => setShowList(false), 150)}
+        onPressIn={() => {
+          if (showList) {
+            setShowList(false);
+            inputRef.current?.blur();
+          } else {
+            setShowList(true);
+          }
+        }}
       />
       {showList && filtered.length > 0 && (
         <ScrollView style={styles.list} keyboardShouldPersistTaps="handled" nestedScrollEnabled>

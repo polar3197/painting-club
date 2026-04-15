@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, Image, ActivityIndicator, StyleSheet, Alert, Pressable, ScrollView } from 'react-native';
+import { View, Text, Image, ActivityIndicator, StyleSheet, Pressable } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 
 const tabIcons = {
@@ -24,7 +25,7 @@ import ArtStack from './ArtStack';
 
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { AuthStackParamList, MainTabParamList } from './types';
+import type { MainTabParamList } from './types';
 
 function HomeIcon({ focused, size }: { focused: boolean; size: number }) {
   return (
@@ -49,9 +50,9 @@ function HomeIcon({ focused, size }: { focused: boolean; size: number }) {
 }
 
 function MoreScreen() {
-  const { logout, currentRole } = useAuth();
+  const { logout, currentUser, currentRole } = useAuth();
   const insets = useSafeAreaInsets();
-  const navigation = require('@react-navigation/native').useNavigation<any>();
+  const navigation = useNavigation<any>();
   const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false);
 
   return (
@@ -61,7 +62,11 @@ function MoreScreen() {
         title="logout"
         message="are you sure you want to logout?"
         confirmLabel="logout"
-        onConfirm={() => { setShowLogoutConfirm(false); logout(); }}
+        onConfirm={async () => {
+          setShowLogoutConfirm(false);
+          await logout();
+          navigation.navigate('LandingPage');
+        }}
         onCancel={() => setShowLogoutConfirm(false)}
       />
       <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.xl, marginBottom: 30, borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 10 }}>more</Text>
@@ -82,31 +87,32 @@ function MoreScreen() {
         <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>ethos</Text>
       </Pressable>
 
-      <Pressable
-        style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.redCoral }}
-        onPress={() => setShowLogoutConfirm(true)}
-      >
-        <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.white }}>logout</Text>
-      </Pressable>
+      {currentUser ? (
+        <Pressable
+          style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.redCoral }}
+          onPress={() => setShowLogoutConfirm(true)}
+        >
+          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.white }}>logout</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.white }}
+          onPress={() => navigation.navigate('LandingPage')}
+        >
+          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>login</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
 
-const AuthNav = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const RootStack = createNativeStackNavigator();
 
 function MeScreen() {
+  const { currentUser } = useAuth();
+  if (!currentUser) return <NotMember />;
   return <UserProfile />;
-}
-
-function AuthStackNavigator() {
-  return (
-    <AuthNav.Navigator screenOptions={{ headerShown: false }}>
-      <AuthNav.Screen name="LandingPage" component={LandingPage} />
-      <AuthNav.Screen name="NotMember" component={NotMember} />
-    </AuthNav.Navigator>
-  );
 }
 
 function MainTabs() {
@@ -156,7 +162,7 @@ function MainTabs() {
 }
 
 export default function RootNavigator() {
-  const { currentUser, isLoading } = useAuth();
+  const { isLoading, currentUser } = useAuth();
 
   if (isLoading) {
     return (
@@ -167,19 +173,17 @@ export default function RootNavigator() {
   }
 
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {!currentUser ? (
-        <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-      ) : (
-        <>
-          <RootStack.Screen name="Main" component={MainTabs} />
-          <RootStack.Group screenOptions={{ presentation: 'modal' }}>
-            <RootStack.Screen name="Ethos" component={Ethos} />
-            <RootStack.Screen name="Portfolio" component={Portfolio} />
-            <RootStack.Screen name="Admin" component={Admin} />
-          </RootStack.Group>
-        </>
-      )}
+    <RootStack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName={currentUser ? 'Main' : 'LandingPage'}
+    >
+      <RootStack.Screen name="Main" component={MainTabs} />
+      <RootStack.Screen name="LandingPage" component={LandingPage} />
+      <RootStack.Screen name="Ethos" component={Ethos} />
+      <RootStack.Group screenOptions={{ presentation: 'modal' }}>
+        <RootStack.Screen name="Portfolio" component={Portfolio} />
+        <RootStack.Screen name="Admin" component={Admin} />
+      </RootStack.Group>
     </RootStack.Navigator>
   );
 }

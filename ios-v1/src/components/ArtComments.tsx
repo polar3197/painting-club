@@ -120,16 +120,18 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
         <Animated.View style={[styles.panel, { transform: [{ translateY }] }]}>
-          <View {...panResponder.panHandlers} style={styles.swipeHandle}>
-            <View style={styles.swipeBar} />
-          </View>
-          <View style={styles.imageSection}>
-            <View style={[styles.imageBorder, { aspectRatio: imgRatio }]}>
-              <Image
-                source={{ uri: imgUri }}
-                style={{ width: '100%', height: '100%' }}
-                contentFit="cover"
-              />
+          <View {...panResponder.panHandlers}>
+            <View style={styles.swipeHandle}>
+              <View style={styles.swipeBar} />
+            </View>
+            <View style={styles.imageSection}>
+              <View style={[styles.imageBorder, { aspectRatio: imgRatio }]}>
+                <Image
+                  source={{ uri: imgUri }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="cover"
+                />
+              </View>
             </View>
           </View>
           <View style={styles.commentsSection}>

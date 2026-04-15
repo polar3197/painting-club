@@ -10,6 +10,7 @@ export default function Login(
 ) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [member, setMember] = useState(true);
   const [memberStatus, setMemberStatus] = useState("not a member?");
   const [showApplication, setShowApplication] = useState(false);
@@ -57,12 +58,22 @@ export default function Login(
             </div>
             <div className="input-wrapper">
               <div className="input-title">pw:</div>
-              <input
-                type="password"
-                placeholder=""
-                onChange={(event) => setPassword(event.target.value)}
-                value={password}
-              />
+              <div className="password-field">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder=""
+                  onChange={(event) => setPassword(event.target.value)}
+                  value={password}
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "🙈" : "👁"}
+                </button>
+              </div>
             </div>
             <button type="submit">login</button>
           </form>
