@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Visual2DOut, CommentOut, get_comments, post_comment } from "../../api";
 import { useNavigate } from "react-router-dom";
+import ArtZoomIn from "./ArtZoomIn";
 import "../../styles/utils/art-comments.css";
 
 const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: boolean) => void }) => {
@@ -9,6 +10,7 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
     const navigate = useNavigate();
     const [comments, setComments] = useState<CommentOut[]>([]);
     const [input, setInput] = useState("");
+    const [isZoomedIn, setIsZoomedIn] = useState(false);
 
     useEffect(() => {
         get_comments(piece.id, token).then(setComments).catch(() => {});
@@ -27,9 +29,10 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
     };
 
     return (
+        <>
         <div className="art-comments-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}>
             <div className="art-comments-panel">
-                <div className="art-comments-image">
+                <div className="art-comments-image" onClick={() => setIsZoomedIn(true)} style={{ cursor: "pointer" }}>
                     <img src={piece.file_path} alt={piece.title} />
                 </div>
                 <div className="art-comments-section">
@@ -78,6 +81,14 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
                 </div>
             </div>
         </div>
+        {isZoomedIn && (
+            <ArtZoomIn
+                isOwner={false}
+                imgPath={piece.file_path}
+                setIsZoomedIn={setIsZoomedIn}
+            />
+        )}
+        </>
     );
 };
 
