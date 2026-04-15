@@ -33,7 +33,16 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
                     <img src={piece.file_path} alt={piece.title} />
                 </div>
                 <div className="art-comments-section">
-                    <div className="art-comments-header">{piece.title}</div>
+                    <div className="art-comments-header">
+                        <span className="art-comments-title">{piece.title}</span>
+                        <button
+                            className="art-comments-close"
+                            onClick={() => setIsOpen(false)}
+                            aria-label="Close comments"
+                        >
+                            ×
+                        </button>
+                    </div>
                     <div className="art-comments-list">
                         {comments.map((c) => {
                             const isOwn = c.username === currentUser;

@@ -209,6 +209,20 @@ button:focus {
     .sidebar-tooltip {
         display: none;
     }
+
+    .sidebar-element button {
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .sidebar-element button img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
 }
 
 
