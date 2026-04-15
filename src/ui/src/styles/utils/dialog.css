@@ -336,3 +336,37 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
         font-size: 16px;
     }
 }
+
+@media (max-width: 640px) {
+    .blowup-wrapper {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 92vw;
+        max-width: 92vw;
+        height: auto;
+        max-height: 85vh;
+    }
+
+    .blowup-dialog {
+        width: 100%;
+        height: auto;
+    }
+
+    .card-front {
+        height: auto;
+        width: 100%;
+    }
+
+    .card-front img {
+        width: 100%;
+        height: auto;
+        max-height: 85vh;
+        object-fit: contain;
+    }
+
+    .card-back {
+        min-height: 60vw;
+    }
+}

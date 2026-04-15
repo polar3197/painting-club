@@ -39,3 +39,25 @@
     font-size: 7vw;
   }
 }
+
+@media (max-width: 640px) {
+  .page {
+    overflow-x: hidden;
+    overflow-y: auto;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .page-background {
+    position: fixed;
+  }
+
+  .title {
+    position: static;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    padding: 1.25rem 1.5rem 0.5rem;
+    font-size: 2rem;
+  }
+}
