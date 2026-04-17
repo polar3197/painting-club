@@ -4,7 +4,7 @@ import "../../styles/admin.css";
 
 const statusColor: Record<string, string> = {
     pending: "rgb(238, 190, 100)",
-    pending_setup: "rgb(120, 180, 230)",
+    pending_setup: "lightblue",
     approved: "lightgreen",
     rejected: "lightcoral",
     resolved: "lightgreen",
