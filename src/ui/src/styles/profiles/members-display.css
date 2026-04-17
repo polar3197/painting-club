@@ -153,4 +153,15 @@
         width: 100%;
         padding-left: 0;
     }
+
+    /* Desktop uses .member-deets { height: 100% } + { margin-top: auto } on the last <p>
+       to pin the mediums line to the bottom of the horizontal card. In mobile's vertical
+       stack that just inflates the cell, which pushes the image up out of view. */
+    .member-deets {
+        height: auto;
+    }
+
+    .member-deets p:last-child {
+        margin-top: 0;
+    }
 }
