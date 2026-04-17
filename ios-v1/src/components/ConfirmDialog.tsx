@@ -5,10 +5,13 @@ import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 interface ConfirmDialogProps {
   visible: boolean;
   title: string;
-  message: string;
+  message?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   confirmColor?: string;
+  cancelColor?: string;
+  confirmTextColor?: string;
+  cancelTextColor?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,6 +23,9 @@ export default function ConfirmDialog({
   confirmLabel = 'confirm',
   cancelLabel = 'cancel',
   confirmColor = Colors.redCoral,
+  cancelColor = Colors.white,
+  confirmTextColor = Colors.white,
+  cancelTextColor = Colors.black,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -28,13 +34,13 @@ export default function ConfirmDialog({
       <Pressable style={styles.backdrop} onPress={onCancel}>
         <View style={styles.dialog} onStartShouldSetResponder={() => true}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          {!!message && <Text style={styles.message}>{message}</Text>}
           <View style={styles.buttons}>
-            <Pressable style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={styles.cancelText}>{cancelLabel}</Text>
+            <Pressable style={[styles.cancelBtn, { backgroundColor: cancelColor }]} onPress={onCancel}>
+              <Text style={[styles.cancelText, { color: cancelTextColor }]}>{cancelLabel}</Text>
             </Pressable>
             <Pressable style={[styles.confirmBtn, { backgroundColor: confirmColor }]} onPress={onConfirm}>
-              <Text style={styles.confirmText}>{confirmLabel}</Text>
+              <Text style={[styles.confirmText, { color: confirmTextColor }]}>{confirmLabel}</Text>
             </Pressable>
           </View>
         </View>

@@ -272,7 +272,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     marginBottom: 8,
-    width: '100%',
   },
   commentRowOwn: {
     justifyContent: 'flex-end',

@@ -3,8 +3,8 @@ import "../../styles/utils/confirm-dialog.css";
 const ConfirmDialog = (
     {
         message = "u sure?",
-        confirmLabel = "u sure?",
-        cancelLabel = "nvm",
+        confirmLabel = "yes",
+        cancelLabel = "no. shit. stop",
         onConfirm,
         onCancel,
     }
@@ -22,7 +22,7 @@ const ConfirmDialog = (
             <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
                 <div className="confirm-message">{message}</div>
                 <div className="confirm-buttons">
-                    <button onClick={onCancel}>{cancelLabel}</button>
+                    <button className="confirm-no" onClick={onCancel}>{cancelLabel}</button>
                     <button className="confirm-yes" onClick={onConfirm}>{confirmLabel}</button>
                 </div>
             </div>

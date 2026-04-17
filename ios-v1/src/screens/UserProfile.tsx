@@ -71,9 +71,13 @@ function Visual2DPiece({
     <>
       <ConfirmDialog
         visible={showRemoveConfirm}
-        title="remove art"
-        message={`are you sure you want to remove "${piece.title}"?`}
-        confirmLabel="remove"
+        title="u sure?"
+        confirmLabel="yes"
+        cancelLabel="no. shit. stop"
+        confirmColor={Colors.greenBright}
+        cancelColor={Colors.redLight}
+        confirmTextColor={Colors.black}
+        cancelTextColor={Colors.black}
         onConfirm={removeArt}
         onCancel={() => setShowRemoveConfirm(false)}
       />
