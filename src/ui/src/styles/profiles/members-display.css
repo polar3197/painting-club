@@ -118,9 +118,39 @@
 
     .display-card {
         padding: 8px;
+        align-items: stretch;
+    }
+
+    /* Art card already has img before details in the DOM — column puts image on top. */
+    .art-card {
+        flex-direction: column;
+    }
+
+    /* Member card has details before pic in the DOM — reverse so pic sits on top. */
+    .member-card {
+        flex-direction: column-reverse;
+    }
+
+    .member-pic,
+    .art-card-img {
+        flex: none;
+        width: 100%;
+    }
+
+    .member-pic img {
+        width: 100%;
+        height: auto;
+        display: block;
     }
 
     .art-card-img img {
         max-height: 140px;
+    }
+
+    .member-deets,
+    .art-card-deets {
+        flex: none;
+        width: 100%;
+        padding-left: 0;
     }
 }
