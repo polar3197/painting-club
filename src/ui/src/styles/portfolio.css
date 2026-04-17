@@ -38,6 +38,7 @@
     cursor: pointer;
     white-space: nowrap;
     align-self: center;
+    width: auto;
 }
 
 .portfolio-view-toggle:hover {
