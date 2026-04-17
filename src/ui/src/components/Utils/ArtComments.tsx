@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Visual2DOut, CommentOut, get_comments, post_comment, delete_comment } from "../../api";
+import { Visual2DOut, CommentOut, get_comments, post_comment, delete_comment, thumbUrl } from "../../api";
 import { useNavigate } from "react-router-dom";
 import ArtZoomIn from "./ArtZoomIn";
 import "../../styles/utils/art-comments.css";
@@ -11,10 +11,19 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
     const [comments, setComments] = useState<CommentOut[]>([]);
     const [input, setInput] = useState("");
     const [isZoomedIn, setIsZoomedIn] = useState(false);
+    // Start with the thumb for instant paint, swap to full-res once it finishes preloading.
+    const [imgSrc, setImgSrc] = useState(thumbUrl(piece.id));
 
     useEffect(() => {
         get_comments(piece.id, token).then(setComments).catch(() => {});
     }, [piece.id]);
+
+    useEffect(() => {
+        setImgSrc(thumbUrl(piece.id));
+        const full = new Image();
+        full.onload = () => setImgSrc(piece.file_path);
+        full.src = piece.file_path;
+    }, [piece.id, piece.file_path]);
 
     const submit = async () => {
         const text = input.trim();
@@ -45,7 +54,7 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
         <div className="art-comments-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}>
             <div className="art-comments-panel">
                 <div className="art-comments-image" onClick={() => setIsZoomedIn(true)} style={{ cursor: "pointer" }}>
-                    <img src={piece.file_path} alt={piece.title} />
+                    <img src={imgSrc} alt={piece.title} />
                 </div>
                 <div className="art-comments-section">
                     <div className="art-comments-header">

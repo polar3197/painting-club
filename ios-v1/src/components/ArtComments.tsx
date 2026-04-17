@@ -19,7 +19,7 @@ import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { get_comments, post_comment, delete_comment, resolveImageUrl, Visual2DOut, CommentOut } from '../api';
+import { get_comments, post_comment, delete_comment, resolveImageUrl, thumbUrl, Visual2DOut, CommentOut } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -161,6 +161,8 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             <View style={styles.imageSection}>
               <Image
                 source={{ uri: imgUri }}
+                placeholder={{ uri: thumbUrl(piece.id) }}
+                transition={200}
                 style={[styles.image, computeImgSize(imgRatio)]}
                 contentFit="contain"
               />
@@ -296,7 +298,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     fontWeight: '600',
-    color: Colors.blueLink,
+    color: Colors.black,
   },
   commentLabelUsername: {
     fontSize: FontSizes.micro,
