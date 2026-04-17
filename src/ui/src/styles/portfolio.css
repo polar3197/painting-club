@@ -29,6 +29,7 @@
 
 .portfolio-view-toggle {
     margin-left: auto;
+    width: fit-content;
     font-family: system-ui, sans-serif;
     font-size: 13px;
     font-weight: 400;
@@ -38,7 +39,6 @@
     cursor: pointer;
     white-space: nowrap;
     align-self: center;
-    width: auto;
 }
 
 .portfolio-view-toggle:hover {
