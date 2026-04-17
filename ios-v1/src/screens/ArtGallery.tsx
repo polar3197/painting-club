@@ -7,7 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import CentralFilter from '../components/CentralFilter';
 import { useOptions } from '../hooks';
-import { search_art, resolveImageUrl, ArtResult } from '../api';
+import { search_art, resolveImageUrl, thumbUrl, ArtResult } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { ArtStackParamList } from '../navigation/types';
 
@@ -86,6 +86,8 @@ export default function ArtGallery() {
     >
       <Image
         source={{ uri: resolveImageUrl(item.file_path) }}
+        placeholder={{ uri: thumbUrl(item.id) }}
+        transition={200}
         style={styles.cardImage}
         contentFit="cover"
       />

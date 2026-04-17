@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../hooks';
@@ -24,6 +24,7 @@ import {
   update_profile,
   get_search_options,
   resolveImageUrl,
+  thumbUrl,
   upload_profile_picture,
   Visual2DOut,
   Profile,
@@ -98,6 +99,8 @@ function Visual2DPiece({
         >
           <Image
             source={{ uri: resolveImageUrl(piece.file_path) }}
+            placeholder={{ uri: thumbUrl(piece.id) }}
+            transition={200}
             style={styles.artImage}
             contentFit="cover"
           />
@@ -175,6 +178,7 @@ export default function UserProfile() {
   const insets = useSafeAreaInsets();
   const route = useRoute<ProfileRoute>();
   const navigation = useNavigation<any>();
+  const isFocused = useIsFocused();
   const { currentUser, token } = useAuth();
 
   const params = route.params as { username?: string; artId?: string; medium?: string } | undefined;
@@ -218,6 +222,15 @@ export default function UserProfile() {
       setSelectedMedium(profile.media[0]);
     }
   }, [profile]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', () => {
+      if (isFocused) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigation, isFocused]);
 
   // Fetch art
   useEffect(() => {

@@ -23,7 +23,20 @@ import { get_comments, post_comment, delete_comment, resolveImageUrl, Visual2DOu
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from './ConfirmDialog';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const IMG_SECTION_HEIGHT = SCREEN_HEIGHT * 0.4;
+const MAX_IMG_WIDTH = SCREEN_WIDTH - 20;
+const MAX_IMG_HEIGHT = IMG_SECTION_HEIGHT - 20;
+
+function computeImgSize(ratio: number) {
+  let w = MAX_IMG_WIDTH;
+  let h = w / ratio;
+  if (h > MAX_IMG_HEIGHT) {
+    h = MAX_IMG_HEIGHT;
+    w = h * ratio;
+  }
+  return { width: w, height: h };
+}
 
 interface ArtCommentsProps {
   piece: Visual2DOut;
@@ -148,7 +161,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             <View style={styles.imageSection}>
               <Image
                 source={{ uri: imgUri }}
-                style={[styles.image, { aspectRatio: imgRatio }]}
+                style={[styles.image, computeImgSize(imgRatio)]}
                 contentFit="contain"
               />
             </View>
@@ -216,7 +229,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.textMuted,
   },
   imageSection: {
-    height: SCREEN_HEIGHT * 0.4,
+    height: IMG_SECTION_HEIGHT,
     backgroundColor: Colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -225,8 +238,6 @@ const styles = StyleSheet.create({
     borderBottomColor: '#000',
   },
   image: {
-    maxWidth: '100%',
-    maxHeight: '100%',
     borderWidth: 1,
     borderColor: '#000',
   },

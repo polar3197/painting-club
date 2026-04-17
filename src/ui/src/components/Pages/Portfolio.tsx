@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { get_members_visual_2d, Visual2DOut } from "../../api";
 import { useProfile } from "../../hooks/useProfile";
 import ArtZoomIn from "../Utils/ArtZoomIn";
+import ArtImage from "../Utils/ArtImage";
 import "../../styles/portfolio.css";
 
 const ROW_SIZE = 10;  // matches grid-auto-rows in CSS
@@ -20,9 +21,7 @@ const PortfolioCell = ({
   const [rowSpan, setRowSpan] = useState(10);
   const cellRef = useRef<HTMLDivElement>(null);
 
-  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    const ratio = img.naturalWidth / img.naturalHeight;
+  const handleReady = (ratio: number) => {
     const col = ratio >= 1.6 ? 2 : 1;
 
     const grid = cellRef.current?.closest(".portfolio-grid") as HTMLElement | null;
@@ -43,7 +42,7 @@ const PortfolioCell = ({
       style={{ gridColumn: `span ${colSpan}`, gridRow: `span ${rowSpan}` }}
       onClick={onClick}
     >
-      <img src={piece.file_path} alt={piece.title} onLoad={handleLoad} />
+      <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} onReady={handleReady} />
       <div className="portfolio-cell-overlay">
         <p>{piece.title}</p>
         {piece.date && <p>{piece.date}</p>}

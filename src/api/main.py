@@ -1,4 +1,5 @@
-from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File, Form
+from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File, Form, Response
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import date
 from contextlib import asynccontextmanager
@@ -334,10 +335,32 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 HEIC_MIMES = {"image/heic", "image/heif"}
 
 STATIC_ROOT = Path("/app")
+THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 
 def abs_path(rel: str) -> Path:
     # rel is an absolute-looking web path like "/static/foo.jpg" — anchor it under STATIC_ROOT
     return STATIC_ROOT / rel.lstrip("/")
+
+def thumb_file(art_id: str) -> Path:
+    return STATIC_ROOT / "static" / "thumbs" / f"{art_id}.jpg"
+
+def generate_thumbnail(art_id: str, src_abs: Path) -> Path | None:
+    """Render a JPEG thumbnail at THUMB_SIZE for art_id. Returns the path, or None on failure."""
+    thumb_path = thumb_file(art_id)
+    try:
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            img.draft("RGB", (THUMB_SIZE * 2, THUMB_SIZE * 2))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((THUMB_SIZE, THUMB_SIZE * 4), Image.LANCZOS)
+            img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+        return thumb_path
+    except Exception as e:
+        print(f"[thumb] generation failed for {art_id}: {type(e).__name__}: {e}")
+        if thumb_path.exists():
+            thumb_path.unlink(missing_ok=True)
+        return None
 
 def sanitize_path_segment(value: str) -> str:
     import re
@@ -451,6 +474,10 @@ async def upload_visual_2d(
         path.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail=str(e))
 
+    # eager thumbnail generation for images (PDFs skip — no preview thumb)
+    if path.suffix.lower() != ".pdf":
+        generate_thumbnail(str(art_id), path)
+
     return {"file_path": file_path}
 
 @app.patch("/art/{art_id}")
@@ -486,7 +513,35 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
     file_path = await db_remove_visual_2d(art_id=art_id, current_member_id=current_user.id, db=db)
     if file_path:
         abs_path(file_path).unlink(missing_ok=True)
+    thumb_file(art_id).unlink(missing_ok=True)
     return
+
+
+@app.get("/art/{art_id}/thumb")
+async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db)):
+    """512px JPEG thumbnail used as a low-fi placeholder. Lazy-generates on first request
+    for art uploaded before eager-gen was in place; future requests hit the cached file."""
+    result = await db.execute(select(Art.file_path).filter(Art.id == art_id))
+    file_path = result.scalar_one_or_none()
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Art not found")
+
+    src_abs = abs_path(file_path)
+    if not src_abs.exists():
+        raise HTTPException(status_code=404, detail="Source file missing")
+
+    cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+    # PDFs have no thumb — serve the original
+    if src_abs.suffix.lower() == ".pdf":
+        return FileResponse(src_abs, headers=cache_headers)
+
+    thumb_path = thumb_file(art_id)
+    if not thumb_path.exists():
+        if generate_thumbnail(art_id, src_abs) is None:
+            return FileResponse(src_abs, headers=cache_headers)
+
+    return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
 
 
 # ====================== COMMENTS =========================
@@ -512,7 +567,7 @@ async def add_comment(
 ):
     return await db_add_comment(db, art_id, current_member.id, payload.text)
 
-@app.delete("/art/{art_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/art/{art_id}/comments/{comment_id}")
 async def delete_comment(
     art_id: str,
     comment_id: str,
@@ -524,7 +579,7 @@ async def delete_comment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
     if outcome == 'forbidden':
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your comment")
-    return None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # ====================== APPLICATIONS =========================
 

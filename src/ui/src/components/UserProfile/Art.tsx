@@ -5,6 +5,7 @@ import { Profile } from "../../api";
 import AddArtDialog from "../Utils/AddArtDialog";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtComments from "../Utils/ArtComments";
+import ArtImage from "../Utils/ArtImage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import { get_members_visual_2d, remove_visual_2d, Visual2DOut } from "../../api";
 
@@ -41,7 +42,7 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
         }
         <div id={`art-${piece.id}`} className="art-element">
             <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
-                <img src={piece.file_path} alt={piece.title} />
+                <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
             </div>
             <div className="art-right">
                 <div className="art-details">

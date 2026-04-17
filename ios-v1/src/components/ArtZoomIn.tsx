@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   },
   darkenOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   imageWrapper: {
     ...StyleSheet.absoluteFillObject,
