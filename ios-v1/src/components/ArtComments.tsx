@@ -7,6 +7,7 @@ import {
   TextInput,
   FlatList,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   Dimensions,
@@ -24,15 +25,16 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from './ConfirmDialog';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
-const IMG_SECTION_HEIGHT = SCREEN_HEIGHT * 0.4;
-const MAX_IMG_WIDTH = SCREEN_WIDTH - 20;
-const MAX_IMG_HEIGHT = IMG_SECTION_HEIGHT - 20;
+const IMG_SECTION_HEIGHT_OPEN = SCREEN_HEIGHT * 0.4;
+const IMG_SECTION_HEIGHT_KEYBOARD = SCREEN_HEIGHT * 0.18;
 
-function computeImgSize(ratio: number) {
-  let w = MAX_IMG_WIDTH;
+function computeImgSize(ratio: number, sectionHeight: number) {
+  const maxW = SCREEN_WIDTH - 20;
+  const maxH = sectionHeight - 20;
+  let w = maxW;
   let h = w / ratio;
-  if (h > MAX_IMG_HEIGHT) {
-    h = MAX_IMG_HEIGHT;
+  if (h > maxH) {
+    h = maxH;
     w = h * ratio;
   }
   return { width: w, height: h };
@@ -51,7 +53,21 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const [input, setInput] = useState('');
   const [imgRatio, setImgRatio] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<CommentOut | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, () => setKeyboardOpen(true));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardOpen(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const sectionHeight = keyboardOpen ? IMG_SECTION_HEIGHT_KEYBOARD : IMG_SECTION_HEIGHT_OPEN;
 
   const imgUri = resolveImageUrl(piece.file_path);
   useEffect(() => {
@@ -158,12 +174,12 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             <View style={styles.swipeHandle}>
               <View style={styles.swipeBar} />
             </View>
-            <View style={styles.imageSection}>
+            <View style={[styles.imageSection, { height: sectionHeight }]}>
               <Image
                 source={{ uri: imgUri }}
                 placeholder={{ uri: thumbUrl(piece.id) }}
                 transition={200}
-                style={[styles.image, computeImgSize(imgRatio)]}
+                style={[styles.image, computeImgSize(imgRatio, sectionHeight)]}
                 contentFit="contain"
               />
             </View>
@@ -181,6 +197,8 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
               renderItem={renderComment}
               style={styles.list}
               contentContainerStyle={styles.listContent}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
             />
             <View style={[styles.inputBar, { paddingBottom: 8 + insets.bottom }]}>
               <TextInput
@@ -231,7 +249,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.textMuted,
   },
   imageSection: {
-    height: IMG_SECTION_HEIGHT,
     backgroundColor: Colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
