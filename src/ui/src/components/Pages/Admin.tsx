@@ -79,7 +79,7 @@ const ApplicationRow = ({
 
 const Admin = () => {
     const [applications, setApplications] = useState<ApplicationOut[]>([]);
-    const token = sessionStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
     useEffect(() => {
         get_applications(token).then(setApplications).catch(console.error);

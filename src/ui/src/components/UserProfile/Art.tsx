@@ -5,7 +5,7 @@ import { Profile } from "../../api";
 import AddArtDialog from "../Utils/AddArtDialog";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtComments from "../Utils/ArtComments";
-import { get_members_visual_2d, remove_visual_2d, thumbUrl, Visual2DOut } from "../../api";
+import { get_members_visual_2d, remove_visual_2d, Visual2DOut } from "../../api";
 
 import '../../styles/user-profile/art.css';
 
@@ -14,7 +14,7 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
     const [showComments, setShowComments] = useState(false);
 
     const removeArt = async ({ pieceId }: { pieceId: string }) => {
-        await remove_visual_2d(pieceId, sessionStorage.getItem("token"));
+        await remove_visual_2d(pieceId, localStorage.getItem("token"));
         onRemove();
     }
 
@@ -32,7 +32,7 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
         }
         <div id={`art-${piece.id}`} className="art-element">
             <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
-                <img src={thumbUrl(piece.id, 512)} alt={piece.title} />
+                <img src={piece.file_path} alt={piece.title} />
             </div>
             <div className="art-right">
                 <div className="art-details">

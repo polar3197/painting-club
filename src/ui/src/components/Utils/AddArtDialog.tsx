@@ -29,7 +29,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, piec
 
     const submit = async () => {
         if (!formData) return;
-        const token = sessionStorage.getItem("token");
+        const token = localStorage.getItem("token");
 
         if (isVisual2D(selectedMedium)) {
             if (piece) {

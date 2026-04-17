@@ -23,7 +23,7 @@ export default function SetupAccount() {
   const [error, setError] = useState<string | null>(null);
 
   const theme = useMemo(() => Themes[Math.floor(Math.random() * Themes.length)], []);
-  const token = sessionStorage.getItem("token");
+  const token = localStorage.getItem("token");
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

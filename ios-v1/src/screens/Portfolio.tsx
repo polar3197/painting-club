@@ -13,7 +13,7 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useProfile } from '../hooks';
-import { get_members_visual_2d, resolveImageUrl, getPortfolioUrl, thumbUrl, Visual2DOut } from '../api';
+import { get_members_visual_2d, resolveImageUrl, getPortfolioUrl, Visual2DOut } from '../api';
 import ArtZoomIn from '../components/ArtZoomIn';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -47,7 +47,7 @@ export default function Portfolio() {
         filtered.map(
           (piece: Visual2DOut) =>
             new Promise<CellData>((resolve) => {
-              const uri = thumbUrl(piece.id, 512);
+              const uri = resolveImageUrl(piece.file_path);
               RNImage.getSize(
                 uri,
                 (w, h) => resolve({ piece, aspectRatio: h > 0 ? w / h : 1 }),
@@ -91,7 +91,7 @@ export default function Portfolio() {
         onPressOut={() => setPressedId(null)}
       >
         <Image
-          source={{ uri: thumbUrl(cell.piece.id, 512) }}
+          source={{ uri: resolveImageUrl(cell.piece.file_path) }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
         />

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions } from 'react-native';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -18,9 +18,21 @@ const CARD_WIDTH = (SCREEN_WIDTH - 60) / 2;
 export default function People() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
-  const [members] = useMembers('', '');
+  const [members, , , refetchMembers] = useMembers('', '');
   const [options] = useOptions();
   const [query, setQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterKey, setFilterKey] = useState(0);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setQuery('');
+    setFilterKey((k) => k + 1);
+    try {
+      await refetchMembers();
+    } catch {}
+    setRefreshing(false);
+  }, [refetchMembers]);
 
   const allOptions = useMemo(() => {
     const o = options as any;
@@ -82,6 +94,7 @@ export default function People() {
         />
       </View>
       <CentralFilter
+        key={filterKey}
         header="members"
         options={allOptions}
         onSearch={setQuery}
@@ -94,6 +107,7 @@ export default function People() {
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
     </View>
   );

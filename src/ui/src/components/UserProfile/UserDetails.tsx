@@ -25,7 +25,7 @@ const UserDetails = (
   useEffect(() => { setImgFailed(false); }, [imgSrc]);
 
   const handleUpload = async (file: File) => {
-    const token = sessionStorage.getItem("token");
+    const token = localStorage.getItem("token");
     const result = await upload_profile_picture(file, token);
     setProfile({ ...profile, profile_pic_path: result.profile_pic_path });
   };

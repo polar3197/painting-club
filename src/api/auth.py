@@ -13,7 +13,7 @@ def create_token(member: Member):
 
     payload = {
         "sub": str(member.id),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=2)
+        "exp": datetime.now(timezone.utc) + timedelta(days=30)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=HASH_ALGORITHM)
 

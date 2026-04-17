@@ -82,7 +82,7 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   };
 
   const gotoLogout = () => {
-    logout(); // removes token from sessionStorage
+    logout(); // removes token from localStorage
     navigate("/landing-page");
   }
 

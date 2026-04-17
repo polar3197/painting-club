@@ -1,5 +1,4 @@
 from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File, Form
-from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import date
 from contextlib import asynccontextmanager
@@ -339,12 +338,6 @@ def abs_path(rel: str) -> Path:
     # rel is an absolute-looking web path like "/static/foo.jpg" — anchor it under STATIC_ROOT
     return STATIC_ROOT / rel.lstrip("/")
 
-def thumbs_dir() -> Path:
-    return STATIC_ROOT / "static" / "thumbs"
-
-def thumb_file(art_id: str, w: int) -> Path:
-    return thumbs_dir() / f"{art_id}_{w}.jpg"
-
 def sanitize_path_segment(value: str) -> str:
     import re
     return re.sub(r"[^\w\-]", "_", value)
@@ -457,11 +450,6 @@ async def upload_visual_2d(
         path.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail=str(e))
 
-    # eager thumbnail generation (skip PDFs — GET endpoint serves original)
-    if path.suffix.lower() != ".pdf":
-        for w in ALLOWED_THUMB_WIDTHS:
-            generate_thumbnail(str(art_id), path, w)
-
     return {"file_path": file_path}
 
 @app.patch("/art/{art_id}")
@@ -497,61 +485,7 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
     file_path = await db_remove_visual_2d(art_id=art_id, current_member_id=current_user.id, db=db)
     if file_path:
         abs_path(file_path).unlink(missing_ok=True)
-    thumb_dir = thumbs_dir()
-    if thumb_dir.exists():
-        for stale in thumb_dir.glob(f"{art_id}_*.jpg"):
-            stale.unlink(missing_ok=True)
     return
-
-
-ALLOWED_THUMB_WIDTHS = {256, 512, 1024}
-
-
-def generate_thumbnail(art_id: str, src_abs: Path, w: int) -> Path | None:
-    """Render a JPEG thumbnail for art_id at width w. Returns the path on success, None on failure."""
-    thumb_path = thumb_file(art_id, w)
-    try:
-        thumb_path.parent.mkdir(parents=True, exist_ok=True)
-        with Image.open(src_abs) as img:
-            img.draft("RGB", (w * 2, w * 2))
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-            img.thumbnail((w, w * 4), Image.LANCZOS)
-            img.save(thumb_path, format="JPEG", quality=85, optimize=True)
-        return thumb_path
-    except Exception as e:
-        print(f"[thumb] generation failed for {art_id} w={w}: {type(e).__name__}: {e}")
-        if thumb_path.exists():
-            thumb_path.unlink(missing_ok=True)
-        return None
-
-
-@app.get("/art/{art_id}/thumb")
-async def get_art_thumb(art_id: str, w: int = 512, db: AsyncSession = Depends(get_db)):
-    if w not in ALLOWED_THUMB_WIDTHS:
-        raise HTTPException(status_code=400, detail=f"width must be one of {sorted(ALLOWED_THUMB_WIDTHS)}")
-
-    result = await db.execute(select(Art.file_path).filter(Art.id == art_id))
-    file_path = result.scalar_one_or_none()
-    if not file_path:
-        raise HTTPException(status_code=404, detail="Art not found")
-
-    src_abs = abs_path(file_path)
-    if not src_abs.exists():
-        raise HTTPException(status_code=404, detail="Source file missing")
-
-    cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
-
-    # non-image (e.g. PDF) — fall back to original
-    if src_abs.suffix.lower() == ".pdf":
-        return FileResponse(src_abs, headers=cache_headers)
-
-    thumb_path = thumb_file(art_id, w)
-    if not thumb_path.exists():
-        if generate_thumbnail(art_id, src_abs, w) is None:
-            return FileResponse(src_abs, headers=cache_headers)
-
-    return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
 
 
 # ====================== COMMENTS =========================

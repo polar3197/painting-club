@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   LayoutChangeEvent,
+  RefreshControl,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +24,6 @@ import {
   update_profile,
   get_search_options,
   resolveImageUrl,
-  thumbUrl,
   upload_profile_picture,
   Visual2DOut,
   Profile,
@@ -93,7 +93,7 @@ function Visual2DPiece({
           onPress={() => setIsZoomedIn(true)}
         >
           <Image
-            source={{ uri: thumbUrl(piece.id, 512) }}
+            source={{ uri: resolveImageUrl(piece.file_path) }}
             style={styles.artImage}
             contentFit="cover"
           />
@@ -178,12 +178,22 @@ export default function UserProfile() {
   const scrollToArtId = params?.artId;
   const mediumParam = params?.medium;
 
-  const [profile, setProfile, error, loading] = useProfile(username);
+  const [profile, setProfile, error, loading, refetchProfile] = useProfile(username);
   const [selectedMedium, setSelectedMedium] = useState<string | null>(mediumParam ?? null);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<string[]>([]);
   const [art, setArt] = useState<Visual2DOut[]>([]);
   const [refresh, setRefresh] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetchProfile();
+      setRefresh((r) => r + 1);
+    } catch {}
+    setRefreshing(false);
+  }, [refetchProfile]);
   const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
@@ -282,7 +292,14 @@ export default function UserProfile() {
   }
 
   return (
-    <ScrollView ref={scrollRef} style={[styles.container, { paddingTop: insets.top }]} contentContainerStyle={styles.contentContainer} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+    <ScrollView
+      ref={scrollRef}
+      style={[styles.container, { paddingTop: insets.top }]}
+      contentContainerStyle={styles.contentContainer}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       {/* Profile zoom */}
       {profileZoom && (
         <ArtZoomIn

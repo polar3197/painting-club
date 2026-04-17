@@ -16,7 +16,7 @@ export function useProfile(username: string | undefined):
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = sessionStorage.getItem("token");
+      const token = localStorage.getItem("token");
       console.log(token);
       try {
         const data = await get_profile(username!, token);

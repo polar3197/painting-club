@@ -1,26 +1,33 @@
 
 const API_BASE = "/api";
 
-export function thumbUrl(artId: string, w: 256 | 512 | 1024 = 512): string {
-  return `${API_BASE}/art/${artId}/thumb?w=${w}`;
-}
-
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
 
 async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(`${API_BASE}${path}`, {                                                                                        
-    ...options, 
-    headers: {                                                                                                                              
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
         ...(!isFormData && { "Content-Type": "application/json" }),
-        ...(options.headers || {}),                                                                                                         
-    },          
+        ...(options.headers || {}),
+    },
   });
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
   const data = isJson ? await response.json() : null;
+
+  // Expired/invalid token on an authenticated request → clear session + kick to landing.
+  // Skip the redirect for the login endpoint itself so bad-password attempts don't bounce the page.
+  if (response.status === 401 && !path.startsWith("/members/login")) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    localStorage.removeItem("role");
+    if (window.location.pathname !== "/landing-page") {
+      window.location.href = "/landing-page";
+    }
+  }
 
   if (!response.ok) {
     const detail = (data as any)?.detail;

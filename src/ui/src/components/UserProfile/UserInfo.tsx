@@ -37,7 +37,7 @@ const UserInfo = (
     }
 ) => {
     const [updateProfile, setUpdateProfile] = useState<boolean>(false);
-    const token = sessionStorage.getItem("token");
+    const token = localStorage.getItem("token");
     const navigate = useNavigate();
 
     const handlePortfolioView = () => {

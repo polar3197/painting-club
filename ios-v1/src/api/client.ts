@@ -8,6 +8,13 @@ interface RequestOptions {
   body?: any;
 }
 
+let onAuthExpired: (() => void) | null = null;
+
+/** Register a handler fired when any authenticated request comes back 401. */
+export function setAuthExpiredHandler(fn: (() => void) | null) {
+  onAuthExpired = fn;
+}
+
 export async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const isFormData = options.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
@@ -20,6 +27,12 @@ export async function request(path: string, options: RequestOptions = {}): Promi
 
   const isJson = response.headers.get('content-type')?.includes('application/json');
   const data = isJson ? await response.json() : null;
+
+  // Expired/invalid token on an authenticated request → let the app wipe auth state + go to landing.
+  // Skip for the login endpoint so a wrong password doesn't trigger a logout navigation.
+  if (response.status === 401 && !path.startsWith('/members/login') && onAuthExpired) {
+    onAuthExpired();
+  }
 
   if (!response.ok) {
     const detail = (data as any)?.detail;
@@ -35,10 +48,6 @@ export function resolveImageUrl(path: string): string {
   if (!path) return '';
   if (path.startsWith('http')) return path;
   return `${SERVER_ORIGIN}${path}`;
-}
-
-export function thumbUrl(artId: string, w: 256 | 512 | 1024 = 512): string {
-  return `${API_BASE}/art/${artId}/thumb?w=${w}`;
 }
 
 export function getPortfolioUrl(username: string, medium?: string, keywords?: string[]): string {

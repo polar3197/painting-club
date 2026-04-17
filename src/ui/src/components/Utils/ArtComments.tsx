@@ -5,8 +5,8 @@ import ArtZoomIn from "./ArtZoomIn";
 import "../../styles/utils/art-comments.css";
 
 const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: boolean) => void }) => {
-    const currentUser = sessionStorage.getItem("username") ?? "";
-    const token = sessionStorage.getItem("token");
+    const currentUser = localStorage.getItem("username") ?? "";
+    const token = localStorage.getItem("token");
     const navigate = useNavigate();
     const [comments, setComments] = useState<CommentOut[]>([]);
     const [input, setInput] = useState("");

@@ -1,20 +1,15 @@
-"""Delete endpoint: removes source file and all thumb sizes."""
+"""Delete endpoint: removes the source file."""
 import uuid
 
 from api import main as main_mod
 
 
-def test_delete_unlinks_source_and_thumbs(client, fake_member, tmp_static):
+def test_delete_unlinks_source(client, fake_member, tmp_static):
     art_id = str(uuid.uuid4())
     file_path = f"/static/art/{fake_member.id}/canvas/{art_id}.jpg"
     src = main_mod.abs_path(file_path)
     src.parent.mkdir(parents=True, exist_ok=True)
     src.write_bytes(b"fake-image-bytes")
-
-    thumbs = [main_mod.thumb_file(art_id, w) for w in (256, 512, 1024)]
-    for t in thumbs:
-        t.parent.mkdir(parents=True, exist_ok=True)
-        t.write_bytes(b"fake-thumb")
 
     # tell the stubbed db_remove_visual_2d what file_path to return
     client.captured["remove_path"] = file_path
@@ -22,8 +17,6 @@ def test_delete_unlinks_source_and_thumbs(client, fake_member, tmp_static):
     resp = client.delete(f"/art/{art_id}")
     assert resp.status_code == 200, resp.text
     assert not src.exists(), "source file should be unlinked"
-    for t in thumbs:
-        assert not t.exists(), f"thumb {t.name} should be unlinked"
 
 
 def test_delete_survives_missing_files(client, fake_member):

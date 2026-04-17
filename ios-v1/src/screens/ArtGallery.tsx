@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -7,7 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import CentralFilter from '../components/CentralFilter';
 import { useOptions } from '../hooks';
-import { search_art, thumbUrl, ArtResult } from '../api';
+import { search_art, resolveImageUrl, ArtResult } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { ArtStackParamList } from '../navigation/types';
 
@@ -21,9 +21,22 @@ export default function ArtGallery() {
   const [options] = useOptions();
   const [art, setArt] = useState<ArtResult[]>([]);
   const [query, setQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterKey, setFilterKey] = useState(0);
 
   useEffect(() => {
     search_art('').then(setArt).catch(() => {});
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setQuery('');
+    setFilterKey((k) => k + 1);
+    try {
+      const data = await search_art('');
+      setArt(data);
+    } catch {}
+    setRefreshing(false);
   }, []);
 
   const allOptions = useMemo(() => {
@@ -64,7 +77,7 @@ export default function ArtGallery() {
       }
     >
       <Image
-        source={{ uri: thumbUrl(item.id, 512) }}
+        source={{ uri: resolveImageUrl(item.file_path) }}
         style={styles.cardImage}
         contentFit="cover"
       />
@@ -102,6 +115,7 @@ export default function ArtGallery() {
         />
       </View>
       <CentralFilter
+        key={filterKey}
         header="art"
         options={allOptions}
         onSearch={setQuery}
@@ -114,6 +128,7 @@ export default function ArtGallery() {
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
     </View>
   );

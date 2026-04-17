@@ -90,32 +90,16 @@ def test_same_title_no_collision(client):
     assert main_mod.abs_path(p2).stat().st_size > 0
 
 
-# ------------------- Eager thumbnails -------------------
+# ------------------- PDF uploads still work -------------------
 
-def test_eager_thumbs_generated_for_image(client, tmp_static):
-    resp = _upload_jpeg(client)
-    assert resp.status_code == 200
-    # Derive art_id from the returned path (last path segment before .jpg)
-    file_path = resp.json()["file_path"]
-    art_id = file_path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-
-    for w in (256, 512, 1024):
-        thumb = main_mod.thumb_file(art_id, w)
-        assert thumb.exists(), f"thumb missing for width {w}"
-        with Image.open(thumb) as img:
-            # thumbnail() preserves aspect ratio and caps the longest side,
-            # so for a 64x64 source upscaled to w, width should be <= w.
-            assert img.width <= w
-
-
-def test_eager_thumbs_skipped_for_pdf(client, tmp_static):
+def test_pdf_upload_succeeds(client):
     resp = client.post(
         "/art/upload/visual-2d",
         data={"username": "testuser", "medium": "canvas", "title": "doc"},
         files={"file": ("doc.pdf", make_pdf_bytes(), "application/pdf")},
     )
     assert resp.status_code == 200, resp.text
-    assert not main_mod.thumbs_dir().exists() or not any(main_mod.thumbs_dir().iterdir())
+    assert resp.json()["file_path"].endswith(".pdf")
 
 
 # ------------------- Size / allowlist still enforced -------------------
