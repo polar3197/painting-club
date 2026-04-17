@@ -153,6 +153,40 @@
     padding: 4px 8px;
     width: 66%;
     word-wrap: break-word;
+    position: relative;
+}
+
+.art-comment-delete {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 18px;
+    height: 18px;
+    border: 1px solid black;
+    background-color: white;
+    border-radius: 50%;
+    line-height: 1;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.art-comment-row--own:hover .art-comment-delete {
+    opacity: 1;
+}
+
+.art-comment-delete:hover {
+    background-color: rgb(241, 99, 99);
+}
+
+.art-comment-delete:active {
+    transform: scale(0.9);
 }
 
 .art-comments-input-bar {

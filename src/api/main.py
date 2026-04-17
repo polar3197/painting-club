@@ -76,6 +76,7 @@ from db.db_ops.media import (
 from db.db_ops.comments import (
     db_get_comments,
     db_add_comment,
+    db_delete_comment,
 )
     
 from db.session import get_db
@@ -510,6 +511,20 @@ async def add_comment(
     current_member: Member = Depends(get_current_member),
 ):
     return await db_add_comment(db, art_id, current_member.id, payload.text)
+
+@app.delete("/art/{art_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment(
+    art_id: str,
+    comment_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    outcome = await db_delete_comment(db, comment_id, current_member.id)
+    if outcome == 'not_found':
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+    if outcome == 'forbidden':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your comment")
+    return None
 
 # ====================== APPLICATIONS =========================
 

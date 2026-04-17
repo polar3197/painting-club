@@ -20,3 +20,19 @@ async def db_add_comment(db: AsyncSession, art_id: str, member_id: str, text: st
     await db.commit()
     await db.refresh(comment)
     return comment
+
+
+async def db_delete_comment(db: AsyncSession, comment_id: str, member_id: str) -> str:
+    """Delete a comment if it belongs to member_id.
+
+    Returns 'ok', 'not_found', or 'forbidden'.
+    """
+    result = await db.execute(select(Comment).filter(Comment.id == comment_id))
+    comment = result.scalar_one_or_none()
+    if comment is None:
+        return 'not_found'
+    if str(comment.member_id) != str(member_id):
+        return 'forbidden'
+    await db.delete(comment)
+    await db.commit()
+    return 'ok'

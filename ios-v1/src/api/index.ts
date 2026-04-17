@@ -149,6 +149,13 @@ export function post_comment(art_id: string, text: string, token: string | null)
   }) as Promise<CommentOut>;
 }
 
+export function delete_comment(art_id: string, comment_id: string, token: string | null): Promise<void> {
+  return request(`/art/${art_id}/comments/${comment_id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<void>;
+}
+
 export function submit_application(payload: ApplicationIn): Promise<unknown> {
   return request('/apply', {
     method: 'POST',

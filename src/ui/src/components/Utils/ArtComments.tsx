@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Visual2DOut, CommentOut, get_comments, post_comment } from "../../api";
+import { Visual2DOut, CommentOut, get_comments, post_comment, delete_comment } from "../../api";
 import { useNavigate } from "react-router-dom";
 import ArtZoomIn from "./ArtZoomIn";
 import "../../styles/utils/art-comments.css";
@@ -28,6 +28,15 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
             // while the server never received it. Restore the text and surface the error.
             setInput(text);
             alert((err as Error).message || "Could not post comment");
+        }
+    };
+
+    const handleDelete = async (commentId: string) => {
+        try {
+            await delete_comment(piece.id, commentId, token);
+            setComments(prev => prev.filter(c => c.id !== commentId));
+        } catch (err) {
+            alert((err as Error).message || "Could not delete comment");
         }
     };
 
@@ -61,7 +70,18 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
                                             {c.firstname && <span className="art-comment-label-username">@{c.username}</span>}
                                         </div>
                                     )}
-                                    <div className="art-comment">{c.text}</div>
+                                    <div className="art-comment">
+                                        {c.text}
+                                        {isOwn && (
+                                            <button
+                                                className="art-comment-delete"
+                                                aria-label="Delete comment"
+                                                onClick={() => handleDelete(c.id)}
+                                            >
+                                                x
+                                            </button>
+                                        )}
+                                    </div>
                                     {isOwn && (
                                         <div className="art-comment-label">
                                             <span className="art-comment-label-name">&lt;</span>

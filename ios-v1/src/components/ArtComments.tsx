@@ -19,8 +19,9 @@ import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { get_comments, post_comment, resolveImageUrl, Visual2DOut, CommentOut } from '../api';
+import { get_comments, post_comment, delete_comment, resolveImageUrl, Visual2DOut, CommentOut } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
+import ConfirmDialog from './ConfirmDialog';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -36,6 +37,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const [comments, setComments] = useState<CommentOut[]>([]);
   const [input, setInput] = useState('');
   const [imgRatio, setImgRatio] = useState(1);
+  const [pendingDelete, setPendingDelete] = useState<CommentOut | null>(null);
   const translateY = useRef(new Animated.Value(0)).current;
 
   const imgUri = resolveImageUrl(piece.file_path);
@@ -84,6 +86,18 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
     navigation.navigate('UserProfile', { username });
   };
 
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setPendingDelete(null);
+    try {
+      await delete_comment(piece.id, id, token);
+      setComments((prev) => prev.filter((c) => c.id !== id));
+    } catch (err: any) {
+      Alert.alert('Delete failed', err?.message || 'Could not delete comment');
+    }
+  };
+
   const renderComment = ({ item: c }: { item: CommentOut }) => {
     const isOwn = c.username === currentUser;
     const display = c.firstname || c.username;
@@ -95,9 +109,13 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             {c.firstname && <Text style={styles.commentLabelUsername}>@{c.username}</Text>}
           </Pressable>
         )}
-        <View style={styles.commentBubble}>
+        <Pressable
+          style={styles.commentBubble}
+          onLongPress={isOwn ? () => setPendingDelete(c) : undefined}
+          delayLongPress={400}
+        >
           <Text style={styles.commentText}>{c.text}</Text>
-        </View>
+        </Pressable>
         {isOwn && (
           <View style={styles.commentLabel}>
             <Text style={styles.commentLabelName}>{'<'}</Text>
@@ -109,6 +127,14 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose}>
+      <ConfirmDialog
+        visible={pendingDelete !== null}
+        title="delete cmt?"
+        message={pendingDelete ? `"${pendingDelete.text}"` : ''}
+        confirmLabel="delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
