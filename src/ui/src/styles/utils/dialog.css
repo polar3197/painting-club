@@ -338,35 +338,35 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 @media (max-width: 640px) {
+    /* Let the image size itself to its intrinsic aspect ratio, capped at 92vw/85vh.
+       The wrapper/dialog/card-front shrink-wrap the img, so the border hugs the image
+       even for very tall or very wide paintings. */
     .blowup-wrapper {
         position: fixed;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 92vw;
-        max-width: 92vw;
+        width: auto;
         height: auto;
+        max-width: 92vw;
         max-height: 85vh;
     }
 
     .blowup-dialog {
-        width: 100%;
+        width: auto;
         height: auto;
     }
 
     .card-front {
+        width: auto;
         height: auto;
-        width: 100%;
     }
 
     .card-front img {
-        width: 100%;
+        display: block;
+        width: auto;
         height: auto;
+        max-width: 92vw;
         max-height: 85vh;
-        object-fit: contain;
-    }
-
-    .card-back {
-        min-height: 60vw;
     }
 }
