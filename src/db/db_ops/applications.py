@@ -85,6 +85,8 @@ async def db_approve_application(db: AsyncSession, application_id: str) -> tuple
         temp_password_expires_at=datetime.utcnow() + timedelta(days=TEMP_PASSWORD_TTL_DAYS),
     )
     db.add(member)
+    # Flush so the member INSERT is emitted before the application UPDATE with member_id FK.
+    await db.flush()
 
     app.status = "pending_setup"
     app.member_id = member_id

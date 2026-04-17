@@ -35,6 +35,12 @@ export default function LandingPage() {
     if (!normalized || !password.trim()) return;
     try {
       const res = await login_user({ username: normalized, password: password.trim() });
+      if (res.must_setup) {
+        // Temp-password user: route to setup with the token; skip auth.login() until they've
+        // chosen a real username + password.
+        (navigation as any).navigate('SetupAccount', { token: res.access_token });
+        return;
+      }
       const profile = await get_profile(normalized, res.access_token);
       await auth.login(profile.username, res.access_token, profile.role);
       (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });

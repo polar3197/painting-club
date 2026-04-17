@@ -5,6 +5,12 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   access_token: string;
+  must_setup?: boolean;
+}
+
+export interface SetupAccountIn {
+  new_username: string;
+  new_password: string;
 }
 
 export interface Profile {

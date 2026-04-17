@@ -8,6 +8,7 @@ import type {
   Profile,
   ApplicationIn,
   ApplicationOut,
+  SetupAccountIn,
   Visual2DIn,
   Visual2DOut,
   Visual2DUpdatePayload,
@@ -27,6 +28,14 @@ export function get_profile(username: string, token: string | null): Promise<Pro
   return request(`/members/${username}/profile`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   }) as Promise<Profile>;
+}
+
+export function setup_account(payload: SetupAccountIn, token: string): Promise<{ id: string; username: string }> {
+  return request('/members/setup-account', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }) as Promise<{ id: string; username: string }>;
 }
 
 export function get_profiles(): Promise<Profile[]> {
