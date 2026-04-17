@@ -119,7 +119,14 @@ export default function People() {
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.darkerGold}
+            colors={[Colors.darkerGold]}
+          />
+        }
       />
     </View>
   );

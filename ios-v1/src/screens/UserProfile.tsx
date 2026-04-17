@@ -298,7 +298,14 @@ export default function UserProfile() {
       contentContainerStyle={styles.contentContainer}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={Colors.darkerGold}
+          colors={[Colors.darkerGold]}
+        />
+      }
     >
       {/* Profile zoom */}
       {profileZoom && (

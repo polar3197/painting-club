@@ -23,8 +23,11 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
         try {
             const newComment = await post_comment(piece.id, text, token);
             setComments(prev => [...prev, newComment]);
-        } catch {
-            setComments(prev => [...prev, { id: crypto.randomUUID(), username: currentUser, firstname: null, text, created_at: new Date().toISOString() }]);
+        } catch (err) {
+            // Don't fabricate a local comment — that creates the illusion of success
+            // while the server never received it. Restore the text and surface the error.
+            setInput(text);
+            alert((err as Error).message || "Could not post comment");
         }
     };
 

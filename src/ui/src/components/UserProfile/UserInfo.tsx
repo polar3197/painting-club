@@ -60,27 +60,51 @@ const UserInfo = (
 
     return (
         <div className="user-fields">
-            <div className="user-name" onClick={() => handleUpdateProfile()}>
-                {updateProfile ?
+            <div className="user-identity">
+                <div className="user-name" onClick={() => handleUpdateProfile()}>
+                    {updateProfile ?
+                        <>
+                        <textarea
+                            rows={1}
+                            value={profile.firstname}
+                            placeholder="firstname"
+                            onChange={(e) => setProfile({ ...profile, firstname: e.target.value })}
+                        />
+                        <textarea
+                            rows={1}
+                            value={profile.lastname}
+                            placeholder="lastname"
+                        />
+                        </>
+                    :
+                        <>
+                        <p>{profile.firstname} {profile.lastname}</p>
+                        </>
+                    }
+                </div>
+                <div className="user-location" onClick={() => handleUpdateProfile()}>
+                    {updateProfile ?
                     <>
-                    <textarea
-                        rows={1}
-                        value={profile.firstname}
-                        placeholder="firstname"
-                        onChange={(e) => setProfile({ ...profile, firstname: e.target.value })}
-                    />
-                    <textarea
-                        rows={1}
-                        value={profile.lastname}
-                        placeholder="lastname"
-                    />
+                        <textarea
+                            className="user-city"
+                            rows={1}
+                            value={profile.city}
+                            placeholder="city"
+                            onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                        />
+                        <textarea
+                            className="user-state"
+                            rows={1}
+                            value={profile.state}
+                            placeholder="state"
+                            onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                        />
                     </>
-                :
-                    <>
-                    <p>{profile.firstname} {profile.lastname}</p>
-                    </>
-                }
-                {selectedMedium && (
+                    :
+                        <p>{profile.city}, {profile.state}</p>
+                    }
+                </div>
+                {!updateProfile && selectedMedium && (
                     <div
                         className="portfolio-view-toggle"
                         onClick={(e) => { e.stopPropagation(); handlePortfolioView(); }}
@@ -89,29 +113,6 @@ const UserInfo = (
                     </div>
                 )}
             </div>
-            <div className="user-location" onClick={() => handleUpdateProfile()}>
-                {updateProfile ? 
-                <>
-                    <textarea
-                        className="user-city"
-                        rows={1}
-                        value={profile.city}
-                        placeholder="city"
-                        onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-                    />
-                    <textarea
-                        className="user-state"
-                        rows={1}
-                        value={profile.state}
-                        placeholder="state"
-                        onChange={(e) => setProfile({ ...profile, state: e.target.value })}
-                    />
-                </>
-                :
-                    <p>{profile.city}, {profile.state}</p>
-                }
-            </div>
-            <br></br>
             <div className="user-field-element" onClick={() => handleUpdateProfile()}>
                 {updateProfile ? 
                     <>

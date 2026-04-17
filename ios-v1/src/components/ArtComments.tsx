@@ -12,6 +12,7 @@ import {
   Dimensions,
   Animated,
   PanResponder,
+  Alert,
   Image as RNImage,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -70,17 +71,11 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
     try {
       const newComment = await post_comment(piece.id, text, token);
       setComments((prev) => [...prev, newComment]);
-    } catch {
-      setComments((prev) => [
-        ...prev,
-        {
-          id: String(Date.now()),
-          username: currentUser || '',
-          firstname: null,
-          text,
-          created_at: new Date().toISOString(),
-        },
-      ]);
+    } catch (err: any) {
+      // Don't fabricate a local comment — that creates the illusion of success
+      // while the server never received it. Restore the text and surface the error.
+      setInput(text);
+      Alert.alert('Comment failed', err?.message || 'Could not post your comment');
     }
   };
 
@@ -251,6 +246,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     marginBottom: 8,
+    width: '100%',
   },
   commentRowOwn: {
     justifyContent: 'flex-end',
