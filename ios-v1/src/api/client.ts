@@ -54,6 +54,11 @@ export function thumbUrl(artId: string): string {
   return `${API_BASE}/art/${artId}/thumb`;
 }
 
+/** Small JPEG placeholder for a member's profile pic. Served directly from nginx. */
+export function profileThumbUrl(memberId: string): string {
+  return `${SERVER_ORIGIN}/static/profile-thumbs/${memberId}.jpg`;
+}
+
 export function getPortfolioUrl(username: string, medium?: string, keywords?: string[]): string {
   const params = new URLSearchParams();
   if (medium) params.set('medium', medium);

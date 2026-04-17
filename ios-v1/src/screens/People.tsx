@@ -7,7 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import CentralFilter from '../components/CentralFilter';
 import { useMembers, useOptions } from '../hooks';
-import { resolveImageUrl, Profile } from '../api';
+import { resolveImageUrl, profileThumbUrl, Profile } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { PeopleStackParamList } from '../navigation/types';
 
@@ -73,6 +73,8 @@ export default function People() {
     >
       <Image
         source={{ uri: resolveImageUrl(item.profile_pic_path || `/imgs/${item.id}.png`) }}
+        placeholder={item.profile_pic_path ? { uri: profileThumbUrl(item.id) } : undefined}
+        transition={200}
         style={styles.cardImage}
         contentFit="cover"
       />

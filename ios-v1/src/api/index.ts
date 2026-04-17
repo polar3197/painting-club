@@ -1,5 +1,5 @@
 export * from './types';
-export { resolveImageUrl, getPortfolioUrl, thumbUrl } from './client';
+export { resolveImageUrl, getPortfolioUrl, thumbUrl, profileThumbUrl } from './client';
 
 import { request } from './client';
 import type {

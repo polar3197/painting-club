@@ -374,6 +374,31 @@ def heic_to_jpeg_bytes(contents: bytes) -> bytes:
     img.save(buf, format="JPEG", quality=90)
     return buf.getvalue()
 
+
+PROFILE_THUMB_DIM = 256  # tiny placeholder for instant first paint; original stays full-res
+
+
+def profile_thumb_file(member_id: str) -> Path:
+    return STATIC_ROOT / "static" / "profile-thumbs" / f"{member_id}.jpg"
+
+
+def generate_profile_thumb(member_id: str, src_abs: Path) -> Path | None:
+    """Render a small JPEG placeholder for a profile pic. Returns the path, or None on failure."""
+    thumb_path = profile_thumb_file(member_id)
+    try:
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((PROFILE_THUMB_DIM, PROFILE_THUMB_DIM), Image.LANCZOS)
+            img.save(thumb_path, format="JPEG", quality=82, optimize=True)
+        return thumb_path
+    except Exception as e:
+        print(f"[profile-thumb] failed for {member_id}: {type(e).__name__}: {e}")
+        if thumb_path.exists():
+            thumb_path.unlink(missing_ok=True)
+        return None
+
 @app.post("/members/profile-picture")
 async def upload_profile_picture(
     file: UploadFile = File(...),
@@ -396,6 +421,10 @@ async def upload_profile_picture(
     path = abs_path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(contents)
+
+    # Generate a small placeholder thumb so clients can paint something immediately
+    # while the full-res original downloads in the background.
+    generate_profile_thumb(str(current_member.id), path)
 
     current_member.profile_pic_path = file_path
     await db.commit()
@@ -565,7 +594,14 @@ async def add_comment(
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
 ):
-    return await db_add_comment(db, art_id, current_member.id, payload.text)
+    comment = await db_add_comment(db, art_id, current_member.id, payload.text)
+    return CommentOut(
+        id=comment.id,
+        username=current_member.username,
+        firstname=current_member.firstname,
+        text=comment.text,
+        created_at=comment.created_at,
+    )
 
 @app.delete("/art/{art_id}/comments/{comment_id}")
 async def delete_comment(

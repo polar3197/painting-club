@@ -5,6 +5,12 @@ export function thumbUrl(artId: string): string {
   return `${API_BASE}/art/${artId}/thumb`;
 }
 
+/** Small JPEG placeholder for a member's profile pic. Served directly by nginx from
+ *  /static/profile-thumbs/. Falls back silently (404) for members without a pic uploaded. */
+export function profileThumbUrl(memberId: string): string {
+  return `/static/profile-thumbs/${memberId}.jpg`;
+}
+
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }

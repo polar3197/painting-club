@@ -1,4 +1,4 @@
-import { Profile, upload_profile_picture } from "../../api";
+import { Profile, upload_profile_picture, profileThumbUrl } from "../../api";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import UserInfo from "./UserInfo";
@@ -21,8 +21,24 @@ const UserDetails = (
   const imgSrc = profile.profile_pic_path
     ? `${profile.profile_pic_path}?v=${Date.now()}`
     : `/imgs/${profile.id}.png`;
+  // Start with the small placeholder thumb for instant paint; swap to the full-res
+  // original once it finishes preloading in the background.
+  const [displaySrc, setDisplaySrc] = useState(
+    profile.profile_pic_path ? profileThumbUrl(profile.id) : imgSrc,
+  );
 
   useEffect(() => { setImgFailed(false); }, [imgSrc]);
+
+  useEffect(() => {
+    if (!profile.profile_pic_path) {
+      setDisplaySrc(imgSrc);
+      return;
+    }
+    setDisplaySrc(profileThumbUrl(profile.id));
+    const full = new Image();
+    full.onload = () => setDisplaySrc(imgSrc);
+    full.src = imgSrc;
+  }, [profile.id, profile.profile_pic_path, imgSrc]);
 
   const handleUpload = async (file: File) => {
     const token = localStorage.getItem("token");
@@ -60,10 +76,12 @@ const UserDetails = (
         {!showEmpty ? (
           <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
             <img
-              src={imgSrc}
+              src={displaySrc}
               width="180"
               height="200"
               onError={() => setImgFailed(true)}
+              // @ts-ignore — fetchpriority isn't in the standard React img types yet
+              fetchpriority="high"
             />
           </div>
         ) : (

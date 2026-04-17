@@ -25,6 +25,7 @@ import {
   get_search_options,
   resolveImageUrl,
   thumbUrl,
+  profileThumbUrl,
   upload_profile_picture,
   Visual2DOut,
   Profile,
@@ -401,6 +402,9 @@ export default function UserProfile() {
                 <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                   <Image
                     source={{ uri: resolveImageUrl(profile.profile_pic_path || `/imgs/${profile.id}.png`) }}
+                    placeholder={profile.profile_pic_path ? { uri: profileThumbUrl(profile.id) } : undefined}
+                    transition={200}
+                    priority="high"
                     style={styles.profilePic}
                     contentFit="cover"
                   />
