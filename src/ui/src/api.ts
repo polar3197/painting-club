@@ -37,6 +37,20 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   access_token: string;
+  must_setup?: boolean;
+}
+
+export interface SetupAccountIn {
+  new_username: string;
+  new_password: string;
+}
+
+export function setup_account(payload: SetupAccountIn, token: string | null): Promise<{ id: string; username: string }> {
+  return request("/members/setup-account", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: JSON.stringify(payload),
+  }) as Promise<{ id: string; username: string }>;
 }
 
 export interface Profile {
@@ -74,6 +88,16 @@ export interface ApplicationOut {
   reason: string | null;
   status: string;
   created_at: string;
+  temp_username?: string | null;
+  temp_password?: string | null;
+}
+
+export interface ApplicationApproveOut {
+  application_id: string;
+  status: string;
+  temp_username: string;
+  temp_password: string;
+  temp_password_expires_at: string;
 }
 
 export function submit_application(payload: ApplicationIn): Promise<unknown> {
@@ -89,12 +113,12 @@ export function get_applications(token: string | null): Promise<ApplicationOut[]
   }) as Promise<ApplicationOut[]>;
 }
 
-export function update_application_status(id: string, status: string, token: string | null): Promise<unknown> {
+export function update_application_status(id: string, status: string, token: string | null): Promise<ApplicationApproveOut | { ok: true }> {
   return request(`/admin/applications/${id}`, {
     method: "PATCH",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: JSON.stringify({ status }),
-  });
+  }) as Promise<ApplicationApproveOut | { ok: true }>;
 }
 
 export interface Visual2DIn {

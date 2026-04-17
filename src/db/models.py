@@ -21,6 +21,9 @@ class Member(Base):
     bio = Column(Text)
     role = Column(String(20), nullable=False, default="member")
     profile_pic_path = Column(String(300))
+    must_change_password = Column(Boolean, nullable=False, default=False)
+    temp_password_plaintext = Column(String(32))
+    temp_password_expires_at = Column(DateTime)
 
     # favorite piece you made
     # favorite medium
@@ -139,3 +142,4 @@ class Application(Base):
     reason = Column(Text)
     status = Column(String(20), nullable=False, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'))

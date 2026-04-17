@@ -12,6 +12,33 @@
   padding: 4px;
 }
 
+/* Setup flow reuses the login card visuals but is a bit taller for 3 inputs. */
+.login-container--setup {
+  grid-template-rows: 1fr auto;
+  height: auto;
+  min-height: 180px;
+  width: 180px;
+}
+
+.login-setup-heading {
+  font-family: Cambria, Cochin, Georgia, Times, "Times New Roman", serif;
+  font-weight: 400;
+  font-size: 14px;
+  margin: 0 0 8px 0;
+  line-height: 1.2;
+}
+
+.login-setup-cancel {
+  margin-top: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+  color: #3a3a3a;
+  font-size: 12px;
+}
+
 .login-footer {
   border: transparent;
 }
@@ -197,6 +224,16 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .login-container--setup {
+    aspect-ratio: auto !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .login-setup-heading {
+    font-size: 18px;
   }
 
   .login-body {

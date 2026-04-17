@@ -43,6 +43,12 @@ class ProfileUpdate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    must_setup: bool = False
+
+
+class SetupAccountIn(BaseModel):
+    new_username: str
+    new_password: str
 
 class MemberFilters(BaseModel):
     uname: str | None
@@ -117,9 +123,18 @@ class ApplicationOut(BaseModel):
     reason: str | None
     status: str
     created_at: datetime
+    temp_username: str | None = None
+    temp_password: str | None = None
 
 class ApplicationStatusUpdate(BaseModel):
     status: str  # "approved" or "rejected"
+
+class ApplicationApproveOut(BaseModel):
+    application_id: uuid.UUID
+    status: str
+    temp_username: str
+    temp_password: str
+    temp_password_expires_at: datetime
 
 class CommentIn(BaseModel):
     text: str

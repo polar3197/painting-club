@@ -34,15 +34,18 @@ from api.models import (
     ApplicationIn,
     ApplicationOut,
     ApplicationStatusUpdate,
+    ApplicationApproveOut,
+    SetupAccountIn,
     CommentOut,
     CommentIn,
 )
 
 from db.db_ops.members import (
-    db_create_member, 
+    db_create_member,
     db_create_full_member,
-    db_login_user, 
-    db_get_members, 
+    db_login_user,
+    db_get_members,
+    db_complete_setup,
 )
 
 from db.db_ops.profile import (
@@ -60,6 +63,7 @@ from db.db_ops.applications import (
     db_submit_application,
     db_get_applications,
     db_update_application_status,
+    db_approve_application,
 )
 
 from db.db_ops.media import (
@@ -146,8 +150,34 @@ async def login_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(ge
     member = await db_login_user(db, payload.username, payload.password)
     if not member:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if member.must_change_password:
+        from datetime import datetime as _dt
+        if member.temp_password_expires_at and member.temp_password_expires_at < _dt.utcnow():
+            raise HTTPException(status_code=401, detail="Temporary password has expired — contact an admin")
     token = create_token(member)
-    return Token(access_token=token)
+    return Token(access_token=token, must_setup=bool(member.must_change_password))
+
+
+@app.post("/members/setup-account", response_model=MemberOut)
+async def setup_account_endpoint(
+    payload: SetupAccountIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if not current_member.must_change_password:
+        raise HTTPException(status_code=400, detail="Account setup already complete")
+
+    new_username = payload.new_username.strip().lower()
+    if len(new_username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    try:
+        member = await db_complete_setup(db, current_member, new_username, payload.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return MemberOut(id=member.id, username=member.username)
 
 # @app.get("/members", response_model=list[MemberOut])
 # async def list_members(db: AsyncSession = Depends(get_db)) -> list[MemberOut]:
@@ -565,7 +595,32 @@ async def submit_application(payload: ApplicationIn, db: AsyncSession = Depends(
 
 @app.get("/admin/applications", response_model=list[ApplicationOut])
 async def get_applications(db: AsyncSession = Depends(get_db), _: Member = Depends(get_admin_member)):
-    return await db_get_applications(db)
+    apps = await db_get_applications(db)
+    # surface temp creds for pending_setup applications so the admin UI can show them
+    out: list[ApplicationOut] = []
+    for app in apps:
+        temp_username = None
+        temp_password = None
+        if app.status == "pending_setup" and app.member_id:
+            m = (await db.execute(select(Member).filter(Member.id == app.member_id))).scalar_one_or_none()
+            if m:
+                temp_username = m.username
+                temp_password = m.temp_password_plaintext
+        out.append(ApplicationOut(
+            id=app.id,
+            firstname=app.firstname,
+            lastname=app.lastname,
+            email=app.email,
+            city=app.city,
+            state=app.state,
+            known_member=app.known_member,
+            reason=app.reason,
+            status=app.status,
+            created_at=app.created_at,
+            temp_username=temp_username,
+            temp_password=temp_password,
+        ))
+    return out
 
 @app.patch("/admin/applications/{application_id}")
 async def update_application_status(
@@ -574,6 +629,18 @@ async def update_application_status(
     db: AsyncSession = Depends(get_db),
     _: Member = Depends(get_admin_member),
 ):
+    if payload.status == "approved":
+        try:
+            app, member, temp_password = await db_approve_application(db, application_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        return ApplicationApproveOut(
+            application_id=app.id,
+            status=app.status,
+            temp_username=member.username,
+            temp_password=temp_password,
+            temp_password_expires_at=member.temp_password_expires_at,
+        )
     try:
         await db_update_application_status(db, application_id, payload.status)
     except ValueError as e:
