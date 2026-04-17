@@ -70,7 +70,7 @@ const Portfolio = () => {
     get_members_visual_2d(username, medium).then((data) => {
       const filtered =
         keywords.length > 0
-          ? data.filter((p) => p.keywords?.some((k) => keywords.includes(k)))
+          ? data.filter((p) => keywords.every((k) => p.keywords?.includes(k)))
           : data;
       setArt(filtered);
     });

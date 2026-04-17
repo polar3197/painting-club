@@ -26,18 +26,38 @@ const MemberCard = ({ member }: { member: Profile }) => {
   );
 };
 
+const PEOPLE_KEYS = ["username", "firstname", "lastname", "city", "media"];
+
 const People = () => {
   const [query, setQuery] = useState("");
+  const [chips, setChips] = useState<string[]>([]);
   const [members] = useMembers("", "");
   const [options] = useOptions();
 
   const peopleOptions = [...options.usernames, ...options.fullnames, ...options.cities, ...options.mediums].filter(Boolean);
-  const fuse = new Fuse(members, { keys: ["username", "firstname", "lastname", "city", "media"], threshold: 0.4 });
-  const filtered = query ? fuse.search(query).map(r => r.item) : members;
+
+  let filtered: Profile[] = members;
+  for (const chip of chips) {
+    filtered = new Fuse(filtered, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(chip).map(r => r.item);
+  }
+  if (query.trim()) {
+    filtered = new Fuse(filtered, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(query).map(r => r.item);
+  }
+
+  const addChip = (value: string) => setChips(prev => prev.includes(value) ? prev : [...prev, value]);
+  const removeChip = (value: string) => setChips(prev => prev.filter(c => c !== value));
 
   return (
     <>
-      <CentralFilter header={"members"} options={peopleOptions} onSearch={setQuery} placeholder="search people..." />
+      <CentralFilter
+        header="members"
+        options={peopleOptions}
+        chips={chips}
+        onAddChip={addChip}
+        onRemoveChip={removeChip}
+        onQueryChange={setQuery}
+        placeholder="search people..."
+      />
       <div className='members-display'>
         {filtered.length > 0
           ? filtered.map(m => <MemberCard key={m.username} member={m} />)

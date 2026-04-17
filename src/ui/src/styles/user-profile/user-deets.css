@@ -33,9 +33,12 @@
     box-shadow: 0 0 0 1px black;
     border-radius: 5px;
     cursor: pointer;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .user-profile-pic img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -74,14 +77,10 @@
 
 
 .user-fields {
-    /* position: relative; */
     width: 75%;
     height: 100%;
     display: flex;
     flex-direction: column;
-
-    border-radius: 5px;
-    border: 1px solid black;
     padding: 10px;
     position: relative;
 }
@@ -105,6 +104,18 @@
     flex-direction: column;
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
     font-size: 18px;
+    border: 1px solid black;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 12px;
+    flex: 1;
+}
+
+.user-field-element hr {
+    height: 1px;
+    border: none;
+    background-color: #000;
+    margin: 4px 0 8px;
 }
 
 .user-name textarea {
@@ -182,7 +193,7 @@
         display: grid;
         grid-template-columns: 1fr 32vw;
         column-gap: 12px;
-        row-gap: 4px;
+        row-gap: 0;
         padding: 10px;
         position: relative;
     }
@@ -204,6 +215,7 @@
         grid-row: 1;
         margin: 0;
         font-size: 18px;
+        line-height: 1.15;
         align-self: flex-start;
     }
 
@@ -225,7 +237,12 @@
         flex-wrap: wrap;
         gap: 6px;
         font-size: 14px;
-        margin-top: 2px;
+        line-height: 1.15;
+        margin-top: 0;
+    }
+
+    .user-location p {
+        margin: 0;
     }
 
     .user-profile-pic {

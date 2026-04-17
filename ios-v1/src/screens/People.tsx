@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,12 +21,14 @@ export default function People() {
   const [members, , , refetchMembers] = useMembers('', '');
   const [options] = useOptions();
   const [query, setQuery] = useState('');
+  const [chips, setChips] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filterKey, setFilterKey] = useState(0);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setQuery('');
+    setChips([]);
     setFilterKey((k) => k + 1);
     try {
       await refetchMembers();
@@ -40,22 +42,29 @@ export default function People() {
       ...(o.usernames || []),
       ...(o.fullnames || []),
       ...(o.cities || []),
+      ...(o.mediums || []),
     ];
   }, [options]);
 
-  const fuse = useRef<Fuse<Profile> | null>(null);
-  const fuseItems = useMemo(() => {
-    fuse.current = new Fuse(members, {
-      keys: ['username', 'firstname', 'lastname', 'city', 'media'],
-      threshold: 0.4,
-    });
-    return fuse.current;
-  }, [members]);
+  const PEOPLE_KEYS = ['username', 'firstname', 'lastname', 'city', 'media'];
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return members;
-    return fuseItems.search(query).map((r) => r.item);
-  }, [query, members, fuseItems]);
+    let result = members;
+    for (const chip of chips) {
+      result = new Fuse(result, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(chip).map((r) => r.item);
+    }
+    if (query.trim()) {
+      result = new Fuse(result, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
+    }
+    return result;
+  }, [members, chips, query]);
+
+  const addChip = useCallback((value: string) => {
+    setChips((prev) => (prev.includes(value) ? prev : [...prev, value]));
+  }, []);
+  const removeChip = useCallback((value: string) => {
+    setChips((prev) => prev.filter((c) => c !== value));
+  }, []);
 
   const renderCard = ({ item }: { item: Profile }) => (
     <Pressable
@@ -97,7 +106,10 @@ export default function People() {
         key={filterKey}
         header="members"
         options={allOptions}
-        onSearch={setQuery}
+        chips={chips}
+        onAddChip={addChip}
+        onRemoveChip={removeChip}
+        onQueryChange={setQuery}
         placeholder="search people..."
       />
       <FlatList

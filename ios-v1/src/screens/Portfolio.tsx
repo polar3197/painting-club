@@ -40,7 +40,7 @@ export default function Portfolio() {
     get_members_visual_2d(username, medium).then(async (data) => {
       const filtered =
         keywords && keywords.length > 0
-          ? data.filter((p: Visual2DOut) => p.keywords?.some((k: string) => keywords.includes(k)))
+          ? data.filter((p: Visual2DOut) => keywords.every((k: string) => p.keywords?.includes(k)))
           : data;
 
       const resolved = await Promise.all(

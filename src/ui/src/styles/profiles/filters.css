@@ -50,3 +50,51 @@
         text-align: center;
     }
 }
+
+.filter-chips {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 30px;
+    background-color: rgb(255, 250, 245);
+    border-bottom: 1px black solid;
+}
+
+.filter-chips .bubble {
+    display: flex;
+    flex-direction: row;
+    border: 2px blue solid;
+    background-color: rgb(252, 219, 121);
+    border-radius: 15px;
+    padding: 4px;
+    gap: 6px;
+    align-items: center;
+}
+
+.filter-chips .bubble-name {
+    white-space: nowrap;
+    padding: 2px 4px;
+    font-size: 16px;
+}
+
+.filter-chips .bubble-x {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    background-color: white;
+}
+
+.filter-chips .bubble-x:hover {
+    background-color: rgb(241, 99, 99);
+}
+
+@media (max-width: 640px) {
+    .filter-chips {
+        padding: 8px 16px;
+    }
+}

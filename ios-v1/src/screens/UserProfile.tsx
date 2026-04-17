@@ -242,7 +242,7 @@ export default function UserProfile() {
 
   const filteredArt = useMemo(() => {
     if (selectedKeywords.length === 0) return art;
-    return art.filter((p) => p.keywords?.some((k) => selectedKeywords.includes(k)));
+    return art.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
   }, [art, selectedKeywords]);
 
   const handleArtLayout = useCallback((pieceId: string, e: LayoutChangeEvent) => {

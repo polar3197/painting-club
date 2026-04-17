@@ -26,8 +26,11 @@ const ArtCard = ({ piece }: { piece: ArtResult }) => {
   );
 };
 
+const ART_KEYS = ["title", "medium", "song", "creator_username", "location", "keywords"];
+
 const ArtGallery = () => {
   const [query, setQuery] = useState("");
+  const [chips, setChips] = useState<string[]>([]);
   const [allArt, setAllArt] = useState<ArtResult[]>([]);
   const [options] = useOptions();
 
@@ -35,13 +38,30 @@ const ArtGallery = () => {
     search_art("").then(setAllArt).catch((e) => console.error("art fetch failed:", e));
   }, []);
 
-  const artOptions = [...options.titles, ...options.songs, ...options.keywords].filter(Boolean);
-  const fuse = new Fuse(allArt, { keys: ["title", "medium", "song", "creator_username", "location", "keywords"], threshold: 0.4 });
-  const filtered = query ? fuse.search(query).map(r => r.item) : allArt;
+  const artOptions = [...options.titles, ...options.songs, ...options.keywords, ...options.mediums, ...options.usernames, ...options.cities].filter(Boolean);
+
+  let filtered: ArtResult[] = allArt;
+  for (const chip of chips) {
+    filtered = new Fuse(filtered, { keys: ART_KEYS, threshold: 0.4 }).search(chip).map(r => r.item);
+  }
+  if (query.trim()) {
+    filtered = new Fuse(filtered, { keys: ART_KEYS, threshold: 0.4 }).search(query).map(r => r.item);
+  }
+
+  const addChip = (value: string) => setChips(prev => prev.includes(value) ? prev : [...prev, value]);
+  const removeChip = (value: string) => setChips(prev => prev.filter(c => c !== value));
 
   return (
     <>
-      <CentralFilter header="art" options={artOptions} onSearch={setQuery} placeholder="search art..." />
+      <CentralFilter
+        header="art"
+        options={artOptions}
+        chips={chips}
+        onAddChip={addChip}
+        onRemoveChip={removeChip}
+        onQueryChange={setQuery}
+        placeholder="search art..."
+      />
       <div className='members-display'>
         {filtered.length > 0
           ? filtered.map(a => <ArtCard key={a.id} piece={a} />)

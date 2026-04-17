@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ export default function ArtGallery() {
   const [options] = useOptions();
   const [art, setArt] = useState<ArtResult[]>([]);
   const [query, setQuery] = useState('');
+  const [chips, setChips] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filterKey, setFilterKey] = useState(0);
 
@@ -31,6 +32,7 @@ export default function ArtGallery() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setQuery('');
+    setChips([]);
     setFilterKey((k) => k + 1);
     try {
       const data = await search_art('');
@@ -51,19 +53,25 @@ export default function ArtGallery() {
     ];
   }, [options]);
 
-  const fuse = useRef<Fuse<ArtResult> | null>(null);
-  const fuseItems = useMemo(() => {
-    fuse.current = new Fuse(art, {
-      keys: ['title', 'medium', 'song', 'creator_username', 'location', 'keywords'],
-      threshold: 0.4,
-    });
-    return fuse.current;
-  }, [art]);
+  const ART_KEYS = ['title', 'medium', 'song', 'creator_username', 'location', 'keywords'];
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return art;
-    return fuseItems.search(query).map((r) => r.item);
-  }, [query, art, fuseItems]);
+    let result = art;
+    for (const chip of chips) {
+      result = new Fuse(result, { keys: ART_KEYS, threshold: 0.4 }).search(chip).map((r) => r.item);
+    }
+    if (query.trim()) {
+      result = new Fuse(result, { keys: ART_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
+    }
+    return result;
+  }, [art, chips, query]);
+
+  const addChip = useCallback((value: string) => {
+    setChips((prev) => (prev.includes(value) ? prev : [...prev, value]));
+  }, []);
+  const removeChip = useCallback((value: string) => {
+    setChips((prev) => prev.filter((c) => c !== value));
+  }, []);
 
   const renderCard = ({ item }: { item: ArtResult }) => (
     <Pressable
@@ -118,7 +126,10 @@ export default function ArtGallery() {
         key={filterKey}
         header="art"
         options={allOptions}
-        onSearch={setQuery}
+        chips={chips}
+        onAddChip={addChip}
+        onRemoveChip={removeChip}
+        onQueryChange={setQuery}
         placeholder="search art..."
       />
       <FlatList

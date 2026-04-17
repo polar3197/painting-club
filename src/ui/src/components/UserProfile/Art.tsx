@@ -148,7 +148,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                     selectedMedium == "drawing" ||
                     selectedMedium == "photography")
                     ?
-                    (selectedKeywords.length > 0 ? art.filter(p => p.keywords?.some(k => selectedKeywords.includes(k))) : art)
+                    (selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art)
                         .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)
                 :
                 `${selectedMedium} is empty atm`}
