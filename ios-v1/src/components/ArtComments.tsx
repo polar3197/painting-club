@@ -146,13 +146,11 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
               <View style={styles.swipeBar} />
             </View>
             <View style={styles.imageSection}>
-              <View style={[styles.imageBorder, { aspectRatio: imgRatio }]}>
-                <Image
-                  source={{ uri: imgUri }}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="cover"
-                />
-              </View>
+              <Image
+                source={{ uri: imgUri }}
+                style={[styles.image, { aspectRatio: imgRatio }]}
+                contentFit="contain"
+              />
             </View>
           </View>
           <View style={styles.commentsSection}>
@@ -218,7 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.textMuted,
   },
   imageSection: {
-    maxHeight: SCREEN_HEIGHT * 0.4,
+    height: SCREEN_HEIGHT * 0.4,
     backgroundColor: Colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -226,11 +224,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#000',
   },
-  imageBorder: {
-    borderWidth: 2,
+  image: {
+    maxWidth: '100%',
+    maxHeight: '100%',
+    borderWidth: 1,
     borderColor: '#000',
-    maxWidth: '95%',
-    maxHeight: '95%',
   },
   commentsSection: {
     flex: 1,

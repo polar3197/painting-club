@@ -10,6 +10,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { resolveImageUrl } from '../api';
 import { Colors, Fonts } from '../constants/theme';
@@ -136,7 +137,8 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
   return (
     <Modal transparent visible animationType="fade" onRequestClose={handleClose} supportedOrientations={['portrait', 'landscape']}>
       <Pressable style={styles.backdrop} onPress={handleClose}>
-        <View style={styles.blurOverlay} />
+        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={styles.darkenOverlay} />
       </Pressable>
       <View style={styles.imageWrapper} pointerEvents="box-none">
         <Animated.View
@@ -153,6 +155,7 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
           <Animated.View
             style={[
               StyleSheet.absoluteFill,
+              styles.cardFront,
               { transform: [{ perspective: 1000 }, { rotateY: frontRotate }], backfaceVisibility: 'hidden' },
             ]}
           >
@@ -195,15 +198,19 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlay,
   },
-  blurOverlay: {
-    flex: 1,
+  darkenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   imageWrapper: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cardFront: {
+    borderWidth: 1,
+    borderColor: '#000',
   },
   cardBack: {
     backgroundColor: Colors.secondary,
