@@ -75,6 +75,7 @@ async def db_get_visual_2d(db: AsyncSession, username: str, medium: str):
 
 async def db_add_visual_2d(
         db: AsyncSession,
+        art_id,
         username: str,
         medium: str,
         title: str,
@@ -87,7 +88,7 @@ async def db_add_visual_2d(
         height: int | None = None,
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
-    )-> bool:
+    ) -> str:
     username = username.lower()
     # find member_id, media_id
     member_result = await db.execute(select(Member.id).filter(Member.username==username))
@@ -102,6 +103,7 @@ async def db_add_visual_2d(
 
     # use this to create the entry in Art
     new_art = Visual2D(
+        id=art_id,
         title=title,
         date=date,
         creator_id=member_id,
@@ -115,8 +117,7 @@ async def db_add_visual_2d(
         comments_enabled=comments_enabled,
     )
     db.add(new_art)
-    await db.flush()  # gets the id without committing
-    art_id = new_art.id
+    await db.flush()
 
     # create mappings between keywords, members and media
     for k in (keywords or []):
@@ -129,10 +130,10 @@ async def db_add_visual_2d(
             await db.flush()
             keyword_id = new_keyword.id
 
-        db.add(KeywordArt(keyword_id=keyword_id, art_id=art_id))                                                                                    
+        db.add(KeywordArt(keyword_id=keyword_id, art_id=art_id))
 
     await db.commit()
-    return True
+    return str(art_id)
 
 async def db_update_visual_2d(
     db: AsyncSession,
@@ -181,17 +182,19 @@ async def db_update_visual_2d(
     await db.commit()
 
 
-async def db_remove_visual_2d(db: AsyncSession, art_id: str, current_member_id: str):
-    result = await db.execute(select(Art.creator_id).filter(Art.id == art_id))
-    creator_id = result.scalar_one_or_none()
-    
-    if creator_id is None:
+async def db_remove_visual_2d(db: AsyncSession, art_id: str, current_member_id: str) -> str | None:
+    result = await db.execute(select(Art.creator_id, Art.file_path).filter(Art.id == art_id))
+    row = result.one_or_none()
+
+    if row is None:
         raise ValueError("Art not found")
-    
+
+    creator_id, file_path = row
     if str(creator_id) != str(current_member_id):
         raise PermissionError("Not your piece")
-    
+
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
     await db.execute(delete(Visual2D).filter(Visual2D.id == art_id))
     await db.execute(delete(Art).filter(Art.id == art_id))
     await db.commit()
+    return file_path

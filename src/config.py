@@ -15,6 +15,7 @@ class PostgreSQLConfig(BaseSettings):
         env_prefix="PG_",
         env_file=Path(__file__).parent.parent / ".env",
         case_sensitive=False,
+        extra="ignore",
     )
 
     @property

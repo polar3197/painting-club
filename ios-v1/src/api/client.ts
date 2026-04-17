@@ -37,6 +37,10 @@ export function resolveImageUrl(path: string): string {
   return `${SERVER_ORIGIN}${path}`;
 }
 
+export function thumbUrl(artId: string, w: 256 | 512 | 1024 = 512): string {
+  return `${API_BASE}/art/${artId}/thumb?w=${w}`;
+}
+
 export function getPortfolioUrl(username: string, medium?: string, keywords?: string[]): string {
   const params = new URLSearchParams();
   if (medium) params.set('medium', medium);

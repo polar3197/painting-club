@@ -23,6 +23,7 @@ import {
   update_profile,
   get_search_options,
   resolveImageUrl,
+  thumbUrl,
   upload_profile_picture,
   Visual2DOut,
   Profile,
@@ -92,7 +93,7 @@ function Visual2DPiece({
           onPress={() => setIsZoomedIn(true)}
         >
           <Image
-            source={{ uri: resolveImageUrl(piece.file_path) }}
+            source={{ uri: thumbUrl(piece.id, 512) }}
             style={styles.artImage}
             contentFit="cover"
           />

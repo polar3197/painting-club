@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Optional, List
 from pathlib import Path
 import io
+import uuid
 import magic
 from PIL import Image
 import pillow_heif
@@ -302,6 +303,18 @@ ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf",
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 HEIC_MIMES = {"image/heic", "image/heif"}
 
+STATIC_ROOT = Path("/app")
+
+def abs_path(rel: str) -> Path:
+    # rel is an absolute-looking web path like "/static/foo.jpg" — anchor it under STATIC_ROOT
+    return STATIC_ROOT / rel.lstrip("/")
+
+def thumbs_dir() -> Path:
+    return STATIC_ROOT / "static" / "thumbs"
+
+def thumb_file(art_id: str, w: int) -> Path:
+    return thumbs_dir() / f"{art_id}_{w}.jpg"
+
 def sanitize_path_segment(value: str) -> str:
     import re
     return re.sub(r"[^\w\-]", "_", value)
@@ -333,7 +346,7 @@ async def upload_profile_picture(
 
     ext = "png" if mime == "image/png" else "jpg"
     file_path = f"/static/profile/{current_member.id}.{ext}"
-    path = Path(f"/app{file_path}")
+    path = abs_path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(contents)
 
@@ -372,25 +385,24 @@ async def upload_visual_2d(
     mime = magic.from_buffer(contents, mime=True)
     if mime not in ALLOWED_MIME_TYPES:
         raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
-    original_mime = mime
-    if original_mime != file.content_type:
-        raise HTTPException(status_code=400, detail=f"File type mismatch: stated {file.content_type}, actual {original_mime}")
 
     if mime in HEIC_MIMES:
         contents = heic_to_jpeg_bytes(contents)
         mime = "image/jpeg"
 
-    # sanitize path segments to prevent traversal
+    # id-keyed path: generate before write so filename can never collide
+    art_id = uuid.uuid4()
     safe_medium = sanitize_path_segment(medium)
-    safe_title = sanitize_path_segment(title)
     ext_by_mime = {"image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "application/pdf": "pdf"}
     file_ext = ext_by_mime[mime]
-    file_path = f"/static/art/{current_member.id}/{safe_medium}/{safe_title}.{file_ext}"
+    file_path = f"/static/art/{current_member.id}/{safe_medium}/{art_id}.{file_ext}"
 
     # save the file to the filepath
-    path = Path(f"/app{file_path}")
+    path = abs_path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(contents)
+    if not path.exists() or path.stat().st_size == 0:
+        raise HTTPException(status_code=500, detail="Upload write failed")
 
     # parse keywords
     keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
@@ -398,12 +410,13 @@ async def upload_visual_2d(
 
     try:
         await db_add_visual_2d(
-            db=db, 
-            username=username, 
-            medium=medium, 
-            title=title, 
-            date=date, 
-            location=location, 
+            db=db,
+            art_id=art_id,
+            username=username,
+            medium=medium,
+            title=title,
+            date=date,
+            location=location,
             song=song, song_artist=song_artist, width=width,
             height=height,
             keywords=keywords_list,
@@ -411,7 +424,13 @@ async def upload_visual_2d(
             comments_enabled=comments_enabled,
         )
     except ValueError as e:
+        path.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail=str(e))
+
+    # eager thumbnail generation (skip PDFs — GET endpoint serves original)
+    if path.suffix.lower() != ".pdf":
+        for w in ALLOWED_THUMB_WIDTHS:
+            generate_thumbnail(str(art_id), path, w)
 
     return {"file_path": file_path}
 
@@ -445,8 +464,10 @@ async def update_visual_2d(
 
 @app.delete("/art/{art_id}")
 async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
-    await db_remove_visual_2d(art_id=art_id, current_member_id=current_user.id, db=db)
-    thumb_dir = Path("/app/static/thumbs")
+    file_path = await db_remove_visual_2d(art_id=art_id, current_member_id=current_user.id, db=db)
+    if file_path:
+        abs_path(file_path).unlink(missing_ok=True)
+    thumb_dir = thumbs_dir()
     if thumb_dir.exists():
         for stale in thumb_dir.glob(f"{art_id}_*.jpg"):
             stale.unlink(missing_ok=True)
@@ -454,6 +475,26 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
 
 
 ALLOWED_THUMB_WIDTHS = {256, 512, 1024}
+
+
+def generate_thumbnail(art_id: str, src_abs: Path, w: int) -> Path | None:
+    """Render a JPEG thumbnail for art_id at width w. Returns the path on success, None on failure."""
+    thumb_path = thumb_file(art_id, w)
+    try:
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            img.draft("RGB", (w * 2, w * 2))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((w, w * 4), Image.LANCZOS)
+            img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+        return thumb_path
+    except Exception as e:
+        print(f"[thumb] generation failed for {art_id} w={w}: {type(e).__name__}: {e}")
+        if thumb_path.exists():
+            thumb_path.unlink(missing_ok=True)
+        return None
+
 
 @app.get("/art/{art_id}/thumb")
 async def get_art_thumb(art_id: str, w: int = 512, db: AsyncSession = Depends(get_db)):
@@ -465,7 +506,7 @@ async def get_art_thumb(art_id: str, w: int = 512, db: AsyncSession = Depends(ge
     if not file_path:
         raise HTTPException(status_code=404, detail="Art not found")
 
-    src_abs = Path(f"/app{file_path}")
+    src_abs = abs_path(file_path)
     if not src_abs.exists():
         raise HTTPException(status_code=404, detail="Source file missing")
 
@@ -475,20 +516,9 @@ async def get_art_thumb(art_id: str, w: int = 512, db: AsyncSession = Depends(ge
     if src_abs.suffix.lower() == ".pdf":
         return FileResponse(src_abs, headers=cache_headers)
 
-    thumb_path = Path(f"/app/static/thumbs/{art_id}_{w}.jpg")
+    thumb_path = thumb_file(art_id, w)
     if not thumb_path.exists():
-        try:
-            thumb_path.parent.mkdir(parents=True, exist_ok=True)
-            with Image.open(src_abs) as img:
-                img.draft("RGB", (w * 2, w * 2))
-                if img.mode != "RGB":
-                    img = img.convert("RGB")
-                img.thumbnail((w, w * 4), Image.LANCZOS)
-                img.save(thumb_path, format="JPEG", quality=85, optimize=True)
-        except Exception as e:
-            print(f"[thumb] generation failed for {art_id} w={w}: {type(e).__name__}: {e}")
-            if thumb_path.exists():
-                thumb_path.unlink(missing_ok=True)
+        if generate_thumbnail(art_id, src_abs, w) is None:
             return FileResponse(src_abs, headers=cache_headers)
 
     return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
