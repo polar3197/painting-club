@@ -5,6 +5,7 @@ import { Profile } from "../../api";
 import AddArtDialog from "../Utils/AddArtDialog";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtComments from "../Utils/ArtComments";
+import ConfirmDialog from "../Utils/ConfirmDialog";
 import { get_members_visual_2d, remove_visual_2d, Visual2DOut } from "../../api";
 
 import '../../styles/user-profile/art.css';
@@ -12,9 +13,11 @@ import '../../styles/user-profile/art.css';
 const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean; piece: Visual2DOut; onRemove: () => void; onEdit: () => void }) => {
     const [isZoomedIn, setIsZoomedIn] = useState(false);
     const [showComments, setShowComments] = useState(false);
+    const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
     const removeArt = async ({ pieceId }: { pieceId: string }) => {
         await remove_visual_2d(pieceId, localStorage.getItem("token"));
+        setShowRemoveConfirm(false);
         onRemove();
     }
 
@@ -29,6 +32,12 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
         }
         {showComments &&
             <ArtComments piece={piece} setIsOpen={() => setShowComments(false)} />
+        }
+        {showRemoveConfirm &&
+            <ConfirmDialog
+                onConfirm={() => removeArt({ pieceId: piece.id })}
+                onCancel={() => setShowRemoveConfirm(false)}
+            />
         }
         <div id={`art-${piece.id}`} className="art-element">
             <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
@@ -59,7 +68,7 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
                                 </div>
                             )}
                             <div className="remove">
-                                <button onClick={() => removeArt({ pieceId: piece.id })}>remove</button>
+                                <button onClick={() => setShowRemoveConfirm(true)}>remove</button>
                             </div>
                         </div>
                     ) : piece.comments_enabled && (
