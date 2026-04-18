@@ -18,7 +18,7 @@ const UserDetails = (
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasPic = !!profile.profile_pic_path;
-  const imgSrc = hasPic ? `${profile.profile_pic_path}?v=${Date.now()}` : "";
+  const imgSrc = hasPic ? (profile.profile_pic_path as string) : "";
   // Start with the small placeholder thumb for instant paint; swap to the full-res
   // original once it finishes preloading in the background.
   const [displaySrc, setDisplaySrc] = useState(
