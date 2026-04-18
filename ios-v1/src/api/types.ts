@@ -123,3 +123,8 @@ export interface CommentOut {
   text: string;
   created_at: string;
 }
+
+export interface MediaType {
+  id: string;
+  name: string;
+}

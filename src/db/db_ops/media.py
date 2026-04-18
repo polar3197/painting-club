@@ -4,6 +4,23 @@ from sqlalchemy import select, delete, func, desc, nulls_last
 
 from db.models import Member, Media, Media_Members, Visual2D, Keyword, KeywordArt, Art
 
+async def db_list_media(db: AsyncSession):
+    result = await db.execute(select(Media).order_by(Media.name))
+    return result.scalars().all()
+
+
+async def db_create_media(db: AsyncSession, name: str) -> Media:
+    existing = await db.execute(select(Media).filter(Media.name == name))
+    row = existing.scalars().first()
+    if row:
+        return row
+    new_medium = Media(name=name)
+    db.add(new_medium)
+    await db.commit()
+    await db.refresh(new_medium)
+    return new_medium
+
+
 async def db_add_medium(db: AsyncSession, username: str, medium: str) -> bool:
     username = username.lower()
     # check for user existence
@@ -13,21 +30,14 @@ async def db_add_medium(db: AsyncSession, username: str, medium: str) -> bool:
     if not member_id:
         raise ValueError(f"Member '{username}' not found")
 
-    # check media exists
+    # require medium to exist — creation is handled via POST /media
     query = select(Media).filter(Media.name==medium)
     result = await db.execute(query)
     medium_record = result.scalars().first()
-
     if not medium_record:
-    # if medium doesn't exist, create a new entry 
-        new_medium = Media(name=medium)
-        db.add(new_medium)
-        await db.commit()
-        await db.refresh(new_medium)
-        media_id = new_medium.id
-    else:
-        media_id = medium_record.id
-    
+        raise ValueError(f"Medium '{medium}' does not exist")
+    media_id = medium_record.id
+
     # check if medium is mapped to member
     query = select(Media_Members).filter(Media_Members.media_id==media_id, Media_Members.member_id==member_id)
     result = await db.execute(query)

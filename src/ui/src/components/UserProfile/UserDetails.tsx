@@ -16,25 +16,17 @@ const UserDetails = (
   ) => {
 
   const [isZoomedIn, setIsZoomedIn] = useState(false);
-  const [imgFailed, setImgFailed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasPic = !!profile.profile_pic_path;
-  const imgSrc = hasPic
-    ? `${profile.profile_pic_path}?v=${Date.now()}`
-    : "";
+  const imgSrc = hasPic ? `${profile.profile_pic_path}?v=${Date.now()}` : "";
   // Start with the small placeholder thumb for instant paint; swap to the full-res
   // original once it finishes preloading in the background.
   const [displaySrc, setDisplaySrc] = useState(
     hasPic ? profileThumbUrl(profile.id) : "",
   );
 
-  useEffect(() => { setImgFailed(false); }, [imgSrc]);
-
   useEffect(() => {
-    if (!hasPic) {
-      setDisplaySrc("");
-      return;
-    }
+    if (!hasPic) return;
     setDisplaySrc(profileThumbUrl(profile.id));
     const full = new Image();
     full.onload = () => setDisplaySrc(imgSrc);
@@ -52,11 +44,9 @@ const UserDetails = (
     if (file) await handleUpload(file);
   };
 
-  const showEmpty = !hasPic || imgFailed;
-
   return (
     <>
-    {isZoomedIn && !showEmpty &&
+    {isZoomedIn && hasPic &&
       <ArtZoomIn
         isOwner={profile.is_owner}
         imgPath={imgSrc}
@@ -74,13 +64,12 @@ const UserDetails = (
           selectedKeywords={selectedKeywords}
         />
 
-        {!showEmpty ? (
+        {hasPic ? (
           <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
             <img
               src={displaySrc}
               width="180"
               height="200"
-              onError={() => setImgFailed(true)}
               // @ts-ignore — fetchpriority isn't in the standard React img types yet
               fetchpriority="high"
             />
@@ -90,9 +79,8 @@ const UserDetails = (
             <button
               className="add-pic-plus"
               onClick={() => fileInputRef.current?.click()}
-              aria-label="add profile picture"
             >
-              +
+              add prof pic
             </button>
             <input
               ref={fileInputRef}

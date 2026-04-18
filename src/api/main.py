@@ -27,6 +27,8 @@ from api.models import (
     Token,
     MemberFilters,
     AddMedia,
+    MediaOut,
+    MediaIn,
     Visual2DOut,
     Visual2DUpdate,
     SearchOptions,
@@ -68,6 +70,8 @@ from db.db_ops.applications import (
 
 from db.db_ops.media import (
     db_add_medium,
+    db_list_media,
+    db_create_media,
     db_add_visual_2d,
     db_get_visual_2d,
     db_update_visual_2d,
@@ -325,9 +329,41 @@ async def search_members(
     return profiles
     
 
+@app.get("/media", response_model=list[MediaOut])
+async def list_media(db: AsyncSession = Depends(get_db)):
+    rows = await db_list_media(db)
+    return [MediaOut(id=r.id, name=r.name) for r in rows]
+
+
+@app.post("/media", response_model=MediaOut)
+async def create_media(
+    payload: MediaIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if (current_member.role or "member") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    row = await db_create_media(db, name)
+    return MediaOut(id=row.id, name=row.name)
+
+
 @app.post("/members/addmedia")
-async def login_member_endpoint(payload: AddMedia, db: AsyncSession = Depends(get_db)):
-    success = await db_add_medium(db, payload.username, payload.medium)
+async def add_member_media_endpoint(
+    payload: AddMedia,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if not payload.username or not payload.medium:
+        raise HTTPException(status_code=400, detail="username and medium required")
+    if current_member.username != payload.username:
+        raise HTTPException(status_code=403, detail="Not your profile")
+    try:
+        success = await db_add_medium(db, payload.username, payload.medium)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return success
 
 ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf", "image/heic", "image/heif"}

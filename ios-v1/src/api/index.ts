@@ -15,6 +15,7 @@ import type {
   SearchOptions,
   ArtResult,
   CommentOut,
+  MediaType,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -68,6 +69,18 @@ export function update_profile(username: string, payload: Profile, token: string
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
+  });
+}
+
+export function get_media(): Promise<MediaType[]> {
+  return request('/media') as Promise<MediaType[]>;
+}
+
+export function add_member_media(username: string, medium: string, token: string | null) {
+  return request('/members/addmedia', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username, medium }),
   });
 }
 

@@ -58,6 +58,13 @@ class AddMedia(BaseModel):
     username: str | None
     medium: str | None
 
+class MediaOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+class MediaIn(BaseModel):
+    name: str
+
 class Visual2DIn(BaseModel):
     username: str
     medium: str

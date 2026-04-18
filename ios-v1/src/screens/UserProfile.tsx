@@ -22,6 +22,7 @@ import {
   get_members_visual_2d,
   remove_visual_2d,
   update_profile,
+  add_member_media,
   get_search_options,
   resolveImageUrl,
   thumbUrl,
@@ -34,6 +35,7 @@ import Dropdown from '../components/Dropdown';
 import ArtZoomIn from '../components/ArtZoomIn';
 import ArtComments from '../components/ArtComments';
 import AddArtDialog from '../components/AddArtDialog';
+import AddMediaDialog from '../components/AddMediaDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
@@ -205,7 +207,20 @@ export default function UserProfile() {
   }, [refetchProfile]);
   const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showAddMedia, setShowAddMedia] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
+
+  const handleAddMedia = useCallback(async (name: string) => {
+    if (!profile) return;
+    try {
+      await add_member_media(username, name, token);
+      setProfile({ ...profile, media: [...(profile.media ?? []), name] });
+      setSelectedMedium(name);
+      setSelectedKeywords([]);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
+  }, [profile, username, token]);
 
   const pickAndUploadProfilePic = async () => {
     if (!profile) return;
@@ -428,7 +443,7 @@ export default function UserProfile() {
                 ) : profile.is_owner ? (
                   <Pressable onPress={pickAndUploadProfilePic} style={styles.profilePicContainer}>
                     <View style={[styles.profilePic, styles.profilePicEmpty]}>
-                      <Text style={styles.profilePicPlus}>+</Text>
+                      <Text style={styles.profilePicPlus}>add prof pic</Text>
                     </View>
                   </Pressable>
                 ) : (
@@ -722,9 +737,9 @@ const styles = StyleSheet.create({
   },
   profilePicPlus: {
     fontFamily: Fonts.serif,
-    fontSize: 72,
-    lineHeight: 72,
+    fontSize: 14,
     color: '#888',
+    textAlign: 'center',
   },
 
   // MediaBar
