@@ -39,6 +39,7 @@
 
 .add-media {
     flex: 0 0 auto;
+    box-sizing: border-box;
     text-align: center;
     border: 1px black solid;
     background-color: rgb(250, 244, 202);
@@ -48,6 +49,7 @@
     font-weight: 600;
     padding: 0 0.75rem;
     line-height: inherit;
+    margin: 0;
 }
 
 .add-media:hover {
@@ -155,6 +157,10 @@
 
     .media-element {
         flex: 1 0 40%;
+        font-size: 13px;
+    }
+
+    .add-media {
         font-size: 13px;
     }
 
