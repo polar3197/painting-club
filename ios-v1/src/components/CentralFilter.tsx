@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import Dropdown from './Dropdown';
+import Dropdown, { DropdownHandle } from './Dropdown';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 interface CentralFilterProps {
@@ -13,15 +13,19 @@ interface CentralFilterProps {
   placeholder: string;
 }
 
-export default function CentralFilter({
-  header,
-  options,
-  chips,
-  onAddChip,
-  onRemoveChip,
-  onQueryChange,
-  placeholder,
-}: CentralFilterProps) {
+export interface CentralFilterHandle {
+  close: () => void;
+}
+
+const CentralFilter = forwardRef<CentralFilterHandle, CentralFilterProps>(function CentralFilter(
+  { header, options, chips, onAddChip, onRemoveChip, onQueryChange, placeholder },
+  ref,
+) {
+  const dropdownRef = useRef<DropdownHandle>(null);
+  useImperativeHandle(ref, () => ({
+    close: () => dropdownRef.current?.close(),
+  }), []);
+
   const availableOptions = options.filter((o) => !chips.includes(o));
   return (
     <View>
@@ -29,6 +33,7 @@ export default function CentralFilter({
         <Text style={styles.header}>{header}</Text>
         <View style={styles.dropdown}>
           <Dropdown
+            ref={dropdownRef}
             placeholder={placeholder}
             options={availableOptions}
             onSelect={(value) => {
@@ -59,7 +64,9 @@ export default function CentralFilter({
       )}
     </View>
   );
-}
+});
+
+export default CentralFilter;
 
 const styles = StyleSheet.create({
   container: {

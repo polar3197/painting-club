@@ -27,7 +27,8 @@ const ArtZoomIn = ({
         <div className="blowup-backdrop" onClick={() => setIsZoomedIn(false)}>
         <div className="blowup-wrapper">
             <div className={`blowup-dialog ${flip === "flip" ? "flip" : ""}`}
-                onClick={(e) => {
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
                     e.stopPropagation();
                     setFlip(flip === "flip" ? "unflip" : "flip");
                 }}

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Keyboard } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
-import CentralFilter from '../components/CentralFilter';
+import CentralFilter, { CentralFilterHandle } from '../components/CentralFilter';
 import { useOptions } from '../hooks';
 import { search_art, resolveImageUrl, thumbUrl, ArtResult } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -24,6 +24,12 @@ export default function ArtGallery() {
   const [chips, setChips] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filterKey, setFilterKey] = useState(0);
+  const filterRef = useRef<CentralFilterHandle>(null);
+
+  const dismissDropdown = useCallback(() => {
+    filterRef.current?.close();
+    Keyboard.dismiss();
+  }, []);
 
   useEffect(() => {
     search_art('').then(setArt).catch(() => {});
@@ -116,7 +122,7 @@ export default function ArtGallery() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <Pressable style={[styles.container, { paddingTop: insets.top }]} onPress={dismissDropdown}>
       <View style={styles.bannerWrap}>
         <Image
           source={require('../../assets/imgs/art.png')}
@@ -126,6 +132,7 @@ export default function ArtGallery() {
       </View>
       <CentralFilter
         key={filterKey}
+        ref={filterRef}
         header="art"
         options={allOptions}
         chips={chips}
@@ -141,6 +148,9 @@ export default function ArtGallery() {
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={dismissDropdown}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -150,7 +160,7 @@ export default function ArtGallery() {
           />
         }
       />
-    </View>
+    </Pressable>
   );
 }
 

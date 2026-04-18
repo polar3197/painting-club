@@ -18,27 +18,28 @@ const UserDetails = (
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imgSrc = profile.profile_pic_path
+  const hasPic = !!profile.profile_pic_path;
+  const imgSrc = hasPic
     ? `${profile.profile_pic_path}?v=${Date.now()}`
-    : `/imgs/${profile.id}.png`;
+    : "";
   // Start with the small placeholder thumb for instant paint; swap to the full-res
   // original once it finishes preloading in the background.
   const [displaySrc, setDisplaySrc] = useState(
-    profile.profile_pic_path ? profileThumbUrl(profile.id) : imgSrc,
+    hasPic ? profileThumbUrl(profile.id) : "",
   );
 
   useEffect(() => { setImgFailed(false); }, [imgSrc]);
 
   useEffect(() => {
-    if (!profile.profile_pic_path) {
-      setDisplaySrc(imgSrc);
+    if (!hasPic) {
+      setDisplaySrc("");
       return;
     }
     setDisplaySrc(profileThumbUrl(profile.id));
     const full = new Image();
     full.onload = () => setDisplaySrc(imgSrc);
     full.src = imgSrc;
-  }, [profile.id, profile.profile_pic_path, imgSrc]);
+  }, [profile.id, profile.profile_pic_path, imgSrc, hasPic]);
 
   const handleUpload = async (file: File) => {
     const token = localStorage.getItem("token");
@@ -51,7 +52,7 @@ const UserDetails = (
     if (file) await handleUpload(file);
   };
 
-  const showEmpty = imgFailed;
+  const showEmpty = !hasPic || imgFailed;
 
   return (
     <>
@@ -84,28 +85,25 @@ const UserDetails = (
               fetchpriority="high"
             />
           </div>
-        ) : (
+        ) : profile.is_owner ? (
           <div className="user-profile-pic empty-pic">
-            {profile.is_owner ? (
-              <>
-                <button
-                  className="change-pic-btn"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  add pic
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/heic,image/heif,.heic,.heif"
-                  style={{ display: "none" }}
-                  onChange={handleFileInput}
-                />
-              </>
-            ) : (
-              <span className="empty-pic-label">no pic</span>
-            )}
+            <button
+              className="add-pic-plus"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="add profile picture"
+            >
+              +
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/heic,image/heif,.heic,.heif"
+              style={{ display: "none" }}
+              onChange={handleFileInput}
+            />
           </div>
+        ) : (
+          <div className="user-profile-pic empty-pic" />
         )}
       </div>
 

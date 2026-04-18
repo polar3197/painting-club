@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, ScrollView, Pressable, Text, StyleSheet, Keyboard } from 'react-native';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import { View, TextInput, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Fuse from 'fuse.js';
 import { Colors } from '../constants/theme';
@@ -9,9 +9,17 @@ interface DropdownProps {
   options: string[];
   onSelect: (value: string) => void;
   onInputChange?: (value: string) => void;
+  onFocus?: () => void;
 }
 
-export default function Dropdown({ placeholder, options, onSelect, onInputChange }: DropdownProps) {
+export interface DropdownHandle {
+  close: () => void;
+}
+
+const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
+  { placeholder, options, onSelect, onInputChange, onFocus },
+  ref,
+) {
   const [query, setQuery] = useState('');
   const [showList, setShowList] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -22,14 +30,18 @@ export default function Dropdown({ placeholder, options, onSelect, onInputChange
     fuseRef.current = new Fuse(options, { threshold: 0.4 });
   }, [options]);
 
+  const close = React.useCallback(() => {
+    setShowList(false);
+    inputRef.current?.blur();
+  }, []);
+
+  useImperativeHandle(ref, () => ({ close }), [close]);
+
   // Close the list whenever the enclosing screen loses focus (e.g. user switches tabs)
   useFocusEffect(
     React.useCallback(() => {
-      return () => {
-        setShowList(false);
-        inputRef.current?.blur();
-      };
-    }, [])
+      return close;
+    }, [close])
   );
 
   const filtered = query.trim()
@@ -59,7 +71,10 @@ export default function Dropdown({ placeholder, options, onSelect, onInputChange
         autoCapitalize="none"
         autoCorrect={false}
         onChangeText={handleChange}
-        onFocus={() => setShowList(true)}
+        onFocus={() => {
+          setShowList(true);
+          onFocus?.();
+        }}
         onBlur={() => setTimeout(() => setShowList(false), 150)}
       />
       {showList && filtered.length > 0 && (
@@ -73,7 +88,9 @@ export default function Dropdown({ placeholder, options, onSelect, onInputChange
       )}
     </View>
   );
-}
+});
+
+export default Dropdown;
 
 const styles = StyleSheet.create({
   container: {

@@ -41,6 +41,7 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
   const baseDist = useRef(0);
   const lastOffset = useRef({ x: 0, y: 0 });
   const isPinching = useRef(false);
+  const lastTapAt = useRef(0);
 
   const uri = resolveImageUrl(imgPath);
 
@@ -115,9 +116,15 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
             y: lastOffset.current.y + gestureState.dy,
           };
         } else {
-          // Single tap at 1x = flip, unless they dragged
+          // Double tap at 1x = flip, unless they dragged
           if (Math.abs(gestureState.dx) < 5 && Math.abs(gestureState.dy) < 5) {
-            handleFlip();
+            const now = Date.now();
+            if (now - lastTapAt.current < 300) {
+              handleFlip();
+              lastTapAt.current = 0;
+            } else {
+              lastTapAt.current = now;
+            }
           }
         }
       },

@@ -207,10 +207,37 @@ export default function UserProfile() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
 
+  const pickAndUploadProfilePic = async () => {
+    if (!profile) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const name = asset.uri.split('/').pop() || 'pic.jpg';
+    const type = asset.mimeType || 'image/jpeg';
+    const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
+    setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
+    setProfileZoom(false);
+  };
+
   const scrollRef = useRef<ScrollView>(null);
   const artPositions = useRef<Record<string, number>>({});
   const artSectionY = useRef(0);
+  const mediaBarY = useRef(0);
+  const keywordsBarY = useRef(0);
   const [pendingScroll, setPendingScroll] = useState<string | null>(scrollToArtId ?? null);
+
+  const handleKeywordFocus = useCallback(() => {
+    // Put the keyword bar near the top of the visible area so it (and the
+    // dropdown list underneath) stays in view when the keyboard pops up.
+    const target = Math.max(0, mediaBarY.current + keywordsBarY.current - 20);
+    // Delay so the keyboard has started animating up before we scroll.
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: target, animated: true });
+    }, 50);
+  }, []);
 
   // Edit mode state
   const [editing, setEditing] = useState(false);
@@ -326,24 +353,12 @@ export default function UserProfile() {
       }
     >
       {/* Profile zoom */}
-      {profileZoom && (
+      {profileZoom && profile.profile_pic_path && (
         <ArtZoomIn
           isOwner={profile.is_owner}
-          imgPath={profile.profile_pic_path || `/imgs/${profile.id}.png`}
+          imgPath={profile.profile_pic_path}
           onClose={() => setProfileZoom(false)}
-          onChangePic={profile.is_owner ? async () => {
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              quality: 1,
-            });
-            if (result.canceled || !result.assets[0]) return;
-            const asset = result.assets[0];
-            const name = asset.uri.split('/').pop() || 'pic.jpg';
-            const type = asset.mimeType || 'image/jpeg';
-            const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
-            setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
-            setProfileZoom(false);
-          } : undefined}
+          onChangePic={profile.is_owner ? pickAndUploadProfilePic : undefined}
         />
       )}
 
@@ -399,16 +414,28 @@ export default function UserProfile() {
                     </Pressable>
                   )}
                 </View>
-                <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
-                  <Image
-                    source={{ uri: resolveImageUrl(profile.profile_pic_path || `/imgs/${profile.id}.png`) }}
-                    placeholder={profile.profile_pic_path ? { uri: profileThumbUrl(profile.id) } : undefined}
-                    transition={200}
-                    priority="high"
-                    style={styles.profilePic}
-                    contentFit="cover"
-                  />
-                </Pressable>
+                {profile.profile_pic_path ? (
+                  <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
+                    <Image
+                      source={{ uri: resolveImageUrl(profile.profile_pic_path) }}
+                      placeholder={{ uri: profileThumbUrl(profile.id) }}
+                      transition={200}
+                      priority="high"
+                      style={styles.profilePic}
+                      contentFit="cover"
+                    />
+                  </Pressable>
+                ) : profile.is_owner ? (
+                  <Pressable onPress={pickAndUploadProfilePic} style={styles.profilePicContainer}>
+                    <View style={[styles.profilePic, styles.profilePicEmpty]}>
+                      <Text style={styles.profilePicPlus}>+</Text>
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={styles.profilePicContainer}>
+                    <View style={[styles.profilePic, styles.profilePicEmpty]} />
+                  </View>
+                )}
               </View>
               {!!profile.bio && (
                 <View style={styles.bioSection}>
@@ -473,7 +500,10 @@ export default function UserProfile() {
       </View>
 
       {/* ---- MediaBar ---- */}
-      <View style={styles.mediaBar}>
+      <View
+        style={styles.mediaBar}
+        onLayout={(e) => { mediaBarY.current = e.nativeEvent.layout.y; }}
+      >
         <View style={styles.mediaTabs}>
           {profile.media?.map((m) => (
             <Pressable
@@ -493,7 +523,10 @@ export default function UserProfile() {
         </View>
 
         {/* Keywords sub-bar */}
-        <View style={styles.keywordsBar}>
+        <View
+          style={styles.keywordsBar}
+          onLayout={(e) => { keywordsBarY.current = e.nativeEvent.layout.y; }}
+        >
             <View style={styles.keywordDropdown}>
               <Dropdown
                 placeholder="keyword"
@@ -503,6 +536,7 @@ export default function UserProfile() {
                     setSelectedKeywords([...selectedKeywords, k]);
                   }
                 }}
+                onFocus={handleKeywordFocus}
               />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.keywordBubbles}>
@@ -681,6 +715,16 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: Colors.primaryGold,
     borderRadius: 5,
+  },
+  profilePicEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profilePicPlus: {
+    fontFamily: Fonts.serif,
+    fontSize: 72,
+    lineHeight: 72,
+    color: '#888',
   },
 
   // MediaBar
