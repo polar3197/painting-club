@@ -1,7 +1,8 @@
 
-import { Dispatch, SetStateAction } from "react";
-import { Profile } from "../../api";
+import { Dispatch, SetStateAction, useState } from "react";
+import { Profile, add_member_media } from "../../api";
 import Dropdown from "../Utils/Dropdown";
+import AddMediaDialog from "../Utils/AddMediaDialog";
 import "../../styles/user-profile/media-bar.css";
 
 const Keywords = (
@@ -46,9 +47,10 @@ const Keywords = (
 }
 
 const MediaBar = (
-  { profile, selectedMedium, setSelectedMedium, selectedKeywords, setSelectedKeywords, availableKeywords }:
+  { profile, setProfile, selectedMedium, setSelectedMedium, selectedKeywords, setSelectedKeywords, availableKeywords }:
   {
     profile: Profile;
+    setProfile: Dispatch<SetStateAction<Profile | null>>;
     selectedMedium: string;
     setSelectedMedium: Dispatch<SetStateAction<string | null>>;
     selectedKeywords: string[];
@@ -56,6 +58,21 @@ const MediaBar = (
     availableKeywords: string[];
   }
 ) => {
+  const [showAddMedia, setShowAddMedia] = useState(false);
+  const noMedia = (profile.media?.length ?? 0) === 0;
+
+  const handleAddMedia = async (name: string) => {
+    const token = localStorage.getItem("token");
+    try {
+      await add_member_media(profile.username, name, token);
+      setProfile({ ...profile, media: [...(profile.media ?? []), name] });
+      setSelectedMedium(name);
+      setSelectedKeywords([]);
+    } catch (err: any) {
+      alert(err?.message || "failed to add media");
+    }
+  };
+
   return (
     <div className="media-bar-wrapper">
       <div className="media-bar">
@@ -68,6 +85,16 @@ const MediaBar = (
             {medium}
           </div>
         ))}
+        {profile.is_owner && (
+          <button
+            type="button"
+            className={`add-media ${noMedia ? "add-media--full" : ""}`}
+            onClick={() => setShowAddMedia(true)}
+            aria-label="add artform"
+          >
+            +
+          </button>
+        )}
       </div>
       <Keywords
         availableKeywords={availableKeywords}
@@ -75,6 +102,13 @@ const MediaBar = (
         selectedKeywords={selectedKeywords}
         setSelectedKeywords={setSelectedKeywords}
       />
+      {showAddMedia && (
+        <AddMediaDialog
+          existing={profile.media ?? []}
+          onPick={handleAddMedia}
+          onClose={() => setShowAddMedia(false)}
+        />
+      )}
     </div>
   );
 };

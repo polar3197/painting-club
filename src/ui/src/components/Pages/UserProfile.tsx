@@ -39,6 +39,7 @@ const UserProfile = () => {
       />
       <MediaBar
         profile={profile}
+        setProfile={setProfile}
         selectedMedium={selectedMedium}
         setSelectedMedium={(m) => { setSelectedMedium(m); setSelectedKeywords([]); }}
         selectedKeywords={selectedKeywords}

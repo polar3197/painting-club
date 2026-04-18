@@ -1,0 +1,82 @@
+.add-media-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-media-dialog {
+    width: 360px;
+    max-width: 90vw;
+    max-height: 70vh;
+    background-color: rgb(255, 250, 245);
+    border: 1px black solid;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
+}
+
+.add-media-header {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 20px;
+    border-bottom: 1px black solid;
+    padding-bottom: 6px;
+}
+
+.add-media-error {
+    color: rgb(200, 50, 50);
+    font-size: 14px;
+}
+
+.add-media-loading,
+.add-media-empty {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+    color: #666;
+    padding: 12px 0;
+}
+
+.add-media-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    max-height: 40vh;
+}
+
+.add-media-item {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 16px;
+    padding: 8px 12px;
+    border: 1px black solid;
+    background-color: white;
+    cursor: pointer;
+    text-align: left;
+}
+
+.add-media-item:hover {
+    background-color: rgb(238, 190, 100);
+}
+
+.add-media-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.add-media-close {
+    border: 1px black solid;
+    background-color: white;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.add-media-close:hover {
+    background-color: lightcoral;
+}

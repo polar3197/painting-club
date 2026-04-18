@@ -220,6 +220,23 @@ export function update_profile(username: string, payload: Profile, token: string
   });
 }
 
+export interface MediaType {
+  id: string;
+  name: string;
+}
+
+export function get_media(): Promise<MediaType[]> {
+  return request(`/media`) as Promise<MediaType[]>;
+}
+
+export function add_member_media(username: string, medium: string, token: string | null) {
+  return request(`/members/addmedia`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username, medium }),
+  });
+}
+
 export function get_members(city: string, uname: string, token: string | null): Promise<Profile[]> {
   const params = new URLSearchParams({ city, uname });
   const members = request(`/members?${params}`, {

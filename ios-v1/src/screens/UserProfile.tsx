@@ -395,6 +395,13 @@ export default function UserProfile() {
           piece={editingPiece}
         />
       )}
+      {showAddMedia && (
+        <AddMediaDialog
+          existing={profile.media ?? []}
+          onPick={handleAddMedia}
+          onClose={() => setShowAddMedia(false)}
+        />
+      )}
 
       {/* ---- UserDetails ---- */}
       <View style={styles.userDetails}>
@@ -535,6 +542,17 @@ export default function UserProfile() {
               <Text style={styles.mediaTabText}>{m}</Text>
             </Pressable>
           ))}
+          {profile.is_owner && (
+            <Pressable
+              style={[
+                styles.addMediaBtn,
+                (profile.media?.length ?? 0) === 0 && styles.addMediaBtnFull,
+              ]}
+              onPress={() => setShowAddMedia(true)}
+            >
+              <Text style={styles.addMediaBtnText}>+</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Keywords sub-bar */}
@@ -771,6 +789,27 @@ const styles = StyleSheet.create({
   mediaTabText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
+  },
+  addMediaBtn: {
+    width: 32,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.secondary,
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  addMediaBtnFull: {
+    width: undefined,
+    aspectRatio: undefined,
+    flexGrow: 1,
+    flexBasis: '100%',
+    paddingVertical: 6,
+  },
+  addMediaBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
+    fontWeight: '600',
   },
   keywordsBar: {
     flexDirection: 'row',

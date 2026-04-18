@@ -37,6 +37,31 @@
     background-color: rgb(238, 190, 100);
 }
 
+.add-media {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px black solid;
+    background-color: rgb(250, 244, 202);
+    cursor: pointer;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 0;
+}
+
+.add-media:hover {
+    background-color: rgb(238, 190, 100);
+}
+
+.add-media--full {
+    flex: 1;
+    width: auto;
+}
+
 
 .keywords-bar {
     display: flex;
