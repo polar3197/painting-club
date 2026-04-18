@@ -791,17 +791,19 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
   },
   addMediaBtn: {
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.secondary,
     borderWidth: 1,
     borderColor: '#000',
-    paddingHorizontal: 14,
     paddingVertical: 6,
   },
   addMediaBtnFull: {
+    aspectRatio: undefined,
     flexGrow: 1,
     flexBasis: '100%',
+    paddingHorizontal: 12,
   },
   addMediaBtnText: {
     fontFamily: Fonts.serif,
