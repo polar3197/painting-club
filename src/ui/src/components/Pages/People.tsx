@@ -66,6 +66,9 @@ const People = () => {
 
   return (
     <>
+      <div className="page-banner">
+        <img src="/imgs/profiles.png" alt="" />
+      </div>
       <CentralFilter
         header="members"
         options={peopleOptions}

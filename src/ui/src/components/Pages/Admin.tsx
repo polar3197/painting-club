@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { ApplicationApproveOut, ApplicationOut, get_applications, update_application_status } from "../../api";
+import {
+    ApplicationApproveOut,
+    ApplicationOut,
+    get_applications,
+    update_application_status,
+    MediaRequest,
+    get_media_requests,
+    update_media_request,
+} from "../../api";
 import "../../styles/admin.css";
 
 const statusColor: Record<string, string> = {
@@ -77,12 +85,62 @@ const ApplicationRow = ({
     </div>
 );
 
+const MediaRequestRow = ({
+    req,
+    onResolve,
+}: {
+    req: MediaRequest;
+    onResolve: (id: string, status: "approved" | "rejected", type: string | null) => void;
+}) => {
+    const [pickingType, setPickingType] = useState(false);
+    return (
+        <div className="application-row-item">
+            <div className="application-row-info">
+                <p className="application-name">{req.requested_name}</p>
+                <p className="application-meta">@{req.username}</p>
+                {req.resolved_type && <p className="application-meta">type: {req.resolved_type}</p>}
+                <p className="application-date">{new Date(req.created_at).toLocaleDateString()}</p>
+            </div>
+            <div className="application-row-actions">
+                <div
+                    className="application-status"
+                    style={{ backgroundColor: statusColor[req.status] ?? "white" }}
+                >
+                    {req.status}
+                </div>
+                {req.status === "pending" && !pickingType && (
+                    <>
+                        <div className="application-btn approve" onClick={() => setPickingType(true)}>approve</div>
+                        <div className="application-btn reject" onClick={() => onResolve(req.id, "rejected", null)}>reject</div>
+                    </>
+                )}
+                {req.status === "pending" && pickingType && (
+                    <select
+                        defaultValue=""
+                        style={{ fontFamily: "'Times New Roman', Times, serif", padding: "2px 4px" }}
+                        onChange={(e) => {
+                            if (e.target.value) onResolve(req.id, "approved", e.target.value);
+                        }}
+                    >
+                        <option value="" disabled>pick type</option>
+                        <option value="visual_2d">visual_2d</option>
+                        <option value="written_word">written_word</option>
+                    </select>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const Admin = () => {
+    const [tab, setTab] = useState<"applications" | "media-requests">("applications");
     const [applications, setApplications] = useState<ApplicationOut[]>([]);
+    const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
     const token = localStorage.getItem("token");
 
     useEffect(() => {
         get_applications(token).then(setApplications).catch(console.error);
+        get_media_requests(token).then(setMediaRequests).catch(console.error);
     }, []);
 
     const handleStatusChange = async (id: string, status: string) => {
@@ -99,40 +157,84 @@ const Admin = () => {
         }
     };
 
+    const handleResolveRequest = async (id: string, status: "approved" | "rejected", type: string | null) => {
+        const res = await update_media_request(id, status, type, token);
+        setMediaRequests(prev => prev.map(r => r.id === id ? res : r));
+    };
+
     const pending = applications.filter(a => a.status === "pending");
     const pendingSetup = applications.filter(a => a.status === "pending_setup");
     const reviewed = applications.filter(a => !["pending", "pending_setup"].includes(a.status));
 
+    const pendingRequests = mediaRequests.filter(r => r.status === "pending");
+    const reviewedRequests = mediaRequests.filter(r => r.status !== "pending");
+
     return (
         <div className="admin-page">
-            <h1 className="admin-title">applications</h1>
-            <div className="admin-section">
-                <h2 className="admin-section-title">pending</h2>
-                {pending.length === 0
-                    ? <p className="admin-empty">no pending applications</p>
-                    : pending.map(a => (
-                        <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
-                    ))
-                }
-            </div>
-            <div className="admin-section">
-                <h2 className="admin-section-title">awaiting setup</h2>
-                {pendingSetup.length === 0
-                    ? <p className="admin-empty">none</p>
-                    : pendingSetup.map(a => (
-                        <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
-                    ))
-                }
-            </div>
-            <div className="admin-section">
-                <h2 className="admin-section-title">reviewed</h2>
-                {reviewed.length === 0
-                    ? <p className="admin-empty">none yet</p>
-                    : reviewed.map(a => (
-                        <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
-                    ))
-                }
-            </div>
+            <h1 className="admin-title">
+                <span
+                    onClick={() => setTab("applications")}
+                    style={{ cursor: "pointer", opacity: tab === "applications" ? 1 : 0.4 }}
+                >applications</span>
+                {"  "}
+                <span
+                    onClick={() => setTab("media-requests")}
+                    style={{ cursor: "pointer", opacity: tab === "media-requests" ? 1 : 0.4 }}
+                >media requests</span>
+            </h1>
+
+            {tab === "applications" ? (
+                <>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">pending</h2>
+                        {pending.length === 0
+                            ? <p className="admin-empty">no pending applications</p>
+                            : pending.map(a => (
+                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
+                            ))
+                        }
+                    </div>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">awaiting setup</h2>
+                        {pendingSetup.length === 0
+                            ? <p className="admin-empty">none</p>
+                            : pendingSetup.map(a => (
+                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
+                            ))
+                        }
+                    </div>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">reviewed</h2>
+                        {reviewed.length === 0
+                            ? <p className="admin-empty">none yet</p>
+                            : reviewed.map(a => (
+                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
+                            ))
+                        }
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">pending</h2>
+                        {pendingRequests.length === 0
+                            ? <p className="admin-empty">no pending requests</p>
+                            : pendingRequests.map(r => (
+                                <MediaRequestRow key={r.id} req={r} onResolve={handleResolveRequest} />
+                            ))
+                        }
+                    </div>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">reviewed</h2>
+                        {reviewedRequests.length === 0
+                            ? <p className="admin-empty">none yet</p>
+                            : reviewedRequests.map(r => (
+                                <MediaRequestRow key={r.id} req={r} onResolve={handleResolveRequest} />
+                            ))
+                        }
+                    </div>
+                </>
+            )}
         </div>
     );
 };

@@ -61,9 +61,26 @@ class AddMedia(BaseModel):
 class MediaOut(BaseModel):
     id: uuid.UUID
     name: str
+    type: str | None = None
 
 class MediaIn(BaseModel):
     name: str
+
+class MediaRequestIn(BaseModel):
+    name: str
+
+class MediaRequestOut(BaseModel):
+    id: uuid.UUID
+    member_id: uuid.UUID
+    username: str
+    requested_name: str
+    status: str
+    resolved_type: str | None = None
+    created_at: datetime
+
+class MediaRequestUpdate(BaseModel):
+    status: str
+    type: str | None = None
 
 class Visual2DIn(BaseModel):
     username: str
@@ -88,6 +105,7 @@ class Visual2DUpdate(BaseModel):
     height: int | None = None
     keywords: list[str] | None = None
     comments_enabled: bool = False
+    medium: str | None = None
 
 class SearchOptions(BaseModel):
     usernames: list[str] = []

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { get_media, MediaType } from "../../api";
+import { get_media, submit_media_request, MediaType } from "../../api";
 import "../../styles/utils/add-media-dialog.css";
 
 const AddMediaDialog = (
@@ -13,6 +13,9 @@ const AddMediaDialog = (
 ) => {
     const [media, setMedia] = useState<MediaType[] | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [requestName, setRequestName] = useState("");
+    const [requestSent, setRequestSent] = useState(false);
+    const [requestError, setRequestError] = useState<string | null>(null);
 
     useEffect(() => {
         get_media()
@@ -21,6 +24,21 @@ const AddMediaDialog = (
     }, []);
 
     const available = (media ?? []).filter((m) => !existing.includes(m.name));
+
+    const handleRequest = async () => {
+        const name = requestName.trim();
+        if (!name) return;
+        setRequestError(null);
+        try {
+            const token = localStorage.getItem("token");
+            await submit_media_request(name, token);
+            setRequestName("");
+            setRequestSent(true);
+            setTimeout(() => setRequestSent(false), 2500);
+        } catch (e: any) {
+            setRequestError(e?.message || "request failed");
+        }
+    };
 
     return (
         <div className="add-media-backdrop" onClick={onClose}>
@@ -48,6 +66,22 @@ const AddMediaDialog = (
                         ))}
                     </div>
                 )}
+
+                <div className="add-media-request">
+                    <div className="add-media-request-label">don't see it? request a new artform:</div>
+                    <div className="add-media-request-row">
+                        <input
+                            className="add-media-request-input"
+                            type="text"
+                            value={requestName}
+                            placeholder="artform name"
+                            onChange={(e) => setRequestName(e.target.value)}
+                        />
+                        <button className="add-media-request-btn" onClick={handleRequest}>request</button>
+                    </div>
+                    {requestSent && <div className="add-media-request-sent">request sent</div>}
+                    {requestError && <div className="add-media-error">{requestError}</div>}
+                </div>
 
                 <div className="add-media-footer">
                     <button className="add-media-close" onClick={onClose}>close</button>

@@ -91,6 +91,7 @@ export interface Visual2DUpdatePayload {
   height?: number | null;
   keywords?: string[] | null;
   comments_enabled?: boolean;
+  medium?: string | null;
 }
 
 export interface SearchOptions {
@@ -127,4 +128,15 @@ export interface CommentOut {
 export interface MediaType {
   id: string;
   name: string;
+  type?: string | null;
+}
+
+export interface MediaRequest {
+  id: string;
+  member_id: string;
+  username: string;
+  requested_name: string;
+  status: string;
+  resolved_type: string | null;
+  created_at: string;
 }

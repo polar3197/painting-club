@@ -9,12 +9,17 @@ async def db_list_media(db: AsyncSession):
     return result.scalars().all()
 
 
-async def db_create_media(db: AsyncSession, name: str) -> Media:
+async def db_create_media(db: AsyncSession, name: str, type_: str | None = None) -> Media:
     existing = await db.execute(select(Media).filter(Media.name == name))
     row = existing.scalars().first()
     if row:
+        # Stamp the type if not set yet; don't overwrite an existing type.
+        if type_ is not None and row.type is None:
+            row.type = type_
+            await db.commit()
+            await db.refresh(row)
         return row
-    new_medium = Media(name=name)
+    new_medium = Media(name=name, type=type_)
     db.add(new_medium)
     await db.commit()
     await db.refresh(new_medium)
@@ -158,6 +163,7 @@ async def db_update_visual_2d(
     height: int | None = None,
     keywords: list[str] | None = None,
     comments_enabled: bool = False,
+    medium: str | None = None,
 ):
     result = await db.execute(select(Visual2D).filter(Visual2D.id == art_id))
     piece = result.scalar_one_or_none()
@@ -166,6 +172,32 @@ async def db_update_visual_2d(
         raise ValueError("Art not found")
     if str(piece.creator_id) != str(current_member_id):
         raise PermissionError("Not your piece")
+
+    # Optional media move: only between media that share an overarching type.
+    if medium is not None:
+        current_media = (
+            await db.execute(select(Media).filter(Media.id == piece.media_id))
+        ).scalar_one_or_none()
+        current_type = current_media.type if current_media else None
+        new_media = (
+            await db.execute(select(Media).filter(Media.name == medium))
+        ).scalar_one_or_none()
+        if new_media is None:
+            raise ValueError(f"Medium '{medium}' not found")
+        if current_type is None or new_media.type is None or new_media.type != current_type:
+            raise ValueError("Incompatible media type")
+        if str(new_media.id) != str(piece.media_id):
+            existing_link = (
+                await db.execute(
+                    select(Media_Members).filter(
+                        Media_Members.media_id == new_media.id,
+                        Media_Members.member_id == current_member_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if not existing_link:
+                db.add(Media_Members(media_id=new_media.id, member_id=current_member_id))
+            piece.media_id = new_media.id
 
     piece.title = title
     piece.date = date

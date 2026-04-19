@@ -16,6 +16,7 @@ import type {
   ArtResult,
   CommentOut,
   MediaType,
+  MediaRequest,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -82,6 +83,33 @@ export function add_member_media(username: string, medium: string, token: string
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ username, medium }),
   });
+}
+
+export function submit_media_request(name: string, token: string | null): Promise<MediaRequest> {
+  return request('/media-requests', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name }),
+  }) as Promise<MediaRequest>;
+}
+
+export function get_media_requests(token: string | null): Promise<MediaRequest[]> {
+  return request('/admin/media-requests', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MediaRequest[]>;
+}
+
+export function update_media_request(
+  id: string,
+  status: 'approved' | 'rejected',
+  type: string | null,
+  token: string | null,
+): Promise<MediaRequest> {
+  return request(`/admin/media-requests/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status, type }),
+  }) as Promise<MediaRequest>;
 }
 
 export function get_members(city: string, uname: string, token: string | null): Promise<Profile[]> {

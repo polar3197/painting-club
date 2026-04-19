@@ -87,7 +87,7 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
 }
 
 
-const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, onKeywordsLoaded, scrollToArtId } : { profile: Profile; selectedMedium: string | null; selectedKeywords: string[]; refresh: number; onRefresh: () => void; onKeywordsLoaded: (keywords: string[]) => void; scrollToArtId?: string | null; }) => {
+const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, onKeywordsLoaded, scrollToArtId, onMoved } : { profile: Profile; selectedMedium: string | null; selectedKeywords: string[]; refresh: number; onRefresh: () => void; onKeywordsLoaded: (keywords: string[]) => void; scrollToArtId?: string | null; onMoved?: (newMedium: string) => void; }) => {
     const [showDialog, setShowDialog] = useState(false);
     const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
     const [art, setArt] = useState<Visual2DOut[]>([]);
@@ -149,6 +149,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                     selectedMedium={selectedMedium}
                     username={profile.username}
                     onSuccess={onRefresh}
+                    onMoved={onMoved}
                     piece={editingPiece}
                 />
             }

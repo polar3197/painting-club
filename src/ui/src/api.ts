@@ -223,6 +223,7 @@ export function update_profile(username: string, payload: Profile, token: string
 export interface MediaType {
   id: string;
   name: string;
+  type?: string | null;
 }
 
 export function get_media(): Promise<MediaType[]> {
@@ -235,6 +236,43 @@ export function add_member_media(username: string, medium: string, token: string
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ username, medium }),
   });
+}
+
+export interface MediaRequest {
+  id: string;
+  member_id: string;
+  username: string;
+  requested_name: string;
+  status: string;
+  resolved_type: string | null;
+  created_at: string;
+}
+
+export function submit_media_request(name: string, token: string | null): Promise<MediaRequest> {
+  return request(`/media-requests`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name }),
+  }) as Promise<MediaRequest>;
+}
+
+export function get_media_requests(token: string | null): Promise<MediaRequest[]> {
+  return request(`/admin/media-requests`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MediaRequest[]>;
+}
+
+export function update_media_request(
+  id: string,
+  status: "approved" | "rejected",
+  type: string | null,
+  token: string | null,
+): Promise<MediaRequest> {
+  return request(`/admin/media-requests/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status, type }),
+  }) as Promise<MediaRequest>;
 }
 
 export function get_members(city: string, uname: string, token: string | null): Promise<Profile[]> {
@@ -312,6 +350,7 @@ export interface Visual2DUpdatePayload {
   height?: number | null;
   keywords?: string[] | null;
   comments_enabled?: boolean;
+  medium?: string | null;
 }
 
 export function update_visual_2d(id: string, token: string | null, payload: Visual2DUpdatePayload) {

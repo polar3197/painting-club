@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
-import { get_media, MediaType } from '../api';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { get_media, submit_media_request, MediaType } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 interface AddMediaDialogProps {
@@ -10,8 +11,24 @@ interface AddMediaDialogProps {
 }
 
 export default function AddMediaDialog({ existing, onPick, onClose }: AddMediaDialogProps) {
+  const { token } = useAuth();
   const [media, setMedia] = useState<MediaType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requestName, setRequestName] = useState('');
+  const [requestSent, setRequestSent] = useState(false);
+
+  const handleRequest = async () => {
+    const name = requestName.trim();
+    if (!name) return;
+    try {
+      await submit_media_request(name, token);
+      setRequestName('');
+      setRequestSent(true);
+      setTimeout(() => setRequestSent(false), 2000);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'request failed');
+    }
+  };
 
   useEffect(() => {
     get_media()
@@ -50,6 +67,24 @@ export default function AddMediaDialog({ existing, onPick, onClose }: AddMediaDi
               ))}
             </ScrollView>
           )}
+
+          <View style={styles.requestSection}>
+            <Text style={styles.requestLabel}>don't see it? request a new artform:</Text>
+            <View style={styles.requestRow}>
+              <TextInput
+                style={styles.requestInput}
+                value={requestName}
+                placeholder="artform name"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
+                onChangeText={setRequestName}
+              />
+              <Pressable style={styles.requestBtn} onPress={handleRequest}>
+                <Text style={styles.requestBtnText}>request</Text>
+              </Pressable>
+            </View>
+            {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
+          </View>
 
           <View style={styles.buttons}>
             <Pressable style={styles.cancelBtn} onPress={onClose}>
@@ -129,5 +164,49 @@ const styles = StyleSheet.create({
   cancelText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xxs,
+  },
+  requestSection: {
+    marginTop: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    marginBottom: 8,
+  },
+  requestLabel: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
+  requestRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  requestInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    fontSize: FontSizes.xs,
+  },
+  requestBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: Colors.secondary,
+    justifyContent: 'center',
+  },
+  requestBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
+  },
+  requestSentMsg: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
+    color: Colors.greenBright,
+    marginTop: 6,
   },
 });

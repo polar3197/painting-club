@@ -54,6 +54,9 @@ const ArtGallery = () => {
 
   return (
     <>
+      <div className="page-banner">
+        <img src="/imgs/art.png" alt="" />
+      </div>
       <CentralFilter
         header="art"
         options={artOptions}

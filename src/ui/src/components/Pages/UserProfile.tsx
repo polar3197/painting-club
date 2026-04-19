@@ -54,6 +54,12 @@ const UserProfile = () => {
         onRefresh={() => setRefresh(r => r + 1)}
         onKeywordsLoaded={setAvailableKeywords}
         scrollToArtId={scrollToArtId}
+        onMoved={(newMedium) => {
+          setProfile(p => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
+          setSelectedMedium(newMedium);
+          setSelectedKeywords([]);
+          setRefresh(r => r + 1);
+        }}
       />
     </>
 

@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { add_new_visual_2d, update_visual_2d, Visual2DOut } from '../api';
+import { add_new_visual_2d, update_visual_2d, Visual2DOut, get_media, MediaType } from '../api';
 import PaintingForm from './PaintingForm';
+import Dropdown from './Dropdown';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -15,11 +16,24 @@ interface AddArtDialogProps {
   username: string;
   onSuccess: () => void;
   onClose: () => void;
+  onMoved?: (newMedium: string) => void;
   piece?: Visual2DOut;
 }
 
-export default function AddArtDialog({ selectedMedium, username, onSuccess, onClose, piece }: AddArtDialogProps) {
+export default function AddArtDialog({ selectedMedium, username, onSuccess, onClose, onMoved, piece }: AddArtDialogProps) {
   const { token } = useAuth();
+  const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+  const [newMedium, setNewMedium] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!piece) return;
+    get_media().then(setAllMedia).catch(() => {});
+  }, [piece]);
+
+  const currentType = allMedia.find((m) => m.name === selectedMedium)?.type ?? null;
+  const compatibleMedia = piece && currentType
+    ? allMedia.filter((m) => m.type === currentType && m.name !== selectedMedium).map((m) => m.name)
+    : [];
   const [formData, setFormData] = useState<Record<string, any> | null>(
     piece
       ? {
@@ -61,6 +75,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
     try {
       if (isVisual2D(selectedMedium)) {
         if (piece) {
+          const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
           await update_visual_2d(piece.id, token, {
             title: formData.title,
             location: formData.location,
@@ -76,7 +91,9 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
                   .filter(Boolean)
               : null,
             comments_enabled: formData.comments_enabled,
+            medium: moving,
           });
+          if (moving && onMoved) onMoved(moving);
         } else {
           if (!formData.file) {
             Alert.alert('Missing', 'Please select an image.');
@@ -127,6 +144,18 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
           >
             {isVisual2D(selectedMedium) && (
               <PaintingForm onDataChange={setFormData} initialData={piece} />
+            )}
+            {piece && compatibleMedia.length > 0 && (
+              <View style={styles.moveToRow}>
+                <Text style={styles.moveToLabel}>move to:</Text>
+                <View style={styles.moveToDropdown}>
+                  <Dropdown
+                    placeholder={newMedium ?? selectedMedium}
+                    options={compatibleMedia}
+                    onSelect={setNewMedium}
+                  />
+                </View>
+              </View>
             )}
           </ScrollView>
           <Pressable style={styles.submitBtn} onPress={submit}>
@@ -180,5 +209,21 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
+  },
+  moveToRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    gap: 10,
+  },
+  moveToLabel: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+  },
+  moveToDropdown: {
+    flex: 1,
   },
 });

@@ -80,3 +80,51 @@
 .add-media-close:hover {
     background-color: lightcoral;
 }
+
+.add-media-request {
+    border-top: 1px black solid;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.add-media-request-label {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 13px;
+    color: #666;
+}
+
+.add-media-request-row {
+    display: flex;
+    gap: 6px;
+}
+
+.add-media-request-input {
+    flex: 1;
+    border: 1px black solid;
+    background-color: white;
+    padding: 4px 8px;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+    min-width: 0;
+}
+
+.add-media-request-btn {
+    border: 1px black solid;
+    background-color: rgb(250, 244, 202);
+    padding: 4px 12px;
+    cursor: pointer;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+}
+
+.add-media-request-btn:hover {
+    background-color: rgb(238, 190, 100);
+}
+
+.add-media-request-sent {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 13px;
+    color: rgb(40, 140, 40);
+}

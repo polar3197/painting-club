@@ -10,6 +10,7 @@ import {
   Dimensions,
   LayoutChangeEvent,
   RefreshControl,
+  Image as RNImage,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,6 +65,15 @@ function Visual2DPiece({
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    RNImage.getSize(
+      thumbUrl(piece.id),
+      (w, h) => { if (h > 0) setAspectRatio(w / h); },
+      () => {},
+    );
+  }, [piece.id]);
 
   const removeArt = async () => {
     await remove_visual_2d(piece.id, token);
@@ -97,7 +107,11 @@ function Visual2DPiece({
       )}
       <View style={styles.artElement} onLayout={onLayout}>
         <Pressable
-          style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
+          style={({ pressed }) => [
+            styles.artVisual,
+            aspectRatio ? { aspectRatio } : null,
+            pressed && { opacity: 0.9 },
+          ]}
           onPress={() => setIsZoomedIn(true)}
         >
           <Image
@@ -105,7 +119,7 @@ function Visual2DPiece({
             placeholder={{ uri: thumbUrl(piece.id) }}
             transition={200}
             style={styles.artImage}
-            contentFit="cover"
+            contentFit="contain"
           />
         </Pressable>
         <View style={styles.artDetails}>
@@ -392,6 +406,11 @@ export default function UserProfile() {
           username={username}
           onSuccess={() => setRefresh((r) => r + 1)}
           onClose={() => setEditingPiece(null)}
+          onMoved={(newMedium) => {
+            setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
+            setSelectedMedium(newMedium);
+            setSelectedKeywords([]);
+          }}
           piece={editingPiece}
         />
       )}
@@ -880,8 +899,9 @@ const styles = StyleSheet.create({
   },
   artVisual: {
     width: '100%',
-    aspectRatio: 1,
     marginBottom: 10,
+    borderWidth: 2,
+    borderColor: '#000',
   },
   artImage: {
     width: '100%',

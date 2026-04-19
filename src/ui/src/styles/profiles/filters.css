@@ -1,5 +1,30 @@
 
 
+.page-banner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 0 6px;
+    background-color: rgb(255, 250, 245);
+}
+
+.page-banner img {
+    width: 110px;
+    height: 110px;
+    object-fit: contain;
+}
+
+@media (max-width: 640px) {
+    .page-banner {
+        padding: 8px 0 4px;
+    }
+
+    .page-banner img {
+        width: 80px;
+        height: 80px;
+    }
+}
+
 .filter-bar {
     position: relative;
     display: flex;

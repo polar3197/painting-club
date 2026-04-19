@@ -37,6 +37,7 @@ class Media(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(300), nullable=False)
+    type = Column(String(50), nullable=True)
 
 
 class Media_Members(Base):
@@ -76,8 +77,11 @@ class WrittenWord(Art):
     __tablename__ = "written_word"
 
     id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
-    
-    
+
+    __mapper_args__ = {"polymorphic_identity": "written_word"}
+
+
+
 class Prompt(Base):
     # list of questions for members to choose from on their page
     __tablename__ = "prompt"
@@ -143,3 +147,14 @@ class Application(Base):
     status = Column(String(20), nullable=False, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'))
+
+
+class MediaRequest(Base):
+    __tablename__ = "media_request"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
+    requested_name = Column(String(300), nullable=False)
+    status = Column(String(20), nullable=False, default="pending")
+    resolved_type = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

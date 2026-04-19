@@ -29,6 +29,9 @@ from api.models import (
     AddMedia,
     MediaOut,
     MediaIn,
+    MediaRequestIn,
+    MediaRequestOut,
+    MediaRequestUpdate,
     Visual2DOut,
     Visual2DUpdate,
     SearchOptions,
@@ -61,6 +64,12 @@ from db.db_ops.search import (
     db_search_art,
 )
 
+from db.db_ops.media_requests import (
+    db_create_media_request,
+    db_list_media_requests,
+    db_resolve_media_request,
+)
+
 from db.db_ops.applications import (
     db_submit_application,
     db_get_applications,
@@ -85,7 +94,7 @@ from db.db_ops.comments import (
 )
     
 from db.session import get_db
-from db.db_manager import init_db, empty_db
+from db.db_manager import init_db, empty_db, run_migrations
 from db.models import Member, Media, Media_Members, Art
 
 from api.auth import create_token, decode_token
@@ -98,6 +107,7 @@ bearer_optional = HTTPBearer(auto_error=False)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await run_migrations()
     yield
     # await empty_db()
 
@@ -566,9 +576,13 @@ async def update_visual_2d(
             height=payload.height,
             keywords=payload.keywords,
             comments_enabled=payload.comments_enabled,
+            medium=payload.medium,
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        msg = str(e)
+        if "Incompatible" in msg:
+            raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=404, detail=msg)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     return {"ok": True}
@@ -722,3 +736,74 @@ async def update_application_status(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"ok": True}
+
+
+@app.post("/media-requests", response_model=MediaRequestOut, status_code=201)
+async def submit_media_request(
+    payload: MediaRequestIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    row = await db_create_media_request(db, current_member.id, name)
+    return MediaRequestOut(
+        id=row.id,
+        member_id=row.member_id,
+        username=current_member.username,
+        requested_name=row.requested_name,
+        status=row.status,
+        resolved_type=row.resolved_type,
+        created_at=row.created_at,
+    )
+
+
+@app.get("/admin/media-requests", response_model=list[MediaRequestOut])
+async def get_media_requests(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    rows = await db_list_media_requests(db)
+    return [
+        MediaRequestOut(
+            id=req.id,
+            member_id=req.member_id,
+            username=username,
+            requested_name=req.requested_name,
+            status=req.status,
+            resolved_type=req.resolved_type,
+            created_at=req.created_at,
+        )
+        for req, username in rows
+    ]
+
+
+@app.patch("/admin/media-requests/{request_id}", response_model=MediaRequestOut)
+async def resolve_media_request(
+    request_id: str,
+    payload: MediaRequestUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    if payload.status == "approved" and not payload.type:
+        raise HTTPException(status_code=400, detail="type required for approval")
+    try:
+        row = await db_resolve_media_request(db, request_id, payload.status, payload.type)
+    except ValueError as e:
+        msg = str(e)
+        status = 404 if "not found" in msg else 400
+        raise HTTPException(status_code=status, detail=msg)
+    # fetch username for response
+    member = (
+        await db.execute(select(Member).filter(Member.id == row.member_id))
+    ).scalar_one_or_none()
+    return MediaRequestOut(
+        id=row.id,
+        member_id=row.member_id,
+        username=member.username if member else "",
+        requested_name=row.requested_name,
+        status=row.status,
+        resolved_type=row.resolved_type,
+        created_at=row.created_at,
+    )
