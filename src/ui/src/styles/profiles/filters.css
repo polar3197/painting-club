@@ -22,11 +22,10 @@
     justify-content: center;
     align-items: center;
     gap: 16px;
-    height: 10vh;
     width: 100%;
     border-bottom: 1px black solid;
     background-color: rgb(255, 250, 245);
-    padding-left: 30px;
+    padding: 0 30px;
     box-sizing: border-box;
 }
 
