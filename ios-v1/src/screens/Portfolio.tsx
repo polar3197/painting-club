@@ -96,7 +96,7 @@ export default function Portfolio() {
           placeholder={{ uri: thumbUrl(cell.piece.id) }}
           transition={200}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          contentFit="contain"
         />
         {isPressed && (
           <View style={styles.overlay}>

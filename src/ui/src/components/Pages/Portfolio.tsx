@@ -6,7 +6,7 @@ import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtImage from "../Utils/ArtImage";
 import "../../styles/portfolio.css";
 
-const ROW_SIZE = 10;  // matches grid-auto-rows in CSS
+const ROW_SIZE = 1;  // matches grid-auto-rows in CSS
 const GAP = 4;        // matches gap in CSS
 const COLS = 4;       // matches grid-template-columns
 
