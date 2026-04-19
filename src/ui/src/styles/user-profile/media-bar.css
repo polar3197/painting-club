@@ -27,6 +27,8 @@
     border: 1px black solid;
     cursor: pointer;
     background-color: rgb(250, 244, 202);
+    padding: 4px 8px;
+    box-sizing: border-box;
 }
 
 .media-element.selected {
@@ -39,9 +41,10 @@
 
 .add-media {
     flex: 0 0 auto;
+    align-self: stretch;
     box-sizing: border-box;
     aspect-ratio: 1;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     border: 1px black solid;
@@ -51,7 +54,7 @@
     font-size: inherit;
     font-weight: 600;
     padding: 0;
-    line-height: inherit;
+    line-height: 1;
     margin: 0;
 }
 
@@ -61,8 +64,10 @@
 
 .add-media--full {
     flex: 1;
+    align-self: auto;
     aspect-ratio: auto;
-    padding: 0;
+    padding: 4px 8px;
+    line-height: inherit;
 }
 
 
