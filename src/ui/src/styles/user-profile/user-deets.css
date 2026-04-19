@@ -125,20 +125,34 @@
 }
 
 .user-name textarea {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
     height: 100%;
     font-size: 1.3rem;
 }
 
 .user-location .user-city {
     width: 80%;
+    min-width: 0;
+    box-sizing: border-box;
     height: 100%;
     font-size: 1rem;
 }
 
 .user-location .user-state {
     width: 20%;
+    min-width: 0;
+    box-sizing: border-box;
     height: 100%;
     font-size: 1rem;
+}
+
+.user-field-element textarea {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    resize: vertical;
 }
 
 .artist-statement-label {
@@ -213,6 +227,18 @@
         grid-row: 1;
         gap: 2px;
         align-self: stretch;
+        min-width: 0;
+    }
+
+    .user-name,
+    .user-location {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .user-name textarea,
+    .user-location textarea {
+        width: 100%;
     }
 
     .user-name {
