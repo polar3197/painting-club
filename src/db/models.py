@@ -1,5 +1,5 @@
 # src/db/models.py
-from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean
+from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean, Float
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -66,11 +66,12 @@ class Visual2D(Art):
     __tablename__ = "visual_2d"
 
     id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
-    width = Column(Numeric(6, 2))                                                                                                               
+    width = Column(Numeric(6, 2))
     height = Column(Numeric(6, 2))
     song = Column(String(255))
     song_artist = Column(String(255))
     location = Column(String(255))
+    aspect_ratio = Column(Float)
 
     __mapper_args__ = {"polymorphic_identity": "visual_2d"}
 

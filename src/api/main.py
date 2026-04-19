@@ -295,6 +295,7 @@ async def get_visual_2d(
             keywords=keywords,
             file_path=visual_2d_row.file_path,
             comments_enabled=visual_2d_row.comments_enabled,
+            aspect_ratio=visual_2d_row.aspect_ratio,
         )
         visual_2ds.append(visual_2d)
     print(visual_2ds)
@@ -548,6 +549,17 @@ async def upload_visual_2d(
     keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
     print(keywords_list)
 
+    # Capture canonical source aspect ratio so clients never need to measure images for layout.
+    aspect_ratio: float | None = None
+    if path.suffix.lower() != ".pdf":
+        try:
+            with Image.open(path) as img:
+                w, h = img.size
+                if w and h:
+                    aspect_ratio = w / h
+        except Exception as e:
+            print(f"[aspect_ratio] failed for {art_id}: {type(e).__name__}: {e}")
+
     try:
         await db_add_visual_2d(
             db=db,
@@ -562,6 +574,7 @@ async def upload_visual_2d(
             keywords=keywords_list,
             file_path=file_path,
             comments_enabled=comments_enabled,
+            aspect_ratio=aspect_ratio,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)

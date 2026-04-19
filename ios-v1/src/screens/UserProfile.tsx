@@ -10,7 +10,6 @@ import {
   Dimensions,
   LayoutChangeEvent,
   RefreshControl,
-  Image as RNImage,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,15 +64,9 @@ function Visual2DPiece({
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
-
-  useEffect(() => {
-    RNImage.getSize(
-      thumbUrl(piece.id),
-      (w, h) => { if (h > 0) setAspectRatio(w / h); },
-      () => {},
-    );
-  }, [piece.id]);
+  // Use the server-provided canonical aspect ratio (captured at upload). No image
+  // measurement, no drift from thumbnail pixel rounding.
+  const aspectRatio = piece.aspect_ratio ?? 1;
 
   const removeArt = async () => {
     await remove_visual_2d(piece.id, token);
@@ -110,20 +103,13 @@ function Visual2DPiece({
           style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
           onPress={() => setIsZoomedIn(true)}
         >
-          <View style={[styles.artVisualInner, aspectRatio ? { aspectRatio } : null]}>
+          <View style={[styles.artVisualInner, { aspectRatio }]}>
             <Image
               source={{ uri: resolveImageUrl(piece.file_path) }}
               placeholder={{ uri: thumbUrl(piece.id) }}
               transition={200}
               style={styles.artImage}
               contentFit="contain"
-              onLoad={(e) => {
-                // Refine aspect ratio from the actual source; the thumb's ratio drifts
-                // by a pixel due to PIL integer rounding during thumbnail generation.
-                const w = (e as any)?.source?.width;
-                const h = (e as any)?.source?.height;
-                if (w && h) setAspectRatio(w / h);
-              }}
             />
           </View>
         </Pressable>

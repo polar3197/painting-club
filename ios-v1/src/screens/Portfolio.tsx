@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Dimensions,
-  Image as RNImage,
   Share,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -37,27 +36,14 @@ export default function Portfolio() {
 
   useEffect(() => {
     if (!username || !medium) return;
-    get_members_visual_2d(username, medium).then(async (data) => {
+    get_members_visual_2d(username, medium).then((data) => {
       const filtered =
         keywords && keywords.length > 0
           ? data.filter((p: Visual2DOut) => keywords.every((k: string) => p.keywords?.includes(k)))
           : data;
-
-      const resolved = await Promise.all(
-        filtered.map(
-          (piece: Visual2DOut) =>
-            new Promise<CellData>((resolve) => {
-              // Measure off the thumb since it paints first and has the same aspect ratio.
-              const uri = thumbUrl(piece.id);
-              RNImage.getSize(
-                uri,
-                (w, h) => resolve({ piece, aspectRatio: h > 0 ? w / h : 1 }),
-                () => resolve({ piece, aspectRatio: 1 })
-              );
-            })
-        )
-      );
-      setCells(resolved);
+      // Use the canonical aspect ratio stored server-side at upload. No image measuring
+      // here, so no thumb/full drift and no async round-trip before layout.
+      setCells(filtered.map((piece: Visual2DOut) => ({ piece, aspectRatio: piece.aspect_ratio ?? 1 })));
     });
   }, [username, medium]);
 

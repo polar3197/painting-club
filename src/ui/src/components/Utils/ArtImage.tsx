@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { thumbUrl } from "../../api";
 
 /**
@@ -13,20 +13,15 @@ const ArtImage = ({
   fullSrc,
   alt,
   className,
-  onReady,
 }: {
   artId: string;
   fullSrc: string;
   alt: string;
   className?: string;
-  /** Fires once per piece, with the intrinsic aspect ratio. */
-  onReady?: (aspectRatio: number) => void;
 }) => {
   const [src, setSrc] = useState(thumbUrl(artId));
-  const firedRef = useRef(false);
 
   useEffect(() => {
-    firedRef.current = false;
     setSrc(thumbUrl(artId));
     const full = new Image();
     full.onload = () => setSrc(fullSrc);
@@ -39,13 +34,6 @@ const ArtImage = ({
       alt={alt}
       className={className}
       decoding="async"
-      onLoad={(e) => {
-        const img = e.currentTarget;
-        if (!firedRef.current && img.naturalHeight > 0) {
-          firedRef.current = true;
-          onReady?.(img.naturalWidth / img.naturalHeight);
-        }
-      }}
     />
   );
 };

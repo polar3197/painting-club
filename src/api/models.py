@@ -133,6 +133,7 @@ class ArtResult(BaseModel):
     location: str | None = None
     creator_username: str
     creator_city: str | None
+    aspect_ratio: float | None = None
 
 class ApplicationIn(BaseModel):
     firstname: str
@@ -190,4 +191,5 @@ class Visual2DOut(BaseModel):
     keywords: list[str] | None
     file_path: str
     comments_enabled: bool = False
+    aspect_ratio: float | None = None
 

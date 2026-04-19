@@ -126,6 +126,7 @@ async def db_add_visual_2d(
         height: int | None = None,
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
+        aspect_ratio: float | None = None,
     ) -> str:
     username = username.lower()
     # find member_id, media_id
@@ -153,6 +154,7 @@ async def db_add_visual_2d(
         height=height,
         file_path=file_path,
         comments_enabled=comments_enabled,
+        aspect_ratio=aspect_ratio,
     )
     db.add(new_art)
     await db.flush()

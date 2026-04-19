@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { get_members_visual_2d, Visual2DOut } from "../../api";
 import { useProfile } from "../../hooks/useProfile";
@@ -16,11 +16,14 @@ const PortfolioCell = ({
   piece: Visual2DOut;
   onClick: () => void;
 }) => {
+  const cellRef = useRef<HTMLDivElement>(null);
   const [colSpan, setColSpan] = useState(1);
   const [rowSpan, setRowSpan] = useState(10);
-  const cellRef = useRef<HTMLDivElement>(null);
 
-  const handleReady = (ratio: number) => {
+  // Lay out from canonical source aspect ratio (stored in DB at upload), not from
+  // thumbnail pixel dimensions — those drift from the source by PIL's integer rounding.
+  useLayoutEffect(() => {
+    const ratio = piece.aspect_ratio ?? 1;
     const grid = cellRef.current?.closest(".portfolio-grid") as HTMLElement | null;
     const gridWidth = grid?.clientWidth ?? 800;
     // Read live column count from the grid so this stays in sync with the CSS media queries
@@ -36,7 +39,7 @@ const PortfolioCell = ({
 
     setColSpan(col);
     setRowSpan(row);
-  };
+  }, [piece.aspect_ratio]);
 
   return (
     <div
@@ -45,7 +48,7 @@ const PortfolioCell = ({
       style={{ gridColumn: `span ${colSpan}`, gridRow: `span ${rowSpan}` }}
       onClick={onClick}
     >
-      <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} onReady={handleReady} />
+      <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
       <div className="portfolio-cell-overlay">
         <p>{piece.title}</p>
         {piece.date && <p>{piece.date}</p>}

@@ -42,4 +42,9 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE media_members ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false"
         ))
+        # Canonical source aspect ratio (w/h), captured at upload. Avoids relying on
+        # thumbnail pixel dimensions, which drift from source by PIL integer rounding.
+        await conn.execute(text(
+            "ALTER TABLE visual_2d ADD COLUMN IF NOT EXISTS aspect_ratio DOUBLE PRECISION"
+        ))
     print("Migrations applied.")

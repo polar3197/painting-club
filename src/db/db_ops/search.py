@@ -107,6 +107,7 @@ async def db_search_art(db: AsyncSession, q: str):
             "location": visual2d.location,
             "creator_username": username,
             "creator_city": city,
+            "aspect_ratio": visual2d.aspect_ratio,
         })
 
     return art_list

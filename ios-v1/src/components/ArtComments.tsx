@@ -14,7 +14,6 @@ import {
   Animated,
   PanResponder,
   Alert,
-  Image as RNImage,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
@@ -51,7 +50,9 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const insets = useSafeAreaInsets();
   const [comments, setComments] = useState<CommentOut[]>([]);
   const [input, setInput] = useState('');
-  const [imgRatio, setImgRatio] = useState(1);
+  // Canonical aspect ratio from the server (captured at upload). Falls back to 1
+  // if absent (legacy rows that haven't been backfilled yet).
+  const imgRatio = piece.aspect_ratio ?? 1;
   const [pendingDelete, setPendingDelete] = useState<CommentOut | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const translateY = useRef(new Animated.Value(0)).current;
@@ -70,9 +71,6 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const sectionHeight = keyboardOpen ? IMG_SECTION_HEIGHT_KEYBOARD : IMG_SECTION_HEIGHT_OPEN;
 
   const imgUri = resolveImageUrl(piece.file_path);
-  useEffect(() => {
-    RNImage.getSize(imgUri, (w, h) => { if (h > 0) setImgRatio(w / h); }, () => {});
-  }, [imgUri]);
 
   const panResponder = useRef(
     PanResponder.create({

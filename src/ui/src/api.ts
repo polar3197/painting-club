@@ -168,6 +168,7 @@ export interface Visual2DOut {
   keywords: string[];
   file_path: string;
   comments_enabled: boolean;
+  aspect_ratio: number | null;
 }
 
 export function getHealth(): Promise<unknown> {
@@ -314,6 +315,7 @@ export interface ArtResult {
   location: string | null;
   creator_username: string;
   creator_city: string | null;
+  aspect_ratio: number | null;
 }
 
 export function get_search_options(medium?: string, username?: string): Promise<SearchOptions> {
