@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { get_media, submit_media_request, set_media_visibility, MediaType } from "../../api";
 import "../../styles/utils/add-media-dialog.css";
 
@@ -17,6 +17,9 @@ const AddMediaDialog = (
 ) => {
     const [tab, setTab] = useState<Tab>("hide-show");
     const [media, setMedia] = useState<MediaType[] | null>(null);
+    // Freeze the order of artforms at mount time so toggling doesn't reshuffle rows.
+    const initialOrder = useMemo(() => [...shown, ...hidden], []); // eslint-disable-line react-hooks/exhaustive-deps
+    const hiddenSet = new Set(hidden);
     const [error, setError] = useState<string | null>(null);
     const [requestName, setRequestName] = useState("");
     const [requestSent, setRequestSent] = useState(false);
@@ -72,23 +75,24 @@ const AddMediaDialog = (
 
                 {tab === "hide-show" ? (
                     <div className="add-media-panel">
-                        {shown.length === 0 && hidden.length === 0 ? (
+                        {initialOrder.length === 0 ? (
                             <div className="add-media-empty">no artforms on your profile yet — switch to "new artform"</div>
                         ) : (
                             <div className="add-media-toggle-list">
-                                {[
-                                    ...shown.map((n) => ({ name: n, isHidden: false })),
-                                    ...hidden.map((n) => ({ name: n, isHidden: true })),
-                                ].map((row) => (
-                                    <div
-                                        key={row.name}
-                                        className={`add-media-toggle-row ${row.isHidden ? "is-hidden" : "is-shown"}`}
-                                        onClick={() => toggleVisibility(row.name, !row.isHidden)}
-                                    >
-                                        <span className="toggle-state-label">{row.isHidden ? "hidden" : "shown"}</span>
-                                        <button type="button" className="toggle-chip">{row.name}</button>
-                                    </div>
-                                ))}
+                                {initialOrder.map((name) => {
+                                    const isHidden = hiddenSet.has(name);
+                                    return (
+                                        <div
+                                            key={name}
+                                            className={`add-media-toggle-row ${isHidden ? "is-hidden" : "is-shown"}`}
+                                            onClick={() => toggleVisibility(name, !isHidden)}
+                                        >
+                                            <span className="toggle-state-label left">shown</span>
+                                            <span className="toggle-state-label right">hidden</span>
+                                            <span className="toggle-chip">{name}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

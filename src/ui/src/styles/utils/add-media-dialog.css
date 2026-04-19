@@ -12,7 +12,10 @@
 .add-media-dialog {
     width: 420px;
     max-width: 92vw;
-    max-height: 80vh;
+    /* Fixed height so the dialog doesn't reflow when switching tabs or when
+       the hide/show list has fewer rows than the "new artform" pane. */
+    height: 520px;
+    max-height: 88vh;
     background-color: rgb(255, 250, 245);
     border: 1px black solid;
     padding: 20px;
@@ -150,15 +153,15 @@
 }
 
 .add-media-toggle-row {
+    position: relative;
     width: 100%;
+    height: 40px;
     border: 1px black solid;
-    padding: 8px 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     cursor: pointer;
-    transition: background-color 0.18s ease;
+    overflow: hidden;
+    transition: background-color 0.22s ease;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
 }
 
 .add-media-toggle-row.is-shown {
@@ -170,19 +173,52 @@
 }
 
 .toggle-state-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-family: 'Times New Roman', Times, serif;
     font-size: 13px;
-    color: #333;
+    color: #444;
     text-transform: lowercase;
+    pointer-events: none;
 }
 
+.toggle-state-label.left { grid-column: 1; }
+.toggle-state-label.right { grid-column: 2; }
+
+.add-media-toggle-row.is-shown .toggle-state-label.left { visibility: hidden; }
+.add-media-toggle-row.is-hidden .toggle-state-label.right { visibility: hidden; }
+
 .toggle-chip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    /* 5/12ths of the row width, no matter the label inside. */
+    width: calc(100% * 5 / 12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-family: 'Times New Roman', Times, serif;
     font-size: 15px;
-    padding: 4px 14px;
-    border: 1px black solid;
+    font-weight: 600;
     background-color: rgb(250, 244, 202);
-    cursor: pointer;
+    border-right: 1px black solid;
+    transition: transform 0.22s ease;
+    pointer-events: none;
+    /* keep the label readable when the name is long */
+    padding: 0 8px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.add-media-toggle-row.is-hidden .toggle-chip {
+    /* Moves the chip by 7/12 of the row's width (the gap between chip's 5/12
+       left edge and the right edge). 7/12 of row / 5/12 of chip = 140%. */
+    transform: translateX(140%);
+    border-right: none;
+    border-left: 1px black solid;
 }
 
 @media (max-width: 640px) {

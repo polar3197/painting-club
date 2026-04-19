@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Animated,
+  LayoutChangeEvent,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
 import { get_media, submit_media_request, set_media_visibility, MediaType } from '../api';
@@ -38,6 +40,10 @@ export default function AddMediaDialog({
   const [error, setError] = useState<string | null>(null);
   const [requestName, setRequestName] = useState('');
   const [requestSent, setRequestSent] = useState(false);
+
+  // Freeze order at mount so toggles don't reshuffle.
+  const initialOrder = useMemo(() => [...shown, ...hidden], []); // eslint-disable-line react-hooks/exhaustive-deps
+  const hiddenSet = new Set(hidden);
 
   useEffect(() => {
     get_media()
@@ -87,69 +93,68 @@ export default function AddMediaDialog({
             </Pressable>
           </View>
 
-          {tab === 'hide-show' ? (
-            shown.length === 0 && hidden.length === 0 ? (
-              <Text style={styles.empty}>no artforms on your profile yet — switch to "new artform"</Text>
+          <View style={styles.panelArea}>
+            {tab === 'hide-show' ? (
+              initialOrder.length === 0 ? (
+                <Text style={styles.empty}>no artforms on your profile yet — switch to "new artform"</Text>
+              ) : (
+                <ScrollView style={styles.panelScroll}>
+                  {initialOrder.map((name) => (
+                    <ToggleRow
+                      key={name}
+                      name={name}
+                      hidden={hiddenSet.has(name)}
+                      onToggle={() => toggle(name, !hiddenSet.has(name))}
+                    />
+                  ))}
+                </ScrollView>
+              )
             ) : (
               <ScrollView style={styles.panelScroll}>
-                {[
-                  ...shown.map((n) => ({ name: n, isHidden: false })),
-                  ...hidden.map((n) => ({ name: n, isHidden: true })),
-                ].map((row) => (
-                  <ToggleRow
-                    key={row.name}
-                    name={row.name}
-                    hidden={row.isHidden}
-                    onToggle={() => toggle(row.name, !row.isHidden)}
-                  />
-                ))}
-              </ScrollView>
-            )
-          ) : (
-            <ScrollView style={styles.panelScroll}>
-              {error && <Text style={styles.error}>{error}</Text>}
-              {!error && media === null && (
-                <ActivityIndicator color={Colors.darkerGold} style={{ marginVertical: 12 }} />
-              )}
-              {!error && media !== null && available.length === 0 && (
-                <Text style={styles.empty}>all artforms already on your profile</Text>
-              )}
-              {!error && available.length > 0 && (
-                <View>
-                  {available.map((m) => (
-                    <Pressable
-                      key={m.id}
-                      style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-                      onPress={() => {
-                        onAdd(m.name);
-                        onClose();
-                      }}
-                    >
-                      <Text style={styles.itemText}>{m.name}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
+                {error && <Text style={styles.error}>{error}</Text>}
+                {!error && media === null && (
+                  <ActivityIndicator color={Colors.darkerGold} style={{ marginVertical: 12 }} />
+                )}
+                {!error && media !== null && available.length === 0 && (
+                  <Text style={styles.empty}>all artforms already on your profile</Text>
+                )}
+                {!error && available.length > 0 && (
+                  <View>
+                    {available.map((m) => (
+                      <Pressable
+                        key={m.id}
+                        style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                        onPress={() => {
+                          onAdd(m.name);
+                          onClose();
+                        }}
+                      >
+                        <Text style={styles.itemText}>{m.name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
 
-              <View style={styles.requestSection}>
-                <Text style={styles.requestLabel}>propose a media form:</Text>
-                <View style={styles.requestRow}>
-                  <TextInput
-                    style={styles.requestInput}
-                    value={requestName}
-                    placeholder="artform name"
-                    placeholderTextColor={Colors.textMuted}
-                    autoCapitalize="none"
-                    onChangeText={setRequestName}
-                  />
-                  <Pressable style={styles.requestBtn} onPress={handleRequest}>
-                    <Text style={styles.requestBtnText}>request</Text>
-                  </Pressable>
+                <View style={styles.requestSection}>
+                  <Text style={styles.requestLabel}>propose a media form:</Text>
+                  <View style={styles.requestRow}>
+                    <TextInput
+                      style={styles.requestInput}
+                      value={requestName}
+                      placeholder="artform name"
+                      placeholderTextColor={Colors.textMuted}
+                      autoCapitalize="none"
+                      onChangeText={setRequestName}
+                    />
+                    <Pressable style={styles.requestBtn} onPress={handleRequest}>
+                      <Text style={styles.requestBtnText}>request</Text>
+                    </Pressable>
+                  </View>
+                  {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
                 </View>
-                {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
-              </View>
-            </ScrollView>
-          )}
+              </ScrollView>
+            )}
+          </View>
 
           <View style={styles.buttons}>
             <Pressable style={styles.cancelBtn} onPress={onClose}>
@@ -163,8 +168,8 @@ export default function AddMediaDialog({
 }
 
 /**
- * A single-row toggle. Row background = green (shown) or red (hidden). Artform
- * name sits in a cream chip, tappable. Swipe left/right also flips it.
+ * Fixed-width chip (5/12 of row) that slides left<->right on toggle. Row bg
+ * goes green(shown) <-> red(hidden). Tap row or swipe chip to flip.
  */
 function ToggleRow({
   name,
@@ -175,28 +180,61 @@ function ToggleRow({
   hidden: boolean;
   onToggle: () => void;
 }) {
+  const [rowWidth, setRowWidth] = useState(0);
+  const chipWidth = rowWidth * (5 / 12);
+  const travel = rowWidth - chipWidth; // distance chip moves between states
+
+  const translate = useRef(new Animated.Value(hidden ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(translate, {
+      toValue: hidden ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [hidden, translate]);
+
+  const translateX = translate.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, travel],
+  });
+
   const onGesture = (e: PanGestureHandlerStateChangeEvent) => {
     if (e.nativeEvent.state === State.END) {
       if (Math.abs(e.nativeEvent.translationX) > 30) onToggle();
     }
   };
 
+  const onLayout = (e: LayoutChangeEvent) => {
+    setRowWidth(e.nativeEvent.layout.width);
+  };
+
   return (
     <PanGestureHandler onHandlerStateChange={onGesture}>
-      <View>
-        <Pressable
-          onPress={onToggle}
-          style={[styles.toggleRow, hidden ? styles.toggleRowHidden : styles.toggleRowShown]}
-        >
-          <Text style={styles.toggleStateLabel}>{hidden ? 'hidden' : 'shown'}</Text>
-          <View style={styles.toggleChip}>
-            <Text style={styles.toggleChipText}>{name}</Text>
-          </View>
-        </Pressable>
-      </View>
+      <Pressable
+        onPress={onToggle}
+        onLayout={onLayout}
+        style={[styles.toggleRow, hidden ? styles.toggleRowHidden : styles.toggleRowShown]}
+      >
+        {/* state labels on the uncovered side */}
+        {hidden && <Text style={[styles.toggleStateLabel, styles.toggleStateLeft]}>shown</Text>}
+        {!hidden && <Text style={[styles.toggleStateLabel, styles.toggleStateRight]}>hidden</Text>}
+        {rowWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.toggleChip,
+              { width: chipWidth, transform: [{ translateX }] },
+            ]}
+          >
+            <Text style={styles.toggleChipText} numberOfLines={1}>{name}</Text>
+          </Animated.View>
+        )}
+      </Pressable>
     </PanGestureHandler>
   );
 }
+
+const DIALOG_HEIGHT = 520;
 
 const styles = StyleSheet.create({
   backdrop: {
@@ -207,7 +245,8 @@ const styles = StyleSheet.create({
   },
   dialog: {
     width: '88%',
-    maxHeight: '82%',
+    height: DIALOG_HEIGHT,
+    maxHeight: '88%',
     backgroundColor: Colors.mainBg,
     borderWidth: 1,
     borderColor: '#000',
@@ -231,8 +270,12 @@ const styles = StyleSheet.create({
   titleInactive: {
     opacity: 0.4,
   },
+  panelArea: {
+    flex: 1,
+    minHeight: 0,
+  },
   panelScroll: {
-    marginBottom: 10,
+    flex: 1,
   },
   error: {
     fontFamily: Fonts.serif,
@@ -305,14 +348,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    position: 'relative',
+    height: 40,
     borderWidth: 1,
     borderColor: '#000',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
     marginBottom: 8,
+    overflow: 'hidden',
+    justifyContent: 'center',
   },
   toggleRowShown: {
     backgroundColor: Colors.greenBright,
@@ -321,16 +363,36 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.redLight,
   },
   toggleStateLabel: {
+    position: 'absolute',
     fontFamily: Fonts.serif,
     fontSize: FontSizes.tiny,
-    color: '#333',
+    color: '#444',
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    lineHeight: 40,
+  },
+  toggleStateLeft: {
+    left: 0,
+    width: '41.6667%', // 5/12
+    textAlign: 'center',
+  },
+  toggleStateRight: {
+    right: 0,
+    width: '41.6667%',
+    textAlign: 'center',
   },
   toggleChip: {
-    borderWidth: 1,
-    borderColor: '#000',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRightWidth: 1,
+    borderRightColor: '#000',
     backgroundColor: Colors.secondary,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   toggleChipText: {
     fontFamily: Fonts.serif,
@@ -340,6 +402,7 @@ const styles = StyleSheet.create({
   buttons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    marginTop: 10,
   },
   cancelBtn: {
     borderWidth: 1,

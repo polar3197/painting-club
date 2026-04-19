@@ -27,12 +27,6 @@
     border: 1px black solid;
     cursor: pointer;
     background-color: rgb(250, 244, 202);
-    padding: 4px 8px;
-    box-sizing: border-box;
-    min-height: 2em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .media-element.selected {
@@ -46,7 +40,6 @@
 .add-media {
     flex: 0 0 auto;
     box-sizing: border-box;
-    min-height: 2em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -57,7 +50,6 @@
     font-size: inherit;
     font-weight: 600;
     padding: 0 10px;
-    line-height: 1;
     margin: 0;
 }
 
@@ -67,9 +59,7 @@
 
 .add-media--full {
     flex: 1;
-    min-height: 2em;
-    padding: 4px 8px;
-    line-height: inherit;
+    padding: 0;
 }
 
 
