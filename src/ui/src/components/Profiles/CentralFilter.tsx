@@ -17,11 +17,13 @@ const CentralFilter = (
     const availableOptions = options.filter(o => !chips.includes(o));
     return (
         <>
-            <div className="filter-bar">
-                <div className="filter-bar-left">
-                    {bannerSrc && <img className="filter-bar-banner" src={bannerSrc} alt="" />}
-                    <span className="filter-header">{header}</span>
+            {bannerSrc && (
+                <div className="page-banner">
+                    <img src={bannerSrc} alt="" />
                 </div>
+            )}
+            <div className="filter-bar">
+                <span className="filter-header">{header}</span>
                 <div className="filter-bar-search">
                     <Dropdown
                         placeholder={placeholder}
