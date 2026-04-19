@@ -333,6 +333,7 @@ async def search_members(
             media=list(media),
             is_owner=is_owner,
             role=member_row.role or "member",
+            profile_pic_path=member_row.profile_pic_path,
         )
         profiles.append(profile)
     print(profiles)

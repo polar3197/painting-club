@@ -54,9 +54,6 @@ const ArtGallery = () => {
 
   return (
     <>
-      <div className="page-banner">
-        <img src="/imgs/art.png" alt="" />
-      </div>
       <CentralFilter
         header="art"
         options={artOptions}
@@ -65,6 +62,7 @@ const ArtGallery = () => {
         onRemoveChip={removeChip}
         onQueryChange={setQuery}
         placeholder="search art..."
+        bannerSrc="/imgs/art.png"
       />
       <div className='members-display'>
         {filtered.length > 0

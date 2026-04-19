@@ -1,36 +1,37 @@
 
 
-.page-banner {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 4px 0 2px;
-    background-color: rgb(255, 250, 245);
-}
-
-.page-banner img {
-    width: 110px;
-    height: 110px;
-    object-fit: contain;
-}
-
 .filter-bar {
-    position: relative;
     display: flex;
-    justify-content: center;
+    flex-direction: row;
     align-items: center;
     gap: 16px;
-    height: 10vh;
     width: 100%;
     border-bottom: 1px black solid;
     background-color: rgb(255, 250, 245);
-    padding-left: 30px;
+    padding: 8px 30px;
     box-sizing: border-box;
 }
 
+.filter-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.filter-bar-banner {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.filter-bar-search {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
 .filter-header {
-    position: absolute;
-    left: 30px;
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
     font-size: 24px;
     white-space: nowrap;
@@ -39,29 +40,33 @@
 @media (max-width: 1024px) {
     .filter-header {
         font-size: 20px;
-        left: 16px;
     }
 
     .filter-bar {
-        padding-left: 16px;
+        padding: 8px 16px;
         gap: 10px;
     }
 }
 
 @media (max-width: 640px) {
     .filter-bar {
+        padding: 8px 12px;
+        gap: 10px;
+    }
+
+    .filter-bar-left {
         flex-direction: column;
-        align-items: stretch;
-        justify-content: center;
-        height: auto;
-        padding: 10px 16px;
-        gap: 8px;
+        gap: 2px;
+        align-items: center;
+    }
+
+    .filter-bar-banner {
+        width: 48px;
+        height: 48px;
     }
 
     .filter-header {
-        position: static;
-        font-size: 18px;
-        text-align: center;
+        font-size: 16px;
     }
 }
 

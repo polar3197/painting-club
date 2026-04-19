@@ -66,9 +66,6 @@ const People = () => {
 
   return (
     <>
-      <div className="page-banner">
-        <img src="/imgs/profiles.png" alt="" />
-      </div>
       <CentralFilter
         header="members"
         options={peopleOptions}
@@ -77,6 +74,7 @@ const People = () => {
         onRemoveChip={removeChip}
         onQueryChange={setQuery}
         placeholder="search people..."
+        bannerSrc="/imgs/profiles.png"
       />
       <div className='members-display'>
         {filtered.length > 0
