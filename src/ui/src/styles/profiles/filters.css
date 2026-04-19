@@ -4,14 +4,16 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 12px 0 6px;
+    padding: 0;
     background-color: rgb(255, 250, 245);
+    line-height: 0;
 }
 
 .page-banner img {
     width: 110px;
     height: 110px;
     object-fit: contain;
+    display: block;
 }
 
 .filter-bar {
