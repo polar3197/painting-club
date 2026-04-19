@@ -39,4 +39,7 @@ async def run_migrations():
             ),
             {"names": list(_WRITTEN_WORD_SEED)},
         )
+        await conn.execute(text(
+            "ALTER TABLE media_members ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false"
+        ))
     print("Migrations applied.")

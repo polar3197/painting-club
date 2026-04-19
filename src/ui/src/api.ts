@@ -80,6 +80,7 @@ export interface Profile {
   bio:string;
   is_owner: boolean;
   media: string[];
+  hidden_media: string[];
   role: string;
   profile_pic_path: string | null;
 }
@@ -238,6 +239,14 @@ export function add_member_media(username: string, medium: string, token: string
   });
 }
 
+export function set_media_visibility(medium: string, hidden: boolean, token: string | null) {
+  return request(`/members/media/${encodeURIComponent(medium)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ hidden }),
+  });
+}
+
 export interface MediaRequest {
   id: string;
   member_id: string;
@@ -267,11 +276,12 @@ export function update_media_request(
   status: "approved" | "rejected",
   type: string | null,
   token: string | null,
+  name: string | null = null,
 ): Promise<MediaRequest> {
   return request(`/admin/media-requests/${id}`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status, type }),
+    body: JSON.stringify({ status, type, name }),
   }) as Promise<MediaRequest>;
 }
 

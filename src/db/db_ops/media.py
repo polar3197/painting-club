@@ -9,6 +9,29 @@ async def db_list_media(db: AsyncSession):
     return result.scalars().all()
 
 
+async def db_set_media_visibility(
+    db: AsyncSession, member_id: str, medium: str, hidden: bool
+) -> bool:
+    medium_row = (
+        await db.execute(select(Media).filter(Media.name == medium))
+    ).scalar_one_or_none()
+    if not medium_row:
+        raise ValueError(f"Medium '{medium}' not found")
+    link = (
+        await db.execute(
+            select(Media_Members).filter(
+                Media_Members.member_id == member_id,
+                Media_Members.media_id == medium_row.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not link:
+        raise ValueError(f"You do not have medium '{medium}' on your profile")
+    link.hidden = hidden
+    await db.commit()
+    return True
+
+
 async def db_create_media(db: AsyncSession, name: str, type_: str | None = None) -> Media:
     existing = await db.execute(select(Media).filter(Media.name == name))
     row = existing.scalars().first()

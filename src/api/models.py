@@ -26,6 +26,7 @@ class Profile(BaseModel):
     firstname: str | None
     lastname: str | None
     media: List[str] = []
+    hidden_media: List[str] = []
     city: str | None
     state: str | None
     bio: str | None
@@ -81,6 +82,11 @@ class MediaRequestOut(BaseModel):
 class MediaRequestUpdate(BaseModel):
     status: str
     type: str | None = None
+    name: str | None = None  # admin may rename before approving
+
+
+class MediaVisibilityUpdate(BaseModel):
+    hidden: bool
 
 class Visual2DIn(BaseModel):
     username: str

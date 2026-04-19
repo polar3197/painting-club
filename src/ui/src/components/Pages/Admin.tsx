@@ -90,13 +90,29 @@ const MediaRequestRow = ({
     onResolve,
 }: {
     req: MediaRequest;
-    onResolve: (id: string, status: "approved" | "rejected", type: string | null) => void;
+    onResolve: (id: string, status: "approved" | "rejected", type: string | null, name: string | null) => void;
 }) => {
     const [pickingType, setPickingType] = useState(false);
+    const [editName, setEditName] = useState(req.requested_name);
+
+    const finalName = () => {
+        const n = editName.trim();
+        return n && n !== req.requested_name ? n : null;
+    };
+
     return (
         <div className="application-row-item">
             <div className="application-row-info">
-                <p className="application-name">{req.requested_name}</p>
+                {pickingType ? (
+                    <input
+                        className="application-name"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        style={{ border: "1px solid #ccc", padding: "2px 4px", fontFamily: "inherit", fontSize: "inherit", minWidth: 0, width: "100%", boxSizing: "border-box" }}
+                    />
+                ) : (
+                    <p className="application-name">{req.requested_name}</p>
+                )}
                 <p className="application-meta">@{req.username}</p>
                 {req.resolved_type && <p className="application-meta">type: {req.resolved_type}</p>}
                 <p className="application-date">{new Date(req.created_at).toLocaleDateString()}</p>
@@ -111,7 +127,7 @@ const MediaRequestRow = ({
                 {req.status === "pending" && !pickingType && (
                     <>
                         <div className="application-btn approve" onClick={() => setPickingType(true)}>approve</div>
-                        <div className="application-btn reject" onClick={() => onResolve(req.id, "rejected", null)}>reject</div>
+                        <div className="application-btn reject" onClick={() => onResolve(req.id, "rejected", null, null)}>reject</div>
                     </>
                 )}
                 {req.status === "pending" && pickingType && (
@@ -119,7 +135,7 @@ const MediaRequestRow = ({
                         defaultValue=""
                         style={{ fontFamily: "'Times New Roman', Times, serif", padding: "2px 4px" }}
                         onChange={(e) => {
-                            if (e.target.value) onResolve(req.id, "approved", e.target.value);
+                            if (e.target.value) onResolve(req.id, "approved", e.target.value, finalName());
                         }}
                     >
                         <option value="" disabled>pick type</option>

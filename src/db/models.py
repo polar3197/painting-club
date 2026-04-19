@@ -46,6 +46,7 @@ class Media_Members(Base):
     # Composite primary key - both columns together form the PK
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), primary_key=True)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), primary_key=True)
+    hidden = Column(Boolean, nullable=False, default=False)
 
 class Art(Base):
     __tablename__ = "art"

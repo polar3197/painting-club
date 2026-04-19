@@ -14,11 +14,15 @@ async def db_get_profile(db: AsyncSession, username: str):
         return None
 
     media_result = await db.execute(
-        select(Media.name)
+        select(Media.name, Media_Members.hidden)
         .join(Media_Members, Media.id == Media_Members.media_id)
         .filter(Media_Members.member_id == member.id)
     )
-    return member, media_result.scalars().all()
+    shown: list[str] = []
+    hidden: list[str] = []
+    for name, is_hidden in media_result.all():
+        (hidden if is_hidden else shown).append(name)
+    return member, shown, hidden
 
 async def db_update_profile(db: AsyncSession, username: str, payload: ProfileUpdate):
     username = username.lower()

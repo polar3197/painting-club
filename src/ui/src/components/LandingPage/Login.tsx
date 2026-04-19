@@ -29,18 +29,19 @@ export default function Login(
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const payload = { username, password };
+    const normalized = username.trim().toLowerCase();
+    const payload = { username: normalized, password };
     try {
       const response = await login_user(payload);
       if (response.must_setup) {
         // Don't call get_profile yet — temp users have a placeholder username; let them finish setup first.
-        login(username, response.access_token, "member");
+        login(normalized, response.access_token, "member");
         navigate("/setup");
         return;
       }
-      const profile = await get_profile(username, response.access_token);
-      login(username, response.access_token, profile.role);
-      navigate(`/members/${username}/profile`);
+      const profile = await get_profile(normalized, response.access_token);
+      login(normalized, response.access_token, profile.role);
+      navigate(`/members/${normalized}/profile`);
     } catch (err) {
       alert((err as Error).message);
     }

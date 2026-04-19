@@ -1,21 +1,52 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, StyleSheet, ActivityIndicator, TextInput, Alert } from 'react-native';
-import { get_media, submit_media_request, MediaType } from '../api';
+import {
+  View,
+  Text,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  TextInput,
+  Alert,
+} from 'react-native';
+import { PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
+import { get_media, submit_media_request, set_media_visibility, MediaType } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 interface AddMediaDialogProps {
-  existing: string[];
-  onPick: (name: string) => void;
+  shown: string[];
+  hidden: string[];
+  onAdd: (name: string) => void;
+  onVisibilityChange: (name: string, hidden: boolean) => void;
   onClose: () => void;
 }
 
-export default function AddMediaDialog({ existing, onPick, onClose }: AddMediaDialogProps) {
+type Tab = 'hide-show' | 'new';
+
+export default function AddMediaDialog({
+  shown,
+  hidden,
+  onAdd,
+  onVisibilityChange,
+  onClose,
+}: AddMediaDialogProps) {
   const { token } = useAuth();
+  const [tab, setTab] = useState<Tab>('hide-show');
   const [media, setMedia] = useState<MediaType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestName, setRequestName] = useState('');
   const [requestSent, setRequestSent] = useState(false);
+
+  useEffect(() => {
+    get_media()
+      .then(setMedia)
+      .catch((e) => setError(e?.message || 'failed to load media'));
+  }, []);
+
+  const existing = new Set([...shown, ...hidden]);
+  const available = (media ?? []).filter((m) => !existing.has(m.name));
 
   const handleRequest = async () => {
     const name = requestName.trim();
@@ -30,61 +61,95 @@ export default function AddMediaDialog({ existing, onPick, onClose }: AddMediaDi
     }
   };
 
-  useEffect(() => {
-    get_media()
-      .then(setMedia)
-      .catch((e) => setError(e?.message || 'failed to load media'));
-  }, []);
-
-  const available = (media ?? []).filter((m) => !existing.includes(m.name));
+  const toggle = async (name: string, makeHidden: boolean) => {
+    try {
+      await set_media_visibility(name, makeHidden, token);
+      onVisibilityChange(name, makeHidden);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'failed');
+    }
+  };
 
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <View style={styles.dialog} onStartShouldSetResponder={() => true}>
-          <Text style={styles.title}>add artform</Text>
+          <View style={styles.titleRow}>
+            <Pressable onPress={() => setTab('hide-show')}>
+              <Text style={[styles.title, tab !== 'hide-show' && styles.titleInactive]}>
+                hide/show artform
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setTab('new')}>
+              <Text style={[styles.title, tab !== 'new' && styles.titleInactive]}>
+                new artform
+              </Text>
+            </Pressable>
+          </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
-          {!error && media === null && (
-            <ActivityIndicator color={Colors.darkerGold} style={{ marginVertical: 16 }} />
-          )}
-          {!error && media !== null && available.length === 0 && (
-            <Text style={styles.empty}>all artforms already on your profile</Text>
-          )}
-          {!error && available.length > 0 && (
-            <ScrollView style={styles.list}>
-              {available.map((m) => (
-                <Pressable
-                  key={m.id}
-                  style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-                  onPress={() => {
-                    onPick(m.name);
-                    onClose();
-                  }}
-                >
-                  <Text style={styles.itemText}>{m.name}</Text>
-                </Pressable>
-              ))}
+          {tab === 'hide-show' ? (
+            shown.length === 0 && hidden.length === 0 ? (
+              <Text style={styles.empty}>no artforms on your profile yet — switch to "new artform"</Text>
+            ) : (
+              <ScrollView style={styles.panelScroll}>
+                {[
+                  ...shown.map((n) => ({ name: n, isHidden: false })),
+                  ...hidden.map((n) => ({ name: n, isHidden: true })),
+                ].map((row) => (
+                  <ToggleRow
+                    key={row.name}
+                    name={row.name}
+                    hidden={row.isHidden}
+                    onToggle={() => toggle(row.name, !row.isHidden)}
+                  />
+                ))}
+              </ScrollView>
+            )
+          ) : (
+            <ScrollView style={styles.panelScroll}>
+              {error && <Text style={styles.error}>{error}</Text>}
+              {!error && media === null && (
+                <ActivityIndicator color={Colors.darkerGold} style={{ marginVertical: 12 }} />
+              )}
+              {!error && media !== null && available.length === 0 && (
+                <Text style={styles.empty}>all artforms already on your profile</Text>
+              )}
+              {!error && available.length > 0 && (
+                <View>
+                  {available.map((m) => (
+                    <Pressable
+                      key={m.id}
+                      style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                      onPress={() => {
+                        onAdd(m.name);
+                        onClose();
+                      }}
+                    >
+                      <Text style={styles.itemText}>{m.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.requestSection}>
+                <Text style={styles.requestLabel}>propose a media form:</Text>
+                <View style={styles.requestRow}>
+                  <TextInput
+                    style={styles.requestInput}
+                    value={requestName}
+                    placeholder="artform name"
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    onChangeText={setRequestName}
+                  />
+                  <Pressable style={styles.requestBtn} onPress={handleRequest}>
+                    <Text style={styles.requestBtnText}>request</Text>
+                  </Pressable>
+                </View>
+                {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
+              </View>
             </ScrollView>
           )}
-
-          <View style={styles.requestSection}>
-            <Text style={styles.requestLabel}>don't see it? request a new artform:</Text>
-            <View style={styles.requestRow}>
-              <TextInput
-                style={styles.requestInput}
-                value={requestName}
-                placeholder="artform name"
-                placeholderTextColor={Colors.textMuted}
-                autoCapitalize="none"
-                onChangeText={setRequestName}
-              />
-              <Pressable style={styles.requestBtn} onPress={handleRequest}>
-                <Text style={styles.requestBtnText}>request</Text>
-              </Pressable>
-            </View>
-            {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
-          </View>
 
           <View style={styles.buttons}>
             <Pressable style={styles.cancelBtn} onPress={onClose}>
@@ -97,6 +162,42 @@ export default function AddMediaDialog({ existing, onPick, onClose }: AddMediaDi
   );
 }
 
+/**
+ * A single-row toggle. Row background = green (shown) or red (hidden). Artform
+ * name sits in a cream chip, tappable. Swipe left/right also flips it.
+ */
+function ToggleRow({
+  name,
+  hidden,
+  onToggle,
+}: {
+  name: string;
+  hidden: boolean;
+  onToggle: () => void;
+}) {
+  const onGesture = (e: PanGestureHandlerStateChangeEvent) => {
+    if (e.nativeEvent.state === State.END) {
+      if (Math.abs(e.nativeEvent.translationX) > 30) onToggle();
+    }
+  };
+
+  return (
+    <PanGestureHandler onHandlerStateChange={onGesture}>
+      <View>
+        <Pressable
+          onPress={onToggle}
+          style={[styles.toggleRow, hidden ? styles.toggleRowHidden : styles.toggleRowShown]}
+        >
+          <Text style={styles.toggleStateLabel}>{hidden ? 'hidden' : 'shown'}</Text>
+          <View style={styles.toggleChip}>
+            <Text style={styles.toggleChipText}>{name}</Text>
+          </View>
+        </Pressable>
+      </View>
+    </PanGestureHandler>
+  );
+}
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -105,42 +206,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dialog: {
-    width: '80%',
-    maxHeight: '70%',
+    width: '88%',
+    maxHeight: '82%',
     backgroundColor: Colors.mainBg,
     borderWidth: 1,
     borderColor: '#000',
-    padding: 20,
+    padding: 18,
     ...Shadows.card,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    paddingBottom: 8,
+    marginBottom: 12,
   },
   title: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.md,
     fontWeight: '500',
-    marginBottom: 12,
+  },
+  titleInactive: {
+    opacity: 0.4,
+  },
+  panelScroll: {
+    marginBottom: 10,
   },
   error: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.redCoral,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   empty: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.textSecondary,
-    marginVertical: 16,
-  },
-  list: {
-    maxHeight: 320,
-    marginBottom: 12,
+    marginVertical: 12,
   },
   item: {
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.white,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     marginBottom: 6,
   },
   itemPressed: {
@@ -150,27 +261,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
   },
-  buttons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  cancelBtn: {
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: Colors.white,
-  },
-  cancelText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xxs,
-  },
   requestSection: {
     marginTop: 8,
-    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#000',
-    marginBottom: 8,
+    paddingTop: 10,
   },
   requestLabel: {
     fontFamily: Fonts.serif,
@@ -208,5 +303,53 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xxs,
     color: Colors.greenBright,
     marginTop: 6,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  toggleRowShown: {
+    backgroundColor: Colors.greenBright,
+  },
+  toggleRowHidden: {
+    backgroundColor: Colors.redLight,
+  },
+  toggleStateLabel: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.tiny,
+    color: '#333',
+  },
+  toggleChip: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  toggleChipText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+  },
+  buttons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  cancelBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: Colors.white,
+  },
+  cancelText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
   },
 });

@@ -85,6 +85,14 @@ export function add_member_media(username: string, medium: string, token: string
   });
 }
 
+export function set_media_visibility(medium: string, hidden: boolean, token: string | null) {
+  return request(`/members/media/${encodeURIComponent(medium)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ hidden }),
+  });
+}
+
 export function submit_media_request(name: string, token: string | null): Promise<MediaRequest> {
   return request('/media-requests', {
     method: 'POST',
@@ -104,11 +112,12 @@ export function update_media_request(
   status: 'approved' | 'rejected',
   type: string | null,
   token: string | null,
+  name: string | null = null,
 ): Promise<MediaRequest> {
   return request(`/admin/media-requests/${id}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status, type }),
+    body: JSON.stringify({ status, type, name }),
   }) as Promise<MediaRequest>;
 }
 

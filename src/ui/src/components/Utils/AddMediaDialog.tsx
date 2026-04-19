@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
-import { get_media, submit_media_request, MediaType } from "../../api";
+import { get_media, submit_media_request, set_media_visibility, MediaType } from "../../api";
 import "../../styles/utils/add-media-dialog.css";
 
+type Tab = "hide-show" | "new";
+
 const AddMediaDialog = (
-    { existing, onPick, onClose }
+    { shown, hidden, onAdd, onVisibilityChange, onClose }
     :
     {
-        existing: string[];
-        onPick: (name: string) => void;
+        shown: string[];
+        hidden: string[];
+        onAdd: (name: string) => void;
+        onVisibilityChange: (name: string, hidden: boolean) => void;
         onClose: () => void;
     }
 ) => {
+    const [tab, setTab] = useState<Tab>("hide-show");
     const [media, setMedia] = useState<MediaType[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [requestName, setRequestName] = useState("");
@@ -23,7 +28,8 @@ const AddMediaDialog = (
             .catch((e) => setError(e?.message || "failed to load media"));
     }, []);
 
-    const available = (media ?? []).filter((m) => !existing.includes(m.name));
+    const existing = new Set([...shown, ...hidden]);
+    const available = (media ?? []).filter((m) => !existing.has(m.name));
 
     const handleRequest = async () => {
         const name = requestName.trim();
@@ -40,48 +46,93 @@ const AddMediaDialog = (
         }
     };
 
+    const toggleVisibility = async (name: string, makeHidden: boolean) => {
+        try {
+            const token = localStorage.getItem("token");
+            await set_media_visibility(name, makeHidden, token);
+            onVisibilityChange(name, makeHidden);
+        } catch (e: any) {
+            alert(e?.message || "failed");
+        }
+    };
+
     return (
         <div className="add-media-backdrop" onClick={onClose}>
             <div className="add-media-dialog" onClick={(e) => e.stopPropagation()}>
-                <div className="add-media-header">add artform</div>
+                <h1 className="add-media-title">
+                    <span
+                        onClick={() => setTab("hide-show")}
+                        style={{ cursor: "pointer", opacity: tab === "hide-show" ? 1 : 0.4 }}
+                    >hide/show artform</span>
+                    <span
+                        onClick={() => setTab("new")}
+                        style={{ cursor: "pointer", opacity: tab === "new" ? 1 : 0.4 }}
+                    >new artform</span>
+                </h1>
 
-                {error && <div className="add-media-error">{error}</div>}
-                {!error && media === null && <div className="add-media-loading">loading...</div>}
-                {!error && media !== null && available.length === 0 && (
-                    <div className="add-media-empty">all artforms already on your profile</div>
-                )}
-                {!error && available.length > 0 && (
-                    <div className="add-media-list">
-                        {available.map((m) => (
-                            <button
-                                key={m.id}
-                                className="add-media-item"
-                                onClick={() => {
-                                    onPick(m.name);
-                                    onClose();
-                                }}
-                            >
-                                {m.name}
-                            </button>
-                        ))}
+                {tab === "hide-show" ? (
+                    <div className="add-media-panel">
+                        {shown.length === 0 && hidden.length === 0 ? (
+                            <div className="add-media-empty">no artforms on your profile yet — switch to "new artform"</div>
+                        ) : (
+                            <div className="add-media-toggle-list">
+                                {[
+                                    ...shown.map((n) => ({ name: n, isHidden: false })),
+                                    ...hidden.map((n) => ({ name: n, isHidden: true })),
+                                ].map((row) => (
+                                    <div
+                                        key={row.name}
+                                        className={`add-media-toggle-row ${row.isHidden ? "is-hidden" : "is-shown"}`}
+                                        onClick={() => toggleVisibility(row.name, !row.isHidden)}
+                                    >
+                                        <span className="toggle-state-label">{row.isHidden ? "hidden" : "shown"}</span>
+                                        <button type="button" className="toggle-chip">{row.name}</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="add-media-panel">
+                        {error && <div className="add-media-error">{error}</div>}
+                        {!error && media === null && <div className="add-media-loading">loading...</div>}
+                        {!error && media !== null && available.length === 0 && (
+                            <div className="add-media-empty">all artforms already on your profile</div>
+                        )}
+                        {!error && available.length > 0 && (
+                            <div className="add-media-list">
+                                {available.map((m) => (
+                                    <button
+                                        key={m.id}
+                                        className="add-media-item"
+                                        onClick={() => {
+                                            onAdd(m.name);
+                                            onClose();
+                                        }}
+                                    >
+                                        {m.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="add-media-request">
+                            <div className="add-media-request-label">propose a media form:</div>
+                            <div className="add-media-request-row">
+                                <input
+                                    className="add-media-request-input"
+                                    type="text"
+                                    value={requestName}
+                                    placeholder="artform name"
+                                    onChange={(e) => setRequestName(e.target.value)}
+                                />
+                                <button className="add-media-request-btn" onClick={handleRequest}>request</button>
+                            </div>
+                            {requestSent && <div className="add-media-request-sent">request sent</div>}
+                            {requestError && <div className="add-media-error">{requestError}</div>}
+                        </div>
                     </div>
                 )}
-
-                <div className="add-media-request">
-                    <div className="add-media-request-label">don't see it? request a new artform:</div>
-                    <div className="add-media-request-row">
-                        <input
-                            className="add-media-request-input"
-                            type="text"
-                            value={requestName}
-                            placeholder="artform name"
-                            onChange={(e) => setRequestName(e.target.value)}
-                        />
-                        <button className="add-media-request-btn" onClick={handleRequest}>request</button>
-                    </div>
-                    {requestSent && <div className="add-media-request-sent">request sent</div>}
-                    {requestError && <div className="add-media-error">{requestError}</div>}
-                </div>
 
                 <div className="add-media-footer">
                     <button className="add-media-close" onClick={onClose}>close</button>

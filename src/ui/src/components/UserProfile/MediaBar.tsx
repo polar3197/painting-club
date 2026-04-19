@@ -73,6 +73,25 @@ const MediaBar = (
     }
   };
 
+  const handleVisibilityChange = (name: string, hiddenNow: boolean) => {
+    const media = [...(profile.media ?? [])];
+    const hidden = [...(profile.hidden_media ?? [])];
+    if (hiddenNow) {
+      const i = media.indexOf(name);
+      if (i >= 0) media.splice(i, 1);
+      if (!hidden.includes(name)) hidden.push(name);
+    } else {
+      const i = hidden.indexOf(name);
+      if (i >= 0) hidden.splice(i, 1);
+      if (!media.includes(name)) media.push(name);
+    }
+    setProfile({ ...profile, media, hidden_media: hidden });
+    if (hiddenNow && selectedMedium === name) {
+      setSelectedMedium(media[0] ?? null as any);
+      setSelectedKeywords([]);
+    }
+  };
+
   return (
     <div className="media-bar-wrapper">
       <div className="media-bar">
@@ -90,9 +109,9 @@ const MediaBar = (
             type="button"
             className={`add-media ${noMedia ? "add-media--full" : ""}`}
             onClick={() => setShowAddMedia(true)}
-            aria-label="add artform"
+            aria-label="add or hide artforms"
           >
-            +
+            +/-
           </button>
         )}
       </div>
@@ -104,8 +123,10 @@ const MediaBar = (
       />
       {showAddMedia && (
         <AddMediaDialog
-          existing={profile.media ?? []}
-          onPick={handleAddMedia}
+          shown={profile.media ?? []}
+          hidden={profile.hidden_media ?? []}
+          onAdd={handleAddMedia}
+          onVisibilityChange={handleVisibilityChange}
           onClose={() => setShowAddMedia(false)}
         />
       )}

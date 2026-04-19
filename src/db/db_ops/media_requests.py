@@ -30,6 +30,7 @@ async def db_resolve_media_request(
     request_id: str,
     status: str,
     type_: str | None = None,
+    name_override: str | None = None,
 ):
     if status not in {"approved", "rejected"}:
         raise ValueError("status must be 'approved' or 'rejected'")
@@ -43,10 +44,22 @@ async def db_resolve_media_request(
     if status == "approved":
         if type_ not in VALID_TYPES:
             raise ValueError(f"type must be one of {sorted(VALID_TYPES)}")
-        # Create the media row with the approved type. db_create_media is idempotent:
-        # if the medium name already exists it returns the existing row and stamps its
-        # type if it was NULL.
-        await db_create_media(db, row.requested_name, type_=type_)
+        # Admin may rename the requested medium before approval. `requested_name` on
+        # the request row stays as the original user ask (audit trail); the Media row
+        # is created with whatever the admin chose.
+        from db.models import Media
+        final_name = (name_override or row.requested_name).strip()
+        if not final_name:
+            raise ValueError("name cannot be empty")
+        if name_override and name_override.strip() != row.requested_name:
+            # Collision check only on a true rename — if the admin left the name as-is
+            # we fall through to db_create_media's idempotent path.
+            existing = (
+                await db.execute(select(Media).filter(Media.name == final_name))
+            ).scalar_one_or_none()
+            if existing:
+                raise ValueError(f"A medium named '{final_name}' already exists")
+        await db_create_media(db, final_name, type_=type_)
         row.resolved_type = type_
 
     row.status = status

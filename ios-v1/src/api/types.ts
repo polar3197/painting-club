@@ -23,6 +23,7 @@ export interface Profile {
   bio: string;
   is_owner: boolean;
   media: string[];
+  hidden_media: string[];
   role: string;
   profile_pic_path: string | null;
 }

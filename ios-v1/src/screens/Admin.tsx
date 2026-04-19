@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -78,9 +78,10 @@ function MediaRequestRow({
   onResolve,
 }: {
   req: MediaRequest;
-  onResolve: (id: string, status: 'approved' | 'rejected', type: string | null) => void;
+  onResolve: (id: string, status: 'approved' | 'rejected', type: string | null, name: string | null) => void;
 }) {
   const [pickingType, setPickingType] = useState(false);
+  const [editName, setEditName] = useState(req.requested_name);
   const statusBg =
     req.status === 'approved'
       ? 'lightgreen'
@@ -88,10 +89,24 @@ function MediaRequestRow({
       ? Colors.redCoral
       : Colors.primaryGold;
 
+  const finalName = () => {
+    const n = editName.trim();
+    return n && n !== req.requested_name ? n : null;
+  };
+
   return (
     <View style={styles.row}>
       <View style={styles.rowInfo}>
-        <Text style={styles.rowName}>{req.requested_name}</Text>
+        {pickingType ? (
+          <TextInput
+            style={styles.rowEditInput}
+            value={editName}
+            onChangeText={setEditName}
+            autoCapitalize="none"
+          />
+        ) : (
+          <Text style={styles.rowName}>{req.requested_name}</Text>
+        )}
         <Text style={styles.rowEmail}>@{req.username}</Text>
         {req.resolved_type && (
           <Text style={styles.rowMeta}>type: {req.resolved_type}</Text>
@@ -114,7 +129,7 @@ function MediaRequestRow({
             </Pressable>
             <Pressable
               style={[styles.actionBtn, { backgroundColor: Colors.redLight }]}
-              onPress={() => onResolve(req.id, 'rejected', null)}
+              onPress={() => onResolve(req.id, 'rejected', null, null)}
             >
               <Text style={styles.actionBtnText}>reject</Text>
             </Pressable>
@@ -124,13 +139,13 @@ function MediaRequestRow({
           <View style={styles.actionBtns}>
             <Pressable
               style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-              onPress={() => onResolve(req.id, 'approved', 'visual_2d')}
+              onPress={() => onResolve(req.id, 'approved', 'visual_2d', finalName())}
             >
               <Text style={styles.actionBtnText}>visual_2d</Text>
             </Pressable>
             <Pressable
               style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-              onPress={() => onResolve(req.id, 'approved', 'written_word')}
+              onPress={() => onResolve(req.id, 'approved', 'written_word', finalName())}
             >
               <Text style={styles.actionBtnText}>written_word</Text>
             </Pressable>
@@ -174,9 +189,10 @@ export default function Admin() {
     id: string,
     status: 'approved' | 'rejected',
     type: string | null,
+    name: string | null = null,
   ) => {
     try {
-      await update_media_request(id, status, type, token);
+      await update_media_request(id, status, type, token, name);
       fetchRequests();
     } catch {
       // ignore
@@ -306,6 +322,13 @@ const styles = StyleSheet.create({
   rowName: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.sm,
+  },
+  rowEditInput: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    paddingVertical: 2,
   },
   rowEmail: {
     fontSize: FontSizes.xxs,

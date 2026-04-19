@@ -51,11 +51,18 @@ async def db_get_search_options(db: AsyncSession, medium: str | None = None, use
 
 
 async def db_search_art(db: AsyncSession, q: str):
-    # Visual2D already joins art via inheritance — do not join Art explicitly
+    # Visual2D already joins art via inheritance — do not join Art explicitly.
+    # The Media_Members join + hidden=False filter excludes art whose creator has
+    # marked that medium as hidden on their profile.
     base_query = (
         select(Visual2D, Media.name, Member.username, Member.city)
         .join(Media, Art.media_id == Media.id)
         .join(Member, Art.creator_id == Member.id)
+        .join(
+            Media_Members,
+            (Media_Members.member_id == Member.id) & (Media_Members.media_id == Media.id),
+        )
+        .where(Media_Members.hidden == False)
         .order_by(nulls_last(desc(Visual2D.date)))
     )
 

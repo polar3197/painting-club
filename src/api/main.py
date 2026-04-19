@@ -32,6 +32,7 @@ from api.models import (
     MediaRequestIn,
     MediaRequestOut,
     MediaRequestUpdate,
+    MediaVisibilityUpdate,
     Visual2DOut,
     Visual2DUpdate,
     SearchOptions,
@@ -81,6 +82,7 @@ from db.db_ops.media import (
     db_add_medium,
     db_list_media,
     db_create_media,
+    db_set_media_visibility,
     db_add_visual_2d,
     db_get_visual_2d,
     db_update_visual_2d,
@@ -216,7 +218,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
     result = await db_get_profile(db, username)
     if not result:
         raise HTTPException(status_code=404)
-    member_row, media = result
+    member_row, media, hidden_media = result
 
     is_owner = current_member is not None and (member_row.username == current_member.username)
 
@@ -229,6 +231,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         city=member_row.city,
         state=member_row.state,
         media=media,
+        hidden_media=hidden_media if is_owner else [],
         is_owner=is_owner,
         role=member_row.role or "member",
         profile_pic_path=member_row.profile_pic_path,
@@ -319,7 +322,7 @@ async def search_members(
         media_result = await db.execute(
             select(Media.name)
             .join(Media_Members, Media.id == Media_Members.media_id)
-            .filter(Media_Members.member_id == member_row.id)
+            .filter(Media_Members.member_id == member_row.id, Media_Members.hidden == False)
         )
         media = media_result.scalars().all()
         profile = Profile(
@@ -376,6 +379,20 @@ async def add_member_media_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return success
+
+
+@app.patch("/members/media/{medium}")
+async def set_member_media_visibility(
+    medium: str,
+    payload: MediaVisibilityUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        await db_set_media_visibility(db, current_member.id, medium, payload.hidden)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True, "medium": medium, "hidden": payload.hidden}
 
 ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf", "image/heic", "image/heif"}
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
@@ -790,10 +807,17 @@ async def resolve_media_request(
     if payload.status == "approved" and not payload.type:
         raise HTTPException(status_code=400, detail="type required for approval")
     try:
-        row = await db_resolve_media_request(db, request_id, payload.status, payload.type)
+        row = await db_resolve_media_request(
+            db, request_id, payload.status, payload.type, name_override=payload.name,
+        )
     except ValueError as e:
         msg = str(e)
-        status = 404 if "not found" in msg else 400
+        if "already exists" in msg:
+            status = 409
+        elif "not found" in msg:
+            status = 404
+        else:
+            status = 400
         raise HTTPException(status_code=status, detail=msg)
     # fetch username for response
     member = (

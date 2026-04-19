@@ -120,6 +120,14 @@ function Visual2DPiece({
             transition={200}
             style={styles.artImage}
             contentFit="contain"
+            onLoad={(e) => {
+              // Refine aspect ratio from the actual source; the thumb's ratio drifts by a
+              // pixel due to PIL integer rounding during thumbnail generation, which
+              // shows as a thin letterbox inside the 2px border.
+              const w = (e as any)?.source?.width;
+              const h = (e as any)?.source?.height;
+              if (w && h) setAspectRatio(w / h);
+            }}
           />
         </Pressable>
         <View style={styles.artDetails}>
@@ -235,6 +243,26 @@ export default function UserProfile() {
       Alert.alert('Error', err.message);
     }
   }, [profile, username, token]);
+
+  const handleMediaVisibilityChange = useCallback((name: string, hiddenNow: boolean) => {
+    if (!profile) return;
+    const media = [...(profile.media ?? [])];
+    const hidden = [...(profile.hidden_media ?? [])];
+    if (hiddenNow) {
+      const i = media.indexOf(name);
+      if (i >= 0) media.splice(i, 1);
+      if (!hidden.includes(name)) hidden.push(name);
+    } else {
+      const i = hidden.indexOf(name);
+      if (i >= 0) hidden.splice(i, 1);
+      if (!media.includes(name)) media.push(name);
+    }
+    setProfile({ ...profile, media, hidden_media: hidden });
+    if (hiddenNow && selectedMedium === name) {
+      setSelectedMedium(media[0] ?? null);
+      setSelectedKeywords([]);
+    }
+  }, [profile, selectedMedium]);
 
   const pickAndUploadProfilePic = async () => {
     if (!profile) return;
@@ -416,8 +444,10 @@ export default function UserProfile() {
       )}
       {showAddMedia && (
         <AddMediaDialog
-          existing={profile.media ?? []}
-          onPick={handleAddMedia}
+          shown={profile.media ?? []}
+          hidden={profile.hidden_media ?? []}
+          onAdd={handleAddMedia}
+          onVisibilityChange={handleMediaVisibilityChange}
           onClose={() => setShowAddMedia(false)}
         />
       )}
@@ -569,7 +599,7 @@ export default function UserProfile() {
               ]}
               onPress={() => setShowAddMedia(true)}
             >
-              <Text style={styles.addMediaBtnText}>+</Text>
+              <Text style={styles.addMediaBtnText}>+/-</Text>
             </Pressable>
           )}
         </View>
@@ -810,19 +840,17 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
   },
   addMediaBtn: {
-    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.secondary,
     borderWidth: 1,
     borderColor: '#000',
     paddingVertical: 6,
+    paddingHorizontal: 10,
   },
   addMediaBtnFull: {
-    aspectRatio: undefined,
     flexGrow: 1,
     flexBasis: '100%',
-    paddingHorizontal: 12,
   },
   addMediaBtnText: {
     fontFamily: Fonts.serif,

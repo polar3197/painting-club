@@ -10,23 +10,37 @@
 }
 
 .add-media-dialog {
-    width: 360px;
-    max-width: 90vw;
-    max-height: 70vh;
+    width: 420px;
+    max-width: 92vw;
+    max-height: 80vh;
     background-color: rgb(255, 250, 245);
     border: 1px black solid;
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
 }
 
-.add-media-header {
+.add-media-title {
     font-family: 'Times New Roman', Times, serif;
     font-size: 20px;
+    font-weight: normal;
     border-bottom: 1px black solid;
-    padding-bottom: 6px;
+    padding-bottom: 8px;
+    margin: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.add-media-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .add-media-error {
@@ -46,8 +60,6 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    overflow-y: auto;
-    max-height: 40vh;
 }
 
 .add-media-item {
@@ -106,7 +118,8 @@
     background-color: white;
     padding: 4px 8px;
     font-family: 'Times New Roman', Times, serif;
-    font-size: 14px;
+    /* 16px stops mobile Safari from auto-zooming when the input is focused. */
+    font-size: 16px;
     min-width: 0;
 }
 
@@ -127,4 +140,54 @@
     font-family: 'Times New Roman', Times, serif;
     font-size: 13px;
     color: rgb(40, 140, 40);
+}
+
+/* ---- hide/show toggle rows ---- */
+.add-media-toggle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.add-media-toggle-row {
+    width: 100%;
+    border: 1px black solid;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+}
+
+.add-media-toggle-row.is-shown {
+    background-color: rgb(189, 240, 189);
+}
+
+.add-media-toggle-row.is-hidden {
+    background-color: rgb(255, 175, 175);
+}
+
+.toggle-state-label {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 13px;
+    color: #333;
+    text-transform: lowercase;
+}
+
+.toggle-chip {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 15px;
+    padding: 4px 14px;
+    border: 1px black solid;
+    background-color: rgb(250, 244, 202);
+    cursor: pointer;
+}
+
+@media (max-width: 640px) {
+    .add-media-dialog {
+        width: 95vw;
+        max-height: 88vh;
+    }
 }
