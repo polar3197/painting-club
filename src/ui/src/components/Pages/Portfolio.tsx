@@ -8,7 +8,6 @@ import "../../styles/portfolio.css";
 
 const ROW_SIZE = 1;  // matches grid-auto-rows in CSS
 const GAP = 4;        // matches gap in CSS
-const COLS = 4;       // matches grid-template-columns
 
 const PortfolioCell = ({
   piece,
@@ -22,11 +21,15 @@ const PortfolioCell = ({
   const cellRef = useRef<HTMLDivElement>(null);
 
   const handleReady = (ratio: number) => {
-    const col = ratio >= 1.6 ? 2 : 1;
-
     const grid = cellRef.current?.closest(".portfolio-grid") as HTMLElement | null;
     const gridWidth = grid?.clientWidth ?? 800;
-    const colWidth = (gridWidth - GAP * (COLS - 1)) / COLS;
+    // Read live column count from the grid so this stays in sync with the CSS media queries
+    // (4 cols desktop / 3 ≤1024px / 2 ≤640px) instead of hardcoding a value that breaks on mobile.
+    const cols = grid
+      ? getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length || 1
+      : 4;
+    const col = Math.min(ratio >= 1.6 ? 2 : 1, cols);
+    const colWidth = (gridWidth - GAP * (cols - 1)) / cols;
     const cellWidth = colWidth * col + GAP * (col - 1);
     const cellHeight = cellWidth / ratio;
     const row = Math.ceil((cellHeight + GAP) / (ROW_SIZE + GAP));
