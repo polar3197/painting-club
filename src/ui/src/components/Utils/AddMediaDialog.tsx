@@ -78,22 +78,26 @@ const AddMediaDialog = (
                         {initialOrder.length === 0 ? (
                             <div className="add-media-empty">no artforms on your profile yet — switch to "new artform"</div>
                         ) : (
-                            <div className="add-media-toggle-list">
-                                {initialOrder.map((name) => {
-                                    const isHidden = hiddenSet.has(name);
-                                    return (
-                                        <div
-                                            key={name}
-                                            className={`add-media-toggle-row ${isHidden ? "is-hidden" : "is-shown"}`}
-                                            onClick={() => toggleVisibility(name, !isHidden)}
-                                        >
-                                            <span className="toggle-state-label left">shown</span>
-                                            <span className="toggle-state-label right">hidden</span>
-                                            <span className="toggle-chip">{name}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                            <>
+                                <div className="add-media-toggle-headers">
+                                    <span className="shown-label">shown</span>
+                                    <span className="hidden-label">hidden</span>
+                                </div>
+                                <div className="add-media-toggle-list">
+                                    {initialOrder.map((name) => {
+                                        const isHidden = hiddenSet.has(name);
+                                        return (
+                                            <div
+                                                key={name}
+                                                className={`add-media-toggle-row ${isHidden ? "is-hidden" : "is-shown"}`}
+                                                onClick={() => toggleVisibility(name, !isHidden)}
+                                            >
+                                                <span className="toggle-chip">{name}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
                         )}
                     </div>
                 ) : (

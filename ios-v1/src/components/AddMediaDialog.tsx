@@ -98,16 +98,22 @@ export default function AddMediaDialog({
               initialOrder.length === 0 ? (
                 <Text style={styles.empty}>no artforms on your profile yet — switch to "new artform"</Text>
               ) : (
-                <ScrollView style={styles.panelScroll}>
-                  {initialOrder.map((name) => (
-                    <ToggleRow
-                      key={name}
-                      name={name}
-                      hidden={hiddenSet.has(name)}
-                      onToggle={() => toggle(name, !hiddenSet.has(name))}
-                    />
-                  ))}
-                </ScrollView>
+                <>
+                  <View style={styles.toggleHeaders}>
+                    <Text style={styles.shownHeader}>shown</Text>
+                    <Text style={styles.hiddenHeader}>hidden</Text>
+                  </View>
+                  <ScrollView style={styles.panelScroll}>
+                    {initialOrder.map((name) => (
+                      <ToggleRow
+                        key={name}
+                        name={name}
+                        hidden={hiddenSet.has(name)}
+                        onToggle={() => toggle(name, !hiddenSet.has(name))}
+                      />
+                    ))}
+                  </ScrollView>
+                </>
               )
             ) : (
               <ScrollView style={styles.panelScroll}>
@@ -171,6 +177,8 @@ export default function AddMediaDialog({
  * Fixed-width chip (5/12 of row) that slides left<->right on toggle. Row bg
  * goes green(shown) <-> red(hidden). Tap row or swipe chip to flip.
  */
+const CHIP_GUTTER = 4;
+
 function ToggleRow({
   name,
   hidden,
@@ -182,7 +190,8 @@ function ToggleRow({
 }) {
   const [rowWidth, setRowWidth] = useState(0);
   const chipWidth = rowWidth * (5 / 12);
-  const travel = rowWidth - chipWidth; // distance chip moves between states
+  // Travel between the left gutter and the right gutter.
+  const travel = Math.max(0, rowWidth - chipWidth - 2 * CHIP_GUTTER);
 
   const translate = useRef(new Animated.Value(hidden ? 1 : 0)).current;
 
@@ -216,14 +225,15 @@ function ToggleRow({
         onLayout={onLayout}
         style={[styles.toggleRow, hidden ? styles.toggleRowHidden : styles.toggleRowShown]}
       >
-        {/* state labels on the uncovered side */}
-        {hidden && <Text style={[styles.toggleStateLabel, styles.toggleStateLeft]}>shown</Text>}
-        {!hidden && <Text style={[styles.toggleStateLabel, styles.toggleStateRight]}>hidden</Text>}
         {rowWidth > 0 && (
           <Animated.View
             style={[
               styles.toggleChip,
-              { width: chipWidth, transform: [{ translateX }] },
+              {
+                width: chipWidth,
+                left: CHIP_GUTTER,
+                transform: [{ translateX }],
+              },
             ]}
           >
             <Text style={styles.toggleChipText} numberOfLines={1}>{name}</Text>
@@ -347,14 +357,31 @@ const styles = StyleSheet.create({
     color: Colors.greenBright,
     marginTop: 6,
   },
+  toggleHeaders: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginBottom: 6,
+  },
+  shownHeader: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+    color: 'rgb(40, 140, 40)',
+  },
+  hiddenHeader: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+    color: 'rgb(200, 50, 50)',
+  },
   toggleRow: {
     position: 'relative',
-    height: 40,
+    height: 28,
     borderWidth: 1,
     borderColor: '#000',
-    marginBottom: 8,
+    marginBottom: 6,
     overflow: 'hidden',
-    justifyContent: 'center',
   },
   toggleRowShown: {
     backgroundColor: Colors.greenBright,
@@ -362,41 +389,20 @@ const styles = StyleSheet.create({
   toggleRowHidden: {
     backgroundColor: Colors.redLight,
   },
-  toggleStateLabel: {
-    position: 'absolute',
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.tiny,
-    color: '#444',
-    top: 0,
-    bottom: 0,
-    textAlignVertical: 'center',
-    lineHeight: 40,
-  },
-  toggleStateLeft: {
-    left: 0,
-    width: '41.6667%', // 5/12
-    textAlign: 'center',
-  },
-  toggleStateRight: {
-    right: 0,
-    width: '41.6667%',
-    textAlign: 'center',
-  },
   toggleChip: {
     position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderRightWidth: 1,
-    borderRightColor: '#000',
+    top: 3,
+    bottom: 3,
+    borderWidth: 1,
+    borderColor: '#000',
     backgroundColor: Colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   toggleChipText: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
+    fontSize: FontSizes.tiny,
     fontWeight: '600',
   },
   buttons: {

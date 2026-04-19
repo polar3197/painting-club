@@ -1,12 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { add_new_visual_2d, update_visual_2d, Visual2DOut, get_media, MediaType } from '../api';
 import PaintingForm from './PaintingForm';
 import Dropdown from './Dropdown';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const isVisual2D = (medium: string) =>
   medium === 'drawing' || medium === 'painting' || medium === 'stained glass' || medium === 'photography';
@@ -50,25 +48,6 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
         }
       : null
   );
-
-  const translateY = useRef(new Animated.Value(0)).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 10,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) translateY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 120) {
-          Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 200, useNativeDriver: true }).start(onClose);
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
-        }
-      },
-    })
-  ).current;
 
   const submit = async () => {
     if (!formData) return;
@@ -129,13 +108,10 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Animated.View
-          style={[styles.panel, { transform: [{ translateY }] }]}
-          {...panResponder.panHandlers}
-        >
-          <View style={styles.swipeHandle}>
-            <View style={styles.swipeBar} />
-          </View>
+        <View style={styles.panel}>
+          <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={10}>
+            <Text style={styles.closeBtnText}>×</Text>
+          </Pressable>
           <ScrollView
             style={styles.formArea}
             contentContainerStyle={styles.formContent}
@@ -161,7 +137,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
           <Pressable style={styles.submitBtn} onPress={submit}>
             <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
           </Pressable>
-        </Animated.View>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -179,21 +155,29 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: '#000',
   },
-  swipeHandle: {
+  closeBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderWidth: 1,
+    borderColor: '#000',
     alignItems: 'center',
-    paddingVertical: 10,
+    justifyContent: 'center',
+    zIndex: 10,
+    backgroundColor: Colors.mainBg,
   },
-  swipeBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.textMuted,
+  closeBtnText: {
+    fontSize: 20,
+    lineHeight: 22,
   },
   formArea: {
     flex: 1,
   },
   formContent: {
     padding: 16,
+    paddingTop: 44,
     paddingBottom: 80,
   },
   submitBtn: {
