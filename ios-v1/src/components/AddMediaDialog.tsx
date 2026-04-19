@@ -82,13 +82,19 @@ export default function AddMediaDialog({
         <View style={styles.dialog} onStartShouldSetResponder={() => true}>
           <View style={styles.titleRow}>
             <Pressable onPress={() => setTab('hide-show')}>
-              <Text style={[styles.title, tab !== 'hide-show' && styles.titleInactive]}>
-                hide/show artform
+              <Text
+                numberOfLines={1}
+                style={[styles.title, tab !== 'hide-show' && styles.titleInactive]}
+              >
+                hide/show
               </Text>
             </Pressable>
             <Pressable onPress={() => setTab('new')}>
-              <Text style={[styles.title, tab !== 'new' && styles.titleInactive]}>
-                new artform
+              <Text
+                numberOfLines={1}
+                style={[styles.title, tab !== 'new' && styles.titleInactive]}
+              >
+                new
               </Text>
             </Pressable>
           </View>

@@ -57,8 +57,11 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
   // gestures always belong to the panel — no gesture conflict.
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 10,
+      // Capture-phase variants run before children claim the touch, so the panel
+      // can hijack a vertical drag that started on a TextInput / Pressable.
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderMove: (_, g) => {
         if (g.dy > 0) translateY.setValue(g.dy);
       },
@@ -69,6 +72,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
         }
       },
+      onPanResponderTerminationRequest: () => false,
     })
   ).current;
 
@@ -126,50 +130,52 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Animated.View
-          style={[styles.panel, { transform: [{ translateY }] }]}
-          {...panResponder.panHandlers}
-        >
-          <View style={styles.swipeHandle}>
-            <View style={styles.swipeBar} />
-          </View>
-          <View style={styles.formContent}>
-            {isVisual2D(selectedMedium) && (
-              <PaintingForm onDataChange={setFormData} initialData={piece} />
-            )}
-            {piece && compatibleMedia.length > 0 && (
-              <View style={styles.moveToRow}>
-                <Text style={styles.moveToLabel}>move to:</Text>
-                <View style={styles.moveToDropdown}>
-                  <Dropdown
-                    placeholder={newMedium ?? selectedMedium}
-                    options={compatibleMedia}
-                    onSelect={setNewMedium}
-                  />
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <Animated.View
+            style={[styles.panel, { transform: [{ translateY }] }]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.swipeHandle}>
+              <View style={styles.swipeBar} />
+            </View>
+            <View style={styles.formContent}>
+              {isVisual2D(selectedMedium) && (
+                <PaintingForm onDataChange={setFormData} initialData={piece} />
+              )}
+              {piece && compatibleMedia.length > 0 && (
+                <View style={styles.moveToRow}>
+                  <Text style={styles.moveToLabel}>move to:</Text>
+                  <View style={styles.moveToDropdown}>
+                    <Dropdown
+                      placeholder={newMedium ?? selectedMedium}
+                      options={compatibleMedia}
+                      onSelect={setNewMedium}
+                    />
+                  </View>
                 </View>
-              </View>
-            )}
-          </View>
-          <Pressable style={styles.submitBtn} onPress={submit}>
-            <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
-          </Pressable>
-        </Animated.View>
-      </KeyboardAvoidingView>
+              )}
+              <Pressable style={styles.submitBtn} onPress={submit}>
+                <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   backdrop: {
-    height: 60,
+    flex: 1,
   },
   panel: {
-    flex: 1,
     backgroundColor: Colors.mainBg,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
@@ -187,14 +193,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.textMuted,
   },
   formContent: {
-    flex: 1,
     padding: 16,
-    paddingBottom: 80,
+    paddingBottom: 20,
   },
   submitBtn: {
-    position: 'absolute',
-    bottom: 30,
-    right: 16,
+    alignSelf: 'flex-end',
+    marginTop: 12,
     borderWidth: 1,
     borderColor: '#000',
     paddingHorizontal: 20,
