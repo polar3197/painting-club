@@ -74,6 +74,7 @@ const UserInfo = (
                             rows={1}
                             value={profile.lastname}
                             placeholder="lastname"
+                            onChange={(e) => setProfile({ ...profile, lastname: e.target.value })}
                         />
                         </>
                     :
