@@ -156,12 +156,9 @@
     font-weight: 600;
 }
 
-.add-media-toggle-headers .shown-label {
-    color: rgb(40, 140, 40);
-}
-
+.add-media-toggle-headers .shown-label,
 .add-media-toggle-headers .hidden-label {
-    color: rgb(200, 50, 50);
+    color: #000;
 }
 
 .add-media-toggle-list {
@@ -220,5 +217,11 @@
     .add-media-dialog {
         width: 95vw;
         max-height: 88vh;
+    }
+    .add-media-toggle-row {
+        height: 40px;
+    }
+    .toggle-chip {
+        font-size: 15px;
     }
 }

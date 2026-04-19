@@ -107,28 +107,25 @@ function Visual2DPiece({
       )}
       <View style={styles.artElement} onLayout={onLayout}>
         <Pressable
-          style={({ pressed }) => [
-            styles.artVisual,
-            aspectRatio ? { aspectRatio } : null,
-            pressed && { opacity: 0.9 },
-          ]}
+          style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
           onPress={() => setIsZoomedIn(true)}
         >
-          <Image
-            source={{ uri: resolveImageUrl(piece.file_path) }}
-            placeholder={{ uri: thumbUrl(piece.id) }}
-            transition={200}
-            style={styles.artImage}
-            contentFit="contain"
-            onLoad={(e) => {
-              // Refine aspect ratio from the actual source; the thumb's ratio drifts by a
-              // pixel due to PIL integer rounding during thumbnail generation, which
-              // shows as a thin letterbox inside the 2px border.
-              const w = (e as any)?.source?.width;
-              const h = (e as any)?.source?.height;
-              if (w && h) setAspectRatio(w / h);
-            }}
-          />
+          <View style={[styles.artVisualInner, aspectRatio ? { aspectRatio } : null]}>
+            <Image
+              source={{ uri: resolveImageUrl(piece.file_path) }}
+              placeholder={{ uri: thumbUrl(piece.id) }}
+              transition={200}
+              style={styles.artImage}
+              contentFit="contain"
+              onLoad={(e) => {
+                // Refine aspect ratio from the actual source; the thumb's ratio drifts
+                // by a pixel due to PIL integer rounding during thumbnail generation.
+                const w = (e as any)?.source?.width;
+                const h = (e as any)?.source?.height;
+                if (w && h) setAspectRatio(w / h);
+              }}
+            />
+          </View>
         </Pressable>
         <View style={styles.artDetails}>
           <Text style={styles.artTitle}>{piece.title}</Text>
@@ -840,17 +837,20 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
   },
   addMediaBtn: {
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.secondary,
     borderWidth: 1,
     borderColor: '#000',
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
   },
   addMediaBtnFull: {
+    aspectRatio: undefined,
     flexGrow: 1,
     flexBasis: '100%',
+    paddingHorizontal: 12,
   },
   addMediaBtnText: {
     fontFamily: Fonts.serif,
@@ -930,6 +930,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 2,
     borderColor: '#000',
+  },
+  artVisualInner: {
+    width: '100%',
   },
   artImage: {
     width: '100%',

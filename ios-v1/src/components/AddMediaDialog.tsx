@@ -116,30 +116,32 @@ export default function AddMediaDialog({
                 </>
               )
             ) : (
-              <ScrollView style={styles.panelScroll}>
-                {error && <Text style={styles.error}>{error}</Text>}
-                {!error && media === null && (
-                  <ActivityIndicator color={Colors.darkerGold} style={{ marginVertical: 12 }} />
-                )}
-                {!error && media !== null && available.length === 0 && (
-                  <Text style={styles.empty}>all artforms already on your profile</Text>
-                )}
-                {!error && available.length > 0 && (
-                  <View>
-                    {available.map((m) => (
-                      <Pressable
-                        key={m.id}
-                        style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-                        onPress={() => {
-                          onAdd(m.name);
-                          onClose();
-                        }}
-                      >
-                        <Text style={styles.itemText}>{m.name}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
+              <>
+                <ScrollView style={styles.panelScroll}>
+                  {error && <Text style={styles.error}>{error}</Text>}
+                  {!error && media === null && (
+                    <ActivityIndicator color={Colors.darkerGold} style={{ marginVertical: 12 }} />
+                  )}
+                  {!error && media !== null && available.length === 0 && (
+                    <Text style={styles.empty}>all artforms already on your profile</Text>
+                  )}
+                  {!error && available.length > 0 && (
+                    <View>
+                      {available.map((m) => (
+                        <Pressable
+                          key={m.id}
+                          style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                          onPress={() => {
+                            onAdd(m.name);
+                            onClose();
+                          }}
+                        >
+                          <Text style={styles.itemText}>{m.name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
 
                 <View style={styles.requestSection}>
                   <Text style={styles.requestLabel}>propose a media form:</Text>
@@ -158,7 +160,7 @@ export default function AddMediaDialog({
                   </View>
                   {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
                 </View>
-              </ScrollView>
+              </>
             )}
           </View>
 
@@ -274,7 +276,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.md,
+    fontSize: FontSizes.sm,
     fontWeight: '500',
   },
   titleInactive: {
@@ -367,17 +369,17 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     fontWeight: '600',
-    color: 'rgb(40, 140, 40)',
+    color: '#000',
   },
   hiddenHeader: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     fontWeight: '600',
-    color: 'rgb(200, 50, 50)',
+    color: '#000',
   },
   toggleRow: {
     position: 'relative',
-    height: 28,
+    height: 40,
     borderWidth: 1,
     borderColor: '#000',
     marginBottom: 6,
@@ -402,7 +404,7 @@ const styles = StyleSheet.create({
   },
   toggleChipText: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.tiny,
+    fontSize: FontSizes.xs,
     fontWeight: '600',
   },
   buttons: {
