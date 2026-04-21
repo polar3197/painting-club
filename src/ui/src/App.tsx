@@ -10,6 +10,7 @@ import Admin from "./components/Pages/Admin";
 import PageLayout from "./components/Pages/PageLayout";
 import Ethos from "./components/Pages/Ethos";
 import Privacy from "./components/Pages/Privacy";
+import Support from "./components/Pages/Support";
 import SetupAccount from "./components/Pages/SetupAccount";
 import "./styles/app-layout.css";
 import Home from "./components/Pages/Home";
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/landing-page" />} />
         <Route path="/ethos" element={<Ethos />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/support" element={<Support />} />
         <Route path="/setup" element={<SetupAccount />} />
         <Route path="/members/:username/portfolio" element={<Portfolio />} />
       </Routes>
