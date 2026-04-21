@@ -1,0 +1,25 @@
+# Dependencies — EAS reinstalls these on the builder
+node_modules
+
+# Native build artifacts
+ios/build
+ios/Pods
+ios/DerivedData
+ios/.xcode.env.local
+android/build
+android/.gradle
+android/app/build
+
+# Expo
+.expo
+dist
+web-build
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+**/.DS_Store

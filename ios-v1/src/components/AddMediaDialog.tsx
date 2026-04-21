@@ -12,7 +12,7 @@ import {
   Animated,
   LayoutChangeEvent,
 } from 'react-native';
-import { PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
 import { get_media, submit_media_request, set_media_visibility, MediaType } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
@@ -78,6 +78,7 @@ export default function AddMediaDialog({
 
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <View style={styles.dialog} onStartShouldSetResponder={() => true}>
           <View style={styles.titleRow}>
@@ -177,6 +178,7 @@ export default function AddMediaDialog({
           </View>
         </View>
       </Pressable>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

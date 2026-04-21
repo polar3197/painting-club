@@ -806,8 +806,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   mediaTab: {
-    flexGrow: 1,
-    flexBasis: '40%',
+    width: '48%',
     alignItems: 'center',
     backgroundColor: Colors.secondary,
     borderWidth: 1,
@@ -823,20 +822,17 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
   },
   addMediaBtn: {
-    aspectRatio: 1,
+    width: '48%',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.secondary,
     borderWidth: 1,
     borderColor: '#000',
     paddingVertical: 6,
-    paddingHorizontal: 0,
+    paddingHorizontal: 12,
   },
   addMediaBtnFull: {
-    aspectRatio: undefined,
-    flexGrow: 1,
-    flexBasis: '100%',
-    paddingHorizontal: 12,
+    width: '100%',
   },
   addMediaBtnText: {
     fontFamily: Fonts.serif,
