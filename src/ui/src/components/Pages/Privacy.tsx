@@ -16,7 +16,7 @@ const Privacy = () => {
                     <hr />
                     <br />
                     <p>
-                        Painting Club is a small thing I'm building solo. No ads, no tracking, no selling data —
+                        Painting Club is a small thing I'm building solo. No ads, no tracking, no selling data.
                         I only keep what's needed to make the app work.
                     </p>
                     <br />

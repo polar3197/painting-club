@@ -15,7 +15,7 @@ const Support = () => {
                     <hr />
                     <br />
                     <p>
-                        Painting Club is built and run by one person. If something is broken, confusing, or missing —
+                        Painting Club is built and run by one person. If something is broken, confusing, or missing,
                         I want to hear about it.
                     </p>
                     <br />
