@@ -15,37 +15,28 @@ const Support = () => {
                     <hr />
                     <br />
                     <p>
-                        Painting Club is built and maintained by one person. If something is broken, confusing,
-                        or missing — please reach out and I'll get back to you as soon as I can.
+                        Painting Club is built and run by one person. If something is broken, confusing, or missing —
+                        I want to hear about it.
                     </p>
                     <br />
 
-                    <p><b>Contact</b></p>
-                    <br />
-                    <p>
-                        Email <a href="mailto:charlie@cooper.nu">charlie@cooper.nu</a> with:
-                    </p>
+                    <p><b>Inside the app</b></p>
                     <ul style={{ padding: "5px 0px 0px 30px" }}>
-                        <li>Bug reports (what you did, what happened, what you expected)</li>
-                        <li>Account issues — lost password, can't log in, want your account deleted</li>
-                        <li>Questions about how something works</li>
-                        <li>Feature suggestions</li>
-                        <li>Anything else</li>
+                        <li>You can edit or delete any art, comment, or profile field yourself.</li>
+                        <li>Profile settings let you hide media types from your page.</li>
                     </ul>
                     <br />
 
-                    <p><b>Response time</b></p>
-                    <br />
+                    <p><b>Getting in touch</b></p>
                     <p>
-                        Usually within a few days. I read every message.
+                        <a href="mailto:charliepolar17@gmail.com">charliepolar17@gmail.com</a>
                     </p>
                     <br />
 
                     <p><b>Deleting your account</b></p>
-                    <br />
                     <p>
-                        Email me from the address on file and I'll delete your account and all associated content
-                        within 30 days.
+                        Send a note from the email on your account and I'll delete your account and everything
+                        attached to it within 30 days.
                     </p>
                 </div>
             </div>

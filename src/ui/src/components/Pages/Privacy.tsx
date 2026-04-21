@@ -16,39 +16,32 @@ const Privacy = () => {
                     <hr />
                     <br />
                     <p>
-                        Painting Club is a small, independent community for artists. We only collect what's needed
-                        to run the app — no ads, no tracking, no selling data.
+                        Painting Club is a small thing I'm building solo. No ads, no tracking, no selling data —
+                        I only keep what's needed to make the app work.
                     </p>
                     <br />
 
-                    <p><b>What we collect</b></p>
+                    <p><b>What I keep</b></p>
                     <ul style={{ padding: "5px 0px 0px 30px" }}>
-                        <li>Account info you provide (username, hashed password, profile details).</li>
-                        <li>Content you upload (art, titles, keywords, comments).</li>
-                        <li>Standard server logs for operating the service.</li>
+                        <li>Whatever you type into your account (username, hashed password, profile stuff).</li>
+                        <li>Whatever you upload (art, titles, keywords, comments).</li>
+                        <li>Basic server logs so I can keep the app running.</li>
                     </ul>
                     <br />
 
-                    <p><b>What we don't do</b></p>
+                    <p><b>What I don't do</b></p>
                     <ul style={{ padding: "5px 0px 0px 30px" }}>
                         <li>No analytics SDKs or cross-site tracking.</li>
                         <li>No advertising.</li>
-                        <li>No sharing or selling your data to third parties.</li>
+                        <li>Not sharing or selling your data to anyone.</li>
                     </ul>
                     <br />
 
                     <p><b>Your choices</b></p>
                     <ul style={{ padding: "5px 0px 0px 30px" }}>
-                        <li>Edit or remove any of your content from inside the app.</li>
-                        <li>Email us to delete your account and associated content.</li>
-                        <li>Email us for a copy of your data.</li>
+                        <li>Edit or delete anything you've posted from inside the app.</li>
+                        <li>Want your account deleted, or a copy of your data? Head to the <a onClick={() => navigate("/support")} style={{ cursor: "pointer", textDecoration: "underline" }}>support page</a> and reach out.</li>
                     </ul>
-                    <br />
-
-                    <p><b>Contact</b></p>
-                    <p>
-                        <a href="mailto:charlie@cooper.nu">charlie@cooper.nu</a>
-                    </p>
                 </div>
             </div>
         </div>
