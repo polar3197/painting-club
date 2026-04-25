@@ -28,6 +28,7 @@ import { resolveImageUrl, block_user, unblock_user } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
+import ContextPopup from './ContextPopup';
 import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
@@ -58,8 +59,12 @@ export default function ArtZoomIn({
   const [showReport, setShowReport] = useState(false);
   const [pendingBlock, setPendingBlock] = useState<string | null>(null);
   const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
+  const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
 
   const isBlocked = blockableUsername ? blockedUsernames.includes(blockableUsername) : false;
+  const canReport = !isOwner && !!reportArtId && !!currentUser;
+  const canBlock = !isOwner && !!blockableUsername && !!currentUser;
+  const showKebab = canReport || canBlock;
 
   const confirmBlock = async () => {
     if (!pendingBlock) return;
@@ -338,33 +343,60 @@ export default function ArtZoomIn({
                     <Text style={styles.changePicBtnText}>change pic</Text>
                   </Pressable>
                 )}
-                {!isOwner && reportArtId && (
+                {showKebab && (
                   <Pressable
-                    onPress={(e) => {
+                    style={styles.backKebab}
+                    onPress={(e: any) => {
                       e.stopPropagation?.();
-                      setShowReport(true);
+                      setPopupAnchor({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
                     }}
+                    hitSlop={10}
                   >
-                    <Text style={styles.backActionText}>report</Text>
-                  </Pressable>
-                )}
-                {!isOwner && blockableUsername && currentUser && (
-                  <Pressable
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      if (isBlocked) setPendingUnblock(blockableUsername);
-                      else setPendingBlock(blockableUsername);
-                    }}
-                  >
-                    <Text style={styles.backActionText}>
-                      {isBlocked ? `unblock @${blockableUsername}` : `block @${blockableUsername}`}
-                    </Text>
+                    <Text style={styles.backKebabText}>⋮</Text>
                   </Pressable>
                 )}
               </RNAnimated.View>
             </Animated.View>
           </GestureDetector>
         </View>
+
+        <ContextPopup
+          visible={popupAnchor !== null}
+          anchor={popupAnchor}
+          onClose={() => setPopupAnchor(null)}
+        >
+          {canReport && (
+            <Pressable
+              style={({ pressed }) => [
+                { paddingVertical: 10, paddingHorizontal: 14 },
+                pressed && { backgroundColor: Colors.secondary },
+              ]}
+              onPress={() => {
+                setPopupAnchor(null);
+                setShowReport(true);
+              }}
+            >
+              <Text style={{ fontFamily: Fonts.serif, fontSize: 15 }}>report</Text>
+            </Pressable>
+          )}
+          {canBlock && (
+            <Pressable
+              style={({ pressed }) => [
+                { paddingVertical: 10, paddingHorizontal: 14 },
+                pressed && { backgroundColor: Colors.secondary },
+              ]}
+              onPress={() => {
+                setPopupAnchor(null);
+                if (isBlocked) setPendingUnblock(blockableUsername!);
+                else setPendingBlock(blockableUsername!);
+              }}
+            >
+              <Text style={{ fontFamily: Fonts.serif, fontSize: 15 }}>
+                {isBlocked ? `unblock @${blockableUsername}` : `block @${blockableUsername}`}
+              </Text>
+            </Pressable>
+          )}
+        </ContextPopup>
 
         {reportArtId && (
           <ReportDialog
@@ -440,12 +472,19 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: 16,
   },
-  backActionText: {
+  backKebab: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backKebabText: {
     fontFamily: Fonts.serif,
-    fontSize: 18,
-    color: Colors.textPrimary,
-    textDecorationLine: 'underline',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    fontSize: 22,
+    color: Colors.textTertiary,
+    fontWeight: '700',
   },
 });

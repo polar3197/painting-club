@@ -25,7 +25,6 @@ export default function ReportDialog({ open, targetType, targetId, onClose }: Pr
             await submit_report(targetType, targetId, reason.trim() || null, token);
             setReason("");
             onClose();
-            alert("thanks — Charlie will take a look.");
         } catch (err: any) {
             alert(err?.message || "Could not send the report.");
         } finally {

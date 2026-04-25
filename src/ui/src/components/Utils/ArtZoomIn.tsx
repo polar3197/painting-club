@@ -3,6 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { block_user, unblock_user } from "../../api";
 import ReportDialog from "./ReportDialog";
 import ConfirmDialog from "./ConfirmDialog";
+import ContextPopup from "./ContextPopup";
 import "../../styles/utils/dialog.css";
 
 const ArtZoomIn = ({
@@ -34,8 +35,12 @@ const ArtZoomIn = ({
     const [showReport, setShowReport] = useState(false);
     const [pendingBlock, setPendingBlock] = useState<string | null>(null);
     const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
+    const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
 
     const isBlocked = blockableUsername ? blockedUsernames.includes(blockableUsername) : false;
+    const canReport = !isOwner && !!reportArtId && !!currentUser;
+    const canBlock = !isOwner && !!blockableUsername && !!currentUser;
+    const showKebab = canReport || canBlock;
 
     const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -97,29 +102,47 @@ const ArtZoomIn = ({
                             />
                         </>
                     )}
-                    {!isOwner && reportArtId && currentUser && (
+                    {showKebab && (
                         <button
-                            className="back-action-btn"
-                            onClick={(e) => { e.stopPropagation(); setShowReport(true); }}
-                        >
-                            report
-                        </button>
-                    )}
-                    {!isOwner && blockableUsername && currentUser && (
-                        <button
-                            className="back-action-btn"
+                            className="back-kebab"
+                            aria-label="options"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (isBlocked) setPendingUnblock(blockableUsername);
-                                else setPendingBlock(blockableUsername);
+                                setPopupAnchor({ x: e.clientX, y: e.clientY });
                             }}
                         >
-                            {isBlocked ? `unblock @${blockableUsername}` : `block @${blockableUsername}`}
+                            ⋮
                         </button>
                     )}
                 </div>
             </div>
         </div>
+        <ContextPopup
+            open={popupAnchor !== null}
+            anchor={popupAnchor}
+            onClose={() => setPopupAnchor(null)}
+        >
+            {canReport && (
+                <button
+                    className="context-popup-row"
+                    onClick={() => { setPopupAnchor(null); setShowReport(true); }}
+                >
+                    report
+                </button>
+            )}
+            {canBlock && (
+                <button
+                    className="context-popup-row"
+                    onClick={() => {
+                        setPopupAnchor(null);
+                        if (isBlocked) setPendingUnblock(blockableUsername!);
+                        else setPendingBlock(blockableUsername!);
+                    }}
+                >
+                    {isBlocked ? `unblock @${blockableUsername}` : `block @${blockableUsername}`}
+                </button>
+            )}
+        </ContextPopup>
         {reportArtId && (
             <ReportDialog
                 open={showReport}

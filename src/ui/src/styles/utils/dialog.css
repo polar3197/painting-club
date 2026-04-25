@@ -120,25 +120,27 @@
       border: 2px solid black;
       background: rgb(250, 244, 202);
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
   }
 
-  .back-action-btn {
+  .back-kebab {
+      position: absolute;
+      top: 8px;
+      right: 8px;
       background: none;
       border: none;
+      color: rgb(120, 120, 120);
       font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-      font-size: 18px;
-      color: #000;
-      text-decoration: underline;
+      font-size: 22px;
+      font-weight: 700;
       cursor: pointer;
-      padding: 8px 14px;
+      padding: 4px 10px;
+      line-height: 1;
   }
 
-  .back-action-btn:hover {
-      color: rgb(80, 80, 80);
+  .back-kebab:hover {
+      color: #000;
   }
 
 .edit-img button {

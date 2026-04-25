@@ -33,7 +33,6 @@ export default function ReportDialog({ visible, targetType, targetId, onClose }:
       await submit_report(targetType, targetId, reason.trim() || null, token);
       setReason('');
       onClose();
-      Alert.alert('thanks', 'Charlie will take a look.');
     } catch (err: any) {
       Alert.alert('Could not send', err?.message || 'try again');
     } finally {
