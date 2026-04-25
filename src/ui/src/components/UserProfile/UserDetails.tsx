@@ -52,6 +52,7 @@ const UserDetails = (
         imgPath={imgSrc}
         setIsZoomedIn={setIsZoomedIn}
         onChangePic={profile.is_owner ? handleUpload : undefined}
+        blockableUsername={!profile.is_owner ? profile.username : undefined}
       />
     }
 

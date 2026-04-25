@@ -25,8 +25,6 @@ import {
   delete_comment,
   resolveImageUrl,
   thumbUrl,
-  block_user,
-  unblock_user,
   Visual2DOut,
   CommentOut,
 } from '../api';
@@ -57,7 +55,7 @@ interface ArtCommentsProps {
 }
 
 export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
-  const { currentUser, token, blockedUsernames, noteBlocked, noteUnblocked } = useAuth();
+  const { currentUser, token } = useAuth();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [comments, setComments] = useState<CommentOut[]>([]);
@@ -69,12 +67,11 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const translateY = useRef(new Animated.Value(0)).current;
 
-  // Kebab / report / block state per active comment.
+  // Kebab / report state per active comment. Block lives on the user's profile-pic flip,
+  // not in the comment menu.
   const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
   const [activeComment, setActiveComment] = useState<CommentOut | null>(null);
   const [showReport, setShowReport] = useState(false);
-  const [pendingBlock, setPendingBlock] = useState<string | null>(null);
-  const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
 
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -124,30 +121,6 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
       // while the server never received it. Restore the text and surface the error.
       setInput(text);
       Alert.alert('Comment failed', err?.message || 'Could not post your comment');
-    }
-  };
-
-  const confirmBlock = async () => {
-    if (!pendingBlock) return;
-    const u = pendingBlock;
-    setPendingBlock(null);
-    try {
-      await block_user(u, token);
-      noteBlocked(u);
-    } catch (err: any) {
-      Alert.alert('Could not block', err?.message || 'try again');
-    }
-  };
-
-  const confirmUnblock = async () => {
-    if (!pendingUnblock) return;
-    const u = pendingUnblock;
-    setPendingUnblock(null);
-    try {
-      await unblock_user(u, token);
-      noteUnblocked(u);
-    } catch (err: any) {
-      Alert.alert('Could not unblock', err?.message || 'try again');
     }
   };
 
@@ -216,32 +189,6 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
-      <ConfirmDialog
-        visible={pendingBlock !== null}
-        title={pendingBlock ? `block @${pendingBlock}?` : ''}
-        message={
-          pendingBlock
-            ? `If you block @${pendingBlock}, they can no longer comment on your pieces. You'll still see anything they post elsewhere — in case they're talking about you in another comment section. If something more serious comes up, use the report button or reach out to Charlie directly.`
-            : ''
-        }
-        confirmLabel="block"
-        cancelLabel="nope"
-        confirmColor={Colors.redLight}
-        cancelColor={Colors.greenBright}
-        onConfirm={confirmBlock}
-        onCancel={() => setPendingBlock(null)}
-      />
-      <ConfirmDialog
-        visible={pendingUnblock !== null}
-        title={pendingUnblock ? `unblock @${pendingUnblock}?` : ''}
-        message="They'll be able to comment on your pieces again."
-        confirmLabel="unblock"
-        cancelLabel="nope"
-        confirmColor={Colors.greenBright}
-        cancelColor={Colors.redLight}
-        onConfirm={confirmUnblock}
-        onCancel={() => setPendingUnblock(null)}
-      />
       <ContextPopup
         visible={popupAnchor !== null}
         anchor={popupAnchor}
@@ -259,26 +206,6 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
         >
           <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>report comment</Text>
         </Pressable>
-        {activeComment && (
-          <Pressable
-            style={({ pressed }) => [
-              { paddingVertical: 10, paddingHorizontal: 14 },
-              pressed && { backgroundColor: Colors.secondary },
-            ]}
-            onPress={() => {
-              const u = activeComment.username;
-              const isBlocked = blockedUsernames.includes(u);
-              setPopupAnchor(null);
-              if (isBlocked) setPendingUnblock(u);
-              else setPendingBlock(u);
-            }}
-          >
-            <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>
-              {blockedUsernames.includes(activeComment.username) ? 'unblock' : 'block'} @
-              {activeComment.username}
-            </Text>
-          </Pressable>
-        )}
       </ContextPopup>
       <ReportDialog
         visible={showReport}

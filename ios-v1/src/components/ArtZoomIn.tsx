@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Animated as RNAnimated,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -23,7 +24,10 @@ import Animated, {
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
-import { resolveImageUrl } from '../api';
+import { resolveImageUrl, block_user, unblock_user } from '../api';
+import { useAuth } from '../context/AuthContext';
+import ReportDialog from './ReportDialog';
+import ConfirmDialog from './ConfirmDialog';
 import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
@@ -31,14 +35,55 @@ interface ArtZoomInProps {
   imgPath: string;
   onClose: () => void;
   onChangePic?: () => void;
+  // Set when this is an art piece and the viewer is allowed to report it.
+  reportArtId?: string;
+  // Set when this is a profile pic and the viewer should be able to block the owner.
+  blockableUsername?: string;
 }
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 6;
 
-export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: ArtZoomInProps) {
+export default function ArtZoomIn({
+  isOwner,
+  imgPath,
+  onClose,
+  onChangePic,
+  reportArtId,
+  blockableUsername,
+}: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const { token, currentUser, blockedUsernames, noteBlocked, noteUnblocked } = useAuth();
+  const [showReport, setShowReport] = useState(false);
+  const [pendingBlock, setPendingBlock] = useState<string | null>(null);
+  const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
+
+  const isBlocked = blockableUsername ? blockedUsernames.includes(blockableUsername) : false;
+
+  const confirmBlock = async () => {
+    if (!pendingBlock) return;
+    const u = pendingBlock;
+    setPendingBlock(null);
+    try {
+      await block_user(u, token);
+      noteBlocked(u);
+    } catch (err: any) {
+      Alert.alert('Could not block', err?.message || 'try again');
+    }
+  };
+
+  const confirmUnblock = async () => {
+    if (!pendingUnblock) return;
+    const u = pendingUnblock;
+    setPendingUnblock(null);
+    try {
+      await unblock_user(u, token);
+      noteUnblocked(u);
+    } catch (err: any) {
+      Alert.alert('Could not unblock', err?.message || 'try again');
+    }
+  };
 
   // Flip is a separate concern (inner face), kept on the legacy Animated API.
   const rotateAnim = useRef(new RNAnimated.Value(0)).current;
@@ -293,10 +338,68 @@ export default function ArtZoomIn({ isOwner, imgPath, onClose, onChangePic }: Ar
                     <Text style={styles.changePicBtnText}>change pic</Text>
                   </Pressable>
                 )}
+                {!isOwner && reportArtId && (
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      setShowReport(true);
+                    }}
+                  >
+                    <Text style={styles.backActionText}>report</Text>
+                  </Pressable>
+                )}
+                {!isOwner && blockableUsername && currentUser && (
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      if (isBlocked) setPendingUnblock(blockableUsername);
+                      else setPendingBlock(blockableUsername);
+                    }}
+                  >
+                    <Text style={styles.backActionText}>
+                      {isBlocked ? `unblock @${blockableUsername}` : `block @${blockableUsername}`}
+                    </Text>
+                  </Pressable>
+                )}
               </RNAnimated.View>
             </Animated.View>
           </GestureDetector>
         </View>
+
+        {reportArtId && (
+          <ReportDialog
+            visible={showReport}
+            targetType="art"
+            targetId={reportArtId}
+            onClose={() => setShowReport(false)}
+          />
+        )}
+        <ConfirmDialog
+          visible={pendingBlock !== null}
+          title={pendingBlock ? `block @${pendingBlock}?` : ''}
+          message={
+            pendingBlock
+              ? `If you block @${pendingBlock}, they can no longer comment on your pieces. You'll still see anything they post elsewhere — in case they're talking about you in another comment section. If something more serious comes up, use the report button or reach out to Charlie directly.`
+              : ''
+          }
+          confirmLabel="block"
+          cancelLabel="nope"
+          confirmColor={Colors.redLight}
+          cancelColor={Colors.greenBright}
+          onConfirm={confirmBlock}
+          onCancel={() => setPendingBlock(null)}
+        />
+        <ConfirmDialog
+          visible={pendingUnblock !== null}
+          title={pendingUnblock ? `unblock @${pendingUnblock}?` : ''}
+          message="They'll be able to comment on your pieces again."
+          confirmLabel="unblock"
+          cancelLabel="nope"
+          confirmColor={Colors.greenBright}
+          cancelColor={Colors.redLight}
+          onConfirm={confirmUnblock}
+          onCancel={() => setPendingUnblock(null)}
+        />
       </GestureHandlerRootView>
     </Modal>
   );
@@ -336,5 +439,13 @@ const styles = StyleSheet.create({
   changePicBtnText: {
     fontFamily: Fonts.serif,
     fontSize: 16,
+  },
+  backActionText: {
+    fontFamily: Fonts.serif,
+    fontSize: 18,
+    color: Colors.textPrimary,
+    textDecorationLine: 'underline',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
 });

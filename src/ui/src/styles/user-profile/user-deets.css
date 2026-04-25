@@ -297,22 +297,3 @@
     }
 }
 
-.profile-kebab {
-    position: absolute;
-    top: 0;
-    right: 0;
-    background: none;
-    border: none;
-    color: rgb(100, 100, 100);
-    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-    font-size: 22px;
-    font-weight: 700;
-    cursor: pointer;
-    padding: 4px 10px;
-    line-height: 1;
-    z-index: 5;
-}
-
-.profile-kebab:hover {
-    color: #000;
-}

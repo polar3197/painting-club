@@ -7,8 +7,6 @@ import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtComments from "../Utils/ArtComments";
 import ArtImage from "../Utils/ArtImage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
-import ContextPopup from "../Utils/ContextPopup";
-import ReportDialog from "../Utils/ReportDialog";
 import { useAuth } from "../../context/AuthContext";
 import { get_members_visual_2d, remove_visual_2d, Visual2DOut } from "../../api";
 
@@ -32,8 +30,6 @@ const Visual2DPiece = ({
     const [isZoomedIn, setIsZoomedIn] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-    const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
-    const [showReport, setShowReport] = useState(false);
 
     const removeArt = async ({ pieceId }: { pieceId: string }) => {
         await remove_visual_2d(pieceId, localStorage.getItem("token"));
@@ -48,6 +44,7 @@ const Visual2DPiece = ({
                 isOwner={isOwner}
                 imgPath={piece.file_path}
                 setIsZoomedIn={setIsZoomedIn}
+                reportArtId={!isOwner && currentUser ? piece.id : undefined}
             />
         }
         {showComments &&
@@ -59,42 +56,9 @@ const Visual2DPiece = ({
                 onCancel={() => setShowRemoveConfirm(false)}
             />
         }
-        <ContextPopup
-            open={popupAnchor !== null}
-            anchor={popupAnchor}
-            onClose={() => setPopupAnchor(null)}
-        >
-            <button
-                className="context-popup-row"
-                onClick={() => {
-                    setPopupAnchor(null);
-                    setShowReport(true);
-                }}
-            >
-                report this
-            </button>
-        </ContextPopup>
-        <ReportDialog
-            open={showReport}
-            targetType="art"
-            targetId={piece.id}
-            onClose={() => setShowReport(false)}
-        />
         <div id={`art-${piece.id}`} className="art-element">
-            <div className="art-visual" onClick={() => setIsZoomedIn(true)} style={{ position: "relative" }}>
+            <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
                 <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
-                {!isOwner && currentUser && (
-                    <button
-                        className="art-kebab"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setPopupAnchor({ x: e.clientX, y: e.clientY });
-                        }}
-                        aria-label="options"
-                    >
-                        ⋮
-                    </button>
-                )}
             </div>
             <div className="art-right">
                 <div className="art-details">

@@ -6,9 +6,6 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import CentralFilter, { CentralFilterHandle } from '../components/CentralFilter';
-import ContextPopup from '../components/ContextPopup';
-import ReportDialog from '../components/ReportDialog';
-import { useAuth } from '../context/AuthContext';
 import { useOptions } from '../hooks';
 import { search_art, resolveImageUrl, thumbUrl, ArtResult } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -28,10 +25,6 @@ export default function ArtGallery() {
   const [refreshing, setRefreshing] = useState(false);
   const [filterKey, setFilterKey] = useState(0);
   const filterRef = useRef<CentralFilterHandle>(null);
-  const { currentUser } = useAuth();
-  const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
-  const [reportTarget, setReportTarget] = useState<string | null>(null);
-  const [showReport, setShowReport] = useState(false);
 
   const dismissDropdown = useCallback(() => {
     filterRef.current?.close();
@@ -104,18 +97,6 @@ export default function ArtGallery() {
         style={styles.cardImage}
         contentFit="cover"
       />
-      {currentUser && currentUser !== item.creator_username && (
-        <Pressable
-          style={({ pressed }) => [styles.kebabBtn, pressed && { opacity: 0.6 }]}
-          onPress={(e) => {
-            setReportTarget(item.id);
-            setPopupAnchor({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
-          }}
-          hitSlop={8}
-        >
-          <Text style={styles.kebabText}>⋮</Text>
-        </Pressable>
-      )}
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={1}>
           {item.title}
@@ -142,35 +123,6 @@ export default function ArtGallery() {
 
   return (
     <Pressable style={[styles.container, { paddingTop: insets.top }]} onPress={dismissDropdown}>
-      <ContextPopup
-        visible={popupAnchor !== null}
-        anchor={popupAnchor}
-        onClose={() => setPopupAnchor(null)}
-      >
-        <Pressable
-          style={({ pressed }) => [
-            { paddingVertical: 10, paddingHorizontal: 14 },
-            pressed && { backgroundColor: Colors.secondary },
-          ]}
-          onPress={() => {
-            setPopupAnchor(null);
-            setShowReport(true);
-          }}
-        >
-          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.black }}>
-            report this
-          </Text>
-        </Pressable>
-      </ContextPopup>
-      <ReportDialog
-        visible={showReport}
-        targetType="art"
-        targetId={reportTarget}
-        onClose={() => {
-          setShowReport(false);
-          setReportTarget(null);
-        }}
-      />
       <View style={styles.bannerWrap}>
         <Image
           source={require('../../assets/imgs/art.png')}
@@ -239,26 +191,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.artCardBg,
-    position: 'relative',
-  },
-  kebabBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 24,
-    height: 24,
-    backgroundColor: 'rgba(255, 250, 245, 0.9)',
-    borderWidth: 1,
-    borderColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kebabText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    lineHeight: 14,
-    color: Colors.black,
-    fontWeight: '700',
   },
   cardPressed: {
     transform: [{ scale: 0.97 }],

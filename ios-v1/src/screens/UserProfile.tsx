@@ -37,9 +37,6 @@ import ArtComments from '../components/ArtComments';
 import AddArtDialog from '../components/AddArtDialog';
 import AddMediaDialog from '../components/AddMediaDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
-import ContextPopup from '../components/ContextPopup';
-import ReportDialog from '../components/ReportDialog';
-import { block_user, unblock_user } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -69,8 +66,6 @@ function Visual2DPiece({
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
-  const [showReport, setShowReport] = useState(false);
   // Use the server-provided canonical aspect ratio (captured at upload). No image
   // measurement, no drift from thumbnail pixel rounding.
   const aspectRatio = piece.aspect_ratio ?? 1;
@@ -100,32 +95,12 @@ function Visual2DPiece({
           isOwner={isOwner}
           imgPath={piece.file_path}
           onClose={() => setIsZoomedIn(false)}
+          reportArtId={!isOwner && currentUser ? piece.id : undefined}
         />
       )}
       {showComments && (
         <ArtComments piece={piece} onClose={() => setShowComments(false)} />
       )}
-      <ContextPopup
-        visible={popupAnchor !== null}
-        anchor={popupAnchor}
-        onClose={() => setPopupAnchor(null)}
-      >
-        <Pressable
-          style={({ pressed }) => [popupStyles.row, pressed && popupStyles.rowPressed]}
-          onPress={() => {
-            setPopupAnchor(null);
-            setShowReport(true);
-          }}
-        >
-          <Text style={popupStyles.rowText}>report this</Text>
-        </Pressable>
-      </ContextPopup>
-      <ReportDialog
-        visible={showReport}
-        targetType="art"
-        targetId={piece.id}
-        onClose={() => setShowReport(false)}
-      />
       <View style={styles.artElement} onLayout={onLayout}>
         <Pressable
           style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
@@ -140,17 +115,6 @@ function Visual2DPiece({
               contentFit="contain"
             />
           </View>
-          {!isOwner && (
-            <Pressable
-              style={({ pressed }) => [styles.kebabBtn, pressed && { opacity: 0.6 }]}
-              onPress={(e) =>
-                setPopupAnchor({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })
-              }
-              hitSlop={8}
-            >
-              <Text style={styles.kebabText}>⋮</Text>
-            </Pressable>
-          )}
         </Pressable>
         <View style={styles.artDetails}>
           <Text style={styles.artTitle}>{piece.title}</Text>
@@ -226,7 +190,7 @@ export default function UserProfile() {
   const route = useRoute<ProfileRoute>();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
-  const { currentUser, token, blockedUsernames, noteBlocked, noteUnblocked } = useAuth();
+  const { currentUser, token } = useAuth();
 
   const params = route.params as { username?: string; artId?: string; medium?: string } | undefined;
   const username = params?.username || currentUser || '';
@@ -253,35 +217,6 @@ export default function UserProfile() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddMedia, setShowAddMedia] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
-
-  // Profile-header kebab (block / unblock) state
-  const [profilePopupAnchor, setProfilePopupAnchor] = useState<{ x: number; y: number } | null>(null);
-  const [pendingBlock, setPendingBlock] = useState<string | null>(null);
-  const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
-
-  const confirmBlock = async () => {
-    if (!pendingBlock) return;
-    const u = pendingBlock;
-    setPendingBlock(null);
-    try {
-      await block_user(u, token);
-      noteBlocked(u);
-    } catch (err: any) {
-      Alert.alert('Could not block', err?.message || 'try again');
-    }
-  };
-
-  const confirmUnblock = async () => {
-    if (!pendingUnblock) return;
-    const u = pendingUnblock;
-    setPendingUnblock(null);
-    try {
-      await unblock_user(u, token);
-      noteUnblocked(u);
-    } catch (err: any) {
-      Alert.alert('Could not unblock', err?.message || 'try again');
-    }
-  };
 
   const handleAddMedia = useCallback(async (name: string) => {
     if (!profile) return;
@@ -460,66 +395,16 @@ export default function UserProfile() {
         />
       }
     >
-      {/* Profile zoom */}
+      {/* Profile zoom — block lives on the back of this dialog for non-owners. */}
       {profileZoom && profile.profile_pic_path && (
         <ArtZoomIn
           isOwner={profile.is_owner}
           imgPath={profile.profile_pic_path}
           onClose={() => setProfileZoom(false)}
           onChangePic={profile.is_owner ? pickAndUploadProfilePic : undefined}
+          blockableUsername={!profile.is_owner ? profile.username : undefined}
         />
       )}
-
-      {/* Profile-header kebab popup + dialogs (block/unblock only — content reports live on art/comments) */}
-      <ContextPopup
-        visible={profilePopupAnchor !== null}
-        anchor={profilePopupAnchor}
-        onClose={() => setProfilePopupAnchor(null)}
-      >
-        <Pressable
-          style={({ pressed }) => [
-            { paddingVertical: 10, paddingHorizontal: 14 },
-            pressed && { backgroundColor: Colors.secondary },
-          ]}
-          onPress={() => {
-            const u = profile.username;
-            const isBlocked = blockedUsernames.includes(u);
-            setProfilePopupAnchor(null);
-            if (isBlocked) setPendingUnblock(u);
-            else setPendingBlock(u);
-          }}
-        >
-          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>
-            {blockedUsernames.includes(profile.username) ? 'unblock' : 'block'} @{profile.username}
-          </Text>
-        </Pressable>
-      </ContextPopup>
-      <ConfirmDialog
-        visible={pendingBlock !== null}
-        title={pendingBlock ? `block @${pendingBlock}?` : ''}
-        message={
-          pendingBlock
-            ? `If you block @${pendingBlock}, they can no longer comment on your pieces. You'll still see anything they post elsewhere — in case they're talking about you in another comment section. If something more serious comes up, use the report button or reach out to Charlie directly.`
-            : ''
-        }
-        confirmLabel="block"
-        cancelLabel="nope"
-        confirmColor={Colors.redLight}
-        cancelColor={Colors.greenBright}
-        onConfirm={confirmBlock}
-        onCancel={() => setPendingBlock(null)}
-      />
-      <ConfirmDialog
-        visible={pendingUnblock !== null}
-        title={pendingUnblock ? `unblock @${pendingUnblock}?` : ''}
-        message="They'll be able to comment on your pieces again."
-        confirmLabel="unblock"
-        cancelLabel="nope"
-        confirmColor={Colors.greenBright}
-        cancelColor={Colors.redLight}
-        onConfirm={confirmUnblock}
-        onCancel={() => setPendingUnblock(null)}
-      />
 
       {/* Add/Edit dialog */}
       {showAddDialog && selectedMedium && (
@@ -563,17 +448,6 @@ export default function UserProfile() {
           {!editing ? (
             <>
               <View style={styles.userTopRow}>
-                {!profile.is_owner && currentUser && (
-                  <Pressable
-                    style={({ pressed }) => [styles.profileKebab, pressed && { opacity: 0.6 }]}
-                    onPress={(e) =>
-                      setProfilePopupAnchor({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })
-                    }
-                    hitSlop={8}
-                  >
-                    <Text style={styles.profileKebabText}>⋮</Text>
-                  </Pressable>
-                )}
                 <View style={styles.userIdentity}>
                   <Text style={styles.userName}>
                     {profile.firstname} {profile.lastname}
@@ -784,22 +658,6 @@ export default function UserProfile() {
   );
 }
 
-// Shared popup-row styling for context menus (kebab → report / block).
-export const popupStyles = StyleSheet.create({
-  row: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  rowPressed: {
-    backgroundColor: Colors.secondary,
-  },
-  rowText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    color: Colors.textPrimary,
-  },
-});
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -913,23 +771,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    position: 'relative',
-  },
-  profileKebab: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  profileKebabText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.lg,
-    color: Colors.textTertiary,
-    fontWeight: '700',
   },
   userIdentity: {
     flex: 1,
@@ -1076,26 +917,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 2,
     borderColor: '#000',
-    position: 'relative',
-  },
-  kebabBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 28,
-    height: 28,
-    backgroundColor: 'rgba(255, 250, 245, 0.9)',
-    borderWidth: 1,
-    borderColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kebabText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    lineHeight: 16,
-    color: Colors.black,
-    fontWeight: '700',
   },
   artVisualInner: {
     width: '100%',

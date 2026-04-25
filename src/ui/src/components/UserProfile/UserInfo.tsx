@@ -1,9 +1,6 @@
 import { Dispatch, SetStateAction, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Profile, update_profile, block_user, unblock_user } from "../../api";
-import { useAuth } from "../../context/AuthContext";
-import ContextPopup from "../Utils/ContextPopup";
-import ConfirmDialog from "../Utils/ConfirmDialog";
+import { Profile, update_profile } from "../../api";
 import "../../styles/user-profile/user-deets.css";
 import "../../styles/portfolio.css";
 
@@ -42,33 +39,6 @@ const UserInfo = (
     const [updateProfile, setUpdateProfile] = useState<boolean>(false);
     const token = localStorage.getItem("token");
     const navigate = useNavigate();
-    const auth = useAuth();
-    const currentUser = auth?.currentUser ?? null;
-    const blockedUsernames = auth?.blockedUsernames ?? [];
-    const noteBlocked = auth?.noteBlocked ?? (() => {});
-    const noteUnblocked = auth?.noteUnblocked ?? (() => {});
-
-    const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
-    const [pendingBlock, setPendingBlock] = useState<string | null>(null);
-    const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
-
-    const isBlocked = blockedUsernames.includes(profile.username);
-
-    const confirmBlock = async () => {
-        if (!pendingBlock) return;
-        const u = pendingBlock;
-        setPendingBlock(null);
-        try { await block_user(u, token); noteBlocked(u); }
-        catch (err) { alert((err as Error).message || "Could not block."); }
-    };
-
-    const confirmUnblock = async () => {
-        if (!pendingUnblock) return;
-        const u = pendingUnblock;
-        setPendingUnblock(null);
-        try { await unblock_user(u, token); noteUnblocked(u); }
-        catch (err) { alert((err as Error).message || "Could not unblock."); }
-    };
 
     const handlePortfolioView = () => {
         if (!selectedMedium) return;
@@ -89,50 +59,7 @@ const UserInfo = (
     }
 
     return (
-        <div className="user-fields" style={{ position: "relative" }}>
-            {!profile.is_owner && currentUser && (
-                <button
-                    className="profile-kebab"
-                    aria-label="profile options"
-                    onClick={(e) => setPopupAnchor({ x: e.clientX, y: e.clientY })}
-                >
-                    ⋮
-                </button>
-            )}
-            <ContextPopup
-                open={popupAnchor !== null}
-                anchor={popupAnchor}
-                onClose={() => setPopupAnchor(null)}
-            >
-                <button
-                    className="context-popup-row"
-                    onClick={() => {
-                        setPopupAnchor(null);
-                        if (isBlocked) setPendingUnblock(profile.username);
-                        else setPendingBlock(profile.username);
-                    }}
-                >
-                    {isBlocked ? "unblock" : "block"} @{profile.username}
-                </button>
-            </ContextPopup>
-            {pendingBlock && (
-                <ConfirmDialog
-                    message={`If you block @${pendingBlock}, they can no longer comment on your pieces. You'll still see anything they post elsewhere — in case they're talking about you in another comment section. If something more serious comes up, use the report button or reach out to Charlie directly.`}
-                    confirmLabel="block"
-                    cancelLabel="nope"
-                    onConfirm={confirmBlock}
-                    onCancel={() => setPendingBlock(null)}
-                />
-            )}
-            {pendingUnblock && (
-                <ConfirmDialog
-                    message={`unblock @${pendingUnblock}? They'll be able to comment on your pieces again.`}
-                    confirmLabel="unblock"
-                    cancelLabel="nope"
-                    onConfirm={confirmUnblock}
-                    onCancel={() => setPendingUnblock(null)}
-                />
-            )}
+        <div className="user-fields">
             <div className="user-identity">
                 <div className="user-name" onClick={() => handleUpdateProfile()}>
                     {updateProfile ?
