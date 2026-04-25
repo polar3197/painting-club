@@ -243,12 +243,10 @@ const Admin = () => {
                     onClick={() => setTab("applications")}
                     style={{ cursor: "pointer", opacity: tab === "applications" ? 1 : 0.4 }}
                 >applications</span>
-                {"  "}
                 <span
                     onClick={() => setTab("media-requests")}
                     style={{ cursor: "pointer", opacity: tab === "media-requests" ? 1 : 0.4 }}
                 >media requests</span>
-                {"  "}
                 <span
                     onClick={() => setTab("reports")}
                     style={{ cursor: "pointer", opacity: tab === "reports" ? 1 : 0.4 }}

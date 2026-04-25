@@ -57,6 +57,10 @@
     margin: 0 0 24px 0;
     border-bottom: 1px solid black;
     padding-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
 }
 
 .admin-section {
@@ -180,6 +184,9 @@
     .admin-title {
         font-size: 20px;
         margin-bottom: 16px;
+        flex-wrap: wrap;
+        gap: 14px;
+        justify-content: flex-start;
     }
 
     .admin-section {
