@@ -7,6 +7,9 @@ import {
     MediaRequest,
     get_media_requests,
     update_media_request,
+    ReportOut,
+    get_reports,
+    update_report_status,
 } from "../../api";
 import "../../styles/admin.css";
 
@@ -16,7 +19,45 @@ const statusColor: Record<string, string> = {
     approved: "lightgreen",
     rejected: "lightcoral",
     resolved: "lightgreen",
+    dismissed: "lightcoral",
 };
+
+const ReportRow = ({
+    report,
+    onResolve,
+}: {
+    report: ReportOut;
+    onResolve: (id: string, status: "resolved" | "dismissed") => void;
+}) => (
+    <div className="application-row-item">
+        <div className="application-row-info">
+            <p className="application-name">
+                {report.target_type}: {report.target_preview ?? "(target removed)"}
+            </p>
+            <p className="application-meta">by @{report.reporter_username}</p>
+            {report.reason && <p className="application-reason">"{report.reason}"</p>}
+            <p className="application-date">{new Date(report.created_at).toLocaleDateString()}</p>
+        </div>
+        <div className="application-row-actions">
+            <div
+                className="application-status"
+                style={{ backgroundColor: statusColor[report.status] ?? "white" }}
+            >
+                {report.status}
+            </div>
+            {report.status === "pending" && (
+                <>
+                    <div className="application-btn approve" onClick={() => onResolve(report.id, "resolved")}>
+                        resolve
+                    </div>
+                    <div className="application-btn reject" onClick={() => onResolve(report.id, "dismissed")}>
+                        dismiss
+                    </div>
+                </>
+            )}
+        </div>
+    </div>
+);
 
 const TempCreds = ({ username, password }: { username: string; password: string }) => {
     const [copied, setCopied] = useState<"" | "un" | "pw">("");
@@ -149,15 +190,22 @@ const MediaRequestRow = ({
 };
 
 const Admin = () => {
-    const [tab, setTab] = useState<"applications" | "media-requests">("applications");
+    const [tab, setTab] = useState<"applications" | "media-requests" | "reports">("applications");
     const [applications, setApplications] = useState<ApplicationOut[]>([]);
     const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
+    const [reports, setReports] = useState<ReportOut[]>([]);
     const token = localStorage.getItem("token");
 
     useEffect(() => {
         get_applications(token).then(setApplications).catch(console.error);
         get_media_requests(token).then(setMediaRequests).catch(console.error);
+        get_reports(token).then(setReports).catch(console.error);
     }, []);
+
+    const handleResolveReport = async (id: string, status: "resolved" | "dismissed") => {
+        const res = await update_report_status(id, status, token);
+        setReports(prev => prev.map(r => r.id === id ? res : r));
+    };
 
     const handleStatusChange = async (id: string, status: string) => {
         const res = await update_application_status(id, status, token);
@@ -185,6 +233,9 @@ const Admin = () => {
     const pendingRequests = mediaRequests.filter(r => r.status === "pending");
     const reviewedRequests = mediaRequests.filter(r => r.status !== "pending");
 
+    const pendingReports = reports.filter(r => r.status === "pending");
+    const reviewedReports = reports.filter(r => r.status !== "pending");
+
     return (
         <div className="admin-page">
             <h1 className="admin-title">
@@ -197,9 +248,35 @@ const Admin = () => {
                     onClick={() => setTab("media-requests")}
                     style={{ cursor: "pointer", opacity: tab === "media-requests" ? 1 : 0.4 }}
                 >media requests</span>
+                {"  "}
+                <span
+                    onClick={() => setTab("reports")}
+                    style={{ cursor: "pointer", opacity: tab === "reports" ? 1 : 0.4 }}
+                >reports</span>
             </h1>
 
-            {tab === "applications" ? (
+            {tab === "reports" ? (
+                <>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">pending</h2>
+                        {pendingReports.length === 0
+                            ? <p className="admin-empty">no pending reports</p>
+                            : pendingReports.map(r => (
+                                <ReportRow key={r.id} report={r} onResolve={handleResolveReport} />
+                            ))
+                        }
+                    </div>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">reviewed</h2>
+                        {reviewedReports.length === 0
+                            ? <p className="admin-empty">none yet</p>
+                            : reviewedReports.map(r => (
+                                <ReportRow key={r.id} report={r} onResolve={handleResolveReport} />
+                            ))
+                        }
+                    </div>
+                </>
+            ) : tab === "applications" ? (
                 <>
                     <div className="admin-section">
                         <h2 className="admin-section-title">pending</h2>

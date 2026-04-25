@@ -14,8 +14,9 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { login_user, get_profile } from '../api';
+import { login_user, get_profile, accept_terms } from '../api';
 import ApplicationDialog from '../components/ApplicationDialog';
+import TermsModal from '../components/TermsModal';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { AuthStackParamList } from '../navigation/types';
 
@@ -29,6 +30,12 @@ export default function LandingPage() {
   const [password, setPassword] = useState('');
   const [notMember, setNotMember] = useState(false);
   const [showApplication, setShowApplication] = useState(false);
+  const [pendingTerms, setPendingTerms] = useState<{
+    username: string;
+    token: string;
+    role: string;
+  } | null>(null);
+  const [acceptingTerms, setAcceptingTerms] = useState(false);
 
   const handleLogin = async () => {
     const normalized = username.trim().toLowerCase();
@@ -42,11 +49,36 @@ export default function LandingPage() {
         return;
       }
       const profile = await get_profile(normalized, res.access_token);
+      // Apple guideline 1.2: gate UGC access on terms acceptance.
+      if (!profile.terms_accepted_at) {
+        setPendingTerms({ username: profile.username, token: res.access_token, role: profile.role });
+        return;
+      }
       await auth.login(profile.username, res.access_token, profile.role);
       (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
       Alert.alert('Login failed', err.message || 'Invalid credentials');
     }
+  };
+
+  const handleAgreeTerms = async () => {
+    if (!pendingTerms) return;
+    setAcceptingTerms(true);
+    try {
+      await accept_terms(pendingTerms.token);
+      await auth.login(pendingTerms.username, pendingTerms.token, pendingTerms.role);
+      setPendingTerms(null);
+      (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });
+    } catch (err: any) {
+      Alert.alert('Could not save', err.message || 'try again');
+    } finally {
+      setAcceptingTerms(false);
+    }
+  };
+
+  const handleDeclineTerms = () => {
+    setPendingTerms(null);
+    setPassword('');
   };
 
   return (
@@ -123,6 +155,13 @@ export default function LandingPage() {
       {showApplication && (
         <ApplicationDialog onClose={() => setShowApplication(false)} />
       )}
+
+      <TermsModal
+        visible={pendingTerms !== null}
+        submitting={acceptingTerms}
+        onAgree={handleAgreeTerms}
+        onDecline={handleDeclineTerms}
+      />
     </ImageBackground>
   );
 }

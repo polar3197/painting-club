@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from db.models import Comment, Member
+from db.models import Comment, Member, Art
+from db.db_ops.blocks import db_is_blocked
 
 
 async def db_get_comments(db: AsyncSession, art_id: str):
@@ -14,7 +15,16 @@ async def db_get_comments(db: AsyncSession, art_id: str):
     return result.all()
 
 
-async def db_add_comment(db: AsyncSession, art_id: str, member_id: str, text: str) -> Comment:
+async def db_add_comment(db: AsyncSession, art_id: str, member_id, text: str) -> Comment:
+    # Asymmetric block: if the art's owner has blocked this commenter, deny.
+    owner_id = (
+        await db.execute(select(Art.creator_id).filter(Art.id == art_id))
+    ).scalar_one_or_none()
+    if owner_id is None:
+        raise ValueError("Art not found")
+    if await db_is_blocked(db, blocker_id=owner_id, blockee_id=member_id):
+        raise PermissionError("can't comment here")
+
     comment = Comment(art_id=art_id, member_id=member_id, text=text)
     db.add(comment)
     await db.commit()

@@ -4,18 +4,17 @@ import {
   Text,
   TextInput,
   Pressable,
-  ImageBackground,
   StyleSheet,
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { setup_account, get_profile } from '../api';
-import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
+import { setup_account, get_profile, accept_terms } from '../api';
+import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 type Nav = NativeStackNavigationProp<any>;
 
@@ -53,6 +52,7 @@ export default function SetupAccount() {
     setSubmitting(true);
     try {
       const result = await setup_account({ new_username: trimmed, new_password: password }, token);
+      await accept_terms(token);
       const profile = await get_profile(result.username, token);
       await auth.login(profile.username, token, profile.role);
       navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
@@ -69,24 +69,20 @@ export default function SetupAccount() {
   };
 
   return (
-    <ImageBackground
-      source={require('../../assets/imgs/klimpt.png')}
-      style={styles.bg}
-      resizeMode="cover"
-    >
+    <View style={styles.page}>
       <KeyboardAvoidingView
-        style={styles.overlay}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.titleWrap}>
-          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>-. Painting Club .-</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.heading}>set up your account</Text>
+          <Text style={styles.sub}>pick a username and password</Text>
 
-        <View style={styles.container}>
-          <Text style={styles.heading}>welcome — pick a username + password</Text>
-
-          <View style={styles.inputRow}>
-            <Text style={styles.inputLabel}>un:</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>username</Text>
             <TextInput
               style={styles.input}
               value={username}
@@ -96,8 +92,9 @@ export default function SetupAccount() {
               placeholderTextColor={Colors.textMuted}
             />
           </View>
-          <View style={styles.inputRow}>
-            <Text style={styles.inputLabel}>pw:</Text>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>password</Text>
             <TextInput
               style={styles.input}
               value={password}
@@ -107,8 +104,9 @@ export default function SetupAccount() {
               placeholderTextColor={Colors.textMuted}
             />
           </View>
-          <View style={styles.inputRow}>
-            <Text style={styles.inputLabel}>pw2:</Text>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>confirm password</Text>
             <TextInput
               style={styles.input}
               value={confirm}
@@ -119,96 +117,111 @@ export default function SetupAccount() {
             />
           </View>
 
-          <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
-            <Text style={styles.submitBtnText}>{submitting ? 'saving...' : 'finish'}</Text>
+          <View style={styles.divider} />
+
+          <Text style={styles.terms}>
+            In accordance with App Store guidelines and Painting Club's ethos, we ask that you
+            don't post anything pornographic, hateful, threatening, or harassing toward other
+            members. Artistic nudity is welcome. If an agreement can't be reached, the member
+            is removed from the app.
+          </Text>
+
+          <Pressable
+            style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={submitting}
+          >
+            <Text style={styles.submitBtnText}>
+              {submitting ? 'saving...' : 'I agree — finish'}
+            </Text>
           </Pressable>
 
-          <Pressable onPress={handleCancel}>
+          <Pressable onPress={handleCancel} style={styles.cancelWrap}>
             <Text style={styles.cancelText}>cancel + sign out</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </View>
   );
 }
 
-const { width } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
-  bg: { flex: 1 },
-  overlay: {
+  page: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 30,
+    backgroundColor: Colors.mainBg,
   },
-  titleWrap: {
-    backgroundColor: 'lightgreen',
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    marginBottom: 40,
-    ...Shadows.card,
-  },
-  title: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xxl,
-    color: Colors.black,
-    textAlign: 'center',
-  },
-  container: {
-    backgroundColor: 'lightgreen',
-    padding: 30,
-    borderWidth: 1,
-    borderColor: '#000',
-    width: width * 0.85,
-    ...Shadows.card,
+  flex: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 28,
+    paddingTop: 80,
+    paddingBottom: 40,
   },
   heading: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    marginBottom: 16,
-    lineHeight: 20,
+    fontSize: FontSizes.lg,
+    color: Colors.textPrimary,
+    marginBottom: 4,
   },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+  sub: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.textTertiary,
+    marginBottom: 32,
   },
-  inputLabel: {
+  fieldGroup: {
+    marginBottom: 22,
+  },
+  fieldLabel: {
     fontFamily: Fonts.mono,
-    fontSize: FontSizes.base,
-    width: 48,
-    flexShrink: 0,
+    fontSize: FontSizes.tiny,
+    color: Colors.textTertiary,
+    marginBottom: 6,
   },
   input: {
-    flex: 1,
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    fontFamily: Fonts.mono,
+    fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
-    paddingVertical: 4,
+    paddingVertical: 6,
+    color: Colors.textPrimary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  terms: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: 28,
   },
   submitBtn: {
     borderWidth: 1,
     borderColor: '#000',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    alignSelf: 'center',
-    marginTop: 10,
-    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: Colors.mainBg,
+  },
+  submitBtnDisabled: {
+    opacity: 0.5,
   },
   submitBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
+    color: Colors.textPrimary,
+  },
+  cancelWrap: {
+    marginTop: 18,
+    alignItems: 'center',
   },
   cancelText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.textTertiary,
-    textAlign: 'center',
-    marginTop: 16,
     textDecorationLine: 'underline',
   },
 });

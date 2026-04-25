@@ -277,3 +277,35 @@
         width: auto;
     }
 }
+
+.art-kebab {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    background-color: rgba(255, 250, 245, 0.9);
+    border: 1px solid #000;
+    cursor: pointer;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4;
+}
+
+.art-kebab:hover {
+    background-color: rgb(250, 244, 202);
+}
+
+@media (max-width: 640px) {
+    .art-kebab {
+        width: 32px;
+        height: 32px;
+        font-size: 20px;
+    }
+}

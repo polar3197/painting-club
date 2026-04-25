@@ -24,6 +24,7 @@ class Member(Base):
     must_change_password = Column(Boolean, nullable=False, default=False)
     temp_password_plaintext = Column(String(32))
     temp_password_expires_at = Column(DateTime)
+    terms_accepted_at = Column(DateTime)
 
     # favorite piece you made
     # favorite medium
@@ -159,4 +160,26 @@ class MediaRequest(Base):
     requested_name = Column(String(300), nullable=False)
     status = Column(String(20), nullable=False, default="pending")
     resolved_type = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Report(Base):
+    __tablename__ = "report"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reporter_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
+    # 'art' | 'comment'. target_id intentionally not a FK so the admin row survives
+    # if the underlying art/comment is deleted before triage.
+    target_type = Column(String(20), nullable=False)
+    target_id = Column(UUID(as_uuid=True), nullable=False)
+    reason = Column(Text)
+    status = Column(String(20), nullable=False, default="pending")  # pending|resolved|dismissed
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class BlockedMember(Base):
+    __tablename__ = "blocked_member"
+
+    blocker_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
+    blockee_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow)

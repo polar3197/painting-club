@@ -292,3 +292,20 @@
         flex-shrink: 0;
     }
 }
+
+.art-comment-kebab {
+    margin-left: 6px;
+    background: none;
+    border: none;
+    color: rgb(120, 120, 120);
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+}
+
+.art-comment-kebab:hover {
+    color: #000;
+}

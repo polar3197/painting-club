@@ -44,6 +44,63 @@ export function get_profiles(): Promise<Profile[]> {
   return request('/members/all/profile') as Promise<Profile[]>;
 }
 
+export function accept_terms(token: string): Promise<{ terms_accepted_at: string }> {
+  return request('/members/accept-terms', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ terms_accepted_at: string }>;
+}
+
+export function submit_report(
+  target_type: 'art' | 'comment',
+  target_id: string,
+  reason: string | null,
+  token: string | null,
+) {
+  return request('/reports', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ target_type, target_id, reason: reason || null }),
+  });
+}
+
+export function block_user(username: string, token: string | null) {
+  return request('/members/block', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username }),
+  });
+}
+
+export function unblock_user(username: string, token: string | null) {
+  return request(`/members/block/${encodeURIComponent(username)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function get_blocks(token: string | null): Promise<string[]> {
+  return request('/members/blocks', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<string[]>;
+}
+
+import type { ReportOut } from './types';
+
+export function get_reports(token: string | null): Promise<ReportOut[]> {
+  return request('/admin/reports', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<ReportOut[]>;
+}
+
+export function update_report_status(id: string, status: 'resolved' | 'dismissed', token: string | null) {
+  return request(`/admin/reports/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function upload_profile_picture(
   file: { uri: string; name: string; type: string },
   token: string | null,

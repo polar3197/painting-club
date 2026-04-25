@@ -9,6 +9,9 @@ import {
   get_media_requests,
   update_media_request,
   MediaRequest,
+  get_reports,
+  update_report_status,
+  ReportOut,
 } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -156,12 +159,66 @@ function MediaRequestRow({
   );
 }
 
+function ReportRow({
+  report,
+  onResolve,
+}: {
+  report: ReportOut;
+  onResolve: (id: string, status: 'resolved' | 'dismissed') => void;
+}) {
+  const statusBg =
+    report.status === 'resolved'
+      ? 'lightgreen'
+      : report.status === 'dismissed'
+      ? Colors.redCoral
+      : Colors.primaryGold;
+
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowInfo}>
+        <Text style={styles.rowName}>
+          {report.target_type}: {report.target_preview ?? '(target removed)'}
+        </Text>
+        <Text style={styles.rowEmail}>by @{report.reporter_username}</Text>
+        {!!report.reason && (
+          <Text style={[styles.rowMeta, { fontStyle: 'italic' }]}>{report.reason}</Text>
+        )}
+        <Text style={styles.rowDate}>
+          {new Date(report.created_at).toLocaleDateString()}
+        </Text>
+      </View>
+      <View style={styles.rowActions}>
+        <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+          <Text style={styles.statusText}>{report.status}</Text>
+        </View>
+        {report.status === 'pending' && (
+          <View style={styles.actionBtns}>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: Colors.greenBright }]}
+              onPress={() => onResolve(report.id, 'resolved')}
+            >
+              <Text style={styles.actionBtnText}>resolve</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: Colors.redLight }]}
+              onPress={() => onResolve(report.id, 'dismissed')}
+            >
+              <Text style={styles.actionBtnText}>dismiss</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export default function Admin() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const [tab, setTab] = useState<'applications' | 'media-requests'>('applications');
+  const [tab, setTab] = useState<'applications' | 'media-requests' | 'reports'>('applications');
   const [applications, setApplications] = useState<ApplicationOut[]>([]);
   const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
+  const [reports, setReports] = useState<ReportOut[]>([]);
 
   const fetchApps = () => {
     get_applications(token).then(setApplications).catch(() => {});
@@ -171,10 +228,24 @@ export default function Admin() {
     get_media_requests(token).then(setMediaRequests).catch(() => {});
   };
 
+  const fetchReports = () => {
+    get_reports(token).then(setReports).catch(() => {});
+  };
+
   useEffect(() => {
     fetchApps();
     fetchRequests();
+    fetchReports();
   }, [token]);
+
+  const handleResolveReport = async (id: string, status: 'resolved' | 'dismissed') => {
+    try {
+      await update_report_status(id, status, token);
+      fetchReports();
+    } catch {
+      // ignore
+    }
+  };
 
   const handleUpdate = async (id: string, status: string) => {
     try {
@@ -203,6 +274,8 @@ export default function Admin() {
   const reviewed = applications.filter((a) => a.status !== 'pending');
   const pendingRequests = mediaRequests.filter((r) => r.status === 'pending');
   const reviewedRequests = mediaRequests.filter((r) => r.status !== 'pending');
+  const pendingReports = reports.filter((r) => r.status === 'pending');
+  const reviewedReports = reports.filter((r) => r.status !== 'pending');
 
   return (
     <ScrollView
@@ -220,9 +293,34 @@ export default function Admin() {
             media requests
           </Text>
         </Pressable>
+        <Pressable onPress={() => setTab('reports')}>
+          <Text style={[styles.title, tab !== 'reports' && styles.titleInactive]}>
+            reports
+          </Text>
+        </Pressable>
       </View>
 
-      {tab === 'applications' ? (
+      {tab === 'reports' ? (
+        <>
+          <Text style={styles.sectionHeader}>pending</Text>
+          {pendingReports.length === 0 ? (
+            <Text style={styles.emptyText}>no pending reports</Text>
+          ) : (
+            pendingReports.map((r) => (
+              <ReportRow key={r.id} report={r} onResolve={handleResolveReport} />
+            ))
+          )}
+
+          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>reviewed</Text>
+          {reviewedReports.length === 0 ? (
+            <Text style={styles.emptyText}>no reviewed reports</Text>
+          ) : (
+            reviewedReports.map((r) => (
+              <ReportRow key={r.id} report={r} onResolve={handleResolveReport} />
+            ))
+          )}
+        </>
+      ) : tab === 'applications' ? (
         <>
           <Text style={styles.sectionHeader}>pending</Text>
           {pending.length === 0 ? (

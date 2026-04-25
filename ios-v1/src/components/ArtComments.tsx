@@ -19,9 +19,21 @@ import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { get_comments, post_comment, delete_comment, resolveImageUrl, thumbUrl, Visual2DOut, CommentOut } from '../api';
+import {
+  get_comments,
+  post_comment,
+  delete_comment,
+  resolveImageUrl,
+  thumbUrl,
+  block_user,
+  unblock_user,
+  Visual2DOut,
+  CommentOut,
+} from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from './ConfirmDialog';
+import ContextPopup from './ContextPopup';
+import ReportDialog from './ReportDialog';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMG_SECTION_HEIGHT_OPEN = SCREEN_HEIGHT * 0.4;
@@ -45,7 +57,7 @@ interface ArtCommentsProps {
 }
 
 export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
-  const { currentUser, token } = useAuth();
+  const { currentUser, token, blockedUsernames, noteBlocked, noteUnblocked } = useAuth();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [comments, setComments] = useState<CommentOut[]>([]);
@@ -56,6 +68,13 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const [pendingDelete, setPendingDelete] = useState<CommentOut | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const translateY = useRef(new Animated.Value(0)).current;
+
+  // Kebab / report / block state per active comment.
+  const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [activeComment, setActiveComment] = useState<CommentOut | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const [pendingBlock, setPendingBlock] = useState<string | null>(null);
+  const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
 
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -108,6 +127,30 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
     }
   };
 
+  const confirmBlock = async () => {
+    if (!pendingBlock) return;
+    const u = pendingBlock;
+    setPendingBlock(null);
+    try {
+      await block_user(u, token);
+      noteBlocked(u);
+    } catch (err: any) {
+      Alert.alert('Could not block', err?.message || 'try again');
+    }
+  };
+
+  const confirmUnblock = async () => {
+    if (!pendingUnblock) return;
+    const u = pendingUnblock;
+    setPendingUnblock(null);
+    try {
+      await unblock_user(u, token);
+      noteUnblocked(u);
+    } catch (err: any) {
+      Alert.alert('Could not unblock', err?.message || 'try again');
+    }
+  };
+
   const navigateToUser = (username: string) => {
     onClose();
     navigation.navigate('UserProfile', { username });
@@ -143,10 +186,21 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
         >
           <Text style={styles.commentText}>{c.text}</Text>
         </Pressable>
-        {isOwn && (
+        {isOwn ? (
           <View style={styles.commentLabel}>
             <Text style={styles.commentLabelName}>{'<'}</Text>
           </View>
+        ) : (
+          <Pressable
+            style={styles.commentKebab}
+            onPress={(e) => {
+              setActiveComment(c);
+              setPopupAnchor({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+            }}
+            hitSlop={8}
+          >
+            <Text style={styles.commentKebabText}>⋮</Text>
+          </Pressable>
         )}
       </View>
     );
@@ -161,6 +215,76 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
         confirmLabel="delete"
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+      <ConfirmDialog
+        visible={pendingBlock !== null}
+        title={pendingBlock ? `block @${pendingBlock}?` : ''}
+        message={
+          pendingBlock
+            ? `If you block @${pendingBlock}, they can no longer comment on your pieces. You'll still see anything they post elsewhere — in case they're talking about you in another comment section. If something more serious comes up, use the report button or reach out to Charlie directly.`
+            : ''
+        }
+        confirmLabel="block"
+        cancelLabel="nope"
+        confirmColor={Colors.redLight}
+        cancelColor={Colors.greenBright}
+        onConfirm={confirmBlock}
+        onCancel={() => setPendingBlock(null)}
+      />
+      <ConfirmDialog
+        visible={pendingUnblock !== null}
+        title={pendingUnblock ? `unblock @${pendingUnblock}?` : ''}
+        message="They'll be able to comment on your pieces again."
+        confirmLabel="unblock"
+        cancelLabel="nope"
+        confirmColor={Colors.greenBright}
+        cancelColor={Colors.redLight}
+        onConfirm={confirmUnblock}
+        onCancel={() => setPendingUnblock(null)}
+      />
+      <ContextPopup
+        visible={popupAnchor !== null}
+        anchor={popupAnchor}
+        onClose={() => setPopupAnchor(null)}
+      >
+        <Pressable
+          style={({ pressed }) => [
+            { paddingVertical: 10, paddingHorizontal: 14 },
+            pressed && { backgroundColor: Colors.secondary },
+          ]}
+          onPress={() => {
+            setPopupAnchor(null);
+            setShowReport(true);
+          }}
+        >
+          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>report comment</Text>
+        </Pressable>
+        {activeComment && (
+          <Pressable
+            style={({ pressed }) => [
+              { paddingVertical: 10, paddingHorizontal: 14 },
+              pressed && { backgroundColor: Colors.secondary },
+            ]}
+            onPress={() => {
+              const u = activeComment.username;
+              const isBlocked = blockedUsernames.includes(u);
+              setPopupAnchor(null);
+              if (isBlocked) setPendingUnblock(u);
+              else setPendingBlock(u);
+            }}
+          >
+            <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>
+              {blockedUsernames.includes(activeComment.username) ? 'unblock' : 'block'} @
+              {activeComment.username}
+            </Text>
+          </Pressable>
+        )}
+      </ContextPopup>
+      <ReportDialog
+        visible={showReport}
+        targetType="comment"
+        targetId={activeComment?.id ?? null}
+        onClose={() => setShowReport(false)}
       />
       <KeyboardAvoidingView
         style={styles.container}
@@ -326,6 +450,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     maxWidth: '70%',
+  },
+  commentKebab: {
+    marginHorizontal: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  commentKebabText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.textTertiary,
+    fontWeight: '700',
   },
   commentText: {
     fontFamily: Fonts.serif,

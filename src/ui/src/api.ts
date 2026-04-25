@@ -83,6 +83,19 @@ export interface Profile {
   hidden_media: string[];
   role: string;
   profile_pic_path: string | null;
+  viewer_blocked_by_owner?: boolean;
+  blocked_usernames?: string[] | null;
+}
+
+export interface ReportOut {
+  id: string;
+  reporter_username: string;
+  target_type: 'art' | 'comment';
+  target_id: string;
+  target_preview: string | null;
+  reason: string | null;
+  status: string;
+  created_at: string;
 }
 
 export interface ApplicationIn {
@@ -408,4 +421,56 @@ export function delete_comment(art_id: string, comment_id: string, token: string
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<void>;
+}
+
+export function submit_report(
+  target_type: 'art' | 'comment',
+  target_id: string,
+  reason: string | null,
+  token: string | null,
+): Promise<ReportOut> {
+  return request("/reports", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ target_type, target_id, reason: reason || null }),
+  }) as Promise<ReportOut>;
+}
+
+export function block_user(username: string, token: string | null) {
+  return request("/members/block", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username }),
+  });
+}
+
+export function unblock_user(username: string, token: string | null) {
+  return request(`/members/block/${encodeURIComponent(username)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function get_blocks(token: string | null): Promise<string[]> {
+  return request("/members/blocks", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<string[]>;
+}
+
+export function get_reports(token: string | null): Promise<ReportOut[]> {
+  return request("/admin/reports", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<ReportOut[]>;
+}
+
+export function update_report_status(
+  id: string,
+  status: 'resolved' | 'dismissed',
+  token: string | null,
+): Promise<ReportOut> {
+  return request(`/admin/reports/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  }) as Promise<ReportOut>;
 }

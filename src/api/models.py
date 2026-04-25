@@ -33,6 +33,9 @@ class Profile(BaseModel):
     is_owner: bool = False
     role: str = "member"
     profile_pic_path: str | None = None
+    terms_accepted_at: datetime | None = None
+    viewer_blocked_by_owner: bool = False
+    blocked_usernames: list[str] | None = None
 
 class ProfileUpdate(BaseModel):
     firstname: str | None
@@ -170,6 +173,36 @@ class ApplicationApproveOut(BaseModel):
 
 class CommentIn(BaseModel):
     text: str
+
+
+class ReportIn(BaseModel):
+    target_type: str  # 'art' | 'comment'
+    target_id: uuid.UUID
+    reason: str | None = None
+
+
+class ReportOut(BaseModel):
+    id: uuid.UUID
+    reporter_username: str
+    target_type: str
+    target_id: uuid.UUID
+    target_preview: str | None = None
+    reason: str | None = None
+    status: str
+    created_at: datetime
+
+
+class ReportStatusUpdate(BaseModel):
+    status: str  # 'resolved' | 'dismissed'
+
+
+class BlockIn(BaseModel):
+    username: str
+
+
+class BlockOut(BaseModel):
+    username: str
+    created_at: datetime
 
 class CommentOut(BaseModel):
     id: uuid.UUID

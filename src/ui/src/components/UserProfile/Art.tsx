@@ -7,14 +7,33 @@ import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtComments from "../Utils/ArtComments";
 import ArtImage from "../Utils/ArtImage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
+import ContextPopup from "../Utils/ContextPopup";
+import ReportDialog from "../Utils/ReportDialog";
+import { useAuth } from "../../context/AuthContext";
 import { get_members_visual_2d, remove_visual_2d, Visual2DOut } from "../../api";
 
 import '../../styles/user-profile/art.css';
 
-const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean; piece: Visual2DOut; onRemove: () => void; onEdit: () => void }) => {
+const Visual2DPiece = ({
+    isOwner,
+    piece,
+    viewerBlockedByOwner,
+    onRemove,
+    onEdit,
+}: {
+    isOwner: boolean;
+    piece: Visual2DOut;
+    viewerBlockedByOwner: boolean;
+    onRemove: () => void;
+    onEdit: () => void;
+}) => {
+    const auth = useAuth();
+    const currentUser = auth?.currentUser ?? null;
     const [isZoomedIn, setIsZoomedIn] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+    const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
+    const [showReport, setShowReport] = useState(false);
 
     const removeArt = async ({ pieceId }: { pieceId: string }) => {
         await remove_visual_2d(pieceId, localStorage.getItem("token"));
@@ -40,9 +59,42 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
                 onCancel={() => setShowRemoveConfirm(false)}
             />
         }
+        <ContextPopup
+            open={popupAnchor !== null}
+            anchor={popupAnchor}
+            onClose={() => setPopupAnchor(null)}
+        >
+            <button
+                className="context-popup-row"
+                onClick={() => {
+                    setPopupAnchor(null);
+                    setShowReport(true);
+                }}
+            >
+                report this
+            </button>
+        </ContextPopup>
+        <ReportDialog
+            open={showReport}
+            targetType="art"
+            targetId={piece.id}
+            onClose={() => setShowReport(false)}
+        />
         <div id={`art-${piece.id}`} className="art-element">
-            <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
+            <div className="art-visual" onClick={() => setIsZoomedIn(true)} style={{ position: "relative" }}>
                 <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
+                {!isOwner && currentUser && (
+                    <button
+                        className="art-kebab"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setPopupAnchor({ x: e.clientX, y: e.clientY });
+                        }}
+                        aria-label="options"
+                    >
+                        ⋮
+                    </button>
+                )}
             </div>
             <div className="art-right">
                 <div className="art-details">
@@ -72,7 +124,7 @@ const Visual2DPiece = ({ isOwner, piece, onRemove, onEdit }: { isOwner: boolean;
                                 <button onClick={() => setShowRemoveConfirm(true)}>remove</button>
                             </div>
                         </div>
-                    ) : piece.comments_enabled && (
+                    ) : piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
                         <div className="art-element-buttons art-element-buttons--centered">
                             <div className="comments-toggle">
                                 <button onClick={() => setShowComments(true)}>comments</button>
@@ -160,7 +212,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                     selectedMedium == "photography")
                     ?
                     (selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art)
-                        .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)
+                        .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)
                 :
                 `${selectedMedium} is empty atm`}
             </div>

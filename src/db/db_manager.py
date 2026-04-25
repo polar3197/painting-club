@@ -47,4 +47,7 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE visual_2d ADD COLUMN IF NOT EXISTS aspect_ratio DOUBLE PRECISION"
         ))
+        await conn.execute(text(
+            "ALTER TABLE member ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP"
+        ))
     print("Migrations applied.")

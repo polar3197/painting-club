@@ -1,18 +1,60 @@
 import { useState, useEffect } from 'react';
 import Fuse from "fuse.js";
 import { useOptions } from "../../hooks/useOptions";
+import { useAuth } from "../../context/AuthContext";
 import { ArtResult, search_art } from "../../api";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
 import ArtImage from "../Utils/ArtImage";
+import ContextPopup from "../Utils/ContextPopup";
+import ReportDialog from "../Utils/ReportDialog";
 import "../../styles/profiles/members-display.css";
 
 const ArtCard = ({ piece }: { piece: ArtResult }) => {
   const navigate = useNavigate();
+  const auth = useAuth();
+  const currentUser = auth?.currentUser ?? null;
+  const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [showReport, setShowReport] = useState(false);
+
   return (
+    <>
+    <ContextPopup
+      open={popupAnchor !== null}
+      anchor={popupAnchor}
+      onClose={() => setPopupAnchor(null)}
+    >
+      <button
+        className="context-popup-row"
+        onClick={() => {
+          setPopupAnchor(null);
+          setShowReport(true);
+        }}
+      >
+        report this
+      </button>
+    </ContextPopup>
+    <ReportDialog
+      open={showReport}
+      targetType="art"
+      targetId={piece.id}
+      onClose={() => setShowReport(false)}
+    />
     <div className='display-card art-card' onClick={() => navigate(`/members/${piece.creator_username}/profile?artId=${piece.id}&medium=${encodeURIComponent(piece.medium)}`)}>
-      <div className='art-card-img'>
+      <div className='art-card-img' style={{ position: "relative" }}>
         <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
+        {currentUser && currentUser !== piece.creator_username && (
+          <button
+            className="art-kebab"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPopupAnchor({ x: e.clientX, y: e.clientY });
+            }}
+            aria-label="options"
+          >
+            ⋮
+          </button>
+        )}
       </div>
       <div className='art-card-deets'>
         <p><b>{piece.title}</b></p>
@@ -24,6 +66,7 @@ const ArtCard = ({ piece }: { piece: ArtResult }) => {
         {piece.keywords.length > 0 && <p>{piece.keywords.join(", ")}</p>}
       </div>
     </div>
+    </>
   );
 };
 

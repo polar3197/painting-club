@@ -44,6 +44,10 @@ from api.models import (
     SetupAccountIn,
     CommentOut,
     CommentIn,
+    ReportIn,
+    ReportOut,
+    ReportStatusUpdate,
+    BlockIn,
 )
 
 from db.db_ops.members import (
@@ -57,6 +61,22 @@ from db.db_ops.members import (
 from db.db_ops.profile import (
     db_get_profile,
     db_update_profile,
+    db_get_blocked_usernames,
+)
+
+from db.db_ops.blocks import (
+    db_block_member,
+    db_unblock_member,
+    db_list_blocks,
+    db_is_blocked,
+    db_resolve_username,
+)
+
+from db.db_ops.reports import (
+    db_create_report,
+    db_list_reports,
+    db_resolve_report,
+    VALID_TARGETS as REPORT_VALID_TARGETS,
 )
 
 from db.db_ops.search import (
@@ -97,7 +117,7 @@ from db.db_ops.comments import (
     
 from db.session import get_db
 from db.db_manager import init_db, empty_db, run_migrations
-from db.models import Member, Media, Media_Members, Art
+from db.models import Member, Media, Media_Members, Art, Comment
 
 from api.auth import create_token, decode_token
 
@@ -222,6 +242,14 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
 
     is_owner = current_member is not None and (member_row.username == current_member.username)
 
+    viewer_blocked_by_owner = False
+    if current_member is not None and not is_owner:
+        viewer_blocked_by_owner = await db_is_blocked(
+            db, blocker_id=member_row.id, blockee_id=current_member.id
+        )
+
+    blocked_usernames = await db_get_blocked_usernames(db, member_row.id) if is_owner else None
+
     return Profile(
         id=member_row.id,
         username=member_row.username,
@@ -235,7 +263,21 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         is_owner=is_owner,
         role=member_row.role or "member",
         profile_pic_path=member_row.profile_pic_path,
+        terms_accepted_at=member_row.terms_accepted_at if is_owner else None,
+        viewer_blocked_by_owner=viewer_blocked_by_owner,
+        blocked_usernames=blocked_usernames,
     )
+
+@app.post("/members/accept-terms")
+async def accept_terms(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    from datetime import datetime as _dt
+    if current_member.terms_accepted_at is None:
+        current_member.terms_accepted_at = _dt.utcnow()
+        await db.commit()
+    return {"terms_accepted_at": current_member.terms_accepted_at}
 
 @app.patch("/members/update-username")
 async def update_username(
@@ -675,7 +717,12 @@ async def add_comment(
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
 ):
-    comment = await db_add_comment(db, art_id, current_member.id, payload.text)
+    try:
+        comment = await db_add_comment(db, art_id, current_member.id, payload.text)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return CommentOut(
         id=comment.id,
         username=current_member.username,
@@ -843,5 +890,126 @@ async def resolve_media_request(
         requested_name=row.requested_name,
         status=row.status,
         resolved_type=row.resolved_type,
+        created_at=row.created_at,
+    )
+
+
+# ====================== REPORTS + BLOCKS =========================
+
+@app.post("/reports", response_model=ReportOut, status_code=status.HTTP_201_CREATED)
+async def submit_report(
+    payload: ReportIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if payload.target_type not in REPORT_VALID_TARGETS:
+        raise HTTPException(status_code=400, detail=f"target_type must be one of {sorted(REPORT_VALID_TARGETS)}")
+    # confirm the target exists so the admin queue isn't polluted with phantom rows
+    if payload.target_type == "art":
+        exists = (await db.execute(select(Art.id).filter(Art.id == payload.target_id))).scalar_one_or_none()
+    else:
+        exists = (await db.execute(select(Comment.id).filter(Comment.id == payload.target_id))).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(status_code=404, detail=f"{payload.target_type} not found")
+
+    try:
+        row = await db_create_report(db, current_member.id, payload.target_type, payload.target_id, payload.reason)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return ReportOut(
+        id=row.id,
+        reporter_username=current_member.username,
+        target_type=row.target_type,
+        target_id=row.target_id,
+        target_preview=None,
+        reason=row.reason,
+        status=row.status,
+        created_at=row.created_at,
+    )
+
+
+@app.post("/members/block")
+async def block_member_endpoint(
+    payload: BlockIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    target = await db_resolve_username(db, payload.username)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    try:
+        await db_block_member(db, blocker_id=current_member.id, blockee_id=target.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "username": target.username}
+
+
+@app.delete("/members/block/{username}")
+async def unblock_member_endpoint(
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    target = await db_resolve_username(db, username)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    await db_unblock_member(db, blocker_id=current_member.id, blockee_id=target.id)
+    return {"ok": True, "username": target.username}
+
+
+@app.get("/members/blocks")
+async def list_blocks_endpoint(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+) -> list[str]:
+    return await db_list_blocks(db, current_member.id)
+
+
+@app.get("/admin/reports", response_model=list[ReportOut])
+async def list_reports_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    rows = await db_list_reports(db)
+    return [
+        ReportOut(
+            id=report.id,
+            reporter_username=reporter_username,
+            target_type=report.target_type,
+            target_id=report.target_id,
+            target_preview=preview,
+            reason=report.reason,
+            status=report.status,
+            created_at=report.created_at,
+        )
+        for report, reporter_username, preview in rows
+    ]
+
+
+@app.patch("/admin/reports/{report_id}", response_model=ReportOut)
+async def resolve_report_endpoint(
+    report_id: str,
+    payload: ReportStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    try:
+        row = await db_resolve_report(db, report_id, payload.status)
+    except ValueError as e:
+        msg = str(e)
+        code = 404 if "not found" in msg else 400
+        raise HTTPException(status_code=code, detail=msg)
+    reporter = (
+        await db.execute(select(Member.username).filter(Member.id == row.reporter_id))
+    ).scalar_one_or_none() or ""
+    return ReportOut(
+        id=row.id,
+        reporter_username=reporter,
+        target_type=row.target_type,
+        target_id=row.target_id,
+        target_preview=None,
+        reason=row.reason,
+        status=row.status,
         created_at=row.created_at,
     )

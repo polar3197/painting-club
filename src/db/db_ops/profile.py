@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from db.models import Member, Media, Media_Members
+from db.models import Member, Media, Media_Members, BlockedMember
 from api.models import ProfileUpdate
 
 async def db_get_profile(db: AsyncSession, username: str):
@@ -23,6 +23,17 @@ async def db_get_profile(db: AsyncSession, username: str):
     for name, is_hidden in media_result.all():
         (hidden if is_hidden else shown).append(name)
     return member, shown, hidden
+
+
+async def db_get_blocked_usernames(db: AsyncSession, blocker_id) -> list[str]:
+    rows = (
+        await db.execute(
+            select(Member.username)
+            .join(BlockedMember, BlockedMember.blockee_id == Member.id)
+            .filter(BlockedMember.blocker_id == blocker_id)
+        )
+    ).scalars().all()
+    return list(rows)
 
 async def db_update_profile(db: AsyncSession, username: str, payload: ProfileUpdate):
     username = username.lower()

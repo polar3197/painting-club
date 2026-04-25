@@ -26,6 +26,20 @@ export interface Profile {
   hidden_media: string[];
   role: string;
   profile_pic_path: string | null;
+  terms_accepted_at: string | null;
+  viewer_blocked_by_owner: boolean;
+  blocked_usernames: string[] | null;
+}
+
+export interface ReportOut {
+  id: string;
+  reporter_username: string;
+  target_type: 'art' | 'comment';
+  target_id: string;
+  target_preview: string | null;
+  reason: string | null;
+  status: string;
+  created_at: string;
 }
 
 export interface ApplicationIn {
