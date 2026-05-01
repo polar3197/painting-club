@@ -122,8 +122,7 @@ export default function SetupAccount() {
           <Text style={styles.terms}>
             In accordance with App Store guidelines and Painting Club's ethos, we ask that you
             don't post anything pornographic, hateful, threatening, or harassing toward other
-            members. Artistic nudity is welcome. If an agreement can't be reached, the member
-            is removed from the app.
+            members. In a real pinch we will resort to removing your account.
           </Text>
 
           <Pressable

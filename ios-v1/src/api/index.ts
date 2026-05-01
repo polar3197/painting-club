@@ -51,6 +51,19 @@ export function accept_terms(token: string): Promise<{ terms_accepted_at: string
   }) as Promise<{ terms_accepted_at: string }>;
 }
 
+export function export_my_data(token: string): Promise<unknown> {
+  return request('/members/me/export', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function delete_account(token: string): Promise<{ ok: true }> {
+  return request('/members/me', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: true }>;
+}
+
 export function submit_report(
   target_type: 'art' | 'comment',
   target_id: string,

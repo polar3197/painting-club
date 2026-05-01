@@ -56,6 +56,8 @@ from db.db_ops.members import (
     db_login_user,
     db_get_members,
     db_complete_setup,
+    db_export_member_data,
+    db_delete_member,
 )
 
 from db.db_ops.profile import (
@@ -278,6 +280,41 @@ async def accept_terms(
         current_member.terms_accepted_at = _dt.utcnow()
         await db.commit()
     return {"terms_accepted_at": current_member.terms_accepted_at}
+
+
+@app.get("/members/me/export")
+async def export_my_data(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    return await db_export_member_data(db, current_member.id)
+
+
+@app.delete("/members/me")
+async def delete_my_account(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if current_member.role == "admin":
+        raise HTTPException(status_code=403, detail="admin accounts cannot self-delete")
+    member_id = current_member.id
+    paths, art_ids = await db_delete_member(db, member_id)
+    for p in paths:
+        try:
+            abs_path(p).unlink(missing_ok=True)
+        except Exception as e:
+            print(f"[delete_my_account] failed to remove {p}: {type(e).__name__}: {e}")
+    for aid in art_ids:
+        try:
+            thumb_file(aid).unlink(missing_ok=True)
+        except Exception:
+            pass
+    try:
+        profile_thumb_file(str(member_id)).unlink(missing_ok=True)
+    except Exception:
+        pass
+    return {"ok": True}
+
 
 @app.patch("/members/update-username")
 async def update_username(

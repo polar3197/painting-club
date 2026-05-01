@@ -29,6 +29,7 @@ import { useAuth } from '../context/AuthContext';
 import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
 import ContextPopup from './ContextPopup';
+import DeleteAccountDialog from './DeleteAccountDialog';
 import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
@@ -55,11 +56,14 @@ export default function ArtZoomIn({
 }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
-  const { token, currentUser, blockedUsernames, noteBlocked, noteUnblocked } = useAuth();
+  const { token, currentUser, blockedUsernames, noteBlocked, noteUnblocked, logout } = useAuth();
   const [showReport, setShowReport] = useState(false);
   const [pendingBlock, setPendingBlock] = useState<string | null>(null);
   const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
   const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const showDeleteAccount = isOwner && !!onChangePic && !!currentUser;
 
   const isBlocked = blockableUsername ? blockedUsernames.includes(blockableUsername) : false;
   const canReport = !isOwner && !!reportArtId && !!currentUser;
@@ -333,15 +337,28 @@ export default function ArtZoomIn({
                 ]}
               >
                 {isOwner && onChangePic && (
-                  <Pressable
-                    style={styles.changePicBtn}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      onChangePic();
-                    }}
-                  >
-                    <Text style={styles.changePicBtnText}>change pic</Text>
-                  </Pressable>
+                  <View style={styles.ownerActions}>
+                    <Pressable
+                      style={styles.changePicBtn}
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        onChangePic();
+                      }}
+                    >
+                      <Text style={styles.changePicBtnText}>change pic</Text>
+                    </Pressable>
+                    {showDeleteAccount && (
+                      <Pressable
+                        style={styles.deleteAccountBtn}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          setShowDeleteDialog(true);
+                        }}
+                      >
+                        <Text style={styles.deleteAccountBtnText}>delete account</Text>
+                      </Pressable>
+                    )}
+                  </View>
                 )}
                 {showKebab && (
                   <Pressable
@@ -432,6 +449,18 @@ export default function ArtZoomIn({
           onConfirm={confirmUnblock}
           onCancel={() => setPendingUnblock(null)}
         />
+        {showDeleteAccount && (
+          <DeleteAccountDialog
+            visible={showDeleteDialog}
+            username={currentUser ?? ''}
+            onClose={() => setShowDeleteDialog(false)}
+            onDeleted={async () => {
+              setShowDeleteDialog(false);
+              onClose();
+              await logout();
+            }}
+          />
+        )}
       </GestureHandlerRootView>
     </Modal>
   );
@@ -461,6 +490,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  ownerActions: {
+    alignItems: 'center',
+    gap: 10,
+  },
   changePicBtn: {
     borderWidth: 1,
     borderColor: '#000',
@@ -471,6 +504,18 @@ const styles = StyleSheet.create({
   changePicBtnText: {
     fontFamily: Fonts.serif,
     fontSize: 16,
+  },
+  deleteAccountBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.redCoral,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  deleteAccountBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: 16,
+    color: Colors.white,
   },
   backKebab: {
     position: 'absolute',

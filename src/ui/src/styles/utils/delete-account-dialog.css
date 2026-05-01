@@ -1,0 +1,117 @@
+.delete-account-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 220;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.delete-account-dialog {
+    background-color: rgb(255, 250, 245);
+    border: 1px solid black;
+    box-shadow: rgba(17, 17, 26, 0.15) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
+    padding: 22px;
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+}
+
+.delete-account-title {
+    font-size: 22px;
+    margin-bottom: 10px;
+}
+
+.delete-account-message {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.7);
+    line-height: 20px;
+    margin-bottom: 18px;
+}
+
+.delete-account-download {
+    border: 1px solid black;
+    padding: 10px 14px;
+    background-color: rgb(255, 250, 245);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 18px;
+}
+
+.delete-account-download:hover:not(:disabled) {
+    background-color: rgb(245, 240, 230);
+}
+
+.delete-account-download.done {
+    background-color: rgb(189, 240, 189);
+}
+
+.delete-account-download:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.delete-account-label {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    color: rgba(0, 0, 0, 0.6);
+    margin-bottom: 6px;
+}
+
+.delete-account-input {
+    border: none;
+    border-bottom: 1px solid black;
+    font-family: inherit;
+    font-size: 16px;
+    padding: 6px 0;
+    background: transparent;
+    margin-bottom: 22px;
+    outline: none;
+}
+
+.delete-account-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.delete-account-buttons button {
+    border: 1px solid black;
+    padding: 6px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.delete-account-cancel {
+    background-color: rgb(255, 250, 245);
+    color: black;
+}
+
+.delete-account-cancel:hover:not(:disabled) {
+    background-color: rgb(245, 240, 230);
+}
+
+.delete-account-confirm {
+    background-color: rgb(241, 99, 99);
+    color: white;
+}
+
+.delete-account-confirm:hover:not(:disabled) {
+    background-color: rgb(220, 80, 80);
+}
+
+.delete-account-confirm:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.delete-account-buttons button:disabled {
+    cursor: default;
+}

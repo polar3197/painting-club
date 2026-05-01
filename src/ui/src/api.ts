@@ -457,6 +457,19 @@ export function get_blocks(token: string | null): Promise<string[]> {
   }) as Promise<string[]>;
 }
 
+export function export_my_data(token: string | null): Promise<unknown> {
+  return request("/members/me/export", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function delete_account(token: string | null): Promise<{ ok: true }> {
+  return request("/members/me", {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: true }>;
+}
+
 export function get_reports(token: string | null): Promise<ReportOut[]> {
   return request("/admin/reports", {
     headers: { Authorization: `Bearer ${token}` },

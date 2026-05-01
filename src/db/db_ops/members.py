@@ -1,9 +1,13 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 import bcrypt
 
-from db.models import Member, Application
+from db.models import (
+    Member, Application, Art, Visual2D, WrittenWord, Comment,
+    Media, Media_Members, MediaRequest, Report, BlockedMember,
+    PromptRecords, KeywordArt,
+)
 
 async def db_get_members(db: AsyncSession):
     result = await db.execute(select(Member))
@@ -84,3 +88,199 @@ async def db_create_full_member(
     await db.refresh(member)
     print(f"Successfully created new user: {username}")
     return member
+
+async def db_export_member_data(db: AsyncSession, member_id) -> dict:
+    """Build a JSON-serializable dict of everything we have on this member.
+    Used for the in-app 'download my data' option before account deletion."""
+
+    member_row = (await db.execute(
+        select(Member).filter(Member.id == member_id)
+    )).scalar_one_or_none()
+    if member_row is None:
+        return {}
+
+    def _iso(dt):
+        return dt.isoformat() if dt is not None else None
+
+    profile = {
+        "id": str(member_row.id),
+        "username": member_row.username,
+        "email": member_row.email,
+        "firstname": member_row.firstname,
+        "lastname": member_row.lastname,
+        "city": member_row.city,
+        "state": member_row.state,
+        "bio": member_row.bio,
+        "role": member_row.role,
+        "profile_pic_path": member_row.profile_pic_path,
+        "terms_accepted_at": _iso(member_row.terms_accepted_at),
+    }
+
+    media_rows = (await db.execute(
+        select(Media.name, Media_Members.hidden)
+        .join(Media_Members, Media.id == Media_Members.media_id)
+        .filter(Media_Members.member_id == member_id)
+    )).all()
+    mediums = [{"name": name, "hidden": bool(hidden)} for name, hidden in media_rows]
+
+    art_rows = (await db.execute(
+        select(Art).filter(Art.creator_id == member_id)
+    )).scalars().all()
+    art_ids = [a.id for a in art_rows]
+    art = []
+    for a in art_rows:
+        entry = {
+            "id": str(a.id),
+            "title": a.title,
+            "date": a.date.isoformat() if a.date else None,
+            "file_path": a.file_path,
+            "comments_enabled": a.comments_enabled,
+            "type": a.type,
+        }
+        if a.type == "visual_2d":
+            v = (await db.execute(
+                select(Visual2D).filter(Visual2D.id == a.id)
+            )).scalar_one_or_none()
+            if v is not None:
+                entry.update({
+                    "width": float(v.width) if v.width is not None else None,
+                    "height": float(v.height) if v.height is not None else None,
+                    "song": v.song,
+                    "song_artist": v.song_artist,
+                    "location": v.location,
+                    "aspect_ratio": v.aspect_ratio,
+                })
+        art.append(entry)
+
+    comments_authored = (await db.execute(
+        select(Comment).filter(Comment.member_id == member_id)
+    )).scalars().all()
+    authored = [
+        {"id": str(c.id), "art_id": str(c.art_id), "text": c.text, "created_at": _iso(c.created_at)}
+        for c in comments_authored
+    ]
+
+    received = []
+    if art_ids:
+        comments_received = (await db.execute(
+            select(Comment, Member.username)
+            .join(Member, Member.id == Comment.member_id)
+            .filter(Comment.art_id.in_(art_ids))
+        )).all()
+        for c, author in comments_received:
+            received.append({
+                "id": str(c.id),
+                "art_id": str(c.art_id),
+                "author_username": author,
+                "text": c.text,
+                "created_at": _iso(c.created_at),
+            })
+
+    apps = (await db.execute(
+        select(Application).filter(Application.member_id == member_id)
+    )).scalars().all()
+    applications = [
+        {
+            "id": str(a.id),
+            "firstname": a.firstname,
+            "lastname": a.lastname,
+            "email": a.email,
+            "city": a.city,
+            "state": a.state,
+            "known_member": a.known_member,
+            "reason": a.reason,
+            "status": a.status,
+            "created_at": _iso(a.created_at),
+        }
+        for a in apps
+    ]
+
+    mreqs = (await db.execute(
+        select(MediaRequest).filter(MediaRequest.member_id == member_id)
+    )).scalars().all()
+    media_requests = [
+        {
+            "id": str(m.id),
+            "requested_name": m.requested_name,
+            "status": m.status,
+            "resolved_type": m.resolved_type,
+            "created_at": _iso(m.created_at),
+        }
+        for m in mreqs
+    ]
+
+    rep_rows = (await db.execute(
+        select(Report).filter(Report.reporter_id == member_id)
+    )).scalars().all()
+    reports = [
+        {
+            "id": str(r.id),
+            "target_type": r.target_type,
+            "target_id": str(r.target_id),
+            "reason": r.reason,
+            "status": r.status,
+            "created_at": _iso(r.created_at),
+        }
+        for r in rep_rows
+    ]
+
+    blocked_rows = (await db.execute(
+        select(Member.username)
+        .join(BlockedMember, BlockedMember.blockee_id == Member.id)
+        .filter(BlockedMember.blocker_id == member_id)
+    )).scalars().all()
+
+    return {
+        "profile": profile,
+        "mediums": mediums,
+        "art": art,
+        "comments_authored": authored,
+        "comments_received": received,
+        "applications": applications,
+        "media_requests": media_requests,
+        "reports_filed": reports,
+        "blocked_usernames": list(blocked_rows),
+    }
+
+
+async def db_delete_member(db: AsyncSession, member_id) -> tuple[list[str], list[str]]:
+    """Hard-delete the member and all owned data, in one transaction.
+
+    Returns (file_paths, art_ids): file_paths are profile pic + art file paths the
+    caller should unlink; art_ids let the caller remove derived thumbnails. Tables
+    with cascading FKs (Comment, BlockedMember) are handled by Postgres."""
+
+    member_row = (await db.execute(
+        select(Member).filter(Member.id == member_id)
+    )).scalar_one_or_none()
+    if member_row is None:
+        raise ValueError("Member not found")
+
+    paths_to_remove: list[str] = []
+    if member_row.profile_pic_path:
+        paths_to_remove.append(member_row.profile_pic_path)
+
+    art_rows = (await db.execute(
+        select(Art.id, Art.file_path).filter(Art.creator_id == member_id)
+    )).all()
+    art_ids = [aid for aid, _ in art_rows]
+    for _, fp in art_rows:
+        if fp:
+            paths_to_remove.append(fp)
+
+    await db.execute(delete(Report).filter(Report.reporter_id == member_id))
+    await db.execute(delete(MediaRequest).filter(MediaRequest.member_id == member_id))
+    await db.execute(delete(Application).filter(Application.member_id == member_id))
+    await db.execute(delete(PromptRecords).filter(PromptRecords.member_id == member_id))
+    await db.execute(delete(Media_Members).filter(Media_Members.member_id == member_id))
+
+    if art_ids:
+        await db.execute(delete(KeywordArt).filter(KeywordArt.art_id.in_(art_ids)))
+        await db.execute(delete(Visual2D).filter(Visual2D.id.in_(art_ids)))
+        await db.execute(delete(WrittenWord).filter(WrittenWord.id.in_(art_ids)))
+        await db.execute(delete(Art).filter(Art.id.in_(art_ids)))
+
+    await db.execute(delete(Member).filter(Member.id == member_id))
+    await db.commit()
+
+    return paths_to_remove, [str(aid) for aid in art_ids]

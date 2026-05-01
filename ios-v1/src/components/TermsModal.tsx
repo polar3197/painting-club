@@ -23,13 +23,12 @@ export default function TermsModal({ visible, submitting, onAgree, onDecline }: 
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onDecline}>
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
-          <Text style={styles.title}>house rules</Text>
+          <Text style={styles.title}>terms</Text>
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             <Text style={styles.body}>
               In accordance with App Store guidelines and Painting Club's ethos, we ask that you
               don't post anything pornographic, hateful, threatening, or harassing toward other
-              members. Artistic nudity is welcome. If an agreement can't be reached, the member
-              is removed from the app.
+              members. In a real pinch we will resort to removing your account.
             </Text>
           </ScrollView>
 
@@ -42,7 +41,7 @@ export default function TermsModal({ visible, submitting, onAgree, onDecline }: 
 
           <View style={styles.buttons}>
             <Pressable style={styles.declineBtn} onPress={onDecline} disabled={submitting}>
-              <Text style={styles.declineText}>decline + sign out</Text>
+              <Text style={styles.declineText}>cancel</Text>
             </Pressable>
             <Pressable
               style={[styles.agreeBtn, (!checked || submitting) && styles.agreeBtnDisabled]}
@@ -127,14 +126,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   declineBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    backgroundColor: 'transparent',
   },
   declineText: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
-    textDecorationLine: 'underline',
+    fontSize: FontSizes.base,
+    color: Colors.textPrimary,
   },
   agreeBtn: {
     borderWidth: 1,

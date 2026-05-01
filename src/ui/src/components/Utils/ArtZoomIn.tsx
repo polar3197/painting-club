@@ -1,9 +1,11 @@
 import { Dispatch, SetStateAction, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { block_user, unblock_user } from "../../api";
 import ReportDialog from "./ReportDialog";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextPopup from "./ContextPopup";
+import DeleteAccountDialog from "./DeleteAccountDialog";
 import "../../styles/utils/dialog.css";
 
 const ArtZoomIn = ({
@@ -27,7 +29,9 @@ const ArtZoomIn = ({
     const [flip, setFlip] = useState<"idle" | "flip" | "unflip">("idle");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const auth = useAuth();
+    const navigate = useNavigate();
     const currentUser = auth?.currentUser ?? null;
+    const logout = auth?.logout ?? (() => {});
     const blockedUsernames = auth?.blockedUsernames ?? [];
     const noteBlocked = auth?.noteBlocked ?? (() => {});
     const noteUnblocked = auth?.noteUnblocked ?? (() => {});
@@ -36,11 +40,13 @@ const ArtZoomIn = ({
     const [pendingBlock, setPendingBlock] = useState<string | null>(null);
     const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
     const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
     const isBlocked = blockableUsername ? blockedUsernames.includes(blockableUsername) : false;
     const canReport = !isOwner && !!reportArtId && !!currentUser;
     const canBlock = !isOwner && !!blockableUsername && !!currentUser;
     const showKebab = canReport || canBlock;
+    const showDeleteAccount = isOwner && !!onChangePic && !!currentUser;
 
     const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -83,7 +89,7 @@ const ArtZoomIn = ({
                 </div>
                 <div className="card-back">
                     {isOwner && onChangePic && (
-                        <>
+                        <div className="card-back-owner-actions">
                             <button
                                 className="change-pic-btn"
                                 onClick={(e) => {
@@ -100,7 +106,18 @@ const ArtZoomIn = ({
                                 style={{ display: "none" }}
                                 onChange={handleFile}
                             />
-                        </>
+                            {showDeleteAccount && (
+                                <button
+                                    className="delete-account-btn"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowDeleteDialog(true);
+                                    }}
+                                >
+                                    delete account
+                                </button>
+                            )}
+                        </div>
                     )}
                     {showKebab && (
                         <button
@@ -167,6 +184,19 @@ const ArtZoomIn = ({
                 cancelLabel="nope"
                 onConfirm={confirmUnblock}
                 onCancel={() => setPendingUnblock(null)}
+            />
+        )}
+        {showDeleteAccount && (
+            <DeleteAccountDialog
+                open={showDeleteDialog}
+                username={currentUser ?? ""}
+                onClose={() => setShowDeleteDialog(false)}
+                onDeleted={() => {
+                    setShowDeleteDialog(false);
+                    setIsZoomedIn(false);
+                    logout();
+                    navigate("/landing-page");
+                }}
             />
         )}
     </div>
