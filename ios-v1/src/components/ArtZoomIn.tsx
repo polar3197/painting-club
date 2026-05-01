@@ -327,6 +327,7 @@ export default function ArtZoomIn({
                 />
               </RNAnimated.View>
               <RNAnimated.View
+                pointerEvents={flipped ? 'auto' : 'none'}
                 style={[
                   StyleSheet.absoluteFill,
                   styles.cardBack,
