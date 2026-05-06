@@ -19,5 +19,10 @@ html, body, #root {
     color: #000;
     -webkit-appearance: none;
     appearance: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:focus {
+    outline: none;
   }
 }
