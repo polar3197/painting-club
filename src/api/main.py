@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File, Form, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status, UploadFile, File, Form, Response
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import date
@@ -135,7 +135,14 @@ async def lifespan(app: FastAPI):
     yield
     # await empty_db()
 
-app = FastAPI(lifespan=lifespan, title="painting-club", root_path="/api")
+app = FastAPI(
+    lifespan=lifespan,
+    title="painting-club",
+    root_path="/api",
+    openapi_url=None,
+    docs_url=None,
+    redoc_url=None,
+)
 
 @app.get("/health")
 def health() -> dict[str, str]:
@@ -545,6 +552,7 @@ def generate_profile_thumb(member_id: str, src_abs: Path) -> Path | None:
 
 @app.post("/members/profile-picture")
 async def upload_profile_picture(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
@@ -566,9 +574,9 @@ async def upload_profile_picture(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(contents)
 
-    # Generate a small placeholder thumb so clients can paint something immediately
-    # while the full-res original downloads in the background.
-    generate_profile_thumb(str(current_member.id), path)
+    # Thumb generation is slow on the Pi; run it after the response returns so
+    # clients see a snappy success and the thumb appears on next refresh.
+    background_tasks.add_task(generate_profile_thumb, str(current_member.id), path)
 
     current_member.profile_pic_path = file_path
     await db.commit()

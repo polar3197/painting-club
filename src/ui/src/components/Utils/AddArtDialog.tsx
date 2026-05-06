@@ -68,6 +68,10 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
                 });
                 if (moving && onMoved) onMoved(moving);
             } else {
+                if (!formData.files) {
+                    alert("Please select an image.");
+                    return;
+                }
                 await add_new_visual_2d(token, {
                     username,
                     medium: selectedMedium,
