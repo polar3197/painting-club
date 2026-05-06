@@ -365,6 +365,16 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     .exit button {
         background-color: lightcoral;
     }
+
+    .change-pic-btn {
+        background-color: rgb(238, 190, 100);
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 6px 12px;
+        font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+        font-size: 16px;
+        cursor: pointer;
+    }
 }
 
 @media (max-width: 640px) {
