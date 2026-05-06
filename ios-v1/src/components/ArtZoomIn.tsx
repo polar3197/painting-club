@@ -68,7 +68,7 @@ export default function ArtZoomIn({
   const isBlocked = blockableUsername ? blockedUsernames.includes(blockableUsername) : false;
   const canReport = !isOwner && !!reportArtId && !!currentUser;
   const canBlock = !isOwner && !!blockableUsername && !!currentUser;
-  const showKebab = canReport || canBlock;
+  const showKebab = canReport || canBlock || showDeleteAccount;
 
   const confirmBlock = async () => {
     if (!pendingBlock) return;
@@ -338,28 +338,15 @@ export default function ArtZoomIn({
                 ]}
               >
                 {isOwner && onChangePic && (
-                  <View style={styles.ownerActions}>
-                    <Pressable
-                      style={styles.changePicBtn}
-                      onPress={(e) => {
-                        e.stopPropagation?.();
-                        onChangePic();
-                      }}
-                    >
-                      <Text style={styles.changePicBtnText}>change pic</Text>
-                    </Pressable>
-                    {showDeleteAccount && (
-                      <Pressable
-                        style={styles.deleteAccountBtn}
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          setShowDeleteDialog(true);
-                        }}
-                      >
-                        <Text style={styles.deleteAccountBtnText}>delete account</Text>
-                      </Pressable>
-                    )}
-                  </View>
+                  <Pressable
+                    style={styles.changePicBtn}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      onChangePic();
+                    }}
+                  >
+                    <Text style={styles.changePicBtnText}>change pic</Text>
+                  </Pressable>
                 )}
                 {showKebab && (
                   <Pressable
@@ -411,6 +398,22 @@ export default function ArtZoomIn({
             >
               <Text style={{ fontFamily: Fonts.serif, fontSize: 15 }}>
                 {isBlocked ? `unblock @${blockableUsername}` : `block @${blockableUsername}`}
+              </Text>
+            </Pressable>
+          )}
+          {showDeleteAccount && (
+            <Pressable
+              style={({ pressed }) => [
+                { paddingVertical: 10, paddingHorizontal: 14 },
+                pressed && { backgroundColor: Colors.secondary },
+              ]}
+              onPress={() => {
+                setPopupAnchor(null);
+                setShowDeleteDialog(true);
+              }}
+            >
+              <Text style={{ fontFamily: Fonts.serif, fontSize: 15, color: Colors.redCoral }}>
+                delete account
               </Text>
             </Pressable>
           )}
@@ -491,10 +494,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  ownerActions: {
-    alignItems: 'center',
-    gap: 10,
-  },
   changePicBtn: {
     borderWidth: 1,
     borderColor: '#000',
@@ -505,18 +504,6 @@ const styles = StyleSheet.create({
   changePicBtnText: {
     fontFamily: Fonts.serif,
     fontSize: 16,
-  },
-  deleteAccountBtn: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.redCoral,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  deleteAccountBtnText: {
-    fontFamily: Fonts.serif,
-    fontSize: 16,
-    color: Colors.white,
   },
   backKebab: {
     position: 'absolute',

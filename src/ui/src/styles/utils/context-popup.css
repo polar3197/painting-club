@@ -37,6 +37,10 @@
     background-color: rgb(238, 230, 170);
 }
 
+.context-popup-row-destructive {
+    color: rgb(200, 60, 60);
+}
+
 @media (max-width: 640px) {
     .context-popup {
         max-width: 80vw;

@@ -45,8 +45,8 @@ const ArtZoomIn = ({
     const isBlocked = blockableUsername ? blockedUsernames.includes(blockableUsername) : false;
     const canReport = !isOwner && !!reportArtId && !!currentUser;
     const canBlock = !isOwner && !!blockableUsername && !!currentUser;
-    const showKebab = canReport || canBlock;
     const showDeleteAccount = isOwner && !!onChangePic && !!currentUser;
+    const showKebab = canReport || canBlock || showDeleteAccount;
 
     const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -89,7 +89,7 @@ const ArtZoomIn = ({
                 </div>
                 <div className="card-back">
                     {isOwner && onChangePic && (
-                        <div className="card-back-owner-actions">
+                        <>
                             <button
                                 className="change-pic-btn"
                                 onClick={(e) => {
@@ -106,18 +106,7 @@ const ArtZoomIn = ({
                                 style={{ display: "none" }}
                                 onChange={handleFile}
                             />
-                            {showDeleteAccount && (
-                                <button
-                                    className="delete-account-btn"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowDeleteDialog(true);
-                                    }}
-                                >
-                                    delete account
-                                </button>
-                            )}
-                        </div>
+                        </>
                     )}
                     {showKebab && (
                         <button
@@ -157,6 +146,17 @@ const ArtZoomIn = ({
                     }}
                 >
                     {isBlocked ? `unblock @${blockableUsername}` : `block @${blockableUsername}`}
+                </button>
+            )}
+            {showDeleteAccount && (
+                <button
+                    className="context-popup-row context-popup-row-destructive"
+                    onClick={() => {
+                        setPopupAnchor(null);
+                        setShowDeleteDialog(true);
+                    }}
+                >
+                    delete account
                 </button>
             )}
         </ContextPopup>
