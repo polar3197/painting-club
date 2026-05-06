@@ -357,6 +357,14 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     .dialog input {
         font-size: 16px;
     }
+
+    .submit button {
+        background-color: lightgreen;
+    }
+
+    .exit button {
+        background-color: lightcoral;
+    }
 }
 
 @media (max-width: 640px) {
