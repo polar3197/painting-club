@@ -55,6 +55,7 @@ export interface LoginPayload {
 export interface LoginResponse {
   access_token: string;
   must_setup?: boolean;
+  username: string;
 }
 
 export interface SetupAccountIn {
@@ -119,14 +120,14 @@ export interface ApplicationOut {
   reason: string | null;
   status: string;
   created_at: string;
-  temp_username?: string | null;
+  temp_email?: string | null;
   temp_password?: string | null;
 }
 
 export interface ApplicationApproveOut {
   application_id: string;
   status: string;
-  temp_username: string;
+  temp_email: string;
   temp_password: string;
   temp_password_expires_at: string;
 }

@@ -29,19 +29,21 @@ export default function Login(
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalized = username.trim().toLowerCase();
-    const payload = { username: normalized, password };
+    const identifier = username.trim().toLowerCase();
+    const payload = { username: identifier, password };
     try {
       const response = await login_user(payload);
+      // Server returns the canonical username, in case the user logged in with their email.
+      const realUsername = response.username;
       if (response.must_setup) {
         // Don't call get_profile yet — temp users have a placeholder username; let them finish setup first.
-        login(normalized, response.access_token, "member");
+        login(realUsername, response.access_token, "member");
         navigate("/setup");
         return;
       }
-      const profile = await get_profile(normalized, response.access_token);
-      login(normalized, response.access_token, profile.role);
-      navigate(`/members/${normalized}/profile`);
+      const profile = await get_profile(realUsername, response.access_token);
+      login(realUsername, response.access_token, profile.role);
+      navigate(`/members/${realUsername}/profile`);
     } catch (err) {
       alert((err as Error).message);
     }
@@ -55,7 +57,7 @@ export default function Login(
         {member && (
           <form className="user-form" onSubmit={handleSubmit}>
             <div className="input-wrapper">
-              <div className="input-title">un:</div>
+              <div className="input-title">un / email:</div>
               <input
                 type="text"
                 placeholder=""
