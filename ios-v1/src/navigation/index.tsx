@@ -26,6 +26,7 @@ import ArtStack from './ArtStack';
 
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from '../components/ConfirmDialog';
+import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import type { MainTabParamList } from './types';
 
 function HomeIcon({ focused, size }: { focused: boolean; size: number }) {
@@ -55,6 +56,7 @@ function MoreScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.mainBg, paddingTop: insets.top + 20, paddingHorizontal: 30 }}>
@@ -69,6 +71,16 @@ function MoreScreen() {
           navigation.navigate('LandingPage');
         }}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+      <DeleteAccountDialog
+        visible={showDeleteDialog}
+        username={currentUser ?? ''}
+        onClose={() => setShowDeleteDialog(false)}
+        onDeleted={async () => {
+          setShowDeleteDialog(false);
+          await logout();
+          navigation.navigate('LandingPage');
+        }}
       />
       <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.xl, marginBottom: 30, borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 10 }}>more</Text>
 
@@ -89,12 +101,22 @@ function MoreScreen() {
       </Pressable>
 
       {currentUser ? (
-        <Pressable
-          style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.redCoral }}
-          onPress={() => setShowLogoutConfirm(true)}
-        >
-          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.white }}>logout</Text>
-        </Pressable>
+        <>
+          <Pressable
+            style={{ borderWidth: 1, borderColor: '#000', padding: 14, marginBottom: 10, backgroundColor: Colors.redCoral }}
+            onPress={() => setShowLogoutConfirm(true)}
+          >
+            <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.white }}>logout</Text>
+          </Pressable>
+          {currentRole !== 'admin' && (
+            <Pressable
+              style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.white }}
+              onPress={() => setShowDeleteDialog(true)}
+            >
+              <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.redCoral }}>delete account</Text>
+            </Pressable>
+          )}
+        </>
       ) : (
         <Pressable
           style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.white }}
