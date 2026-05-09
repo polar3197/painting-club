@@ -55,7 +55,6 @@ export interface LoginPayload {
 export interface LoginResponse {
   access_token: string;
   must_setup?: boolean;
-  username: string;
 }
 
 export interface SetupAccountIn {
