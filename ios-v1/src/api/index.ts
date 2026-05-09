@@ -9,6 +9,7 @@ import type {
   ApplicationIn,
   ApplicationOut,
   SetupAccountIn,
+  SetupCodePayload,
   Visual2DIn,
   Visual2DOut,
   Visual2DUpdatePayload,
@@ -21,6 +22,13 @@ import type {
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
   return request('/members/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }) as Promise<LoginResponse>;
+}
+
+export function redeem_setup_code(payload: SetupCodePayload): Promise<LoginResponse> {
+  return request('/members/redeem-setup-code', {
     method: 'POST',
     body: JSON.stringify(payload),
   }) as Promise<LoginResponse>;

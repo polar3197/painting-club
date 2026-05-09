@@ -14,7 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { login_user, get_profile, accept_terms } from '../api';
+import { login_user, redeem_setup_code, get_profile, accept_terms } from '../api';
 import ApplicationDialog from '../components/ApplicationDialog';
 import TermsModal from '../components/TermsModal';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
@@ -29,6 +29,8 @@ export default function LandingPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [notMember, setNotMember] = useState(false);
+  const [setupMode, setSetupMode] = useState(false);
+  const [setupCode, setSetupCode] = useState('');
   const [showApplication, setShowApplication] = useState(false);
   const [pendingTerms, setPendingTerms] = useState<{
     username: string;
@@ -38,17 +40,19 @@ export default function LandingPage() {
   const [acceptingTerms, setAcceptingTerms] = useState(false);
 
   const handleLogin = async () => {
-    const normalized = username.trim().toLowerCase();
-    if (!normalized || !password.trim()) return;
+    const identifier = username.trim().toLowerCase();
+    if (!identifier || !password.trim()) return;
     try {
-      const res = await login_user({ username: normalized, password: password.trim() });
+      const res = await login_user({ username: identifier, password: password.trim() });
+      // Server returns the canonical username, in case the user logged in with their email.
+      const realUsername = res.username;
       if (res.must_setup) {
         // Temp-password user: route to setup with the token; skip auth.login() until they've
         // chosen a real username + password.
         (navigation as any).navigate('SetupAccount', { token: res.access_token });
         return;
       }
-      const profile = await get_profile(normalized, res.access_token);
+      const profile = await get_profile(realUsername, res.access_token);
       // Apple guideline 1.2: gate UGC access on terms acceptance.
       if (!profile.terms_accepted_at) {
         setPendingTerms({ username: profile.username, token: res.access_token, role: profile.role });
@@ -58,6 +62,17 @@ export default function LandingPage() {
       (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
       Alert.alert('Login failed', err.message || 'Invalid credentials');
+    }
+  };
+
+  const handleSetupCode = async () => {
+    const code = setupCode.trim();
+    if (!code) return;
+    try {
+      const res = await redeem_setup_code({ code });
+      (navigation as any).navigate('SetupAccount', { token: res.access_token });
+    } catch (err: any) {
+      Alert.alert('Setup failed', err.message || 'Invalid or expired setup code');
     }
   };
 
@@ -96,10 +111,30 @@ export default function LandingPage() {
         </View>
 
         <View style={styles.loginContainer}>
-          {!notMember ? (
+          {setupMode ? (
             <>
               <View style={styles.inputRow}>
-                <Text style={styles.inputLabel}>un:</Text>
+                <Text style={[styles.inputLabel, styles.inputLabelWide]}>setup code:</Text>
+                <TextInput
+                  style={styles.input}
+                  value={setupCode}
+                  onChangeText={setSetupCode}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+              <Pressable style={styles.loginBtn} onPress={handleSetupCode}>
+                <Text style={styles.loginBtnText}>continue</Text>
+              </Pressable>
+              <Pressable onPress={() => { setSetupMode(false); setSetupCode(''); }}>
+                <Text style={styles.notMemberText}>← back to login</Text>
+              </Pressable>
+            </>
+          ) : !notMember ? (
+            <>
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>un / email:</Text>
                 <TextInput
                   style={styles.input}
                   value={username}
@@ -122,6 +157,9 @@ export default function LandingPage() {
               </View>
               <Pressable style={styles.loginBtn} onPress={handleLogin}>
                 <Text style={styles.loginBtnText}>login</Text>
+              </Pressable>
+              <Pressable onPress={() => setSetupMode(true)}>
+                <Text style={styles.notMemberText}>first time? enter setup code →</Text>
               </Pressable>
               <Pressable onPress={() => setNotMember(true)}>
                 <Text style={styles.notMemberText}>not a member?</Text>
@@ -211,6 +249,9 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.base,
     width: 40,
     flexShrink: 0,
+  },
+  inputLabelWide: {
+    width: 100,
   },
   input: {
     flex: 1,

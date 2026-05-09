@@ -13,13 +13,38 @@ async def db_get_members(db: AsyncSession):
     result = await db.execute(select(Member))
     return result.scalars().all()
 
-async def db_login_user(db: AsyncSession, username: str, password: str):
-    username = username.lower()
-    result = await db.execute(select(Member).filter(Member.username == username))
+async def db_login_user(db: AsyncSession, identifier: str, password: str):
+    """Look up a member by username OR email (whichever the caller typed) and verify the password."""
+    from sqlalchemy import or_
+    ident = identifier.lower()
+    result = await db.execute(
+        select(Member).filter(or_(Member.username == ident, Member.email == ident))
+    )
     member = result.scalar_one_or_none()
     if member and bcrypt.checkpw(password.encode(), member.password_hash.encode()):
         return member
     return None
+
+async def db_redeem_setup_code(db: AsyncSession, code: str) -> Member | None:
+    """Look up the unique pending-setup member whose temp_password_plaintext matches `code`.
+    Returns None if not found, expired, or not in setup state."""
+    from datetime import datetime as _dt
+    code = code.strip()
+    if not code:
+        return None
+    result = await db.execute(
+        select(Member).filter(
+            Member.temp_password_plaintext == code,
+            Member.must_change_password == True,
+        )
+    )
+    member = result.scalar_one_or_none()
+    if member is None:
+        return None
+    if member.temp_password_expires_at and member.temp_password_expires_at < _dt.utcnow():
+        return None
+    return member
+
 
 async def db_create_member(db: AsyncSession, username: str, password: str) -> Member:
     username = username.lower()

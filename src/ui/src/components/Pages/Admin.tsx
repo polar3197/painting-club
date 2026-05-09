@@ -76,7 +76,7 @@ const TempCreds = ({ email, password }: { email: string; password: string }) => 
                 </button>
             </div>
             <div className="temp-creds-row">
-                <span className="temp-creds-label">temp pw:</span>
+                <span className="temp-creds-label">setup code:</span>
                 <code className="temp-creds-value">{password}</code>
                 <button className="temp-creds-copy" onClick={() => copy(password, "pw")}>
                     {copied === "pw" ? "copied" : "copy"}

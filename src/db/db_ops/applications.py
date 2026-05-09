@@ -68,7 +68,18 @@ async def db_approve_application(db: AsyncSession, application_id: str) -> tuple
 
     member_id = uuid.uuid4()
     placeholder_username = f"user_{str(member_id)[:8]}"
-    temp_password = _gen_temp_password()
+    # Generate a temp password unique among active (non-null) plaintext values, since the
+    # setup-code login looks members up by this column. Collisions are astronomically rare,
+    # but cheap to guard against.
+    for _ in range(5):
+        temp_password = _gen_temp_password()
+        clash = (await db.execute(
+            select(Member.id).filter(Member.temp_password_plaintext == temp_password)
+        )).scalar_one_or_none()
+        if clash is None:
+            break
+    else:
+        raise RuntimeError("Could not generate a unique temp password after 5 attempts")
     password_hash = bcrypt.hashpw(temp_password.encode(), bcrypt.gensalt(rounds=12)).decode()
 
     member = Member(

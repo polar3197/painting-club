@@ -6,11 +6,16 @@ export interface LoginPayload {
 export interface LoginResponse {
   access_token: string;
   must_setup?: boolean;
+  username: string;
 }
 
 export interface SetupAccountIn {
   new_username: string;
   new_password: string;
+}
+
+export interface SetupCodePayload {
+  code: string;
 }
 
 export interface Profile {
