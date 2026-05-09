@@ -1,8 +1,7 @@
 
 
-import Announcements from "../Utils/Announcements";
 import "../../styles/app-layout.css";
-import "../../styles/home.css";
+import "../../styles/home.css"
 
 const HomeConfig = {
   // coords are measured in rem from bottom left
@@ -29,25 +28,26 @@ export default function Home() {
             <div className="home-left-title">-• Painting Club •-</div>
             
           </div>
-          <div className="home-right">
+          <div className="home-left-content">
+            weekly prompt
+          </div>
+          
+        </div>
+        <div className="home-right">
             <div className="painting-club-message">
               <p>Welcome to Painting Club.</p>
               <br></br>
               <p>I built this space for artists to share their art.</p>
               <br></br>
-              <p>The goal is to center art and sincerity. There are no likes nor algorithm. Just friends, art and conversations.</p>
+              <p>The goal is to center art and sincerity.</p>
               <br></br>
-              <p>It currently handles photography, painting, drawing, etc. — you get the idea, #2d-static-visual...</p>
-              <br></br>
-              <p>For friends who film, write, sing, sculpt, and so on and on, I would love to chat about how Painting Club could best display your art form.</p>
+              <p>For friends who film, write, sing, sculpt and so on, I would love to chat about how Painting Club could best display your art form.</p>
               <br></br>
               <p>It's true, we can all use instagram, but I lowkey hate instagram and highkey don't like zuckerberg.</p> 
               <br></br>
-              <p>With a Painting Club account you can create custom portfolios with a few clicks and share them with anyone you want. You could also opt to hide all of your art so that only other members see it. Either way, your pick!</p> 
-              
+              <p>I look forward to a version of Painting Club where artists are easily and securely able to share their work. A version where people inspire eachother and non of it chases virality or likes.</p> 
             </div>
           </div>
-        </div>
         {/* <div className="home-right">
           <Announcements />
         </div> */}
