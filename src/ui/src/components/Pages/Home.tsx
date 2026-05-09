@@ -26,29 +26,28 @@ export default function Home() {
         <div className="home-left">
           <div className="home-left-top">
             <div className="home-left-title">-• Painting Club •-</div>
-            
+
           </div>
           <div className="home-left-content">
             weekly prompt
           </div>
-          
+
         </div>
         <div className="home-right">
             <div className="painting-club-message">
-              <img src="/imgs/groups.png" alt="" className="painting-club-message-img" />
               <p>Welcome to Painting Club.</p>
               <br></br>
               <p>I built this space for artists to share their art.</p>
               <br></br>
-              <p>The goal is to center art around sincerity.</p>
+              <p>The goal is to center art and sincerity.</p>
               <br></br>
-              <p>I truly believe you see a person's intent in every brush stroke - and I am sure this goes for other mediums too.</p>
-              <br></br>
-              <p>As realism is conquered, abstract, impressionism, are all conquered as well, and AI can conquer the ones to come, it is the sincerity in art that shines through. Painting Club is for sincere art.</p>
-              <br></br>
-              <p>Its a random fun spot for art, a place to inspire and be inspired by others</p>
+              <p>Its a random fun spot for art, a place to inspire and be inspired by others </p>
               <br></br>
               <p>— its kinda also my secret hope to create a internet haven, safe from algorithms and warped value systems.</p>
+              <br></br>
+              <div className="stamp-wrapper">
+                <img src='/imgs/groups.png' width='120px'></img>
+              </div>
             </div>
           </div>
         {/* <div className="home-right">
