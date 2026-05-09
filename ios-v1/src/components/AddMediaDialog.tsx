@@ -103,7 +103,7 @@ export default function AddMediaDialog({
           <View style={styles.panelArea}>
             {tab === 'hide-show' ? (
               initialOrder.length === 0 ? (
-                <Text style={styles.empty}>no artforms on your profile yet — switch to "new artform"</Text>
+                <Text style={styles.empty}>you've got to add an art form before you can hide them. click new. top right.</Text>
               ) : (
                 <>
                   <View style={styles.toggleHeaders}>

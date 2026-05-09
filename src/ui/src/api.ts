@@ -152,6 +152,13 @@ export function update_application_status(id: string, status: string, token: str
   }) as Promise<ApplicationApproveOut | { ok: true }>;
 }
 
+export function delete_application(id: string, token: string | null): Promise<{ ok: true }> {
+  return request(`/admin/applications/${id}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }) as Promise<{ ok: true }>;
+}
+
 export interface Visual2DIn {
   username: string;
   medium: string;

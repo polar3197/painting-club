@@ -495,13 +495,11 @@ export default function UserProfile() {
                   </View>
                 )}
               </View>
-              {!!profile.bio && (
-                <View style={styles.bioSection}>
-                  <Text style={styles.bioLabel}>Artist Statement</Text>
-                  <View style={styles.bioHr} />
-                  <Text style={styles.bioText}>{profile.bio}</Text>
-                </View>
-              )}
+              <View style={styles.bioSection}>
+                <Text style={styles.bioLabel}>Artist Statement</Text>
+                <View style={styles.bioHr} />
+                {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
+              </View>
             </>
           ) : (
             <>
@@ -545,7 +543,7 @@ export default function UserProfile() {
                 value={editBio}
                 onChangeText={setEditBio}
                 autoCapitalize="none"
-                placeholder="write a bio"
+                placeholder="no pressure"
                 placeholderTextColor={Colors.textMuted}
                 multiline
               />

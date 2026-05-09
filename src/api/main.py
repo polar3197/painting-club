@@ -100,6 +100,7 @@ from db.db_ops.applications import (
     db_get_applications,
     db_update_application_status,
     db_approve_application,
+    db_delete_application,
 )
 
 from db.db_ops.media import (
@@ -866,6 +867,19 @@ async def update_application_status(
         )
     try:
         await db_update_application_status(db, application_id, payload.status)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True}
+
+
+@app.delete("/admin/applications/{application_id}")
+async def delete_application_endpoint(
+    application_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    try:
+        await db_delete_application(db, application_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"ok": True}

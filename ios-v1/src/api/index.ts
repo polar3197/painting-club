@@ -304,3 +304,10 @@ export function update_application_status(id: string, status: string, token: str
     body: JSON.stringify({ status }),
   });
 }
+
+export function delete_application(id: string, token: string | null): Promise<unknown> {
+  return request(`/admin/applications/${id}`, {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+}

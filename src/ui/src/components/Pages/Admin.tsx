@@ -4,6 +4,7 @@ import {
     ApplicationOut,
     get_applications,
     update_application_status,
+    delete_application,
     MediaRequest,
     get_media_requests,
     update_media_request,
@@ -11,6 +12,7 @@ import {
     get_reports,
     update_report_status,
 } from "../../api";
+import ConfirmDialog from "../Utils/ConfirmDialog";
 import "../../styles/admin.css";
 
 const statusColor: Record<string, string> = {
@@ -82,42 +84,59 @@ const TempCreds = ({ password }: { password: string }) => {
 const ApplicationRow = ({
     app,
     onStatusChange,
+    onDelete,
 }: {
     app: ApplicationOut;
     onStatusChange: (id: string, status: string) => void;
-}) => (
-    <div className="application-row-item">
-        <div className="application-row-info">
-            <p className="application-name">{app.firstname} {app.lastname}</p>
-            <p className="application-meta">{app.email}</p>
-            {(app.city || app.state) && <p className="application-meta">{[app.city, app.state].filter(Boolean).join(", ")}</p>}
-            {app.known_member && <p className="application-meta">knows: {app.known_member}</p>}
-            {app.reason && <p className="application-reason">"{app.reason}"</p>}
-            <p className="application-date">{new Date(app.created_at).toLocaleDateString()}</p>
-            {app.status === "pending_setup" && app.temp_password && (
-                <TempCreds password={app.temp_password} />
+    onDelete: (id: string) => void;
+}) => {
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+    return (
+        <div className="application-row-item">
+            {showConfirmDelete && (
+                <ConfirmDialog
+                    onConfirm={() => {
+                        setShowConfirmDelete(false);
+                        onDelete(app.id);
+                    }}
+                    onCancel={() => setShowConfirmDelete(false)}
+                />
             )}
-        </div>
-        <div className="application-row-actions">
-            <div
-                className="application-status"
-                style={{ backgroundColor: statusColor[app.status] ?? "white" }}
-            >
-                {app.status.replace("_", " ")}
+            <div className="application-row-info">
+                <p className="application-name">{app.firstname} {app.lastname}</p>
+                <p className="application-meta">{app.email}</p>
+                {(app.city || app.state) && <p className="application-meta">{[app.city, app.state].filter(Boolean).join(", ")}</p>}
+                {app.known_member && <p className="application-meta">knows: {app.known_member}</p>}
+                {app.reason && <p className="application-reason">"{app.reason}"</p>}
+                <p className="application-date">{new Date(app.created_at).toLocaleDateString()}</p>
+                {app.status === "pending_setup" && app.temp_password && (
+                    <TempCreds password={app.temp_password} />
+                )}
             </div>
-            {app.status === "pending" && (
-                <>
-                    <div className="application-btn approve" onClick={() => onStatusChange(app.id, "approved")}>
-                        approve
-                    </div>
-                    <div className="application-btn reject" onClick={() => onStatusChange(app.id, "rejected")}>
-                        reject
-                    </div>
-                </>
-            )}
+            <div className="application-row-actions">
+                <div
+                    className="application-status"
+                    style={{ backgroundColor: statusColor[app.status] ?? "white" }}
+                >
+                    {app.status.replace("_", " ")}
+                </div>
+                {app.status === "pending" && (
+                    <>
+                        <div className="application-btn approve" onClick={() => onStatusChange(app.id, "approved")}>
+                            approve
+                        </div>
+                        <div className="application-btn reject" onClick={() => onStatusChange(app.id, "rejected")}>
+                            reject
+                        </div>
+                    </>
+                )}
+                <div className="application-btn reject" onClick={() => setShowConfirmDelete(true)}>
+                    delete
+                </div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const MediaRequestRow = ({
     req,
@@ -214,6 +233,17 @@ const Admin = () => {
         }
     };
 
+    const handleDeleteApplication = async (id: string) => {
+        setApplications(apps => apps.filter(a => a.id !== id));
+        try {
+            await delete_application(id, token);
+        } catch {
+            // refetch on failure to resync
+            const fresh = await get_applications(token).catch(() => null);
+            if (fresh) setApplications(fresh);
+        }
+    };
+
     const handleResolveRequest = async (id: string, status: "approved" | "rejected", type: string | null) => {
         const res = await update_media_request(id, status, type, token);
         setMediaRequests(prev => prev.map(r => r.id === id ? res : r));
@@ -274,7 +304,7 @@ const Admin = () => {
                         {pending.length === 0
                             ? <p className="admin-empty">no pending applications</p>
                             : pending.map(a => (
-                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
+                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} onDelete={handleDeleteApplication} />
                             ))
                         }
                     </div>
@@ -283,7 +313,7 @@ const Admin = () => {
                         {pendingSetup.length === 0
                             ? <p className="admin-empty">none</p>
                             : pendingSetup.map(a => (
-                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
+                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} onDelete={handleDeleteApplication} />
                             ))
                         }
                     </div>
@@ -292,7 +322,7 @@ const Admin = () => {
                         {reviewed.length === 0
                             ? <p className="admin-empty">none yet</p>
                             : reviewed.map(a => (
-                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} />
+                                <ApplicationRow key={a.id} app={a} onStatusChange={handleStatusChange} onDelete={handleDeleteApplication} />
                             ))
                         }
                     </div>

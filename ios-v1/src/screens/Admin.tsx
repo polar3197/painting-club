@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   get_applications,
   update_application_status,
+  delete_application,
   ApplicationOut,
   get_media_requests,
   update_media_request,
@@ -14,14 +15,18 @@ import {
   ReportOut,
 } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function ApplicationRow({
   app,
   onUpdate,
+  onDelete,
 }: {
   app: ApplicationOut;
   onUpdate: (id: string, status: string) => void;
+  onDelete: (id: string) => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const statusBg =
     app.status === 'approved'
       ? 'lightgreen'
@@ -31,6 +36,21 @@ function ApplicationRow({
 
   return (
     <View style={styles.row}>
+      <ConfirmDialog
+        visible={confirmDelete}
+        title="u sure?"
+        confirmLabel="yes"
+        cancelLabel="no. shit. stop"
+        confirmColor={Colors.greenBright}
+        cancelColor={Colors.redLight}
+        confirmTextColor={Colors.black}
+        cancelTextColor={Colors.black}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDelete(app.id);
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
       <View style={styles.rowInfo}>
         <Text style={styles.rowName}>
           {app.firstname} {app.lastname}
@@ -79,6 +99,12 @@ function ApplicationRow({
             </Pressable>
           </View>
         )}
+        <Pressable
+          style={[styles.actionBtn, styles.deleteBtn]}
+          onPress={() => setConfirmDelete(true)}
+        >
+          <Text style={styles.actionBtnText}>delete</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -264,6 +290,15 @@ export default function Admin() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    setApplications((apps) => apps.filter((a) => a.id !== id));
+    try {
+      await delete_application(id, token);
+    } catch {
+      fetchApps();
+    }
+  };
+
   const handleResolveRequest = async (
     id: string,
     status: 'approved' | 'rejected',
@@ -335,7 +370,7 @@ export default function Admin() {
             <Text style={styles.emptyText}>no pending applications</Text>
           ) : (
             pending.map((a) => (
-              <ApplicationRow key={a.id} app={a} onUpdate={handleUpdate} />
+              <ApplicationRow key={a.id} app={a} onUpdate={handleUpdate} onDelete={handleDelete} />
             ))
           )}
 
@@ -344,7 +379,7 @@ export default function Admin() {
             <Text style={styles.emptyText}>no reviewed applications</Text>
           ) : (
             reviewed.map((a) => (
-              <ApplicationRow key={a.id} app={a} onUpdate={handleUpdate} />
+              <ApplicationRow key={a.id} app={a} onUpdate={handleUpdate} onDelete={handleDelete} />
             ))
           )}
         </>
@@ -476,6 +511,11 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: FontSizes.tiny,
+  },
+  deleteBtn: {
+    backgroundColor: Colors.redCoral,
+    marginTop: 6,
+    alignSelf: 'flex-end',
   },
   tempCreds: {
     flexDirection: 'row',

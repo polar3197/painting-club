@@ -56,6 +56,25 @@ async def db_update_application_status(db: AsyncSession, application_id: str, st
     return app
 
 
+async def db_delete_application(db: AsyncSession, application_id: str) -> None:
+    """Hard-delete an application. If it's still in pending_setup (member created but
+    setup never completed), also delete the orphan Member row so the placeholder
+    username and temp password don't linger."""
+    app = (await db.execute(
+        select(Application).filter(Application.id == application_id)
+    )).scalar_one_or_none()
+    if not app:
+        raise ValueError("Application not found")
+    if app.status == "pending_setup" and app.member_id:
+        member = (await db.execute(
+            select(Member).filter(Member.id == app.member_id)
+        )).scalar_one_or_none()
+        if member is not None:
+            await db.delete(member)
+    await db.delete(app)
+    await db.commit()
+
+
 async def db_approve_application(db: AsyncSession, application_id: str) -> tuple[Application, Member, str]:
     """Approve an application: create a Member with a temp password, link it to the app,
     move the app to 'pending_setup'. Returns (application, member, plaintext_temp_password)."""
