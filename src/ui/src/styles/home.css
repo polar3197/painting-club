@@ -68,7 +68,16 @@
     flex-direction: column;
     align-items: flex-start;
     padding: 20px;
+    overflow-y: auto;
     box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
+}
+
+.painting-club-message-img {
+    align-self: center;
+    width: 60%;
+    max-width: 280px;
+    height: auto;
+    margin-bottom: 16px;
 }
 
 @media (max-width: 1024px) {
@@ -91,6 +100,7 @@
         flex-direction: column;
         height: auto;
         min-height: 100%;
+        overflow-y: auto;
     }
 
     .home-left,
@@ -103,32 +113,43 @@
     }
 
     .home-right {
-        height: 50vh;
+        height: auto;
         justify-content: center;
+        padding: 16px;
+        box-sizing: border-box;
     }
 
     .home-left-top {
         height: auto;
-        padding: 14px;
+        padding: 16px;
         gap: 14px;
         flex-wrap: wrap;
     }
 
     .home-left-title {
-        font-size: 22px;
-        padding: 10px 14px;
+        font-size: 24px;
+        padding: 10px 16px;
     }
 
     .home-left-content {
         height: auto;
-        padding: 10px 0 20px 0;
+        padding: 10px 16px 20px;
+        font-size: 14px;
     }
 
     .painting-club-message {
-        width: 92%;
+        width: 100%;
         height: auto;
-        min-height: 40vh;
-        padding: 14px;
+        padding: 18px;
+        font-size: 14px;
+        line-height: 1.5;
+        box-sizing: border-box;
+        overflow-y: visible;
+    }
+
+    .painting-club-message-img {
+        width: 70%;
+        max-width: 240px;
     }
 }
 

@@ -35,17 +35,20 @@ export default function Home() {
         </div>
         <div className="home-right">
             <div className="painting-club-message">
+              <img src="/imgs/groups.png" alt="" className="painting-club-message-img" />
               <p>Welcome to Painting Club.</p>
               <br></br>
               <p>I built this space for artists to share their art.</p>
               <br></br>
-              <p>The goal is to center art and sincerity.</p>
+              <p>The goal is to center art around sincerity.</p>
               <br></br>
-              <p>For friends who film, write, sing, sculpt and so on, I would love to chat about how Painting Club could best display your art form.</p>
+              <p>I truly believe you see a person's intent in every brush stroke - and I am sure this goes for other mediums too.</p>
               <br></br>
-              <p>It's true, we can all use instagram, but I lowkey hate instagram and highkey don't like zuckerberg.</p> 
+              <p>As realism is conquered, abstract, impressionism, are all conquered as well, and AI can conquer the ones to come, it is the sincerity in art that shines through. Painting Club is for sincere art.</p>
               <br></br>
-              <p>I look forward to a version of Painting Club where artists are easily and securely able to share their work. A version where people inspire eachother and non of it chases virality or likes.</p> 
+              <p>Its a random fun spot for art, a place to inspire and be inspired by others</p>
+              <br></br>
+              <p>— its kinda also my secret hope to create a internet haven, safe from algorithms and warped value systems.</p>
             </div>
           </div>
         {/* <div className="home-right">

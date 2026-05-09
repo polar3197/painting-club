@@ -475,8 +475,7 @@ export default function UserProfile() {
                 {profile.profile_pic_path ? (
                   <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                     <Image
-                      source={{ uri: resolveImageUrl(profile.profile_pic_path) }}
-                      placeholder={{ uri: profileThumbUrl(profile.id) }}
+                      source={{ uri: profileThumbUrl(profile.id) }}
                       transition={200}
                       priority="high"
                       style={styles.profilePic}

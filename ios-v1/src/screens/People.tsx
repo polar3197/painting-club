@@ -78,8 +78,7 @@ export default function People() {
       onPress={() => navigation.navigate('UserProfile', { username: item.username })}
     >
       <Image
-        source={{ uri: resolveImageUrl(item.profile_pic_path || `/imgs/${item.id}.png`) }}
-        placeholder={item.profile_pic_path ? { uri: profileThumbUrl(item.id) } : undefined}
+        source={{ uri: item.profile_pic_path ? profileThumbUrl(item.id) : resolveImageUrl(`/imgs/${item.id}.png`) }}
         transition={200}
         style={styles.cardImage}
         contentFit="cover"

@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Image, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Announcements from '../components/Announcements';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 export default function Home() {
@@ -13,36 +12,37 @@ export default function Home() {
       contentContainerStyle={styles.content}
     >
       <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>{'-\u2022 Painting Club \u2022-'}</Text>
+        <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>{'-• Painting Club •-'}</Text>
       </View>
 
       <View style={styles.messageContainer}>
+        <Image
+          source={require('../../assets/imgs/groups.png')}
+          style={styles.messageImage}
+          resizeMode="contain"
+        />
         <Text style={styles.messageText}>Welcome to Painting Club.</Text>
-        <Text style={styles.spacer}>{' '}</Text>
+        <View style={styles.spacer} />
         <Text style={styles.messageText}>I built this space for artists to share their art.</Text>
-        <Text style={styles.spacer}>{' '}</Text>
+        <View style={styles.spacer} />
+        <Text style={styles.messageText}>The goal is to center art around sincerity.</Text>
+        <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          The goal is to center art and sincerity. There are no likes nor algorithm. Just friends, art and conversations.
+          I truly believe you see a person's intent in every brush stroke - and I am sure this goes for other mediums too.
         </Text>
-        <Text style={styles.spacer}>{' '}</Text>
+        <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          {`It currently handles photography, painting, drawing, etc. \u2014 you get the idea, #2d-static-visual...`}
+          As realism is conquered, abstract, impressionism, are all conquered as well, and AI can conquer the ones to come, it is the sincerity in art that shines through. Painting Club is for sincere art.
         </Text>
-        <Text style={styles.spacer}>{' '}</Text>
+        <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          For friends who film, write, sing, sculpt, and so on and on, I would love to chat about how Painting Club could best display your art form.
+          Its a random fun spot for art, a place to inspire and be inspired by others
         </Text>
-        <Text style={styles.spacer}>{' '}</Text>
+        <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          {`It's true, we can all use instagram, but I lowkey hate instagram and highkey don't like zuckerberg.`}
-        </Text>
-        <Text style={styles.spacer}>{' '}</Text>
-        <Text style={styles.messageText}>
-          With a Painting Club account you can create custom portfolios with a few clicks and share them with anyone you want. You could also opt to hide all of your art so that only other members see it. Either way, your pick!
+          — its kinda also my secret hope to create a internet haven, safe from algorithms and warped value systems.
         </Text>
       </View>
-
-      <Announcements />
     </ScrollView>
   );
 }
@@ -73,9 +73,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.mainBg,
     borderWidth: 2,
     borderColor: '#000',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 20,
     marginTop: 20,
     ...Shadows.card,
+  },
+  messageImage: {
+    alignSelf: 'center',
+    width: 450,
+    height: 582,
+    marginTop: -30,
+    marginBottom: 8,
   },
   messageText: {
     fontFamily: Fonts.mono,
