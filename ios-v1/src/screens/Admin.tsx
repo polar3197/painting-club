@@ -50,6 +50,14 @@ function ApplicationRow({
         <Text style={styles.rowDate}>
           {new Date(app.created_at).toLocaleDateString()}
         </Text>
+        {app.status === 'pending_setup' && app.temp_password && (
+          <View style={styles.tempCreds}>
+            <Text style={styles.tempCredsLabel}>setup code:</Text>
+            <Text style={styles.tempCredsValue} selectable>
+              {app.temp_password}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.rowActions}>
         <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
@@ -468,5 +476,27 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: FontSizes.tiny,
+  },
+  tempCreds: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    backgroundColor: Colors.secondary,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  tempCredsLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
+    color: Colors.textSecondary,
+    marginRight: 6,
+  },
+  tempCredsValue: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textPrimary,
   },
 });

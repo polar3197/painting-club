@@ -225,8 +225,8 @@ async def setup_account_endpoint(
         raise HTTPException(status_code=400, detail="Account setup already complete")
 
     new_username = payload.new_username.strip().lower()
-    if len(new_username) < 3:
-        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if len(new_username) < 1:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
     if len(payload.new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 

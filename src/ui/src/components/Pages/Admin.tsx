@@ -59,27 +59,20 @@ const ReportRow = ({
     </div>
 );
 
-const TempCreds = ({ username, password }: { username: string; password: string }) => {
-    const [copied, setCopied] = useState<"" | "un" | "pw">("");
-    const copy = (value: string, which: "un" | "pw") => {
-        navigator.clipboard.writeText(value);
-        setCopied(which);
-        setTimeout(() => setCopied(""), 1200);
+const TempCreds = ({ password }: { password: string }) => {
+    const [copied, setCopied] = useState(false);
+    const copy = () => {
+        navigator.clipboard.writeText(password);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
     };
     return (
         <div className="temp-creds">
             <div className="temp-creds-row">
-                <span className="temp-creds-label">login username:</span>
-                <code className="temp-creds-value">{username}</code>
-                <button className="temp-creds-copy" onClick={() => copy(username, "un")}>
-                    {copied === "un" ? "copied" : "copy"}
-                </button>
-            </div>
-            <div className="temp-creds-row">
                 <span className="temp-creds-label">setup code:</span>
                 <code className="temp-creds-value">{password}</code>
-                <button className="temp-creds-copy" onClick={() => copy(password, "pw")}>
-                    {copied === "pw" ? "copied" : "copy"}
+                <button className="temp-creds-copy" onClick={copy}>
+                    {copied ? "copied" : "copy"}
                 </button>
             </div>
         </div>
@@ -101,8 +94,8 @@ const ApplicationRow = ({
             {app.known_member && <p className="application-meta">knows: {app.known_member}</p>}
             {app.reason && <p className="application-reason">"{app.reason}"</p>}
             <p className="application-date">{new Date(app.created_at).toLocaleDateString()}</p>
-            {app.status === "pending_setup" && app.temp_username && app.temp_password && (
-                <TempCreds username={app.temp_username} password={app.temp_password} />
+            {app.status === "pending_setup" && app.temp_password && (
+                <TempCreds password={app.temp_password} />
             )}
         </div>
         <div className="application-row-actions">
@@ -214,7 +207,7 @@ const Admin = () => {
 
         if (status === "approved" && isApproval(res)) {
             setApplications(apps => apps.map(a => a.id === id
-                ? { ...a, status: res.status, temp_username: res.temp_username, temp_password: res.temp_password }
+                ? { ...a, status: res.status, temp_password: res.temp_password }
                 : a));
         } else {
             setApplications(apps => apps.map(a => a.id === id ? { ...a, status } : a));

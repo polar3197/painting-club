@@ -30,8 +30,8 @@ export default function SetupAccount() {
     setError(null);
 
     const trimmed = username.trim().toLowerCase();
-    if (trimmed.length < 3) {
-      setError("username must be at least 3 characters");
+    if (trimmed.length < 1) {
+      setError("username cannot be empty");
       return;
     }
     if (password.length < 8) {

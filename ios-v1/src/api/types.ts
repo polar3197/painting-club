@@ -67,6 +67,7 @@ export interface ApplicationOut {
   reason: string | null;
   status: string;
   created_at: string;
+  temp_password?: string | null;
 }
 
 export interface Visual2DIn {

@@ -204,7 +204,11 @@ export default function RootNavigator() {
     >
       <RootStack.Screen name="Main" component={MainTabs} />
       <RootStack.Screen name="LandingPage" component={LandingPage} />
-      <RootStack.Screen name="SetupAccount" component={SetupAccount} />
+      <RootStack.Screen
+        name="SetupAccount"
+        component={SetupAccount}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
       <RootStack.Screen name="Ethos" component={Ethos} />
       <RootStack.Group screenOptions={{ presentation: 'modal' }}>
         <RootStack.Screen name="Portfolio" component={Portfolio} />

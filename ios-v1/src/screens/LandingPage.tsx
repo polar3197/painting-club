@@ -29,7 +29,6 @@ export default function LandingPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [notMember, setNotMember] = useState(false);
-  const [setupMode, setSetupMode] = useState(false);
   const [setupCode, setSetupCode] = useState('');
   const [showApplication, setShowApplication] = useState(false);
   const [pendingTerms, setPendingTerms] = useState<{
@@ -109,27 +108,7 @@ export default function LandingPage() {
         </View>
 
         <View style={styles.loginContainer}>
-          {setupMode ? (
-            <>
-              <View style={styles.inputRow}>
-                <Text style={[styles.inputLabel, styles.inputLabelWide]}>setup code:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={setupCode}
-                  onChangeText={setSetupCode}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholderTextColor={Colors.textMuted}
-                />
-              </View>
-              <Pressable style={styles.loginBtn} onPress={handleSetupCode}>
-                <Text style={styles.loginBtnText}>continue</Text>
-              </Pressable>
-              <Pressable onPress={() => { setSetupMode(false); setSetupCode(''); }}>
-                <Text style={styles.notMemberText}>← back to login</Text>
-              </Pressable>
-            </>
-          ) : !notMember ? (
+          {!notMember ? (
             <>
               <View style={styles.inputRow}>
                 <Text style={styles.inputLabel}>un:</Text>
@@ -153,20 +132,17 @@ export default function LandingPage() {
                   placeholderTextColor={Colors.textMuted}
                 />
               </View>
-              <Pressable style={styles.loginBtn} onPress={handleLogin}>
-                <Text style={styles.loginBtnText}>login</Text>
+              <Pressable style={styles.actionBtn} onPress={handleLogin}>
+                <Text style={styles.actionBtnText}>login</Text>
               </Pressable>
-              <Pressable onPress={() => setSetupMode(true)}>
-                <Text style={styles.notMemberText}>first time? enter setup code →</Text>
-              </Pressable>
-              <Pressable onPress={() => setNotMember(true)}>
-                <Text style={styles.notMemberText}>not a member?</Text>
+              <Pressable style={styles.actionBtn} onPress={() => setNotMember(true)}>
+                <Text style={styles.actionBtnText}>not a member?</Text>
               </Pressable>
             </>
           ) : (
             <>
               <Pressable
-                style={styles.altBtn}
+                style={styles.actionBtn}
                 onPress={() => {
                   setNotMember(false);
                   (navigation as any).reset({
@@ -175,13 +151,29 @@ export default function LandingPage() {
                   });
                 }}
               >
-                <Text style={styles.altBtnText}>view artists profiles</Text>
+                <Text style={styles.actionBtnText}>view artists profiles</Text>
               </Pressable>
-              <Pressable style={styles.altBtn} onPress={() => setShowApplication(true)}>
-                <Text style={styles.altBtnText}>request account</Text>
+              <Pressable style={styles.actionBtn} onPress={() => setShowApplication(true)}>
+                <Text style={styles.actionBtnText}>request account</Text>
               </Pressable>
-              <Pressable onPress={() => setNotMember(false)}>
-                <Text style={styles.notMemberText}>back to login</Text>
+              <View style={styles.secretCodeRow}>
+                <TextInput
+                  style={styles.secretCodeInput}
+                  value={setupCode}
+                  onChangeText={setSetupCode}
+                  placeholder="secret code?"
+                  placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="go"
+                  onSubmitEditing={handleSetupCode}
+                />
+                <Pressable style={styles.secretCodeBtn} onPress={handleSetupCode}>
+                  <Text style={styles.secretCodeBtnArrow}>→</Text>
+                </Pressable>
+              </View>
+              <Pressable style={styles.actionBtn} onPress={() => setNotMember(false)}>
+                <Text style={styles.actionBtnText}>ur a member?</Text>
               </Pressable>
             </>
           )}
@@ -248,9 +240,6 @@ const styles = StyleSheet.create({
     width: 40,
     flexShrink: 0,
   },
-  inputLabelWide: {
-    width: 100,
-  },
   input: {
     flex: 1,
     borderBottomWidth: 1,
@@ -259,38 +248,48 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.base,
     paddingVertical: 4,
   },
-  loginBtn: {
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    alignSelf: 'center',
-    marginTop: 10,
-    backgroundColor: 'transparent',
-  },
-  loginBtnText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-  },
-  notMemberText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-    marginTop: 16,
-    textDecorationLine: 'underline',
-  },
-  altBtn: {
+  actionBtn: {
     borderWidth: 1,
     borderColor: '#000',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    marginBottom: 10,
+    marginTop: 10,
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: 'transparent',
   },
-  altBtnText: {
+  actionBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
+    textAlign: 'center',
+  },
+  secretCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderWidth: 1,
+    borderColor: '#000',
+    marginTop: 10,
+    backgroundColor: Colors.secondary,
+  },
+  secretCodeBtn: {
+    aspectRatio: 1,
+    backgroundColor: Colors.primaryGold,
+    borderLeftWidth: 1,
+    borderLeftColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secretCodeBtnArrow: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
+    color: Colors.black,
+  },
+  secretCodeInput: {
+    flex: 1,
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    textAlign: 'left',
+    color: Colors.black,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
 });
