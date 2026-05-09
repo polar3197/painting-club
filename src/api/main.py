@@ -203,7 +203,7 @@ async def login_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(ge
         if member.temp_password_expires_at and member.temp_password_expires_at < _dt.utcnow():
             raise HTTPException(status_code=401, detail="Temporary password has expired — contact an admin")
     token = create_token(member)
-    return Token(access_token=token, must_setup=bool(member.must_change_password), username=member.username)
+    return Token(access_token=token, must_setup=bool(member.must_change_password))
 
 
 @app.post("/members/redeem-setup-code", response_model=Token)
@@ -212,7 +212,7 @@ async def redeem_setup_code_endpoint(payload: SetupCodeIn, db: AsyncSession = De
     if not member:
         raise HTTPException(status_code=401, detail="Invalid or expired setup code")
     token = create_token(member)
-    return Token(access_token=token, must_setup=True, username=member.username)
+    return Token(access_token=token, must_setup=True)
 
 
 @app.post("/members/setup-account", response_model=MemberOut)
@@ -820,16 +820,14 @@ async def submit_application(payload: ApplicationIn, db: AsyncSession = Depends(
 @app.get("/admin/applications", response_model=list[ApplicationOut])
 async def get_applications(db: AsyncSession = Depends(get_db), _: Member = Depends(get_admin_member)):
     apps = await db_get_applications(db)
-    # surface the temp password for pending_setup applications so the admin UI can show it
-    # alongside the applicant's email (which is what they'll log in with).
     out: list[ApplicationOut] = []
     for app in apps:
-        temp_email = None
+        temp_username = None
         temp_password = None
         if app.status == "pending_setup" and app.member_id:
             m = (await db.execute(select(Member).filter(Member.id == app.member_id))).scalar_one_or_none()
             if m:
-                temp_email = app.email
+                temp_username = m.username
                 temp_password = m.temp_password_plaintext
         out.append(ApplicationOut(
             id=app.id,
@@ -842,7 +840,7 @@ async def get_applications(db: AsyncSession = Depends(get_db), _: Member = Depen
             reason=app.reason,
             status=app.status,
             created_at=app.created_at,
-            temp_email=temp_email,
+            temp_username=temp_username,
             temp_password=temp_password,
         ))
     return out
@@ -862,7 +860,7 @@ async def update_application_status(
         return ApplicationApproveOut(
             application_id=app.id,
             status=app.status,
-            temp_email=app.email,
+            temp_username=member.username,
             temp_password=temp_password,
             temp_password_expires_at=member.temp_password_expires_at,
         )

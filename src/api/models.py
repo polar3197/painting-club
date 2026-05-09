@@ -48,7 +48,6 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     must_setup: bool = False
-    username: str
 
 
 class SetupAccountIn(BaseModel):
@@ -162,7 +161,7 @@ class ApplicationOut(BaseModel):
     reason: str | None
     status: str
     created_at: datetime
-    temp_email: str | None = None
+    temp_username: str | None = None
     temp_password: str | None = None
 
 class ApplicationStatusUpdate(BaseModel):
@@ -171,7 +170,7 @@ class ApplicationStatusUpdate(BaseModel):
 class ApplicationApproveOut(BaseModel):
     application_id: uuid.UUID
     status: str
-    temp_email: str
+    temp_username: str
     temp_password: str
     temp_password_expires_at: datetime
 

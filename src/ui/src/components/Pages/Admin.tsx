@@ -59,9 +59,9 @@ const ReportRow = ({
     </div>
 );
 
-const TempCreds = ({ email, password }: { email: string; password: string }) => {
-    const [copied, setCopied] = useState<"" | "email" | "pw">("");
-    const copy = (value: string, which: "email" | "pw") => {
+const TempCreds = ({ username, password }: { username: string; password: string }) => {
+    const [copied, setCopied] = useState<"" | "un" | "pw">("");
+    const copy = (value: string, which: "un" | "pw") => {
         navigator.clipboard.writeText(value);
         setCopied(which);
         setTimeout(() => setCopied(""), 1200);
@@ -69,10 +69,10 @@ const TempCreds = ({ email, password }: { email: string; password: string }) => 
     return (
         <div className="temp-creds">
             <div className="temp-creds-row">
-                <span className="temp-creds-label">login email:</span>
-                <code className="temp-creds-value">{email}</code>
-                <button className="temp-creds-copy" onClick={() => copy(email, "email")}>
-                    {copied === "email" ? "copied" : "copy"}
+                <span className="temp-creds-label">login username:</span>
+                <code className="temp-creds-value">{username}</code>
+                <button className="temp-creds-copy" onClick={() => copy(username, "un")}>
+                    {copied === "un" ? "copied" : "copy"}
                 </button>
             </div>
             <div className="temp-creds-row">
@@ -101,8 +101,8 @@ const ApplicationRow = ({
             {app.known_member && <p className="application-meta">knows: {app.known_member}</p>}
             {app.reason && <p className="application-reason">"{app.reason}"</p>}
             <p className="application-date">{new Date(app.created_at).toLocaleDateString()}</p>
-            {app.status === "pending_setup" && app.temp_email && app.temp_password && (
-                <TempCreds email={app.temp_email} password={app.temp_password} />
+            {app.status === "pending_setup" && app.temp_username && app.temp_password && (
+                <TempCreds username={app.temp_username} password={app.temp_password} />
             )}
         </div>
         <div className="application-row-actions">
@@ -214,7 +214,7 @@ const Admin = () => {
 
         if (status === "approved" && isApproval(res)) {
             setApplications(apps => apps.map(a => a.id === id
-                ? { ...a, status: res.status, temp_email: res.temp_email, temp_password: res.temp_password }
+                ? { ...a, status: res.status, temp_username: res.temp_username, temp_password: res.temp_password }
                 : a));
         } else {
             setApplications(apps => apps.map(a => a.id === id ? { ...a, status } : a));

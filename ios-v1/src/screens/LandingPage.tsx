@@ -40,19 +40,17 @@ export default function LandingPage() {
   const [acceptingTerms, setAcceptingTerms] = useState(false);
 
   const handleLogin = async () => {
-    const identifier = username.trim().toLowerCase();
-    if (!identifier || !password.trim()) return;
+    const normalized = username.trim().toLowerCase();
+    if (!normalized || !password.trim()) return;
     try {
-      const res = await login_user({ username: identifier, password: password.trim() });
-      // Server returns the canonical username, in case the user logged in with their email.
-      const realUsername = res.username;
+      const res = await login_user({ username: normalized, password: password.trim() });
       if (res.must_setup) {
         // Temp-password user: route to setup with the token; skip auth.login() until they've
         // chosen a real username + password.
         (navigation as any).navigate('SetupAccount', { token: res.access_token });
         return;
       }
-      const profile = await get_profile(realUsername, res.access_token);
+      const profile = await get_profile(normalized, res.access_token);
       // Apple guideline 1.2: gate UGC access on terms acceptance.
       if (!profile.terms_accepted_at) {
         setPendingTerms({ username: profile.username, token: res.access_token, role: profile.role });
@@ -134,7 +132,7 @@ export default function LandingPage() {
           ) : !notMember ? (
             <>
               <View style={styles.inputRow}>
-                <Text style={styles.inputLabel}>un / email:</Text>
+                <Text style={styles.inputLabel}>un:</Text>
                 <TextInput
                   style={styles.input}
                   value={username}
