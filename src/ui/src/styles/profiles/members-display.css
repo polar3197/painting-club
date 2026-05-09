@@ -64,6 +64,10 @@
     flex: 30;
 }
 
+.member-pic img {
+    object-fit: cover;
+}
+
 .art-card-img {
     flex: 40;
 }
