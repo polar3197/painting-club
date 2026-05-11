@@ -28,19 +28,19 @@ export default function Home() {
         <Text style={styles.messageText}>The goal is to center art around sincerity.</Text>
         <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          I truly believe you see a person's intent in every brush stroke - and I am sure this goes for other mediums too.
+          I truly believe you see a person's intent in every brush stroke - and I am sure this goes for other mediums too. If the intention is sincere then it is good.
         </Text>
         <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          As realism is conquered, abstract, impressionism, are all conquered as well, and AI can conquer the ones to come, it is the sincerity in art that shines through. Painting Club is for sincere art.
+          As AI learns to keep up and outperform all artists the only metric worth grading art on is sincerity. So Painting Club is here to foster that community.
         </Text>
         <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          Its a random fun spot for art, a place to inspire and be inspired by others
+          It is a random fun spot for art, a place to inspire and be inspired by others
         </Text>
         <View style={styles.spacer} />
         <Text style={styles.messageText}>
-          — its kinda also my secret hope to create a internet haven, safe from algorithms and warped value systems.
+          — its also been my longtime secret hope for there to be an internet platform safe from predatory algorithms and warped value systems.
         </Text>
       </View>
     </ScrollView>

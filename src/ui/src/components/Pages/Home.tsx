@@ -39,11 +39,15 @@ export default function Home() {
               <br></br>
               <p>I built this space for artists to share their art.</p>
               <br></br>
-              <p>The goal is to center art and sincerity.</p>
+              <p>The goal is to center art around sincerity.</p>
               <br></br>
-              <p>Its a random fun spot for art, a place to inspire and be inspired by others </p>
+              <p>I truly believe you see a person's intent in every brush stroke - and I am sure this goes for other mediums too. If the intention is sincere then it is good.</p>
               <br></br>
-              <p>— its kinda also my secret hope to create a internet haven, safe from algorithms and warped value systems.</p>
+              <p>As AI learns to keep up and outperform all artists the only metric worth grading art on is sincerity. So Painting Club is here to foster that community.</p>
+              <br></br>
+              <p>It is a random fun spot for art, a place to inspire and be inspired by others</p>
+              <br></br>
+              <p>— its also been my longtime secret hope for there to be an internet platform safe from predatory algorithms and warped value systems.</p>
               <br></br>
               <div className="stamp-wrapper">
                 <img src='/imgs/groups.png' width='120px'></img>
