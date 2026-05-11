@@ -53,25 +53,42 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
 
   const translateY = useRef(new Animated.Value(0)).current;
 
-  // Swipe the panel down to dismiss. No inner ScrollView, so vertical
-  // gestures always belong to the panel — no gesture conflict.
-  const panResponder = useRef(
+  const handleDrag = (dy: number) => {
+    if (dy > 0) translateY.setValue(dy);
+  };
+  const handleRelease = (dy: number) => {
+    if (dy > 120) {
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(onClose);
+    } else {
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+    }
+  };
+
+  // Capture-on-move handler for the whole panel — claims a vertical drag
+  // started on top of inputs/pressables once it's clearly vertical.
+  const panelPanResponder = useRef(
     PanResponder.create({
-      // Capture-phase variants run before children claim the touch, so the panel
-      // can hijack a vertical drag that started on a TextInput / Pressable.
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponderCapture: (_, g) =>
         g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) translateY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 120) {
-          Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 200, useNativeDriver: true }).start(onClose);
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
-        }
-      },
+      onPanResponderMove: (_, g) => handleDrag(g.dy),
+      onPanResponderRelease: (_, g) => handleRelease(g.dy),
+      onPanResponderTerminationRequest: () => false,
+    })
+  ).current;
+
+  // Start-on-touch handler for the grab bar — pulling down from the handle
+  // works immediately, no move threshold.
+  const handlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, g) => handleDrag(g.dy),
+      onPanResponderRelease: (_, g) => handleRelease(g.dy),
       onPanResponderTerminationRequest: () => false,
     })
   ).current;
@@ -144,9 +161,9 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Animated.View
             style={[styles.panel, { transform: [{ translateY }] }]}
-            {...panResponder.panHandlers}
+            {...panelPanResponder.panHandlers}
           >
-            <View style={styles.swipeHandle}>
+            <View style={styles.swipeHandle} {...handlePanResponder.panHandlers}>
               <View style={styles.swipeBar} />
             </View>
             <View style={styles.formContent}>
@@ -193,7 +210,7 @@ const styles = StyleSheet.create({
   },
   swipeHandle: {
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 16,
   },
   swipeBar: {
     width: 40,

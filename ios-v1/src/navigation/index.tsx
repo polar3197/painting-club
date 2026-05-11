@@ -173,7 +173,16 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={Home} options={{ tabBarLabel: () => null }} />
+      <Tab.Screen
+        name="Home"
+        component={Home}
+        options={{
+          tabBarLabel: () => null,
+          // Other tabs sit slightly higher to leave room for their label below.
+          // Nudge the home icon down so it visually centers in its tab item.
+          tabBarIconStyle: { marginTop: 10 },
+        }}
+      />
       <Tab.Screen name="PeopleTab" component={PeopleStack} options={{ tabBarLabel: 'people' }} />
       <Tab.Screen name="ArtTab" component={ArtStack} options={{ tabBarLabel: 'art' }} />
       <Tab.Screen

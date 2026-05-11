@@ -102,7 +102,7 @@ export default function People() {
   );
 
   return (
-    <Pressable style={[styles.container, { paddingTop: insets.top }]} onPress={dismissDropdown}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.bannerWrap}>
         <Image
           source={require('../../assets/imgs/profiles.png')}
@@ -145,7 +145,7 @@ export default function People() {
           <Spinner size={48} />
         </View>
       )}
-    </Pressable>
+    </View>
   );
 }
 

@@ -123,7 +123,7 @@ export default function ArtGallery() {
   );
 
   return (
-    <Pressable style={[styles.container, { paddingTop: insets.top }]} onPress={dismissDropdown}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.bannerWrap}>
         <Image
           source={require('../../assets/imgs/art.png')}
@@ -166,7 +166,7 @@ export default function ArtGallery() {
           <Spinner size={48} />
         </View>
       )}
-    </Pressable>
+    </View>
   );
 }
 
