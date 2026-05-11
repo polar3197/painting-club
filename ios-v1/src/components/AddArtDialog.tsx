@@ -112,10 +112,15 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
         Alert.alert('Missing', 'Please select an image.');
         return;
       }
+      const title = (formData.title || '').trim();
+      if (!title) {
+        Alert.alert('Missing', 'Please enter a title.');
+        return;
+      }
       const createPayload: Visual2DIn = {
         username,
         medium: selectedMedium,
-        title: formData.title,
+        title,
         location: formData.location,
         song: formData.song,
         song_artist: formData.song_artist,

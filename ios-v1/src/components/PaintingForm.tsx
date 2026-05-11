@@ -65,7 +65,7 @@ export default function PaintingForm({ onDataChange, initialData }: PaintingForm
       <TextInput
         style={styles.input}
         value={form.title}
-        placeholder="title"
+        placeholder="title *"
         placeholderTextColor={Colors.textMuted}
         autoCapitalize="none"
         onChangeText={(v) => update({ title: v })}

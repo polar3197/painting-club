@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import CentralFilter, { CentralFilterHandle } from '../components/CentralFilter';
+import Spinner from '../components/Spinner';
 import { useOptions } from '../hooks';
 import { search_art, resolveImageUrl, thumbUrl, ArtResult } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -155,11 +156,16 @@ export default function ArtGallery() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.darkerGold}
-            colors={[Colors.darkerGold]}
+            tintColor="transparent"
+            colors={['transparent']}
           />
         }
       />
+      {refreshing && (
+        <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
+          <Spinner size={48} />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -168,6 +174,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.mainBg,
+  },
+  refreshSpinnerOverlay: {
+    position: 'absolute',
+    top: 8,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
   },
   bannerWrap: {
     alignItems: 'center',

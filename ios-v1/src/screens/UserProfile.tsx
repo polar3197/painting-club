@@ -7,8 +7,6 @@ import {
   TextInput,
   StyleSheet,
   Alert,
-  Animated,
-  Easing,
   Dimensions,
   LayoutChangeEvent,
   RefreshControl,
@@ -43,6 +41,7 @@ import ArtComments from '../components/ArtComments';
 import AddArtDialog from '../components/AddArtDialog';
 import AddMediaDialog from '../components/AddMediaDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Spinner from '../components/Spinner';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -51,31 +50,6 @@ type ProfileRoute = RouteProp<
   { UserProfile: { username: string; artId?: string; medium?: string } },
   'UserProfile'
 >;
-
-// --- Spinning loading icon (groups.png) ---
-function Spinner({ size = 80 }: { size?: number }) {
-  const rotation = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: 1400,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [rotation]);
-  const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  return (
-    <Animated.Image
-      source={require('../../assets/imgs/groups.png')}
-      style={{ width: size, height: size, transform: [{ rotate: spin }] }}
-      resizeMode="contain"
-    />
-  );
-}
 
 // --- Placeholder tile shown while an upload is in flight ---
 function PendingPiece({ uri, title, aspectRatio }: { uri: string; title: string; aspectRatio: number }) {
@@ -336,6 +310,7 @@ export default function UserProfile() {
     }
   }, [profile, selectedMedium]);
 
+  const [profilePicVersion, setProfilePicVersion] = useState(0);
   const pickAndUploadProfilePic = async () => {
     if (!profile) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -348,6 +323,9 @@ export default function UserProfile() {
     const type = asset.mimeType || 'image/jpeg';
     const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
     setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
+    // Bust the thumbnail cache — the URL is keyed by member id and stable,
+    // so expo-image would otherwise show the old cached thumb.
+    setProfilePicVersion(Date.now());
     setProfileZoom(false);
   };
 
@@ -478,11 +456,17 @@ export default function UserProfile() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={Colors.darkerGold}
-          colors={[Colors.darkerGold]}
+          // Hide the native spinner — we render a spinning groups.png overlay below.
+          tintColor="transparent"
+          colors={['transparent']}
         />
       }
     >
+      {refreshing && (
+        <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
+          <Spinner size={48} />
+        </View>
+      )}
       {/* Profile zoom — block lives on the back of this dialog for non-owners. */}
       {profileZoom && profile.profile_pic_path && (
         <ArtZoomIn
@@ -564,7 +548,11 @@ export default function UserProfile() {
                 {profile.profile_pic_path ? (
                   <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                     <Image
-                      source={{ uri: profileThumbUrl(profile.id) }}
+                      source={{
+                        uri:
+                          profileThumbUrl(profile.id) +
+                          (profilePicVersion ? `?v=${profilePicVersion}` : ''),
+                      }}
                       transition={200}
                       priority="high"
                       style={styles.profilePic}
@@ -1023,6 +1011,14 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  refreshSpinnerOverlay: {
+    position: 'absolute',
+    top: 8,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
   },
   artDetails: {
     paddingHorizontal: 4,

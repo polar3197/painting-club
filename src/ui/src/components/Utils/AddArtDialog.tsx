@@ -76,10 +76,15 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
                 alert("Please select an image.");
                 return;
             }
+            const title = (formData.title || "").trim();
+            if (!title) {
+                alert("Please enter a title.");
+                return;
+            }
             const createPayload: Visual2DIn = {
                 username,
                 medium: selectedMedium,
-                title: formData.title,
+                title,
                 location: formData.location,
                 song: formData.song,
                 song_artist: formData.song_artist,

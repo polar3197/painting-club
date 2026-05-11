@@ -173,7 +173,7 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={Home} options={{ tabBarLabel: 'home' }} />
+      <Tab.Screen name="Home" component={Home} options={{ tabBarLabel: () => null }} />
       <Tab.Screen name="PeopleTab" component={PeopleStack} options={{ tabBarLabel: 'people' }} />
       <Tab.Screen name="ArtTab" component={ArtStack} options={{ tabBarLabel: 'art' }} />
       <Tab.Screen

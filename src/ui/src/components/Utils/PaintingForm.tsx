@@ -83,7 +83,7 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
         <div className="painting-title">
             <input
                 value={form.title}
-                placeholder="title"
+                placeholder="title *"
                 onChange={(e) => update({ title: e.target.value })}
             />
         </div>
