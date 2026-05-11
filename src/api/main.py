@@ -445,7 +445,7 @@ async def search_members(
 @app.get("/media", response_model=list[MediaOut])
 async def list_media(db: AsyncSession = Depends(get_db)):
     rows = await db_list_media(db)
-    return [MediaOut(id=r.id, name=r.name, type=r.type) for r in rows]
+    return [MediaOut(id=r.id, name=r.name) for r in rows]
 
 
 @app.post("/media", response_model=MediaOut)
@@ -460,7 +460,7 @@ async def create_media(
     if not name:
         raise HTTPException(status_code=400, detail="name required")
     row = await db_create_media(db, name)
-    return MediaOut(id=row.id, name=row.name, type=row.type)
+    return MediaOut(id=row.id, name=row.name)
 
 
 @app.post("/members/addmedia")
