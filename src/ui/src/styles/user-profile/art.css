@@ -1,5 +1,14 @@
 
 
+@keyframes pending-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.pending-spinner {
+    animation: pending-spin 1.4s linear infinite;
+}
+
 .art-wrapper {
     position: relative;
     display: flex;

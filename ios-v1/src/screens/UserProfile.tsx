@@ -7,6 +7,8 @@ import {
   TextInput,
   StyleSheet,
   Alert,
+  Animated,
+  Easing,
   Dimensions,
   LayoutChangeEvent,
   RefreshControl,
@@ -23,13 +25,17 @@ import {
   remove_visual_2d,
   update_profile,
   add_member_media,
+  add_new_visual_2d,
   get_search_options,
   resolveImageUrl,
   thumbUrl,
   profileThumbUrl,
   upload_profile_picture,
+  get_media,
   Visual2DOut,
+  Visual2DIn,
   Profile,
+  MediaType,
 } from '../api';
 import Dropdown from '../components/Dropdown';
 import ArtZoomIn from '../components/ArtZoomIn';
@@ -45,6 +51,55 @@ type ProfileRoute = RouteProp<
   { UserProfile: { username: string; artId?: string; medium?: string } },
   'UserProfile'
 >;
+
+// --- Spinning loading icon (groups.png) ---
+function Spinner({ size = 80 }: { size?: number }) {
+  const rotation = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 1400,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [rotation]);
+  const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.Image
+      source={require('../../assets/imgs/groups.png')}
+      style={{ width: size, height: size, transform: [{ rotate: spin }] }}
+      resizeMode="contain"
+    />
+  );
+}
+
+// --- Placeholder tile shown while an upload is in flight ---
+function PendingPiece({ uri, title, aspectRatio }: { uri: string; title: string; aspectRatio: number }) {
+  return (
+    <View style={styles.artElement}>
+      <View style={styles.artVisual}>
+        <View style={[styles.artVisualInner, { aspectRatio }]}>
+          <Image
+            source={{ uri }}
+            style={[styles.artImage, { opacity: 0.35 }]}
+            contentFit="contain"
+          />
+          <View style={styles.pendingOverlay}>
+            <Spinner size={64} />
+          </View>
+        </View>
+      </View>
+      <View style={styles.artDetails}>
+        <Text style={styles.artTitle}>{title || 'uploading…'}</Text>
+        <Text style={styles.artDetailText}>uploading…</Text>
+      </View>
+    </View>
+  );
+}
 
 // --- Visual2DPiece sub-component ---
 function Visual2DPiece({
@@ -204,6 +259,37 @@ export default function UserProfile() {
   const [art, setArt] = useState<Visual2DOut[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingPieces, setPendingPieces] = useState<
+    { tempId: string; medium: string; uri: string; title: string; aspectRatio: number }[]
+  >([]);
+
+  const startUpload = useCallback((payload: Visual2DIn) => {
+    const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const aspectRatio =
+      payload.width && payload.height && payload.height > 0
+        ? Number(payload.width) / Number(payload.height)
+        : 1;
+    setPendingPieces((p) => [
+      ...p,
+      {
+        tempId,
+        medium: payload.medium,
+        uri: payload.file.uri,
+        title: payload.title || 'uploading…',
+        aspectRatio,
+      },
+    ]);
+    add_new_visual_2d(token, payload)
+      .then(() => {
+        setRefresh((r) => r + 1);
+      })
+      .catch((err: any) => {
+        Alert.alert('Error', err?.message || 'Upload failed');
+      })
+      .finally(() => {
+        setPendingPieces((p) => p.filter((x) => x.tempId !== tempId));
+      });
+  }, [token]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -303,14 +389,16 @@ export default function UserProfile() {
     return unsubscribe;
   }, [navigation, isFocused]);
 
+  const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+  useEffect(() => {
+    get_media().then(setAllMedia).catch(() => {});
+  }, []);
+  const isV2d =
+    !!selectedMedium && allMedia.find((m) => m.name === selectedMedium)?.type === 'visual_2d';
+
   // Fetch art
   useEffect(() => {
     if (!selectedMedium || !username) return;
-    const isV2d =
-      selectedMedium === 'painting' ||
-      selectedMedium === 'drawing' ||
-      selectedMedium === 'stained glass' ||
-      selectedMedium === 'photography';
     if (isV2d) {
       get_members_visual_2d(username, selectedMedium)
         .then((data) => {
@@ -326,7 +414,7 @@ export default function UserProfile() {
       setArt([]);
       setAvailableKeywords([]);
     }
-  }, [username, selectedMedium, refresh]);
+  }, [username, selectedMedium, refresh, isV2d]);
 
   const filteredArt = useMemo(() => {
     if (selectedKeywords.length === 0) return art;
@@ -413,6 +501,7 @@ export default function UserProfile() {
           username={username}
           onSuccess={() => setRefresh((r) => r + 1)}
           onClose={() => setShowAddDialog(false)}
+          onCreate={startUpload}
         />
       )}
       {editingPiece && selectedMedium && (
@@ -631,22 +720,30 @@ export default function UserProfile() {
           </Pressable>
         )}
 
-        {selectedMedium &&
-        (selectedMedium === 'painting' ||
-          selectedMedium === 'drawing' ||
-          selectedMedium === 'stained glass' ||
-          selectedMedium === 'photography') ? (
-          filteredArt.map((piece) => (
-            <Visual2DPiece
-              key={piece.id}
-              isOwner={profile.is_owner}
-              piece={piece}
-              viewerBlockedByOwner={!!profile.viewer_blocked_by_owner}
-              onRemove={() => setRefresh((r) => r + 1)}
-              onEdit={() => setEditingPiece(piece)}
-              onLayout={(e) => handleArtLayout(piece.id, e)}
-            />
-          ))
+        {selectedMedium && isV2d ? (
+          <>
+            {pendingPieces
+              .filter((p) => p.medium === selectedMedium)
+              .map((p) => (
+                <PendingPiece
+                  key={p.tempId}
+                  uri={p.uri}
+                  title={p.title}
+                  aspectRatio={p.aspectRatio}
+                />
+              ))}
+            {filteredArt.map((piece) => (
+              <Visual2DPiece
+                key={piece.id}
+                isOwner={profile.is_owner}
+                piece={piece}
+                viewerBlockedByOwner={!!profile.viewer_blocked_by_owner}
+                onRemove={() => setRefresh((r) => r + 1)}
+                onEdit={() => setEditingPiece(piece)}
+                onLayout={(e) => handleArtLayout(piece.id, e)}
+              />
+            ))}
+          </>
         ) : (
           <Text style={styles.emptyText}>{selectedMedium} is empty atm</Text>
         )}
@@ -921,6 +1018,11 @@ const styles = StyleSheet.create({
   artImage: {
     width: '100%',
     height: '100%',
+  },
+  pendingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   artDetails: {
     paddingHorizontal: 4,

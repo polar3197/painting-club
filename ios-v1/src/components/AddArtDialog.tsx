@@ -1,15 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, Pressable, StyleSheet, Alert, Animated, PanResponder, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { add_new_visual_2d, update_visual_2d, Visual2DOut, get_media, MediaType } from '../api';
+import { update_visual_2d, Visual2DOut, Visual2DIn, get_media, MediaType } from '../api';
 import PaintingForm from './PaintingForm';
 import Dropdown from './Dropdown';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const isVisual2D = (medium: string) =>
-  medium === 'drawing' || medium === 'painting' || medium === 'stained glass' || medium === 'photography';
 
 interface AddArtDialogProps {
   selectedMedium: string;
@@ -18,19 +15,22 @@ interface AddArtDialogProps {
   onClose: () => void;
   onMoved?: (newMedium: string) => void;
   piece?: Visual2DOut;
+  // When provided, the dialog hands the create payload to the parent (which
+  // owns the upload + placeholder tile) instead of firing the request itself.
+  onCreate?: (payload: Visual2DIn) => void;
 }
 
-export default function AddArtDialog({ selectedMedium, username, onSuccess, onClose, onMoved, piece }: AddArtDialogProps) {
+export default function AddArtDialog({ selectedMedium, username, onSuccess, onClose, onMoved, piece, onCreate }: AddArtDialogProps) {
   const { token } = useAuth();
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
   const [newMedium, setNewMedium] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!piece) return;
     get_media().then(setAllMedia).catch(() => {});
-  }, [piece]);
+  }, []);
 
   const currentType = allMedia.find((m) => m.name === selectedMedium)?.type ?? null;
+  const isVisual2D = currentType === 'visual_2d';
   const compatibleMedia = piece && currentType
     ? allMedia.filter((m) => m.type === currentType && m.name !== selectedMedium).map((m) => m.name)
     : [];
@@ -76,55 +76,59 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
     })
   ).current;
 
-  const submit = async () => {
-    if (!formData) return;
-    try {
-      if (isVisual2D(selectedMedium)) {
-        if (piece) {
-          const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
-          await update_visual_2d(piece.id, token, {
-            title: formData.title,
-            location: formData.location,
-            song: formData.song,
-            song_artist: formData.song_artist,
-            date: formData.date || null,
-            width: formData.width,
-            height: formData.height,
-            keywords: formData.keywords
-              ? formData.keywords
-                  .split(',')
-                  .map((k: string) => k.trim())
-                  .filter(Boolean)
-              : null,
-            comments_enabled: formData.comments_enabled,
-            medium: moving,
-          });
-          if (moving && onMoved) onMoved(moving);
-        } else {
-          if (!formData.file) {
-            Alert.alert('Missing', 'Please select an image.');
-            return;
-          }
-          await add_new_visual_2d(token, {
-            username,
-            medium: selectedMedium,
-            title: formData.title,
-            location: formData.location,
-            song: formData.song,
-            song_artist: formData.song_artist,
-            date: formData.date,
-            width: formData.width,
-            height: formData.height,
-            keywords: formData.keywords,
-            comments_enabled: formData.comments_enabled,
-            file: formData.file,
-          });
-        }
-      }
+  const submit = () => {
+    if (!formData || !isVisual2D) return;
+
+    if (piece) {
+      const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
+      const updatePayload = {
+        title: formData.title,
+        location: formData.location,
+        song: formData.song,
+        song_artist: formData.song_artist,
+        date: formData.date || null,
+        width: formData.width,
+        height: formData.height,
+        keywords: formData.keywords
+          ? formData.keywords
+              .split(',')
+              .map((k: string) => k.trim())
+              .filter(Boolean)
+          : null,
+        comments_enabled: formData.comments_enabled,
+        medium: moving,
+      };
       onClose();
-      onSuccess();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong');
+      update_visual_2d(piece.id, token, updatePayload)
+        .then(() => {
+          if (moving && onMoved) onMoved(moving);
+          onSuccess();
+        })
+        .catch((err: any) => {
+          Alert.alert('Error', err?.message || 'Something went wrong');
+        });
+    } else {
+      if (!formData.file) {
+        Alert.alert('Missing', 'Please select an image.');
+        return;
+      }
+      const createPayload: Visual2DIn = {
+        username,
+        medium: selectedMedium,
+        title: formData.title,
+        location: formData.location,
+        song: formData.song,
+        song_artist: formData.song_artist,
+        date: formData.date,
+        width: formData.width,
+        height: formData.height,
+        keywords: formData.keywords,
+        comments_enabled: formData.comments_enabled,
+        file: formData.file,
+      };
+      onClose();
+      // Parent owns the upload + placeholder tile.
+      onCreate?.(createPayload);
     }
   };
 
@@ -141,7 +145,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
               <View style={styles.swipeBar} />
             </View>
             <View style={styles.formContent}>
-              {isVisual2D(selectedMedium) && (
+              {isVisual2D && (
                 <PaintingForm onDataChange={setFormData} initialData={piece} />
               )}
               {piece && compatibleMedia.length > 0 && (

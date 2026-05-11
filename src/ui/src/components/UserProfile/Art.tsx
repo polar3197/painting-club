@@ -8,7 +8,7 @@ import ArtComments from "../Utils/ArtComments";
 import ArtImage from "../Utils/ArtImage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import { useAuth } from "../../context/AuthContext";
-import { get_members_visual_2d, remove_visual_2d, Visual2DOut } from "../../api";
+import { get_members_visual_2d, remove_visual_2d, add_new_visual_2d, Visual2DOut, Visual2DIn, get_media, MediaType } from "../../api";
 
 import '../../styles/user-profile/art.css';
 
@@ -107,14 +107,38 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
     const [showDialog, setShowDialog] = useState(false);
     const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
     const [art, setArt] = useState<Visual2DOut[]>([]);
+    const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+    const [pendingPieces, setPendingPieces] = useState<
+        { tempId: string; medium: string; previewUrl: string; title: string; aspectRatio: number }[]
+    >([]);
+
+    const startUpload = (payload: Visual2DIn) => {
+        const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const previewUrl = URL.createObjectURL(payload.file);
+        const aspectRatio =
+            payload.width && payload.height && Number(payload.height) > 0
+                ? Number(payload.width) / Number(payload.height)
+                : 1;
+        setPendingPieces(p => [...p, { tempId, medium: payload.medium, previewUrl, title: payload.title || "uploading…", aspectRatio }]);
+        const token = localStorage.getItem("token");
+        add_new_visual_2d(token, payload)
+            .then(() => onRefresh())
+            .catch((err: any) => alert(err?.message || "Upload failed"))
+            .finally(() => {
+                setPendingPieces(p => p.filter(x => x.tempId !== tempId));
+                URL.revokeObjectURL(previewUrl);
+            });
+    };
+
+    useEffect(() => {
+        get_media().then(setAllMedia).catch(() => {});
+    }, []);
+
+    const isVisual2D = !!selectedMedium && allMedia.find(m => m.name === selectedMedium)?.type === "visual_2d";
 
     useEffect(() => {
         const getArt = async() => {
-            if (selectedMedium == "painting" ||
-                selectedMedium == "drawing" ||
-                selectedMedium == "stained glass" ||
-                selectedMedium == "photography")
-            {
+            if (selectedMedium && isVisual2D) {
                 const data = await get_members_visual_2d(profile.username, selectedMedium);
                 setArt(data);
                 const unique = [...new Set(data.flatMap(p => p.keywords ?? []))];
@@ -125,7 +149,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
         }
 
         getArt();
-    }, [profile.username, selectedMedium, refresh]);
+    }, [profile.username, selectedMedium, refresh, isVisual2D]);
 
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -157,6 +181,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                     selectedMedium={selectedMedium}
                     username={profile.username}
                     onSuccess={onRefresh}
+                    onCreate={startUpload}
                 />
             }
             { editingPiece && selectedMedium &&
@@ -170,13 +195,32 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                 />
             }
             <div className="art">
-                {(selectedMedium == "painting" ||
-                    selectedMedium == "stained glass" ||
-                    selectedMedium == "drawing" ||
-                    selectedMedium == "photography")
+                {isVisual2D
                     ?
-                    (selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art)
-                        .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)
+                    <>
+                        {pendingPieces.filter(p => p.medium === selectedMedium).map(p => (
+                            <div key={p.tempId} className="art-element">
+                                <div className="art-visual" style={{ position: "relative" }}>
+                                    <img src={p.previewUrl} alt={p.title} style={{ width: "100%", height: "auto", display: "block", border: "2px black solid", opacity: 0.35 }} />
+                                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                                        <img src="/imgs/groups.png" className="pending-spinner" alt="" style={{ width: 64, height: 64 }} />
+                                    </div>
+                                </div>
+                                <div className="art-right">
+                                    <div className="art-details">
+                                        <div className="art-details-header">
+                                            <div className="art-details-title">{p.title}</div>
+                                        </div>
+                                        <div className="art-details-elements">
+                                            <div className="art-details-element">uploading…</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {(selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art)
+                            .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)}
+                    </>
                 :
                 `${selectedMedium} is empty atm`}
             </div>
