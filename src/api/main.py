@@ -586,6 +586,11 @@ async def upload_profile_picture(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(contents)
 
+    # Remove the other-extension sibling so re-uploads that change format don't
+    # leave orphaned bytes on disk (e.g. earlier .png after switching to .jpg).
+    other_ext = "jpg" if ext == "png" else "png"
+    abs_path(f"/static/profile/{current_member.id}.{other_ext}").unlink(missing_ok=True)
+
     # Thumb generation is slow on the Pi; run it after the response returns so
     # clients see a snappy success and the thumb appears on next refresh.
     background_tasks.add_task(generate_profile_thumb, str(current_member.id), path)
