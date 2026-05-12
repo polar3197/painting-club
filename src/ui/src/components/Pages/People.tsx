@@ -1,30 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Fuse from "fuse.js";
 import { useMembers } from "../../hooks/useMembers";
 import { useOptions } from "../../hooks/useOptions";
-import { Profile, profileThumbUrl } from "../../api";
+import { Profile, profilePicSrc } from "../../api";
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
 import "../../styles/profiles/members-display.css";
 
 const MemberCard = ({ member }: { member: Profile }) => {
   const navigate = useNavigate();
-  const fullSrc = member.profile_pic_path || `/imgs/${member.id}.png`;
-  // Start with the placeholder thumb (tiny, loads instantly), swap to full-res when ready.
-  const [displaySrc, setDisplaySrc] = useState(
-    member.profile_pic_path ? profileThumbUrl(member.id) : fullSrc,
-  );
-
-  useEffect(() => {
-    if (!member.profile_pic_path) {
-      setDisplaySrc(fullSrc);
-      return;
-    }
-    setDisplaySrc(profileThumbUrl(member.id));
-    const full = new Image();
-    full.onload = () => setDisplaySrc(fullSrc);
-    full.src = fullSrc;
-  }, [member.id, member.profile_pic_path, fullSrc]);
+  const auth = useAuth();
+  const versions = auth?.profilePicVersions ?? {};
+  const src = profilePicSrc(member, versions) ?? `/imgs/${member.id}.png`;
 
   return (
     <div className='display-card member-card' onClick={() => navigate(`/members/${member.username}/profile`)}>
@@ -37,7 +25,7 @@ const MemberCard = ({ member }: { member: Profile }) => {
         )}
       </div>
       <div className='member-pic'>
-        <img src={displaySrc} width="130" height="155" />
+        <img src={src} width="130" height="155" />
       </div>
     </div>
   );

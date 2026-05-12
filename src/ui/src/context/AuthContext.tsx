@@ -10,6 +10,10 @@ interface AuthContextType {
   refreshBlocks: () => Promise<void>;
   noteBlocked: (username: string) => void;
   noteUnblocked: (username: string) => void;
+  // Per-member cache-bust counters. Bump on profile-pic re-upload so the same
+  // canonical URL (`/static/profile/<id>.<ext>`) refetches.
+  profilePicVersions: Record<string, number>;
+  bumpProfilePic: (memberId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -22,6 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.getItem("role")
   );
   const [blockedUsernames, setBlockedUsernames] = useState<string[]>([]);
+  const [profilePicVersions, setProfilePicVersions] = useState<Record<string, number>>({});
+
+  const bumpProfilePic = useCallback((memberId: string) => {
+    setProfilePicVersions((prev) => ({ ...prev, [memberId]: Date.now() }));
+  }, []);
 
   const refreshBlocks = useCallback(async () => {
     const tok = localStorage.getItem("token");
@@ -72,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ currentUser, currentRole, blockedUsernames, login, logout, refreshBlocks, noteBlocked, noteUnblocked }}
+      value={{ currentUser, currentRole, blockedUsernames, login, logout, refreshBlocks, noteBlocked, noteUnblocked, profilePicVersions, bumpProfilePic }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,5 +1,6 @@
-import { Profile, upload_profile_picture, profileThumbUrl } from "../../api";
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
+import { Profile, upload_profile_picture, profilePicSrc } from "../../api";
+import { Dispatch, SetStateAction, useRef, useState } from 'react';
+import { useAuth } from "../../context/AuthContext";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import UserInfo from "./UserInfo";
 import "../../styles/user-profile/user-deets.css";
@@ -17,26 +18,18 @@ const UserDetails = (
 
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const hasPic = !!profile.profile_pic_path;
-  const imgSrc = hasPic ? (profile.profile_pic_path as string) : "";
-  // Start with the small placeholder thumb for instant paint; swap to the full-res
-  // original once it finishes preloading in the background.
-  const [displaySrc, setDisplaySrc] = useState(
-    hasPic ? profileThumbUrl(profile.id) : "",
-  );
-
-  useEffect(() => {
-    if (!hasPic) return;
-    setDisplaySrc(profileThumbUrl(profile.id));
-    const full = new Image();
-    full.onload = () => setDisplaySrc(imgSrc);
-    full.src = imgSrc;
-  }, [profile.id, profile.profile_pic_path, imgSrc, hasPic]);
+  const auth = useAuth();
+  const versions = auth?.profilePicVersions ?? {};
+  const src = profilePicSrc(profile, versions);
+  const hasPic = !!src;
 
   const handleUpload = async (file: File) => {
     const token = localStorage.getItem("token");
     const result = await upload_profile_picture(file, token);
     setProfile({ ...profile, profile_pic_path: result.profile_pic_path });
+    // Same-extension re-uploads write to the same URL — bump versions so corner
+    // and zoom both refetch.
+    auth?.bumpProfilePic(profile.id);
   };
 
   const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,10 +39,10 @@ const UserDetails = (
 
   return (
     <>
-    {isZoomedIn && hasPic &&
+    {isZoomedIn && src &&
       <ArtZoomIn
         isOwner={profile.is_owner}
-        imgPath={imgSrc}
+        imgPath={src}
         setIsZoomedIn={setIsZoomedIn}
         onChangePic={profile.is_owner ? handleUpload : undefined}
         blockableUsername={!profile.is_owner ? profile.username : undefined}
@@ -68,7 +61,7 @@ const UserDetails = (
         {hasPic ? (
           <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
             <img
-              src={displaySrc}
+              src={src!}
               width="180"
               height="200"
               // @ts-ignore — fetchpriority isn't in the standard React img types yet

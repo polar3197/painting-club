@@ -11,6 +11,18 @@ export function profileThumbUrl(memberId: string): string {
   return `/static/profile-thumbs/${memberId}.jpg`;
 }
 
+/** Cache-busted URL for a member's profile pic — null if none uploaded.
+ *  `versions` comes from AuthContext; it bumps when the current user re-uploads,
+ *  so re-uploads of the same extension still force the browser to refetch. */
+export function profilePicSrc(
+  profile: { id: string; profile_pic_path: string | null },
+  versions: Record<string, number> = {},
+): string | null {
+  if (!profile.profile_pic_path) return null;
+  const v = versions[profile.id];
+  return `${profile.profile_pic_path}${v ? `?v=${v}` : ''}`;
+}
+
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
