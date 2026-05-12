@@ -283,7 +283,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         hidden_media=hidden_media if is_owner else [],
         is_owner=is_owner,
         role=member_row.role or "member",
-        profile_pic_path=member_row.profile_pic_path,
+        profile_pic_path=versioned_pic_path(member_row.profile_pic_path),
         terms_accepted_at=member_row.terms_accepted_at if is_owner else None,
         viewer_blocked_by_owner=viewer_blocked_by_owner,
         blocked_usernames=blocked_usernames,
@@ -435,7 +435,7 @@ async def search_members(
             media=list(media),
             is_owner=is_owner,
             role=member_row.role or "member",
-            profile_pic_path=member_row.profile_pic_path,
+            profile_pic_path=versioned_pic_path(member_row.profile_pic_path),
         )
         profiles.append(profile)
     print(profiles)
@@ -503,6 +503,20 @@ THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before ful
 def abs_path(rel: str) -> Path:
     # rel is an absolute-looking web path like "/static/foo.jpg" — anchor it under STATIC_ROOT
     return STATIC_ROOT / rel.lstrip("/")
+
+
+def versioned_pic_path(rel: str | None) -> str | None:
+    """Append `?v=<file-mtime>` to a profile-pic path. This makes the URL change
+    whenever the bytes on disk change, so every client (web, iOS, others) refetches
+    after any user re-uploads — even if they did it on a different device.
+    Falls back to the raw path if the file doesn't exist yet."""
+    if not rel:
+        return rel
+    try:
+        mtime = int(abs_path(rel).stat().st_mtime)
+    except (FileNotFoundError, OSError):
+        return rel
+    return f"{rel}?v={mtime}"
 
 def thumb_file(art_id: str) -> Path:
     return STATIC_ROOT / "static" / "thumbs" / f"{art_id}.jpg"
@@ -597,7 +611,7 @@ async def upload_profile_picture(
 
     current_member.profile_pic_path = file_path
     await db.commit()
-    return {"profile_pic_path": file_path}
+    return {"profile_pic_path": versioned_pic_path(file_path)}
 
 
 @app.post("/art/upload/visual-2d")
