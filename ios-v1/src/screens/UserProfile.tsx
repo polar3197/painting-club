@@ -26,8 +26,8 @@ import {
   add_new_visual_2d,
   get_search_options,
   resolveImageUrl,
+  profilePicSrc,
   thumbUrl,
-  profileThumbUrl,
   upload_profile_picture,
   get_media,
   Visual2DOut,
@@ -219,7 +219,7 @@ export default function UserProfile() {
   const route = useRoute<ProfileRoute>();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
-  const { currentUser, token } = useAuth();
+  const { currentUser, token, profilePicVersions, bumpProfilePic } = useAuth();
 
   const params = route.params as { username?: string; artId?: string; medium?: string } | undefined;
   const username = params?.username || currentUser || '';
@@ -310,7 +310,6 @@ export default function UserProfile() {
     }
   }, [profile, selectedMedium]);
 
-  const [profilePicVersion, setProfilePicVersion] = useState(0);
   const pickAndUploadProfilePic = async () => {
     if (!profile) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -323,9 +322,9 @@ export default function UserProfile() {
     const type = asset.mimeType || 'image/jpeg';
     const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
     setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
-    // Bust the thumbnail cache — the URL is keyed by member id and stable,
-    // so expo-image would otherwise show the old cached thumb.
-    setProfilePicVersion(Date.now());
+    // Same-extension re-uploads write to the same URL — bump the version so
+    // every surface that reads `profilePicSrc(profile, versions)` refetches.
+    bumpProfilePic(profile.id);
     setProfileZoom(false);
   };
 
@@ -471,7 +470,7 @@ export default function UserProfile() {
       {profileZoom && profile.profile_pic_path && (
         <ArtZoomIn
           isOwner={profile.is_owner}
-          imgPath={profile.profile_pic_path}
+          imgPath={profilePicSrc(profile, profilePicVersions) ?? profile.profile_pic_path}
           onClose={() => setProfileZoom(false)}
           onChangePic={profile.is_owner ? pickAndUploadProfilePic : undefined}
           blockableUsername={!profile.is_owner ? profile.username : undefined}
@@ -548,11 +547,7 @@ export default function UserProfile() {
                 {profile.profile_pic_path ? (
                   <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                     <Image
-                      source={{
-                        uri:
-                          profileThumbUrl(profile.id) +
-                          (profilePicVersion ? `?v=${profilePicVersion}` : ''),
-                      }}
+                      source={{ uri: profilePicSrc(profile, profilePicVersions) ?? '' }}
                       transition={200}
                       priority="high"
                       style={styles.profilePic}

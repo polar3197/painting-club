@@ -8,7 +8,8 @@ import Fuse from 'fuse.js';
 import CentralFilter, { CentralFilterHandle } from '../components/CentralFilter';
 import Spinner from '../components/Spinner';
 import { useMembers, useOptions } from '../hooks';
-import { resolveImageUrl, profileThumbUrl, Profile } from '../api';
+import { resolveImageUrl, profilePicSrc, Profile } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { PeopleStackParamList } from '../navigation/types';
 
@@ -19,6 +20,7 @@ const CARD_WIDTH = (SCREEN_WIDTH - 60) / 2;
 export default function People() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
+  const { profilePicVersions } = useAuth();
   const [members, , , refetchMembers] = useMembers('', '');
   const [options] = useOptions();
   const [query, setQuery] = useState('');
@@ -79,7 +81,7 @@ export default function People() {
       onPress={() => navigation.navigate('UserProfile', { username: item.username })}
     >
       <Image
-        source={{ uri: item.profile_pic_path ? profileThumbUrl(item.id) : resolveImageUrl(`/imgs/${item.id}.png`) }}
+        source={{ uri: profilePicSrc(item, profilePicVersions) ?? resolveImageUrl(`/imgs/${item.id}.png`) }}
         transition={200}
         style={styles.cardImage}
         contentFit="cover"
