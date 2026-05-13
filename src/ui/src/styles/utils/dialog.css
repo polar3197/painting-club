@@ -565,11 +565,20 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 .collection-zoom-grid {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     padding: 20px;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: min-content;
     gap: 20px;
+    /* hide scrollbar — keep scroll behavior, just no visible bar */
+    scrollbar-width: none;
+}
+
+.collection-zoom-grid::-webkit-scrollbar {
+    display: none;
 }
 
 .collection-zoom-cell {
