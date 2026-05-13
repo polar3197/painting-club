@@ -2,7 +2,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func, desc, nulls_last
 
-from db.models import Member, Media, Media_Members, Visual2D, WrittenForm, Keyword, KeywordArt, Art
+from db.models import Member, Media, Media_Members, Visual2D, WrittenForm, Keyword, KeywordArt, Art, Collection
+from db.db_ops.collections import db_get_or_create_collection
 
 async def db_list_media(db: AsyncSession):
     result = await db.execute(select(Media).order_by(Media.name))
@@ -280,16 +281,17 @@ async def db_get_written_form(db: AsyncSession, username: str, medium: str):
         return None
 
     result = await db.execute(
-        select(WrittenForm)
+        select(WrittenForm, Collection.name)
+        .outerjoin(Collection, Collection.id == WrittenForm.collection_id)
         .filter(WrittenForm.creator_id == member_id, WrittenForm.media_id == media_id)
         .order_by(nulls_last(desc(WrittenForm.date)))
     )
-    pieces = result.scalars().all()
+    rows = result.all()
 
     art_with_keywords = []
-    for art in pieces:
+    for art, collection_name in rows:
         keywords = await db_get_art_keywords(db=db, art_id=art.id)
-        art_with_keywords.append((art, keywords))
+        art_with_keywords.append((art, keywords, collection_name))
 
     return art_with_keywords
 
@@ -304,6 +306,7 @@ async def db_add_written_form(
         date=None,
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
+        collection_name: str | None = None,
     ) -> str:
     username = username.lower()
     member_result = await db.execute(select(Member.id).filter(Member.username==username))
@@ -316,12 +319,18 @@ async def db_add_written_form(
     if not media_id:
         raise ValueError(f"Medium '{medium}' not found")
 
+    collection_id = None
+    if collection_name and collection_name.strip():
+        collection = await db_get_or_create_collection(db, member_id, media_id, collection_name)
+        collection_id = collection.id
+
     new_art = WrittenForm(
         id=art_id,
         title=title,
         date=date,
         creator_id=member_id,
         media_id=media_id,
+        collection_id=collection_id,
         file_path=file_path,
         comments_enabled=comments_enabled,
     )
@@ -353,6 +362,8 @@ async def db_update_written_form(
     keywords: list[str] | None = None,
     comments_enabled: bool = False,
     medium: str | None = None,
+    collection_name: str | None = None,
+    clear_collection: bool = False,
 ):
     result = await db.execute(select(WrittenForm).filter(WrittenForm.id == art_id))
     piece = result.scalar_one_or_none()
@@ -391,6 +402,12 @@ async def db_update_written_form(
     piece.title = title
     piece.date = date
     piece.comments_enabled = comments_enabled
+
+    if clear_collection:
+        piece.collection_id = None
+    elif collection_name is not None and collection_name.strip():
+        collection = await db_get_or_create_collection(db, piece.creator_id, piece.media_id, collection_name)
+        piece.collection_id = collection.id
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
 

@@ -10,6 +10,7 @@ import ConfirmDialog from "../Utils/ConfirmDialog";
 import { useAuth } from "../../context/AuthContext";
 import { get_members_visual_2d, remove_visual_2d, add_new_visual_2d, Visual2DOut, Visual2DIn, get_members_written_form, add_new_written_form, WrittenFormOut, WrittenFormIn, get_media, MediaType } from "../../api";
 import WrittenFormPiece from "./WrittenForm";
+import CollectionRow from "./CollectionRow";
 
 import '../../styles/user-profile/art.css';
 
@@ -258,30 +259,71 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                             .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)}
                     </>
                 ) : isWrittenForm ? (
-                    <>
-                        {pendingWrittenForms.filter(p => p.medium === selectedMedium).map(p => (
-                            <div key={p.tempId} className="art-element written-form">
-                                <div className="art-visual">
-                                    <div className="written-form-tile" style={{ opacity: 0.5 }}>
-                                        <div className="written-form-tile-badge">{p.ext}</div>
-                                        <div className="written-form-tile-title">{p.title}</div>
+                    (() => {
+                        const filtered = (selectedKeywords.length > 0
+                            ? writtenForms.filter(p => selectedKeywords.every(k => p.keywords?.includes(k)))
+                            : writtenForms);
+                        // Group by collection_id while preserving the original (date-desc)
+                        // ordering: a group's position in the list is set by its first piece.
+                        type Row =
+                            | { kind: "piece"; piece: WrittenFormOut }
+                            | { kind: "collection"; id: string; name: string; pieces: WrittenFormOut[] };
+                        const groups: Record<string, { id: string; name: string; pieces: WrittenFormOut[] }> = {};
+                        const rows: Row[] = [];
+                        for (const p of filtered) {
+                            if (!p.collection_id) {
+                                rows.push({ kind: "piece", piece: p });
+                                continue;
+                            }
+                            if (!groups[p.collection_id]) {
+                                groups[p.collection_id] = { id: p.collection_id, name: p.collection_name ?? "(untitled collection)", pieces: [] };
+                                rows.push({ kind: "collection", id: p.collection_id, name: groups[p.collection_id].name, pieces: groups[p.collection_id].pieces });
+                            }
+                            groups[p.collection_id].pieces.push(p);
+                        }
+                        return <>
+                            {pendingWrittenForms.filter(p => p.medium === selectedMedium).map(p => (
+                                <div key={p.tempId} className="art-element written-form">
+                                    <div className="art-visual">
+                                        <div className="written-form-tile" style={{ opacity: 0.5 }}>
+                                            <div className="written-form-tile-badge">{p.ext}</div>
+                                            <div className="written-form-tile-title">{p.title}</div>
+                                        </div>
+                                    </div>
+                                    <div className="art-right">
+                                        <div className="art-details">
+                                            <div className="art-details-header">
+                                                <div className="art-details-title">{p.title}</div>
+                                            </div>
+                                            <div className="art-details-elements">
+                                                <div className="art-details-element">uploading…</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="art-right">
-                                    <div className="art-details">
-                                        <div className="art-details-header">
-                                            <div className="art-details-title">{p.title}</div>
-                                        </div>
-                                        <div className="art-details-elements">
-                                            <div className="art-details-element">uploading…</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {(selectedKeywords.length > 0 ? writtenForms.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : writtenForms)
-                            .map(piece => <WrittenFormPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingWrittenForm(piece)} />)}
-                    </>
+                            ))}
+                            {rows.map(row => row.kind === "piece"
+                                ? <WrittenFormPiece
+                                    key={row.piece.id}
+                                    isOwner={profile.is_owner}
+                                    piece={row.piece}
+                                    viewerBlockedByOwner={!!profile.viewer_blocked_by_owner}
+                                    onRemove={onRefresh}
+                                    onEdit={() => setEditingWrittenForm(row.piece)}
+                                />
+                                : <CollectionRow
+                                    key={row.id}
+                                    isOwner={profile.is_owner}
+                                    pieces={row.pieces}
+                                    collectionId={row.id}
+                                    collectionName={row.name}
+                                    username={profile.username}
+                                    selectedMedium={selectedMedium!}
+                                    onRefresh={onRefresh}
+                                />
+                            )}
+                        </>;
+                    })()
                 ) : (
                     `${selectedMedium} is empty atm`
                 )}

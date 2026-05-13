@@ -218,6 +218,30 @@
     height: 100%;
 }
 
+/* ---- collections: lilac row + stacked thumbnail ---- */
+.art-element.written-form.collection {
+    background-color: #f3eefb;
+}
+
+.written-form-stack {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.written-form-stack-layer {
+    position: absolute;
+    inset: 0;
+    background-color: #ffffff;
+    border: 1px black solid;
+    box-sizing: border-box;
+}
+
+.written-form-stack-top {
+    position: relative;
+    z-index: 1;
+}
+
 .art-right {
     display: flex;
     flex-direction: column;

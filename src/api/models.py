@@ -237,6 +237,8 @@ class WrittenFormOut(BaseModel):
     keywords: list[str] | None
     file_path: str
     comments_enabled: bool = False
+    collection_id: uuid.UUID | None = None
+    collection_name: str | None = None
 
 
 class WrittenFormUpdate(BaseModel):
@@ -245,4 +247,12 @@ class WrittenFormUpdate(BaseModel):
     keywords: list[str] | None = None
     comments_enabled: bool = False
     medium: str | None = None
+    collection_name: str | None = None
+    # Explicit signal to detach from any collection. Sending collection_name=""
+    # is treated as "no change"; this flag is the unambiguous removal.
+    clear_collection: bool = False
+
+
+class CollectionRename(BaseModel):
+    name: str
 

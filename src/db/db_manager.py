@@ -81,4 +81,9 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE member ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP"
         ))
+        # Collections — created in create_all but the FK column on art needs
+        # to be added to existing databases.
+        await conn.execute(text(
+            "ALTER TABLE art ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES collection(id)"
+        ))
     print("Migrations applied.")

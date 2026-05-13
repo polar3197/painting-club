@@ -37,6 +37,7 @@ from api.models import (
     Visual2DUpdate,
     WrittenFormOut,
     WrittenFormUpdate,
+    CollectionRename,
     SearchOptions,
     ArtResult,
     ApplicationIn,
@@ -118,6 +119,10 @@ from db.db_ops.media import (
     db_get_written_form,
     db_update_written_form,
     db_remove_written_form,
+)
+
+from db.db_ops.collections import (
+    db_rename_collection,
 )
 
 from db.db_ops.comments import (
@@ -771,6 +776,7 @@ async def upload_written_form(
     date: date | None = Form(None),
     keywords: str | None = Form(None),
     comments_enabled: bool = Form(False),
+    collection_name: str | None = Form(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
@@ -820,6 +826,7 @@ async def upload_written_form(
             keywords=keywords_list,
             file_path=file_path,
             comments_enabled=comments_enabled,
+            collection_name=collection_name,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)
@@ -840,8 +847,7 @@ async def get_written_form(
 
     pieces = []
     for result in results:
-        row = result[0]
-        kws = result[1]
+        row, kws, collection_name = result
         pieces.append(WrittenFormOut(
             id=row.id,
             title=row.title,
@@ -849,6 +855,8 @@ async def get_written_form(
             keywords=kws,
             file_path=row.file_path,
             comments_enabled=row.comments_enabled,
+            collection_id=row.collection_id,
+            collection_name=collection_name,
         ))
     return pieces
 
@@ -870,12 +878,30 @@ async def update_written_form(
             keywords=payload.keywords,
             comments_enabled=payload.comments_enabled,
             medium=payload.medium,
+            collection_name=payload.collection_name,
+            clear_collection=payload.clear_collection,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     return {"ok": True}
+
+
+@app.patch("/collections/{collection_id}")
+async def rename_collection(
+    collection_id: str,
+    payload: CollectionRename,
+    current_user: Member = Depends(get_current_member),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        col = await db_rename_collection(db, collection_id, current_user.id, payload.name)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return {"id": str(col.id), "name": col.name}
 
 
 @app.delete("/art/written-form/{art_id}")

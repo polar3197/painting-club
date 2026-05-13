@@ -420,6 +420,7 @@ export interface WrittenFormIn {
   date?: string;
   keywords?: string;
   comments_enabled?: boolean;
+  collection_name?: string;
   file: File;
 }
 
@@ -430,6 +431,8 @@ export interface WrittenFormOut {
   keywords: string[];
   file_path: string;
   comments_enabled: boolean;
+  collection_id: string | null;
+  collection_name: string | null;
 }
 
 export function add_new_written_form(token: string | null, payload: WrittenFormIn) {
@@ -440,6 +443,7 @@ export function add_new_written_form(token: string | null, payload: WrittenFormI
   if (payload.date) fd.append("date", payload.date);
   if (payload.keywords != null) fd.append("keywords", String(payload.keywords));
   if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
+  if (payload.collection_name) fd.append("collection_name", payload.collection_name);
   fd.append("file", payload.file);
 
   return request("/art/upload/written-form", {
@@ -463,6 +467,8 @@ export interface WrittenFormUpdatePayload {
   keywords?: string[] | null;
   comments_enabled?: boolean;
   medium?: string | null;
+  collection_name?: string | null;
+  clear_collection?: boolean;
 }
 
 export function update_written_form(id: string, token: string | null, payload: WrittenFormUpdatePayload) {
@@ -471,6 +477,14 @@ export function update_written_form(id: string, token: string | null, payload: W
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
   });
+}
+
+export function rename_collection(id: string, name: string, token: string | null): Promise<{ id: string; name: string }> {
+  return request(`/collections/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name }),
+  }) as Promise<{ id: string; name: string }>;
 }
 
 export interface CommentOut {

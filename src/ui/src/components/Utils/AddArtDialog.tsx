@@ -67,12 +67,15 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
 
             if (writtenPiece) {
                 const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
+                const collectionRaw = (formData.collection ?? "").trim();
                 const updatePayload = {
                     title,
                     date: formData.date || null,
                     keywords: formData.keywords ? formData.keywords.split(",").map((k: string) => k.trim()).filter(Boolean) : null,
                     comments_enabled: formData.comments_enabled,
                     medium: moving,
+                    collection_name: collectionRaw || null,
+                    clear_collection: !!writtenPiece.collection_id && collectionRaw === "",
                 };
                 setShowDialog(false);
                 update_written_form(writtenPiece.id, token, updatePayload)
@@ -91,6 +94,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
                 title,
                 date: formData.date,
                 keywords: formData.keywords,
+                collection_name: (formData.collection ?? "").trim() || undefined,
                 comments_enabled: formData.comments_enabled,
                 file: formData.files,
             };

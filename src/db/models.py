@@ -49,11 +49,24 @@ class Media_Members(Base):
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), primary_key=True)
     hidden = Column(Boolean, nullable=False, default=False)
 
+class Collection(Base):
+    """Groups pieces under a shared name within one (creator, medium). Only the
+    WrittenForm UI uses this today, but the column lives on Art so any subtype
+    can adopt it later."""
+    __tablename__ = "collection"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    creator_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
+    media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
+    name = Column(String(300), nullable=False)
+
+
 class Art(Base):
     __tablename__ = "art"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     creator_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
+    collection_id = Column(UUID(as_uuid=True), ForeignKey('collection.id'), nullable=True)
     title = Column(String(300), default="Untitled")
     date = Column(Date)
     file_path = Column(String(300))

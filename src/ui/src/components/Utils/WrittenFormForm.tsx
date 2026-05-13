@@ -15,12 +15,14 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
         title: string;
         date: string;
         keywords: string;
+        collection: string;
         comments_enabled: boolean;
         files: File | null; }>
         ({
             title: initialData?.title ?? "",
             date: initialData?.date ?? "",
             keywords: initialData?.keywords?.join(", ") ?? "",
+            collection: initialData?.collection_name ?? "",
             comments_enabled: initialData?.comments_enabled ?? false,
             files: null,
         });
@@ -92,6 +94,13 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
                 value={form.keywords}
                 placeholder="keywords"
                 onChange={(e) => update({ keywords: e.target.value })}
+            />
+        </div>
+        <div className="written-form-collection-field">
+            <input
+                value={form.collection}
+                placeholder="collection (optional)"
+                onChange={(e) => update({ collection: e.target.value })}
             />
         </div>
         <div className="painting-comments-toggle">
