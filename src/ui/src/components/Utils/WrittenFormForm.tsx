@@ -1,7 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { WrittenFormOut } from "../../api";
 
 const ACCEPTED = ".pdf,.txt,.docx,.md";
+const PREVIEW_LINES = 14;
+const TEXT_EXTS = new Set(["txt", "md"]);
 
 function detectExt(name: string): string {
     const m = name.toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -23,6 +25,7 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
             files: null,
         });
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [snippet, setSnippet] = useState<string | null>(null);
 
     const update = (patch: Record<string, any>) => {
         const next = { ...form, ...patch };
@@ -30,9 +33,19 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
         onDataChange(next);
     };
 
-    const handleFileChange = (file: File | null) => {
-        update({ files: file });
-    };
+    useEffect(() => {
+        if (!form.files) { setSnippet(null); return; }
+        const ext = detectExt(form.files.name);
+        if (!TEXT_EXTS.has(ext)) { setSnippet(null); return; }
+        let cancelled = false;
+        form.files.text()
+            .then(t => {
+                if (cancelled) return;
+                setSnippet(t.split(/\r?\n/).slice(0, PREVIEW_LINES).join("\n"));
+            })
+            .catch(() => { if (!cancelled) setSnippet(null); });
+        return () => { cancelled = true; };
+    }, [form.files]);
 
     const fileExt = form.files ? detectExt(form.files.name).toUpperCase() : "";
 
@@ -44,12 +57,16 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
                 ref={fileInputRef}
                 style={{ display: "none" }}
                 accept={ACCEPTED}
-                onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+                onChange={(e) => update({ files: e.target.files?.[0] ?? null })}
             />
             {form.files ? (
                 <div className="written-form-preview">
                     <div className="written-form-badge">{fileExt}</div>
-                    <div className="written-form-filename">{form.files.name}</div>
+                    {snippet ? (
+                        <pre className="written-form-preview-snippet">{snippet}</pre>
+                    ) : (
+                        <div className="written-form-filename">{form.files.name}</div>
+                    )}
                 </div>
             ) : (
                 "drop your writing here"

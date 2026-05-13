@@ -1,10 +1,14 @@
 import { useState } from "react";
 import ConfirmDialog from "../Utils/ConfirmDialog";
+import WrittenFormZoomIn from "../Utils/WrittenFormZoomIn";
+import { extFromPath, isTextExt, useWrittenFormText } from "../../hooks/useWrittenFormText";
 import { remove_written_form, WrittenFormOut } from "../../api";
 
-function extFromPath(path: string): string {
-    const m = path.toLowerCase().match(/\.([a-z0-9]+)$/);
-    return m ? m[1].toUpperCase() : "FILE";
+const PREVIEW_LINES = 12;
+
+function previewSnippet(text: string | null): string {
+    if (text == null) return "";
+    return text.split(/\r?\n/).slice(0, PREVIEW_LINES).join("\n");
 }
 
 const WrittenFormPiece = ({
@@ -18,8 +22,11 @@ const WrittenFormPiece = ({
     onRemove: () => void;
 }) => {
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+    const [isZoomedIn, setIsZoomedIn] = useState(false);
 
     const ext = extFromPath(piece.file_path);
+    const textContent = useWrittenFormText(piece.file_path);
+    const snippet = previewSnippet(textContent);
 
     const removePiece = async () => {
         await remove_written_form(piece.id, localStorage.getItem("token"));
@@ -29,6 +36,13 @@ const WrittenFormPiece = ({
 
     return (
         <>
+        {isZoomedIn && (
+            <WrittenFormZoomIn
+                title={piece.title}
+                filePath={piece.file_path}
+                setIsZoomedIn={setIsZoomedIn}
+            />
+        )}
         {showRemoveConfirm &&
             <ConfirmDialog
                 onConfirm={removePiece}
@@ -36,10 +50,14 @@ const WrittenFormPiece = ({
             />
         }
         <div id={`art-${piece.id}`} className="art-element written-form">
-            <div className="art-visual" onClick={() => window.open(piece.file_path, "_blank", "noopener,noreferrer")}>
+            <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
                 <div className="written-form-tile">
-                    <div className="written-form-tile-badge">{ext}</div>
-                    <div className="written-form-tile-title">{piece.title}</div>
+                    <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
+                    {isTextExt(ext) && snippet ? (
+                        <pre className="written-form-tile-snippet">{snippet}</pre>
+                    ) : (
+                        <div className="written-form-tile-title">{piece.title}</div>
+                    )}
                 </div>
             </div>
             <div className="art-right">
@@ -58,7 +76,7 @@ const WrittenFormPiece = ({
                     {isOwner && (
                         <div className="art-element-buttons">
                             <div className="remove">
-                                <button onClick={() => setShowRemoveConfirm(true)}>remove</button>
+                                <button onClick={(e) => { e.stopPropagation(); setShowRemoveConfirm(true); }}>remove</button>
                             </div>
                         </div>
                     )}
