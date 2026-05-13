@@ -310,15 +310,22 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 .written-form-preview {
+    /* fill the dropbox; never overflow it. badge sits at the top, snippet
+       takes the rest with clipped overflow so the page-shaped frame stays clean. */
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
+    gap: 8px;
+    padding: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
     text-align: center;
+    overflow: hidden;
 }
 
 .written-form-badge {
+    flex: 0 0 auto;
     border: 1px black solid;
     padding: 4px 10px;
     font-family: 'Courier New', Courier, monospace;
@@ -334,56 +341,48 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 .written-form-preview-snippet {
+    flex: 1 1 auto;
     margin: 0;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
     font-family: 'Times New Roman', Times, serif;
     font-size: 11px;
     line-height: 1.4;
     color: #222;
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 70%;
-    overflow: hidden;
-    width: 100%;
     text-align: left;
 }
 
-/* ----- zoom-in (click-to-paginate paper) ----- */
-.written-form-zoom-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    max-height: 90vh;
-}
-
+/* ----- zoom-in (full-document scrollable paper) ----- */
 .written-form-zoom-page {
-    height: 85vh;
+    /* big sheet of paper, fixed 8.5x11 proportions, scrolls internally */
+    height: 95vh;
     aspect-ratio: 8.5 / 11;
+    max-width: 90vw;
     background-color: #ffffff;
     border: 1px black solid;
     box-shadow: rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
-    padding: 48px 56px;
+    padding: 56px 72px;
     box-sizing: border-box;
-    overflow: hidden;
-    cursor: pointer;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .written-form-zoom-text {
     margin: 0;
-    width: 100%;
-    height: 100%;
     font-family: Cambria, Georgia, 'Times New Roman', serif;
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: 15px;
+    line-height: 1.7;
     color: #111;
     white-space: pre-wrap;
     word-break: break-word;
-    overflow: hidden;
 }
 
 .written-form-zoom-loading {
     width: 100%;
-    height: 100%;
+    min-height: 60vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -393,7 +392,7 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 
 .written-form-zoom-fallback {
     width: 100%;
-    height: 100%;
+    min-height: 60vh;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -420,13 +419,6 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     font-family: 'Times New Roman', Times, serif;
     color: #111;
     text-decoration: underline;
-}
-
-.written-form-zoom-footer {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    color: #fafaf5;
-    letter-spacing: 1px;
 }
 /* --------------------------------------------- */
 /* ========================================= */
