@@ -51,8 +51,8 @@ const WrittenFormPiece = ({
                 onCancel={() => setShowRemoveConfirm(false)}
             />
         }
-        <div id={`art-${piece.id}`} className="art-element written-form">
-            <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
+        <div id={`art-${piece.id}`} className="art-element written-form clickable" onClick={() => setIsZoomedIn(true)}>
+            <div className="art-visual">
                 <div className="written-form-tile">
                     <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
                     {isTextExt(ext) && snippet ? (

@@ -515,6 +515,108 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 /* --------------------------------------------- */
 
+/* ----- collection zoom-in (4-column thumbnail grid) ----- */
+.collection-zoom-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.45);
+    z-index: 110;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.collection-zoom-panel {
+    width: 80vw;
+    max-width: 1000px;
+    max-height: 90vh;
+    background-color: #e3d3b0;
+    border: 1px black solid;
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
+    display: flex;
+    flex-direction: column;
+}
+
+.collection-zoom-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px black solid;
+}
+
+.collection-zoom-title {
+    flex: 1;
+    font-family: Cambria, Georgia, 'Times New Roman', serif;
+    font-size: 26px;
+}
+
+.collection-zoom-close {
+    width: 24px;
+    height: 24px;
+    border: 1px solid black;
+    background-color: rgb(255, 250, 245);
+    cursor: pointer;
+}
+
+.collection-zoom-close:hover {
+    background-color: lightcoral;
+}
+
+.collection-zoom-grid {
+    overflow-y: auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.collection-zoom-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.collection-zoom-cell:hover .collection-zoom-tile {
+    box-shadow: rgba(17, 17, 26, 0.2) 0px 4px 12px;
+}
+
+.collection-zoom-tile {
+    width: 100%;
+    aspect-ratio: 8.5 / 11;
+    /* override the small piece-tile font so thumbnails read clearly in the grid */
+}
+
+.collection-zoom-tile .written-form-tile-snippet {
+    font-size: 7px;
+}
+
+.collection-zoom-cell-title {
+    font-family: Cambria, Georgia, 'Times New Roman', serif;
+    font-size: 14px;
+    text-align: center;
+    width: 100%;
+    word-break: break-word;
+}
+
+@media (max-width: 1024px) {
+    .collection-zoom-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .collection-zoom-panel {
+        width: 95vw;
+    }
+    .collection-zoom-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+/* --------------------------------------------- */
+
 /* ----- zoom-in (full-document scrollable paper) ----- */
 .written-form-zoom-page {
     /* big sheet of paper, fixed 8.5x11 proportions, scrolls internally */

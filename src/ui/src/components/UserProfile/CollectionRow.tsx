@@ -1,5 +1,5 @@
 import { useState } from "react";
-import WrittenFormZoomIn from "../Utils/WrittenFormZoomIn";
+import CollectionZoomIn from "./CollectionZoomIn";
 import CollectionPanel from "./CollectionPanel";
 import { extFromPath, isTextExt, useWrittenFormText } from "../../hooks/useWrittenFormText";
 import { WrittenFormOut } from "../../api";
@@ -54,10 +54,10 @@ const CollectionRow = ({
     return (
         <>
         {isZoomedIn && (
-            <WrittenFormZoomIn
-                title={topPiece.title}
-                filePath={topPiece.file_path}
-                setIsZoomedIn={setIsZoomedIn}
+            <CollectionZoomIn
+                collectionName={collectionName}
+                pieces={ordered}
+                onClose={() => setIsZoomedIn(false)}
             />
         )}
         {showPanel && (
@@ -71,8 +71,8 @@ const CollectionRow = ({
                 onRefresh={onRefresh}
             />
         )}
-        <div id={`collection-${collectionId}`} className="art-element written-form collection">
-            <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
+        <div id={`collection-${collectionId}`} className="art-element written-form collection clickable" onClick={() => setIsZoomedIn(true)}>
+            <div className="art-visual">
                 <div className="written-form-stack">
                     {/* Back layers stay within the art-visual footprint by rotating
                         instead of translating — their corners peek behind the front

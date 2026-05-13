@@ -167,6 +167,10 @@
     align-items: flex-start;
 }
 
+.art-element.written-form.clickable {
+    cursor: pointer;
+}
+
 .art-element.written-form .art-visual {
     flex: 0 0 auto;
     width: 110px;
