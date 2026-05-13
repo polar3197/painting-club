@@ -355,17 +355,30 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     text-align: left;
 }
 
-.written-form-collection-field {
+/* Stack the written-form fields tightly on the right of the dropbox.
+   Order top to bottom: title → date → keywords → collection → comments. */
+.written-form-form .painting-title       { top: 40px; }
+.written-form-form .painting-date        { top: 90px; }
+.written-form-form .keywords             { top: 140px; }
+.written-form-form .written-form-collection-field {
     position: absolute;
     width: 250px;
     height: 20px;
-    top: 340px;
+    top: 190px;
     right: 20px;
     border-bottom: 1px black solid;
 }
+.written-form-form .painting-comments-toggle { top: 240px; }
 
 @media (max-width: 640px) {
-    .written-form-collection-field {
+    .written-form-form .painting-title,
+    .written-form-form .painting-date,
+    .written-form-form .keywords,
+    .written-form-form .written-form-collection-field,
+    .written-form-form .painting-comments-toggle {
+        top: auto;
+    }
+    .written-form-form .written-form-collection-field {
         position: static;
         width: calc(100% - 24px);
         margin: 8px 12px 0 12px;

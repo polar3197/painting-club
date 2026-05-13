@@ -52,7 +52,7 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
     const fileExt = form.files ? detectExt(form.files.name).toUpperCase() : "";
 
     return (
-        <>
+        <div className="written-form-form">
         <div className="written-form-dropbox" onClick={() => fileInputRef.current?.click()}>
             <input
                 type="file"
@@ -115,7 +115,7 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
                 <div className="toggle-thumb" />
             </div>
         </div>
-        </>
+        </div>
     );
 };
 
