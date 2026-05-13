@@ -74,13 +74,16 @@ const CollectionRow = ({
         <div id={`collection-${collectionId}`} className="art-element written-form collection">
             <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
                 <div className="written-form-stack">
-                    {/* Back layers cascade DOWN-RIGHT from the front tile —
-                        the deeper a layer is in the stack, the further it shifts. */}
+                    {/* Back layers cascade DOWN-RIGHT from the front tile.
+                        Render deepest first so shallower layers paint over them —
+                        otherwise the bottom-right overlap shows the deeper layer
+                        on top and the depth illusion breaks. */}
                     {Array.from({ length: stackLayers - 1 }).map((_, i) => {
-                        const offset = (i + 1) * 5;
+                        const depth = stackLayers - 1 - i; // i=0 deepest, decreasing
+                        const offset = depth * 6;
                         return (
                             <div
-                                key={i}
+                                key={depth}
                                 className="written-form-stack-layer"
                                 style={{ transform: `translate(${offset}px, ${offset}px)` }}
                             />
