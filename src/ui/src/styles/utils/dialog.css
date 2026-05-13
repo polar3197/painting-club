@@ -527,9 +527,10 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 .collection-zoom-panel {
-    width: 80vw;
-    max-width: 1000px;
-    max-height: 90vh;
+    /* match the WrittenFormZoomIn paper dimensions */
+    height: 95vh;
+    aspect-ratio: 8.5 / 11;
+    max-width: 90vw;
     background-color: #e3d3b0;
     border: 1px black solid;
     box-shadow: rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
@@ -608,9 +609,6 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 @media (max-width: 640px) {
-    .collection-zoom-panel {
-        width: 95vw;
-    }
     .collection-zoom-grid {
         grid-template-columns: repeat(2, 1fr);
     }
