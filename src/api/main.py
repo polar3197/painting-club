@@ -125,7 +125,7 @@ from db.db_ops.comments import (
 )
     
 from db.session import get_db
-from db.db_manager import init_db, empty_db, run_migrations
+from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
 from db.models import Member, Media, Media_Members, Art, Comment
 
 from api.auth import create_token, decode_token
@@ -137,6 +137,7 @@ bearer_optional = HTTPBearer(auto_error=False)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await pre_init_migrations()
     await init_db()
     await run_migrations()
     yield

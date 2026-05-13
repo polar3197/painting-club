@@ -22,6 +22,17 @@ _VISUAL_2D_SEED = ("painting", "drawing", "stained glass", "photography", "self 
 _WRITTEN_FORM_SEED = ("poetry", "writing")
 
 
+async def pre_init_migrations():
+    """Migrations that MUST run before Base.metadata.create_all.
+
+    create_all would otherwise create an empty 'written_form' table on first boot
+    after the rename, leaving us unable to ALTER ... RENAME the legacy table."""
+    async with engine.begin() as conn:
+        # Rename written_word -> written_form before create_all sees the new model.
+        # No-op on fresh DBs (the IF EXISTS guard) and on already-migrated DBs.
+        await conn.execute(text("ALTER TABLE IF EXISTS written_word RENAME TO written_form"))
+
+
 async def run_migrations():
     async with engine.begin() as conn:
         await conn.execute(text("ALTER TABLE media ADD COLUMN IF NOT EXISTS type VARCHAR(50)"))
@@ -36,7 +47,6 @@ async def run_migrations():
         # before we seed 'written_form' so seeding is a no-op on already-migrated rows.
         await conn.execute(text("UPDATE media SET type='written_form' WHERE type='written_word'"))
         await conn.execute(text("UPDATE art   SET type='written_form' WHERE type='written_word'"))
-        await conn.execute(text("ALTER TABLE IF EXISTS written_word RENAME TO written_form"))
         await conn.execute(
             text(
                 "UPDATE media SET type='written_form' "
