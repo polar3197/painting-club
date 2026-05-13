@@ -164,7 +164,7 @@
 
 .art-element.written-form {
     /* compact: visual is a small page-shaped thumbnail, metadata gets the rest */
-    align-items: stretch;
+    align-items: flex-start;
 }
 
 .art-element.written-form .art-visual {
@@ -221,11 +221,6 @@
 /* ---- collections: lilac row + stacked thumbnail ---- */
 .art-element.written-form.collection {
     background-color: #f3eefb;
-}
-
-/* Don't let the flex row stretch the page-shaped visual taller than 8.5x11. */
-.art-element.written-form .art-visual {
-    align-self: flex-start;
 }
 
 .written-form-stack {
