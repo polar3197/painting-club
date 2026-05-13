@@ -223,10 +223,17 @@
     background-color: #f3eefb;
 }
 
+/* Don't let the flex row stretch the page-shaped visual taller than 8.5x11. */
+.art-element.written-form .art-visual {
+    align-self: flex-start;
+}
+
 .written-form-stack {
     position: relative;
     width: 100%;
     height: 100%;
+    /* let back layers peek beyond the top tile */
+    overflow: visible;
 }
 
 .written-form-stack-layer {
@@ -235,6 +242,7 @@
     background-color: #ffffff;
     border: 1px black solid;
     box-sizing: border-box;
+    z-index: 0;
 }
 
 .written-form-stack-top {

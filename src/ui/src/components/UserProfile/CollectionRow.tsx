@@ -74,13 +74,18 @@ const CollectionRow = ({
         <div id={`collection-${collectionId}`} className="art-element written-form collection">
             <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
                 <div className="written-form-stack">
-                    {Array.from({ length: stackLayers - 1 }).map((_, i) => (
-                        <div
-                            key={i}
-                            className="written-form-stack-layer"
-                            style={{ transform: `translate(${(i + 1) * 3}px, ${(i + 1) * 3}px)` }}
-                        />
-                    ))}
+                    {/* Back layers peek out toward the top-left of the front tile —
+                        the deeper a layer is in the stack, the further it shifts. */}
+                    {Array.from({ length: stackLayers - 1 }).map((_, i) => {
+                        const offset = (i + 1) * 4;
+                        return (
+                            <div
+                                key={i}
+                                className="written-form-stack-layer"
+                                style={{ transform: `translate(${-offset}px, ${-offset}px)` }}
+                            />
+                        );
+                    })}
                     <div className="written-form-tile written-form-stack-top">
                         <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
                         {isTextExt(ext) && snippet ? (
