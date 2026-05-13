@@ -2,8 +2,10 @@
   "expo": {
     "name": "Painting Club",
     "slug": "painting-club",
-    "version": "1.0.1",
-    "runtimeVersion": { "policy": "appVersion" },
+    "version": "1.0.2",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "updates": {
       "url": "https://u.expo.dev/c8eb4621-cd28-48b3-94fa-d9c56d0b287b"
     },
@@ -18,7 +20,7 @@
       "backgroundColor": "#fffaf5"
     },
     "ios": {
-      "buildNumber": "3",
+      "buildNumber": "4",
       "supportsTablet": false,
       "bundleIdentifier": "com.paintingclub.app",
       "infoPlist": {
