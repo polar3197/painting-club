@@ -576,7 +576,10 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     overflow-y: auto;
     padding: 20px;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    /* minmax(0, 1fr) — without the 0 floor, an item's min-content (a long
+       unbreakable word, the aspect-ratio'd tile, etc.) can force the column
+       wider than the container and overflow the panel on the left side. */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-auto-rows: min-content;
     gap: 20px;
     justify-items: stretch;
@@ -589,6 +592,8 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 .collection-zoom-cell {
+    /* match the grid's track minimum so the cell never forces a wider track */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
