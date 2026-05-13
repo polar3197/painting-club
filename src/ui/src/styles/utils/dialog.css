@@ -572,9 +572,10 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     overflow-y: auto;
     padding: 20px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     grid-auto-rows: min-content;
     gap: 20px;
+    justify-items: stretch;
     /* hide scrollbar — keep scroll behavior, just no visible bar */
     scrollbar-width: none;
 }
@@ -611,12 +612,6 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     text-align: center;
     width: 100%;
     word-break: break-word;
-}
-
-@media (max-width: 1024px) {
-    .collection-zoom-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
 }
 
 @media (max-width: 640px) {
