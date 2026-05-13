@@ -218,9 +218,9 @@
     height: 100%;
 }
 
-/* ---- collections: lilac row + stacked thumbnail ---- */
+/* ---- collections: faded-novel-cover row + stacked thumbnail ---- */
 .art-element.written-form.collection {
-    background-color: #f3eefb;
+    background-color: #e3d3b0;
 }
 
 .written-form-stack {

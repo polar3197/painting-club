@@ -400,7 +400,7 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     width: 60vw;
     max-width: 720px;
     max-height: 80vh;
-    background-color: #f3eefb;
+    background-color: #e3d3b0;
     border: 1px black solid;
     box-shadow: rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
     display: flex;
