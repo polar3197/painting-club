@@ -25,12 +25,28 @@ _WRITTEN_FORM_SEED = ("poetry", "writing")
 async def pre_init_migrations():
     """Migrations that MUST run before Base.metadata.create_all.
 
-    create_all would otherwise create an empty 'written_form' table on first boot
-    after the rename, leaving us unable to ALTER ... RENAME the legacy table."""
+    Handles three boot states for the legacy written_word table:
+    - Fresh DB: neither table exists. No-op; create_all will create written_form.
+    - Already migrated: only written_form exists. No-op.
+    - Stuck mid-migration: both tables exist because an earlier buggy boot ran
+      create_all before this rename. The empty written_form is dropped and the
+      legacy table is renamed in its place. Safe because written_form can't have
+      rows yet — the buggy boot crashed before serving any upload."""
     async with engine.begin() as conn:
-        # Rename written_word -> written_form before create_all sees the new model.
-        # No-op on fresh DBs (the IF EXISTS guard) and on already-migrated DBs.
-        await conn.execute(text("ALTER TABLE IF EXISTS written_word RENAME TO written_form"))
+        await conn.execute(text(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'written_word'
+                ) THEN
+                    DROP TABLE IF EXISTS written_form;
+                    ALTER TABLE written_word RENAME TO written_form;
+                END IF;
+            END $$;
+            """
+        ))
 
 
 async def run_migrations():

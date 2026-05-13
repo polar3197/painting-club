@@ -289,18 +289,18 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 /* =============== WRITTEN FORM ============= */
+/* Mirrors .painting-dropbox 1:1 except the proportions: portrait 8.5x11
+   instead of a free aspect ratio. Same border, hover, font, and corner anchor. */
 .written-form-dropbox {
     display: flex;
     justify-content: center;
     align-items: center;
     position: absolute;
-    /* 8.5x11 page proportion within the dialog frame */
     height: 70%;
     aspect-ratio: 8.5 / 11;
     top: 20px;
     left: 20px;
     border: 1px black solid;
-    background-color: rgb(255, 250, 245);
     font-family: 'Times New Roman', Times, serif;
     cursor: pointer;
 }
@@ -332,7 +332,6 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     font-size: 14px;
     word-break: break-all;
 }
-/* ========================================= */
 /* ========================================= */
 
 @media (max-width: 1024px) {
