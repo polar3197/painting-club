@@ -36,6 +36,7 @@ from api.models import (
     Visual2DOut,
     Visual2DUpdate,
     WrittenFormOut,
+    WrittenFormUpdate,
     SearchOptions,
     ArtResult,
     ApplicationIn,
@@ -115,6 +116,7 @@ from db.db_ops.media import (
     db_remove_visual_2d,
     db_add_written_form,
     db_get_written_form,
+    db_update_written_form,
     db_remove_written_form,
 )
 
@@ -849,6 +851,31 @@ async def get_written_form(
             comments_enabled=row.comments_enabled,
         ))
     return pieces
+
+
+@app.patch("/art/written-form/{art_id}")
+async def update_written_form(
+    art_id: str,
+    payload: WrittenFormUpdate,
+    current_user: Member = Depends(get_current_member),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await db_update_written_form(
+            db=db,
+            art_id=art_id,
+            current_member_id=current_user.id,
+            title=payload.title,
+            date=payload.date,
+            keywords=payload.keywords,
+            comments_enabled=payload.comments_enabled,
+            medium=payload.medium,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return {"ok": True}
 
 
 @app.delete("/art/written-form/{art_id}")

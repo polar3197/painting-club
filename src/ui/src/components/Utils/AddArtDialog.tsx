@@ -4,10 +4,10 @@ import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import PaintingForm from "../Utils/PaintingForm";
 import WrittenFormForm from "../Utils/WrittenFormForm";
 import "../../styles/utils/dialog.css";
-import { update_visual_2d, Visual2DOut, Visual2DIn, WrittenFormIn, get_media, MediaType } from "../../api";
+import { update_visual_2d, update_written_form, Visual2DOut, Visual2DIn, WrittenFormOut, WrittenFormIn, get_media, MediaType } from "../../api";
 
 // this element will be z= 100 and centered relative to the whole page
-const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMoved, piece, onCreate, onCreateWrittenForm }
+const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMoved, piece, writtenPiece, onCreate, onCreateWrittenForm }
     : {
         setShowDialog : Dispatch<SetStateAction<boolean>>;
         selectedMedium : string;
@@ -15,6 +15,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
         onSuccess: () => void;
         onMoved?: (newMedium: string) => void;
         piece?: Visual2DOut;
+        writtenPiece?: WrittenFormOut;
         // Parent owns the upload + placeholder tile when supplied.
         onCreate?: (payload: Visual2DIn) => void;
         onCreateWrittenForm?: (payload: WrittenFormIn) => void;
@@ -32,6 +33,12 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
             keywords: piece.keywords?.join(", ") ?? "",
             comments_enabled: piece.comments_enabled ?? false,
             files: null,
+        } : writtenPiece ? {
+            title: writtenPiece.title ?? "",
+            date: writtenPiece.date ?? "",
+            keywords: writtenPiece.keywords?.join(", ") ?? "",
+            comments_enabled: writtenPiece.comments_enabled ?? false,
+            files: null,
         } : null
     );
 
@@ -45,7 +52,8 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
     const currentType = allMedia.find(m => m.name === selectedMedium)?.type ?? null;
     const isVisual2D = currentType === "visual_2d";
     const isWrittenForm = currentType === "written_form";
-    const compatibleMedia = piece && currentType
+    const editing = piece || writtenPiece;
+    const compatibleMedia = editing && currentType
         ? allMedia.filter(m => m.type === currentType && m.name !== selectedMedium)
         : [];
 
@@ -54,10 +62,29 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
         const token = localStorage.getItem("token");
 
         if (isWrittenForm) {
-            if (piece) return; // edit not supported for written-form yet
-            if (!formData.files) { alert("Please select a file."); return; }
             const title = (formData.title || "").trim();
             if (!title) { alert("Please enter a title."); return; }
+
+            if (writtenPiece) {
+                const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
+                const updatePayload = {
+                    title,
+                    date: formData.date || null,
+                    keywords: formData.keywords ? formData.keywords.split(",").map((k: string) => k.trim()).filter(Boolean) : null,
+                    comments_enabled: formData.comments_enabled,
+                    medium: moving,
+                };
+                setShowDialog(false);
+                update_written_form(writtenPiece.id, token, updatePayload)
+                    .then(() => {
+                        if (moving && onMoved) onMoved(moving);
+                        onSuccess();
+                    })
+                    .catch((err: any) => alert(err?.message || "Something went wrong"));
+                return;
+            }
+
+            if (!formData.files) { alert("Please select a file."); return; }
             const createPayload: WrittenFormIn = {
                 username,
                 medium: selectedMedium,
@@ -130,11 +157,11 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
                 <button onClick={() => setShowDialog(false)}>x</button>
             </div>
             <div className="submit">
-                <button onClick={() => submit()}>{piece ? "update" : "submit"}</button>
+                <button onClick={() => submit()}>{editing ? "update" : "submit"}</button>
             </div>
             {isVisual2D && <PaintingForm onDataChange={setFormData} initialData={piece} />}
-            {isWrittenForm && <WrittenFormForm onDataChange={setFormData} />}
-            {piece && compatibleMedia.length > 0 && (
+            {isWrittenForm && <WrittenFormForm onDataChange={setFormData} initialData={writtenPiece} />}
+            {editing && compatibleMedia.length > 0 && (
                 <div style={{ position: "absolute", bottom: 35, left: 20, display: "flex", alignItems: "center", gap: 8 }}>
                     <label style={{ fontFamily: "'Times New Roman', Times, serif" }}>move to:</label>
                     <select

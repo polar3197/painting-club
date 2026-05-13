@@ -457,6 +457,22 @@ export function remove_written_form(id: string, token: string | null) {
   return request(`/art/written-form/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }});
 }
 
+export interface WrittenFormUpdatePayload {
+  title: string;
+  date?: string | null;
+  keywords?: string[] | null;
+  comments_enabled?: boolean;
+  medium?: string | null;
+}
+
+export function update_written_form(id: string, token: string | null, payload: WrittenFormUpdatePayload) {
+  return request(`/art/written-form/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
 export interface CommentOut {
   id: string;
   username: string;

@@ -15,11 +15,13 @@ const WrittenFormPiece = ({
     isOwner,
     piece,
     onRemove,
+    onEdit,
 }: {
     isOwner: boolean;
     piece: WrittenFormOut;
     viewerBlockedByOwner: boolean;
     onRemove: () => void;
+    onEdit: () => void;
 }) => {
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
     const [isZoomedIn, setIsZoomedIn] = useState(false);
@@ -75,6 +77,9 @@ const WrittenFormPiece = ({
                 <div className="art-details-footer">
                     {isOwner && (
                         <div className="art-element-buttons">
+                            <div className="edit">
+                                <button onClick={(e) => { e.stopPropagation(); onEdit(); }}>edit</button>
+                            </div>
                             <div className="remove">
                                 <button onClick={(e) => { e.stopPropagation(); setShowRemoveConfirm(true); }}>remove</button>
                             </div>

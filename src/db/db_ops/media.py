@@ -344,6 +344,70 @@ async def db_add_written_form(
     return str(art_id)
 
 
+async def db_update_written_form(
+    db: AsyncSession,
+    art_id: str,
+    current_member_id: str,
+    title: str,
+    date=None,
+    keywords: list[str] | None = None,
+    comments_enabled: bool = False,
+    medium: str | None = None,
+):
+    result = await db.execute(select(WrittenForm).filter(WrittenForm.id == art_id))
+    piece = result.scalar_one_or_none()
+
+    if piece is None:
+        raise ValueError("Art not found")
+    if str(piece.creator_id) != str(current_member_id):
+        raise PermissionError("Not your piece")
+
+    # Optional media move, restricted to compatible-type media (written_form ↔ written_form).
+    if medium is not None:
+        current_media = (
+            await db.execute(select(Media).filter(Media.id == piece.media_id))
+        ).scalar_one_or_none()
+        current_type = current_media.type if current_media else None
+        new_media = (
+            await db.execute(select(Media).filter(Media.name == medium))
+        ).scalar_one_or_none()
+        if new_media is None:
+            raise ValueError(f"Medium '{medium}' not found")
+        if current_type is None or new_media.type is None or new_media.type != current_type:
+            raise ValueError("Incompatible media type")
+        if str(new_media.id) != str(piece.media_id):
+            existing_link = (
+                await db.execute(
+                    select(Media_Members).filter(
+                        Media_Members.media_id == new_media.id,
+                        Media_Members.member_id == current_member_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if not existing_link:
+                db.add(Media_Members(media_id=new_media.id, member_id=current_member_id))
+            piece.media_id = new_media.id
+
+    piece.title = title
+    piece.date = date
+    piece.comments_enabled = comments_enabled
+
+    await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
+
+    for k in (keywords or []):
+        kw = (await db.execute(select(Keyword).filter(Keyword.keyword == k))).scalar_one_or_none()
+        if kw:
+            keyword_id = kw.id
+        else:
+            new_keyword = Keyword(keyword=k)
+            db.add(new_keyword)
+            await db.flush()
+            keyword_id = new_keyword.id
+        db.add(KeywordArt(keyword_id=keyword_id, art_id=art_id))
+
+    await db.commit()
+
+
 async def db_remove_written_form(db: AsyncSession, art_id: str, current_member_id: str) -> str | None:
     result = await db.execute(select(Art.creator_id, Art.file_path).filter(Art.id == art_id))
     row = result.one_or_none()

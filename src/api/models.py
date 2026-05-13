@@ -238,3 +238,11 @@ class WrittenFormOut(BaseModel):
     file_path: str
     comments_enabled: bool = False
 
+
+class WrittenFormUpdate(BaseModel):
+    title: str
+    date: Date | None = None
+    keywords: list[str] | None = None
+    comments_enabled: bool = False
+    medium: str | None = None
+

@@ -107,6 +107,7 @@ const Visual2DPiece = ({
 const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, onKeywordsLoaded, scrollToArtId, onMoved } : { profile: Profile; selectedMedium: string | null; selectedKeywords: string[]; refresh: number; onRefresh: () => void; onKeywordsLoaded: (keywords: string[]) => void; scrollToArtId?: string | null; onMoved?: (newMedium: string) => void; }) => {
     const [showDialog, setShowDialog] = useState(false);
     const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
+    const [editingWrittenForm, setEditingWrittenForm] = useState<WrittenFormOut | null>(null);
     const [art, setArt] = useState<Visual2DOut[]>([]);
     const [writtenForms, setWrittenForms] = useState<WrittenFormOut[]>([]);
     const [allMedia, setAllMedia] = useState<MediaType[]>([]);
@@ -220,6 +221,16 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                     piece={editingPiece}
                 />
             }
+            { editingWrittenForm && selectedMedium &&
+                <AddArtDialog
+                    setShowDialog={() => setEditingWrittenForm(null)}
+                    selectedMedium={selectedMedium}
+                    username={profile.username}
+                    onSuccess={onRefresh}
+                    onMoved={onMoved}
+                    writtenPiece={editingWrittenForm}
+                />
+            }
             <div className="art">
                 {isVisual2D ? (
                     <>
@@ -269,7 +280,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                             </div>
                         ))}
                         {(selectedKeywords.length > 0 ? writtenForms.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : writtenForms)
-                            .map(piece => <WrittenFormPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} />)}
+                            .map(piece => <WrittenFormPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingWrittenForm(piece)} />)}
                     </>
                 ) : (
                     `${selectedMedium} is empty atm`
