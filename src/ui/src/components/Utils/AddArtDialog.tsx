@@ -2,11 +2,12 @@
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 
 import PaintingForm from "../Utils/PaintingForm";
+import WrittenFormForm from "../Utils/WrittenFormForm";
 import "../../styles/utils/dialog.css";
-import { update_visual_2d, Visual2DOut, Visual2DIn, get_media, MediaType } from "../../api";
+import { update_visual_2d, Visual2DOut, Visual2DIn, WrittenFormIn, get_media, MediaType } from "../../api";
 
 // this element will be z= 100 and centered relative to the whole page
-const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMoved, piece, onCreate }
+const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMoved, piece, onCreate, onCreateWrittenForm }
     : {
         setShowDialog : Dispatch<SetStateAction<boolean>>;
         selectedMedium : string;
@@ -16,6 +17,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
         piece?: Visual2DOut;
         // Parent owns the upload + placeholder tile when supplied.
         onCreate?: (payload: Visual2DIn) => void;
+        onCreateWrittenForm?: (payload: WrittenFormIn) => void;
     }
 ) => {
     const [formData, setFormData] = useState<Record<string, any> | null>(
@@ -42,13 +44,35 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
 
     const currentType = allMedia.find(m => m.name === selectedMedium)?.type ?? null;
     const isVisual2D = currentType === "visual_2d";
+    const isWrittenForm = currentType === "written_form";
     const compatibleMedia = piece && currentType
         ? allMedia.filter(m => m.type === currentType && m.name !== selectedMedium)
         : [];
 
     const submit = () => {
-        if (!formData || !isVisual2D) return;
+        if (!formData) return;
         const token = localStorage.getItem("token");
+
+        if (isWrittenForm) {
+            if (piece) return; // edit not supported for written-form yet
+            if (!formData.files) { alert("Please select a file."); return; }
+            const title = (formData.title || "").trim();
+            if (!title) { alert("Please enter a title."); return; }
+            const createPayload: WrittenFormIn = {
+                username,
+                medium: selectedMedium,
+                title,
+                date: formData.date,
+                keywords: formData.keywords,
+                comments_enabled: formData.comments_enabled,
+                file: formData.files,
+            };
+            setShowDialog(false);
+            onCreateWrittenForm?.(createPayload);
+            return;
+        }
+
+        if (!isVisual2D) return;
 
         if (piece) {
             const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
@@ -109,6 +133,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
                 <button onClick={() => submit()}>{piece ? "update" : "submit"}</button>
             </div>
             {isVisual2D && <PaintingForm onDataChange={setFormData} initialData={piece} />}
+            {isWrittenForm && <WrittenFormForm onDataChange={setFormData} />}
             {piece && compatibleMedia.length > 0 && (
                 <div style={{ position: "absolute", bottom: 35, left: 20, display: "flex", alignItems: "center", gap: 8 }}>
                     <label style={{ fontFamily: "'Times New Roman', Times, serif" }}>move to:</label>

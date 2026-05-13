@@ -229,3 +229,12 @@ class Visual2DOut(BaseModel):
     comments_enabled: bool = False
     aspect_ratio: float | None = None
 
+
+class WrittenFormOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    date: Date | None
+    keywords: list[str] | None
+    file_path: str
+    comments_enabled: bool = False
+

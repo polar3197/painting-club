@@ -2,7 +2,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func, desc, nulls_last
 
-from db.models import Member, Media, Media_Members, Visual2D, Keyword, KeywordArt, Art
+from db.models import Member, Media, Media_Members, Visual2D, WrittenForm, Keyword, KeywordArt, Art
 
 async def db_list_media(db: AsyncSession):
     result = await db.execute(select(Media).order_by(Media.name))
@@ -262,6 +262,101 @@ async def db_remove_visual_2d(db: AsyncSession, art_id: str, current_member_id: 
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
     await db.execute(delete(Visual2D).filter(Visual2D.id == art_id))
+    await db.execute(delete(Art).filter(Art.id == art_id))
+    await db.commit()
+    return file_path
+
+
+async def db_get_written_form(db: AsyncSession, username: str, medium: str):
+    username = username.lower()
+    member_result = await db.execute(select(Member.id).filter(Member.username == username))
+    member_id = member_result.scalars().first()
+    if not member_id:
+        return None
+
+    media_result = await db.execute(select(Media.id).filter(Media.name == medium))
+    media_id = media_result.scalars().first()
+    if not media_id:
+        return None
+
+    result = await db.execute(
+        select(WrittenForm)
+        .filter(WrittenForm.creator_id == member_id, WrittenForm.media_id == media_id)
+        .order_by(nulls_last(desc(WrittenForm.date)))
+    )
+    pieces = result.scalars().all()
+
+    art_with_keywords = []
+    for art in pieces:
+        keywords = await db_get_art_keywords(db=db, art_id=art.id)
+        art_with_keywords.append((art, keywords))
+
+    return art_with_keywords
+
+
+async def db_add_written_form(
+        db: AsyncSession,
+        art_id,
+        username: str,
+        medium: str,
+        title: str,
+        file_path: str,
+        date=None,
+        keywords: list[str] | None = None,
+        comments_enabled: bool = False,
+    ) -> str:
+    username = username.lower()
+    member_result = await db.execute(select(Member.id).filter(Member.username==username))
+    member_id = member_result.scalars().first()
+    if not member_id:
+        raise ValueError(f"Member '{username}' not found")
+
+    media_result = await db.execute(select(Media.id).filter(Media.name==medium))
+    media_id = media_result.scalars().first()
+    if not media_id:
+        raise ValueError(f"Medium '{medium}' not found")
+
+    new_art = WrittenForm(
+        id=art_id,
+        title=title,
+        date=date,
+        creator_id=member_id,
+        media_id=media_id,
+        file_path=file_path,
+        comments_enabled=comments_enabled,
+    )
+    db.add(new_art)
+    await db.flush()
+
+    for k in (keywords or []):
+        result = (await db.execute(select(Keyword).filter(Keyword.keyword == k))).scalar_one_or_none()
+        if result:
+            keyword_id = result.id
+        else:
+            new_keyword = Keyword(keyword=k)
+            db.add(new_keyword)
+            await db.flush()
+            keyword_id = new_keyword.id
+
+        db.add(KeywordArt(keyword_id=keyword_id, art_id=art_id))
+
+    await db.commit()
+    return str(art_id)
+
+
+async def db_remove_written_form(db: AsyncSession, art_id: str, current_member_id: str) -> str | None:
+    result = await db.execute(select(Art.creator_id, Art.file_path).filter(Art.id == art_id))
+    row = result.one_or_none()
+
+    if row is None:
+        raise ValueError("Art not found")
+
+    creator_id, file_path = row
+    if str(creator_id) != str(current_member_id):
+        raise PermissionError("Not your piece")
+
+    await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
+    await db.execute(delete(WrittenForm).filter(WrittenForm.id == art_id))
     await db.execute(delete(Art).filter(Art.id == art_id))
     await db.commit()
     return file_path

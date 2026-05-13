@@ -413,6 +413,50 @@ export function get_members_visual_2d(username: string, medium: string): Promise
   return request(`/members/${username}/art/${medium}`) as Promise<Visual2DOut[]>;
 }
 
+export interface WrittenFormIn {
+  username: string;
+  medium: string;
+  title: string;
+  date?: string;
+  keywords?: string;
+  comments_enabled?: boolean;
+  file: File;
+}
+
+export interface WrittenFormOut {
+  id: string;
+  title: string;
+  date: string | null;
+  keywords: string[];
+  file_path: string;
+  comments_enabled: boolean;
+}
+
+export function add_new_written_form(token: string | null, payload: WrittenFormIn) {
+  const fd = new FormData();
+  fd.append("username", payload.username);
+  fd.append("medium", payload.medium);
+  fd.append("title", payload.title);
+  if (payload.date) fd.append("date", payload.date);
+  if (payload.keywords != null) fd.append("keywords", String(payload.keywords));
+  if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
+  fd.append("file", payload.file);
+
+  return request("/art/upload/written-form", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function get_members_written_form(username: string, medium: string): Promise<WrittenFormOut[]> {
+  return request(`/members/${username}/art/written-form/${medium}`) as Promise<WrittenFormOut[]>;
+}
+
+export function remove_written_form(id: string, token: string | null) {
+  return request(`/art/written-form/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }});
+}
+
 export interface CommentOut {
   id: string;
   username: string;

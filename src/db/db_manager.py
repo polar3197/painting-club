@@ -19,7 +19,7 @@ async def empty_db():
 # Adds columns to existing tables (create_all only creates missing tables, not
 # missing columns) and seeds overarching types for the known media rows.
 _VISUAL_2D_SEED = ("painting", "drawing", "stained glass", "photography", "self portraits")
-_WRITTEN_WORD_SEED = ("poetry", "writing")
+_WRITTEN_FORM_SEED = ("poetry", "writing")
 
 
 async def run_migrations():
@@ -32,12 +32,17 @@ async def run_migrations():
             ),
             {"names": list(_VISUAL_2D_SEED)},
         )
+        # Migrate any rows still using the legacy 'written_word' discriminator
+        # before we seed 'written_form' so seeding is a no-op on already-migrated rows.
+        await conn.execute(text("UPDATE media SET type='written_form' WHERE type='written_word'"))
+        await conn.execute(text("UPDATE art   SET type='written_form' WHERE type='written_word'"))
+        await conn.execute(text("ALTER TABLE IF EXISTS written_word RENAME TO written_form"))
         await conn.execute(
             text(
-                "UPDATE media SET type='written_word' "
+                "UPDATE media SET type='written_form' "
                 "WHERE name = ANY(:names) AND type IS NULL"
             ),
-            {"names": list(_WRITTEN_WORD_SEED)},
+            {"names": list(_WRITTEN_FORM_SEED)},
         )
         await conn.execute(text(
             "ALTER TABLE media_members ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false"

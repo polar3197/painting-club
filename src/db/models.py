@@ -76,12 +76,12 @@ class Visual2D(Art):
 
     __mapper_args__ = {"polymorphic_identity": "visual_2d"}
 
-class WrittenWord(Art):
-    __tablename__ = "written_word"
+class WrittenForm(Art):
+    __tablename__ = "written_form"
 
     id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
 
-    __mapper_args__ = {"polymorphic_identity": "written_word"}
+    __mapper_args__ = {"polymorphic_identity": "written_form"}
 
 
 

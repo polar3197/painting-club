@@ -193,7 +193,7 @@ const MediaRequestRow = ({
                     >
                         <option value="" disabled>pick type</option>
                         <option value="visual_2d">visual_2d</option>
-                        <option value="written_word">written_word</option>
+                        <option value="written_form">written_form</option>
                     </select>
                 )}
             </div>

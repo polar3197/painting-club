@@ -155,11 +155,46 @@
     cursor: pointer;                                                              
 }                                                                                                                                           
                 
-.art-visual img {                                                                                                                           
+.art-visual img {
     width: 100%;
-    height: auto;                                                                                                                           
+    height: auto;
     display: block;
     border: 2px black solid;
+}
+
+.art-element.written-form .art-visual {
+    width: 40%;
+    aspect-ratio: 8.5 / 11;
+}
+
+.written-form-tile {
+    width: 100%;
+    height: 100%;
+    border: 2px black solid;
+    background-color: rgb(255, 250, 245);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.written-form-tile-badge {
+    border: 1px black solid;
+    padding: 4px 10px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    background-color: rgb(250, 244, 202);
+}
+
+.written-form-tile-title {
+    font-family: Cambria, Georgia, 'Times New Roman', serif;
+    font-size: 18px;
+    word-break: break-word;
 }
 
 .art-right {

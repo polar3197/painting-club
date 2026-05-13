@@ -8,7 +8,8 @@ import ArtComments from "../Utils/ArtComments";
 import ArtImage from "../Utils/ArtImage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import { useAuth } from "../../context/AuthContext";
-import { get_members_visual_2d, remove_visual_2d, add_new_visual_2d, Visual2DOut, Visual2DIn, get_media, MediaType } from "../../api";
+import { get_members_visual_2d, remove_visual_2d, add_new_visual_2d, Visual2DOut, Visual2DIn, get_members_written_form, add_new_written_form, WrittenFormOut, WrittenFormIn, get_media, MediaType } from "../../api";
+import WrittenFormPiece from "./WrittenForm";
 
 import '../../styles/user-profile/art.css';
 
@@ -107,9 +108,13 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
     const [showDialog, setShowDialog] = useState(false);
     const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
     const [art, setArt] = useState<Visual2DOut[]>([]);
+    const [writtenForms, setWrittenForms] = useState<WrittenFormOut[]>([]);
     const [allMedia, setAllMedia] = useState<MediaType[]>([]);
     const [pendingPieces, setPendingPieces] = useState<
         { tempId: string; medium: string; previewUrl: string; title: string; aspectRatio: number }[]
+    >([]);
+    const [pendingWrittenForms, setPendingWrittenForms] = useState<
+        { tempId: string; medium: string; title: string; ext: string }[]
     >([]);
 
     const startUpload = (payload: Visual2DIn) => {
@@ -130,11 +135,26 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
             });
     };
 
+    const startWrittenFormUpload = (payload: WrittenFormIn) => {
+        const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const ext = (payload.file.name.match(/\.([a-z0-9]+)$/i)?.[1] ?? "FILE").toUpperCase();
+        setPendingWrittenForms(p => [...p, { tempId, medium: payload.medium, title: payload.title || "uploading…", ext }]);
+        const token = localStorage.getItem("token");
+        add_new_written_form(token, payload)
+            .then(() => onRefresh())
+            .catch((err: any) => alert(err?.message || "Upload failed"))
+            .finally(() => {
+                setPendingWrittenForms(p => p.filter(x => x.tempId !== tempId));
+            });
+    };
+
     useEffect(() => {
         get_media().then(setAllMedia).catch(() => {});
     }, []);
 
-    const isVisual2D = !!selectedMedium && allMedia.find(m => m.name === selectedMedium)?.type === "visual_2d";
+    const selectedMediumType = selectedMedium ? allMedia.find(m => m.name === selectedMedium)?.type ?? null : null;
+    const isVisual2D = selectedMediumType === "visual_2d";
+    const isWrittenForm = selectedMediumType === "written_form";
 
     useEffect(() => {
         const getArt = async() => {
@@ -143,13 +163,18 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                 setArt(data);
                 const unique = [...new Set(data.flatMap(p => p.keywords ?? []))];
                 onKeywordsLoaded(unique);
+            } else if (selectedMedium && isWrittenForm) {
+                const data = await get_members_written_form(profile.username, selectedMedium);
+                setWrittenForms(data);
+                const unique = [...new Set(data.flatMap(p => p.keywords ?? []))];
+                onKeywordsLoaded(unique);
             } else {
                 onKeywordsLoaded([]);
             }
         }
 
         getArt();
-    }, [profile.username, selectedMedium, refresh, isVisual2D]);
+    }, [profile.username, selectedMedium, refresh, isVisual2D, isWrittenForm]);
 
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -182,6 +207,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                     username={profile.username}
                     onSuccess={onRefresh}
                     onCreate={startUpload}
+                    onCreateWrittenForm={startWrittenFormUpload}
                 />
             }
             { editingPiece && selectedMedium &&
@@ -195,8 +221,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                 />
             }
             <div className="art">
-                {isVisual2D
-                    ?
+                {isVisual2D ? (
                     <>
                         {pendingPieces.filter(p => p.medium === selectedMedium).map(p => (
                             <div key={p.tempId} className="art-element">
@@ -221,8 +246,34 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                         {(selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art)
                             .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)}
                     </>
-                :
-                `${selectedMedium} is empty atm`}
+                ) : isWrittenForm ? (
+                    <>
+                        {pendingWrittenForms.filter(p => p.medium === selectedMedium).map(p => (
+                            <div key={p.tempId} className="art-element written-form">
+                                <div className="art-visual">
+                                    <div className="written-form-tile" style={{ opacity: 0.5 }}>
+                                        <div className="written-form-tile-badge">{p.ext}</div>
+                                        <div className="written-form-tile-title">{p.title}</div>
+                                    </div>
+                                </div>
+                                <div className="art-right">
+                                    <div className="art-details">
+                                        <div className="art-details-header">
+                                            <div className="art-details-title">{p.title}</div>
+                                        </div>
+                                        <div className="art-details-elements">
+                                            <div className="art-details-element">uploading…</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {(selectedKeywords.length > 0 ? writtenForms.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : writtenForms)
+                            .map(piece => <WrittenFormPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} />)}
+                    </>
+                ) : (
+                    `${selectedMedium} is empty atm`
+                )}
             </div>
         </div>
     )

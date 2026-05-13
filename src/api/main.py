@@ -35,6 +35,7 @@ from api.models import (
     MediaVisibilityUpdate,
     Visual2DOut,
     Visual2DUpdate,
+    WrittenFormOut,
     SearchOptions,
     ArtResult,
     ApplicationIn,
@@ -112,6 +113,9 @@ from db.db_ops.media import (
     db_get_visual_2d,
     db_update_visual_2d,
     db_remove_visual_2d,
+    db_add_written_form,
+    db_get_written_form,
+    db_remove_written_form,
 )
 
 from db.db_ops.comments import (
@@ -497,6 +501,17 @@ ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf",
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 HEIC_MIMES = {"image/heic", "image/heif"}
 
+# Written-form uploads. libmagic returns 'text/plain' for .md files, so we
+# allowlist by extension too and map ext -> stored ext when the MIME is ambiguous.
+WRITTEN_FORM_MIME_TO_EXT = {
+    "application/pdf": "pdf",
+    "text/plain": "txt",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    # docx is sometimes detected as zip by libmagic; the extension check below handles it
+    "application/zip": "docx",
+}
+WRITTEN_FORM_EXTS = {"pdf", "txt", "md", "docx"}
+
 STATIC_ROOT = Path("/app")
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 
@@ -742,6 +757,109 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
     if file_path:
         abs_path(file_path).unlink(missing_ok=True)
     thumb_file(art_id).unlink(missing_ok=True)
+    return
+
+
+@app.post("/art/upload/written-form")
+async def upload_written_form(
+    username: str = Form(...),
+    medium: str = Form(...),
+    title: str = Form(...),
+    date: date | None = Form(None),
+    keywords: str | None = Form(None),
+    comments_enabled: bool = Form(False),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if current_member.username != username:
+        raise HTTPException(status_code=403, detail="Cannot upload for another user")
+
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+
+    # Resolve extension from filename first; libmagic can't distinguish .md from .txt
+    # (both 'text/plain') and sometimes reports .docx as 'application/zip'.
+    filename_ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+    mime = magic.from_buffer(contents, mime=True)
+
+    if filename_ext in WRITTEN_FORM_EXTS:
+        file_ext = filename_ext
+        # Cross-check that the body bytes are plausible for the claimed extension.
+        if mime not in WRITTEN_FORM_MIME_TO_EXT and not (file_ext in {"txt", "md"} and mime == "text/plain"):
+            raise HTTPException(status_code=400, detail=f"File contents do not match extension .{file_ext} (detected {mime})")
+    elif mime in WRITTEN_FORM_MIME_TO_EXT:
+        file_ext = WRITTEN_FORM_MIME_TO_EXT[mime]
+    else:
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+
+    art_id = uuid.uuid4()
+    safe_medium = sanitize_path_segment(medium)
+    file_path = f"/static/written-form/{current_member.id}/{safe_medium}/{art_id}.{file_ext}"
+
+    path = abs_path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
+    if not path.exists() or path.stat().st_size == 0:
+        raise HTTPException(status_code=500, detail="Upload write failed")
+
+    keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
+
+    try:
+        await db_add_written_form(
+            db=db,
+            art_id=art_id,
+            username=username,
+            medium=medium,
+            title=title,
+            date=date,
+            keywords=keywords_list,
+            file_path=file_path,
+            comments_enabled=comments_enabled,
+        )
+    except ValueError as e:
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return {"file_path": file_path}
+
+
+@app.get("/members/{username}/art/written-form/{medium}", response_model=list[WrittenFormOut])
+async def get_written_form(
+    username: str,
+    medium: str,
+    db: AsyncSession = Depends(get_db),
+) -> list[WrittenFormOut]:
+    results = await db_get_written_form(db, username, medium)
+    if results is None:
+        raise HTTPException(status_code=404)
+
+    pieces = []
+    for result in results:
+        row = result[0]
+        kws = result[1]
+        pieces.append(WrittenFormOut(
+            id=row.id,
+            title=row.title,
+            date=row.date,
+            keywords=kws,
+            file_path=row.file_path,
+            comments_enabled=row.comments_enabled,
+        ))
+    return pieces
+
+
+@app.delete("/art/written-form/{art_id}")
+async def remove_written_form(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
+    try:
+        file_path = await db_remove_written_form(art_id=art_id, current_member_id=current_user.id, db=db)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if file_path:
+        abs_path(file_path).unlink(missing_ok=True)
     return
 
 
