@@ -118,6 +118,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
                 keywords: formData.keywords ? formData.keywords.split(",").map((k: string) => k.trim()).filter(Boolean) : null,
                 comments_enabled: formData.comments_enabled,
                 medium: moving,
+                file: formData.files ?? null,
             };
             setShowDialog(false);
             update_visual_2d(piece.id, token, updatePayload)

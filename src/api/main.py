@@ -34,7 +34,6 @@ from api.models import (
     MediaRequestUpdate,
     MediaVisibilityUpdate,
     Visual2DOut,
-    Visual2DUpdate,
     WrittenFormOut,
     WrittenFormUpdate,
     CollectionRename,
@@ -566,6 +565,20 @@ def sanitize_path_segment(value: str) -> str:
     import re
     return re.sub(r"[^\w\-]", "_", value)
 
+def _compute_aspect_ratio(path: Path) -> float | None:
+    """Read image at path and return w/h. None for PDFs or on read failure."""
+    if path.suffix.lower() == ".pdf":
+        return None
+    try:
+        with Image.open(path) as img:
+            w, h = img.size
+            if w and h:
+                return w / h
+    except Exception as e:
+        print(f"[aspect_ratio] failed for {path}: {type(e).__name__}: {e}")
+    return None
+
+
 def heic_to_jpeg_bytes(contents: bytes) -> bytes:
     img = Image.open(io.BytesIO(contents))
     if img.mode != "RGB":
@@ -691,15 +704,7 @@ async def upload_visual_2d(
     print(keywords_list)
 
     # Capture canonical source aspect ratio so clients never need to measure images for layout.
-    aspect_ratio: float | None = None
-    if path.suffix.lower() != ".pdf":
-        try:
-            with Image.open(path) as img:
-                w, h = img.size
-                if w and h:
-                    aspect_ratio = w / h
-        except Exception as e:
-            print(f"[aspect_ratio] failed for {art_id}: {type(e).__name__}: {e}")
+    aspect_ratio = _compute_aspect_ratio(path)
 
     try:
         await db_add_visual_2d(
@@ -730,34 +735,132 @@ async def upload_visual_2d(
 @app.patch("/art/{art_id}")
 async def update_visual_2d(
     art_id: str,
-    payload: Visual2DUpdate,
+    title: str = Form(...),
+    date: date | None = Form(None),
+    location: str | None = Form(None),
+    song: str | None = Form(None),
+    song_artist: str | None = Form(None),
+    width: int | None = Form(None),
+    height: int | None = Form(None),
+    keywords: str | None = Form(None),
+    comments_enabled: bool = Form(False),
+    medium: str | None = Form(None),
+    file: UploadFile | None = File(None),
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
 ):
+    # parse keywords (CSV) into list — None means leave keywords untouched isn't supported here,
+    # we always replace, matching the old JSON behavior (empty/missing CSV clears keywords).
+    keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
+
+    new_file_path: str | None = None
+    new_aspect_ratio: float | None = None
+    written_path: Path | None = None  # for rollback on db failure
+    old_abs_to_delete: Path | None = None  # deleted after the DB commit succeeds
+
+    if file is not None:
+        # Need the existing piece to (a) verify ownership, (b) know the old file to delete,
+        # (c) reuse the medium directory if no move is requested.
+        existing = (
+            await db.execute(select(Visual2D).filter(Visual2D.id == art_id))
+        ).scalar_one_or_none()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Art not found")
+        if str(existing.creator_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not your piece")
+
+        contents = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+        mime = magic.from_buffer(contents, mime=True)
+        if mime not in ALLOWED_MIME_TYPES:
+            raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+        if mime in HEIC_MIMES:
+            contents = heic_to_jpeg_bytes(contents)
+            mime = "image/jpeg"
+
+        ext_by_mime = {"image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "application/pdf": "pdf"}
+        file_ext = ext_by_mime[mime]
+
+        # Resolve target medium directory. If the caller is moving the piece, write into the
+        # new medium dir; else keep the existing one.
+        if medium:
+            new_media = (
+                await db.execute(select(Media).filter(Media.name == medium))
+            ).scalar_one_or_none()
+            if new_media is None:
+                raise HTTPException(status_code=404, detail=f"Medium '{medium}' not found")
+            safe_medium = sanitize_path_segment(medium)
+        else:
+            # derive from existing file_path: /static/art/{member}/{medium}/{art_id}.{ext}
+            try:
+                safe_medium = Path(existing.file_path).parent.name
+            except Exception:
+                safe_medium = "unknown"
+
+        # Versioned filename so the URL changes on each replacement — browsers / RN image
+        # caches keyed on URL will refetch without us having to touch Cache-Control.
+        rev = uuid.uuid4().hex[:8]
+        new_file_path = f"/static/art/{current_user.id}/{safe_medium}/{art_id}-{rev}.{file_ext}"
+        path = abs_path(new_file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(contents)
+        if not path.exists() or path.stat().st_size == 0:
+            raise HTTPException(status_code=500, detail="Upload write failed")
+        written_path = path
+
+        new_aspect_ratio = _compute_aspect_ratio(path)
+
+        # Record the prior on-disk file for cleanup after the DB commit lands. If the
+        # commit fails we want the old bytes to still be there, since the DB still points
+        # at them.
+        old_abs = abs_path(existing.file_path)
+        if old_abs != path:
+            old_abs_to_delete = old_abs
+
     try:
         await db_update_visual_2d(
             db=db,
             art_id=art_id,
             current_member_id=current_user.id,
-            title=payload.title,
-            date=payload.date,
-            location=payload.location,
-            song=payload.song,
-            song_artist=payload.song_artist,
-            width=payload.width,
-            height=payload.height,
-            keywords=payload.keywords,
-            comments_enabled=payload.comments_enabled,
-            medium=payload.medium,
+            title=title,
+            date=date,
+            location=location,
+            song=song,
+            song_artist=song_artist,
+            width=width,
+            height=height,
+            keywords=keywords_list,
+            comments_enabled=comments_enabled,
+            medium=medium,
+            file_path=new_file_path,
+            aspect_ratio=new_aspect_ratio if file is not None else None,
+            update_file=file is not None,
         )
     except ValueError as e:
+        # Roll back any file we just wrote so the DB and disk don't diverge.
+        if written_path is not None:
+            written_path.unlink(missing_ok=True)
         msg = str(e)
         if "Incompatible" in msg:
             raise HTTPException(status_code=400, detail=msg)
         raise HTTPException(status_code=404, detail=msg)
     except PermissionError as e:
+        if written_path is not None:
+            written_path.unlink(missing_ok=True)
         raise HTTPException(status_code=403, detail=str(e))
-    return {"ok": True}
+
+    if file is not None and written_path is not None:
+        # Commit succeeded — safe to drop the old file now.
+        if old_abs_to_delete is not None:
+            old_abs_to_delete.unlink(missing_ok=True)
+        # Regenerate the thumb at the same art-id path so collections / grids refresh.
+        # PDFs have no cached thumb file; drop the stale one if it exists.
+        thumb_file(art_id).unlink(missing_ok=True)
+        if written_path.suffix.lower() != ".pdf":
+            generate_thumbnail(str(art_id), written_path)
+
+    return {"ok": True, "file_path": new_file_path}
 
 @app.delete("/art/{art_id}")
 async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
@@ -930,7 +1033,9 @@ async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db)):
     if not src_abs.exists():
         raise HTTPException(status_code=404, detail="Source file missing")
 
-    cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+    # Short max-age (not immutable) so PATCH /art/{id} file replacements show up
+    # within ~a minute without us having to version the thumb URL per piece.
+    cache_headers = {"Cache-Control": "public, max-age=60, must-revalidate"}
 
     # PDFs have no thumb — serve the original
     if src_abs.suffix.lower() == ".pdf":

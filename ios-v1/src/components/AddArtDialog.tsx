@@ -114,6 +114,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
           : null,
         comments_enabled: formData.comments_enabled,
         medium: moving,
+        file: formData.file ?? null,
       };
       onClose();
       update_visual_2d(piece.id, token, updatePayload)

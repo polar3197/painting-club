@@ -28,6 +28,10 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
         });
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    // Distinguishes "still converting HEIC" from "finished but no preview available":
+    // both have previewUrl=null, but the user shouldn't see "converting..." forever
+    // if heic2any failed or returned an unrenderable blob.
+    const [converting, setConverting] = useState(false);
 
     const update = (patch: Record<string, any>) => {
         const next = { ...form, ...patch };
@@ -45,20 +49,26 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
         update({ files: file });
         if (!file) {
             setPreviewUrl(null);
+            setConverting(false);
             return;
         }
         const isHeic = /\.(heic|heif)$/i.test(file.name)
             || file.type === "image/heic"
             || file.type === "image/heif";
         if (isHeic) {
+            setConverting(true);
+            setPreviewUrl(null);
             try {
                 const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
                 const blob = Array.isArray(result) ? result[0] : result;
                 setPreviewUrl(URL.createObjectURL(blob as Blob));
             } catch {
                 setPreviewUrl(null);
+            } finally {
+                setConverting(false);
             }
         } else {
+            setConverting(false);
             setPreviewUrl(URL.createObjectURL(file));
         }
     };
@@ -75,9 +85,11 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
             />
             {form.files && previewUrl ?
                 <img src={previewUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                : form.files ?
+                : form.files && converting ?
                     "converting preview..."
-                    : "drop your art here"
+                    : form.files ?
+                        form.files.name
+                        : "drop your art here"
             }
         </div>
         <div className="painting-title">

@@ -113,6 +113,8 @@ export interface Visual2DUpdatePayload {
   keywords?: string[] | null;
   comments_enabled?: boolean;
   medium?: string | null;
+  // When set, the on-disk file (and thumbnail) gets replaced.
+  file?: { uri: string; name: string; type: string } | null;
 }
 
 export interface SearchOptions {

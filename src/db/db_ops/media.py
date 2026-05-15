@@ -190,6 +190,9 @@ async def db_update_visual_2d(
     keywords: list[str] | None = None,
     comments_enabled: bool = False,
     medium: str | None = None,
+    file_path: str | None = None,
+    aspect_ratio: float | None = None,
+    update_file: bool = False,
 ):
     result = await db.execute(select(Visual2D).filter(Visual2D.id == art_id))
     piece = result.scalar_one_or_none()
@@ -233,6 +236,9 @@ async def db_update_visual_2d(
     piece.width = width
     piece.height = height
     piece.comments_enabled = comments_enabled
+    if update_file and file_path is not None:
+        piece.file_path = file_path
+        piece.aspect_ratio = aspect_ratio
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
 

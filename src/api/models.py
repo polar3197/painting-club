@@ -107,18 +107,6 @@ class Visual2DIn(BaseModel):
     height: int | None = None
     keywords: list[str] | None
 
-class Visual2DUpdate(BaseModel):
-    title: str
-    date: Date | None = None
-    location: str | None = None
-    song: str | None = None
-    song_artist: str | None = None
-    width: int | None = None
-    height: int | None = None
-    keywords: list[str] | None = None
-    comments_enabled: bool = False
-    medium: str | None = None
-
 class SearchOptions(BaseModel):
     usernames: list[str] = []
     fullnames: list[str] = []

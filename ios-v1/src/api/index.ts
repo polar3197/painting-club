@@ -245,10 +245,28 @@ export function add_new_visual_2d(token: string | null, payload: Visual2DIn) {
 }
 
 export function update_visual_2d(id: string, token: string | null, payload: Visual2DUpdatePayload) {
+  const fd = new FormData();
+  fd.append('title', payload.title);
+  if (payload.date) fd.append('date', payload.date);
+  if (payload.location != null) fd.append('location', payload.location);
+  if (payload.song != null) fd.append('song', payload.song);
+  if (payload.song_artist != null) fd.append('song_artist', payload.song_artist);
+  if (payload.width != null) fd.append('width', String(payload.width));
+  if (payload.height != null) fd.append('height', String(payload.height));
+  if (payload.keywords != null) fd.append('keywords', payload.keywords.join(', '));
+  if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
+  if (payload.medium) fd.append('medium', payload.medium);
+  if (payload.file) {
+    fd.append('file', {
+      uri: payload.file.uri,
+      name: payload.file.name,
+      type: payload.file.type,
+    } as any);
+  }
   return request(`/art/${id}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
+    body: fd,
   });
 }
 
