@@ -53,6 +53,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // always wants to show ~4 rows) isn't squished when a bio is very short.
 // 4 lines × ~22px line height + label + hr + paddings ≈ 150.
 const BIO_PAGE_MIN_HEIGHT = 150;
+// Visual gap between the two bordered pages of the carousel so the swipe feels
+// like moving to a separate frame rather than sliding content under one.
+const BIO_PAGE_GAP = 40;
 
 type ProfileRoute = RouteProp<
   { UserProfile: { username: string; artId?: string; medium?: string } },
@@ -254,15 +257,18 @@ export default function UserProfile() {
   const [carouselPage, setCarouselPage] = useState(0);
   const toggleCarouselPage = () => {
     const next = carouselPage === 0 ? 1 : 0;
-    carouselScrollRef.current?.scrollTo({ x: next * bioPageWidth, animated: true });
+    carouselScrollRef.current?.scrollTo({
+      x: next * (bioPageWidth + BIO_PAGE_GAP),
+      animated: true,
+    });
     setCarouselPage(next);
   };
-  // Height of the bio content (label+hr+text). The carousel uses this so the
-  // comments page on the right mirrors whatever the bio's auto-size becomes,
-  // floored at BIO_PAGE_MIN_HEIGHT so very short bios still leave room for
-  // the comments rows.
-  const [bioContentHeight, setBioContentHeight] = useState(BIO_PAGE_MIN_HEIGHT);
-  const carouselHeight = Math.max(BIO_PAGE_MIN_HEIGHT, bioContentHeight);
+  // The bio/comments carousel: wrapper has a static minHeight so short bios
+  // still leave room for the comments rows. Both pages auto-stretch to the
+  // tallest one via the ScrollView's default cross-axis alignment, so we don't
+  // need a measured height feeding back into the layout (previous attempts at
+  // that produced a recursive growth loop because the page border kept adding
+  // 2px to the measured value each cycle).
 
   const startUpload = useCallback((payload: Visual2DIn) => {
     const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -612,38 +618,37 @@ export default function UserProfile() {
                   height) is important — a fixed height would constrain the bio
                   page's onLayout measurement and prevent growth past the floor. */}
               <View
-                style={[styles.bioCarouselWrap, { minHeight: carouselHeight }]}
+                style={[styles.bioCarouselWrap, { minHeight: BIO_PAGE_MIN_HEIGHT }]}
                 onLayout={(e) => setBioPageWidth(e.nativeEvent.layout.width)}
               >
                 <ScrollView
                   ref={carouselScrollRef}
                   horizontal
-                  pagingEnabled
                   showsHorizontalScrollIndicator={false}
+                  // snapToInterval (not pagingEnabled) — pagingEnabled snaps to
+                  // multiples of the ScrollView's own width, which is correct
+                  // only when pages are flush. With BIO_PAGE_GAP between pages,
+                  // we need to snap to multiples of pageWidth + gap instead.
+                  decelerationRate="fast"
+                  snapToInterval={bioPageWidth + BIO_PAGE_GAP}
+                  snapToAlignment="start"
                   // nestedScrollEnabled lets the FlatList inside CommentsReceivedPanel
                   // vertically scroll without fighting the parent vertical scroll.
                   nestedScrollEnabled
                   onMomentumScrollEnd={(e) => {
-                    const page = Math.round(e.nativeEvent.contentOffset.x / Math.max(1, bioPageWidth));
+                    const stride = Math.max(1, bioPageWidth + BIO_PAGE_GAP);
+                    const page = Math.round(e.nativeEvent.contentOffset.x / stride);
                     setCarouselPage(page);
                   }}
                 >
-                  <View
-                    style={[styles.bioPage, { width: bioPageWidth }]}
-                    // Measure the bio page's content so the carousel (and the
-                    // sibling comments page) can match its height.
-                    onLayout={(e) => setBioContentHeight(e.nativeEvent.layout.height)}
-                  >
+                  <View style={[styles.bioPage, { width: bioPageWidth, marginRight: BIO_PAGE_GAP }]}>
                     <Text style={styles.bioLabel}>Artist Statement</Text>
                     <View style={styles.bioHr} />
                     {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
                   </View>
                   {profile.is_owner && bioPageWidth > 0 && (
                     <View style={[styles.bioPage, { width: bioPageWidth, padding: 0 }]}>
-                      <CommentsReceivedPanel
-                        height={carouselHeight}
-                        onTapComment={handleTapReceivedComment}
-                      />
+                      <CommentsReceivedPanel onTapComment={handleTapReceivedComment} />
                     </View>
                   )}
                 </ScrollView>

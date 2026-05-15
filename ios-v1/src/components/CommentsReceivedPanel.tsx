@@ -25,15 +25,12 @@ const VISIBLE_ROWS = 4;
 const PANEL_CHROME = 20;
 
 interface CommentsReceivedPanelProps {
-  // Same fixed height as the Artist Statement block so the two pages are
-  // visually identical in shape and size.
-  height: number;
   // Fires when the user taps a comment. Caller is responsible for routing to
   // the art piece (set medium, scroll to artId).
   onTapComment: (c: CommentReceivedOut) => void;
 }
 
-export default function CommentsReceivedPanel({ height, onTapComment }: CommentsReceivedPanelProps) {
+export default function CommentsReceivedPanel({ onTapComment }: CommentsReceivedPanelProps) {
   const { token } = useAuth();
   const [items, setItems] = useState<CommentReceivedOut[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -76,7 +73,11 @@ export default function CommentsReceivedPanel({ height, onTapComment }: Comments
     if (nextCursor && !loading) loadPage(nextCursor);
   }, [nextCursor, loading, loadPage]);
 
-  const rowHeight = Math.floor(Math.max(32, (height - PANEL_CHROME) / VISIBLE_ROWS));
+  // We measure ourselves rather than receiving height as a prop — the parent
+  // sizes us via flex/alignItems, and depending on a prop here was what caused
+  // the previous render-loop where each cycle added the border thickness.
+  const [measuredHeight, setMeasuredHeight] = useState(0);
+  const rowHeight = Math.floor(Math.max(32, (measuredHeight - PANEL_CHROME) / VISIBLE_ROWS));
 
   const isUnseen = (createdAt: string) =>
     thresholdRef.current === null || createdAt > thresholdRef.current;
@@ -104,10 +105,13 @@ export default function CommentsReceivedPanel({ height, onTapComment }: Comments
   };
 
   return (
-    <View style={[styles.block, { height }]}>
+    <View
+      style={styles.block}
+      onLayout={(e) => setMeasuredHeight(e.nativeEvent.layout.height)}
+    >
       {initialLoaded && items.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyText}>no comments yet</Text>
+          <Text style={styles.emptyText}>ppls comments on ur posts will appear here</Text>
         </View>
       ) : (
         <FlatList
@@ -133,6 +137,7 @@ export default function CommentsReceivedPanel({ height, onTapComment }: Comments
 
 const styles = StyleSheet.create({
   block: {
+    flex: 1,
     padding: 10,
   },
   list: {
@@ -174,6 +179,8 @@ const styles = StyleSheet.create({
   emptyText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
+    color: Colors.black,
+    textAlign: 'center',
+    paddingHorizontal: 12,
   },
 });
