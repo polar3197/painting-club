@@ -132,7 +132,7 @@ from db.db_ops.comments import (
     
 from db.session import get_db
 from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
-from db.models import Member, Media, Media_Members, Art, Comment
+from db.models import Member, Media, Media_Members, Art, Comment, Visual2D
 
 from api.auth import create_token, decode_token
 
