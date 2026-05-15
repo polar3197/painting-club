@@ -74,4 +74,8 @@ services:
 
 volumes:
   pg-data:
-  static-files: {}
+    external: true
+    name: painting-club_pg-data
+  static-files:
+    name: painting-club_static-files
+    external: true
