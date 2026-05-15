@@ -8,6 +8,8 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { submit_application } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
@@ -66,12 +68,22 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
 
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.dialog}>
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Text style={styles.closeBtnText}>x</Text>
           </Pressable>
-          <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
+          {/* Submit lives inside the scroll area so it rides above the keyboard
+              with the rest of the form — outside, the keyboard would cover it. */}
+          <ScrollView
+            style={styles.form}
+            contentContainerStyle={styles.formContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <TextInput
               style={styles.input}
               value={firstname}
@@ -131,12 +143,12 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               numberOfLines={4}
               autoCapitalize="none"
             />
+            <Pressable style={styles.submitBtn} onPress={handleSubmit}>
+              <Text style={styles.submitBtnText}>submit</Text>
+            </Pressable>
           </ScrollView>
-          <Pressable style={styles.submitBtn} onPress={handleSubmit}>
-            <Text style={styles.submitBtnText}>submit</Text>
-          </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -173,6 +185,9 @@ const styles = StyleSheet.create({
   },
   form: {
     marginTop: 20,
+  },
+  formContent: {
+    paddingBottom: 8,
   },
   input: {
     borderBottomWidth: 1,

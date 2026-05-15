@@ -439,7 +439,9 @@ export default function UserProfile() {
   if (error || !profile) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <Text style={styles.loadingText}>Something went wrong</Text>
+        <Text style={[styles.loadingText, { paddingHorizontal: 24, textAlign: 'center' }]}>
+          Sorry guys, the power source to the raspberry pi this app runs on is weak and it keeps dying. Will be getting it more power soon.
+        </Text>
       </View>
     );
   }

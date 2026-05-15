@@ -25,6 +25,9 @@ class Member(Base):
     temp_password_plaintext = Column(String(32))
     temp_password_expires_at = Column(DateTime)
     terms_accepted_at = Column(DateTime)
+    # Timestamp of the last time the user opened their "comments on my art"
+    # dialog. Comments with created_at > this value render as unseen.
+    comments_last_viewed_at = Column(DateTime)
 
     # favorite piece you made
     # favorite medium
@@ -72,6 +75,7 @@ class Art(Base):
     file_path = Column(String(300))
     comments_enabled = Column(Boolean, nullable=False, default=False)
     type = Column(String(50), nullable=False)  # discriminator column
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     __mapper_args__ = {"polymorphic_on": type}
 

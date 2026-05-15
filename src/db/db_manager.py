@@ -86,4 +86,13 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE art ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES collection(id)"
         ))
+        # Per-user "last viewed" timestamp for the comments-on-my-art dialog,
+        # used to render unseen comments in a different colour.
+        await conn.execute(text(
+            "ALTER TABLE member ADD COLUMN IF NOT EXISTS comments_last_viewed_at TIMESTAMP"
+        ))
+        # Speeds up cursor pagination of comments-received as the dataset grows.
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_comment_art_created ON comment (art_id, created_at DESC)"
+        ))
     print("Migrations applied.")

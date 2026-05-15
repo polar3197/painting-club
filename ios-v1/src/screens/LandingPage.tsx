@@ -102,9 +102,14 @@ export default function LandingPage() {
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
+        {/* Flex spacers replace justifyContent: 'center' so that when KAV's
+            padding-bottom animates with the keyboard, content slides smoothly
+            instead of recentering every frame (which produces visible twitch). */}
+        <View style={styles.flexSpacer} />
         <View style={styles.titleWrap}>
-          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>-. Painting Club .-</Text>
+          <Text style={styles.title} numberOfLines={1}>-. Painting Club .-</Text>
         </View>
 
         <View style={styles.loginContainer}>
@@ -178,6 +183,7 @@ export default function LandingPage() {
             </>
           )}
         </View>
+        <View style={styles.flexSpacer} />
       </KeyboardAvoidingView>
 
       {showApplication && (
@@ -202,9 +208,11 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 30,
+  },
+  flexSpacer: {
+    flex: 1,
   },
   titleWrap: {
     backgroundColor: 'lightgreen',

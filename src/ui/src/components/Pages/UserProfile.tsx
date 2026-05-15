@@ -24,7 +24,11 @@ const UserProfile = () => {
   }, [profile]);
 
   if (loading) return <p>Loading...</p>;
-  if (error) return <p>Something went wrong</p>;
+  if (error) return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+      <p style={{ maxWidth: 520, textAlign: "center", margin: 0 }}>Sorry guys, the power source to the raspberry pi this app runs on is weak and it keeps dying. Will be getting it more power soon.</p>
+    </div>
+  );
   if (!profile) return null;
 
   

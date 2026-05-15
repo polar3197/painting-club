@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Modal, Pressable, StyleSheet, Alert, Animated, PanResponder, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { update_visual_2d, Visual2DOut, Visual2DIn, get_media, MediaType } from '../api';
 import PaintingForm from './PaintingForm';
@@ -46,10 +48,29 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
           height: piece.height ?? null,
           keywords: piece.keywords?.join(', ') ?? '',
           comments_enabled: piece.comments_enabled ?? false,
-          file: null,
         }
       : null
   );
+
+  // The picked file lives at the dialog level (not inside PaintingForm) so that
+  // the dropbox can sit OUTSIDE the inner ScrollView — that's what makes its
+  // drag-down gesture dismiss the sheet reliably (the same pattern as the
+  // top grab bar). Inside the ScrollView, iOS native scroll wins the gesture.
+  const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const uri = asset.uri;
+      const name = uri.split('/').pop() || 'image.jpg';
+      const type = asset.mimeType || 'image/jpeg';
+      setPickedFile({ uri, name, type });
+    }
+  };
 
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -68,25 +89,30 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
     }
   };
 
-  // Capture-on-move handler for the whole panel — claims a vertical drag
-  // started on top of inputs/pressables once it's clearly vertical.
-  const panelPanResponder = useRef(
+  // Start-on-touch handler for the grab bar — pulling down from the handle
+  // works immediately, no move threshold. We removed the previous panel-wide
+  // capture responder because it conflicted with the inner ScrollView's
+  // vertical gestures (and made the form unscrollable when the keyboard was up).
+  const handlePanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponderCapture: (_, g) =>
-        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderMove: (_, g) => handleDrag(g.dy),
       onPanResponderRelease: (_, g) => handleRelease(g.dy),
       onPanResponderTerminationRequest: () => false,
     })
   ).current;
 
-  // Start-on-touch handler for the grab bar — pulling down from the handle
-  // works immediately, no move threshold.
-  const handlePanResponder = useRef(
+  // Drag-down on the image dropbox dismisses the sheet. Because the dropbox is
+  // rendered OUTSIDE the ScrollView (in the panel header area), there's no
+  // native scroll recognizer competing for the gesture — same as the grab bar.
+  // We still use capture-on-move so taps fall through to pickImage when there's
+  // no actual drag.
+  const dropboxPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderMove: (_, g) => handleDrag(g.dy),
       onPanResponderRelease: (_, g) => handleRelease(g.dy),
       onPanResponderTerminationRequest: () => false,
@@ -114,7 +140,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
           : null,
         comments_enabled: formData.comments_enabled,
         medium: moving,
-        file: formData.file ?? null,
+        file: pickedFile,
       };
       onClose();
       update_visual_2d(piece.id, token, updatePayload)
@@ -126,7 +152,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
           Alert.alert('Error', err?.message || 'Something went wrong');
         });
     } else {
-      if (!formData.file) {
+      if (!pickedFile) {
         Alert.alert('Missing', 'Please select an image.');
         return;
       }
@@ -147,7 +173,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
         height: formData.height,
         keywords: formData.keywords,
         comments_enabled: formData.comments_enabled,
-        file: formData.file,
+        file: pickedFile,
       };
       onClose();
       // Parent owns the upload + placeholder tile.
@@ -159,17 +185,54 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
     <Modal transparent visible animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView
+          style={styles.kav}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <Animated.View
             style={[styles.panel, { transform: [{ translateY }] }]}
-            {...panelPanResponder.panHandlers}
           >
             <View style={styles.swipeHandle} {...handlePanResponder.panHandlers}>
               <View style={styles.swipeBar} />
             </View>
-            <View style={styles.formContent}>
+            {/* Dropbox sits outside the ScrollView so its drag-down responder
+                isn't fighting the native scroll recognizer. The pan handlers go
+                on the WRAPPING View, not the Pressable, because Pressable owns
+                its own responder lifecycle — spreading panHandlers onto it just
+                clobbers each other and both tap and drag stop working. With the
+                outer View holding panHandlers, the inner Pressable handles tap,
+                and a real downward drag is captured by the parent (capture
+                phase wins over the child) and dismisses the sheet. */}
+            {isVisual2D && (
+              <View {...dropboxPanResponder.panHandlers}>
+                <Pressable style={styles.dropbox} onPress={pickImage}>
+                  {pickedFile ? (
+                    <Image source={{ uri: pickedFile.uri }} style={styles.dropboxImage} contentFit="contain" />
+                  ) : (
+                    <Text style={styles.dropboxText}>tap to select art</Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
+            {/* ScrollView lets the user reach every field (and the submit button)
+                when the keyboard is up. keyboardShouldPersistTaps='handled' lets
+                taps on Pressables register without first dismissing the keyboard. */}
+            <ScrollView
+              style={styles.scrollArea}
+              contentContainerStyle={styles.formContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               {isVisual2D && (
-                <PaintingForm onDataChange={setFormData} initialData={piece} />
+                <PaintingForm
+                  onDataChange={setFormData}
+                  initialData={piece}
+                  rightSlot={
+                    <Pressable style={styles.submitBtn} onPress={submit}>
+                      <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
+                    </Pressable>
+                  }
+                />
               )}
               {piece && compatibleMedia.length > 0 && (
                 <View style={styles.moveToRow}>
@@ -183,10 +246,7 @@ export default function AddArtDialog({ selectedMedium, username, onSuccess, onCl
                   </View>
                 </View>
               )}
-              <Pressable style={styles.submitBtn} onPress={submit}>
-                <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
-              </Pressable>
-            </View>
+            </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>
       </View>
@@ -202,12 +262,47 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
   },
+  kav: {
+    // KAV stretches with the modalRoot so its bottom padding (= keyboard
+    // height on iOS) actually lifts the panel above the keyboard.
+    flexShrink: 1,
+  },
   panel: {
     backgroundColor: Colors.mainBg,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     borderTopWidth: 1,
     borderColor: '#000',
+    // Cap the panel so a long form yields a scrollable area instead of pushing
+    // submit off-screen. Picked at ~80% so a peek of the backdrop stays tappable.
+    maxHeight: SCREEN_HEIGHT * 0.8,
+    // Lifts the sheet a bit off the screen edge so there's breathing room
+    // beneath the submit button and the home indicator.
+    paddingBottom: 36,
+  },
+  dropbox: {
+    height: 200,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.secondary,
+  },
+  dropboxImage: {
+    width: '100%',
+    height: '100%',
+  },
+  dropboxText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.textTertiary,
+  },
+  scrollArea: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   swipeHandle: {
     alignItems: 'center',
@@ -224,12 +319,12 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   submitBtn: {
-    alignSelf: 'flex-end',
-    marginTop: 12,
+    // Now rendered inline with the comments toggle via PaintingForm's rightSlot,
+    // so the previous alignSelf/marginTop are no longer needed.
     borderWidth: 1,
     borderColor: '#000',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     backgroundColor: Colors.greenBright,
   },
   submitBtnText: {
