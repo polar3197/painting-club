@@ -250,19 +250,6 @@ export default function UserProfile() {
   // Captured from onLayout so each page of the bio/comments carousel can size
   // to match the container exactly (paging snaps cleanly to that width).
   const [bioPageWidth, setBioPageWidth] = useState(0);
-  // Temporary state + ref for the debug toggle button — sim doesn't make
-  // horizontal swiping easy, so we expose a → / ← chip to programmatically
-  // page the carousel. Safe to delete once we're testing on hardware.
-  const carouselScrollRef = useRef<ScrollView>(null);
-  const [carouselPage, setCarouselPage] = useState(0);
-  const toggleCarouselPage = () => {
-    const next = carouselPage === 0 ? 1 : 0;
-    carouselScrollRef.current?.scrollTo({
-      x: next * (bioPageWidth + BIO_PAGE_GAP),
-      animated: true,
-    });
-    setCarouselPage(next);
-  };
   // The bio/comments carousel: wrapper has a static minHeight so short bios
   // still leave room for the comments rows. Both pages auto-stretch to the
   // tallest one via the ScrollView's default cross-axis alignment, so we don't
@@ -572,10 +559,11 @@ export default function UserProfile() {
 
       {/* ---- UserDetails ---- */}
       <View style={styles.userDetails}>
-        <Pressable
-          style={styles.userFields}
-          onPress={profile.is_owner && !editing ? startEditing : undefined}
-        >
+        {/* The user details used to wrap a single Pressable that started the
+            edit flow on any tap. That intercepted horizontal swipes on the
+            artist-statement carousel — so the tap-to-edit moved into the
+            small `•-•` button rendered inside userIdentity below. */}
+        <View style={styles.userFields}>
           {!editing ? (
             <>
               <View style={styles.userTopRow}>
@@ -637,7 +625,6 @@ export default function UserProfile() {
                 onLayout={(e) => setBioPageWidth(e.nativeEvent.layout.width)}
               >
                 <ScrollView
-                  ref={carouselScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   // snapToInterval (not pagingEnabled) — pagingEnabled snaps to
@@ -650,16 +637,20 @@ export default function UserProfile() {
                   // nestedScrollEnabled lets the FlatList inside CommentsReceivedPanel
                   // vertically scroll without fighting the parent vertical scroll.
                   nestedScrollEnabled
-                  onMomentumScrollEnd={(e) => {
-                    const stride = Math.max(1, bioPageWidth + BIO_PAGE_GAP);
-                    const page = Math.round(e.nativeEvent.contentOffset.x / stride);
-                    setCarouselPage(page);
-                  }}
                 >
                   <View style={[styles.bioPage, { width: bioPageWidth, marginRight: BIO_PAGE_GAP }]}>
                     <Text style={styles.bioLabel}>Artist Statement</Text>
                     <View style={styles.bioHr} />
                     {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
+                    {/* Edit chip lives INSIDE the bio page so it slides off
+                        with the rest of the artist statement when the user
+                        swipes to the comments page. Owner-only, hidden while
+                        editing. */}
+                    {profile.is_owner && !editing && (
+                      <Pressable style={styles.editChip} onPress={startEditing}>
+                        <Text style={styles.editChipText}>•-•</Text>
+                      </Pressable>
+                    )}
                   </View>
                   {profile.is_owner && bioPageWidth > 0 && (
                     <View style={[styles.bioPage, { width: bioPageWidth, padding: 0 }]}>
@@ -667,16 +658,6 @@ export default function UserProfile() {
                     </View>
                   )}
                 </ScrollView>
-                {/* TEMP simulator-only toggle: lets us page the carousel without
-                    needing a horizontal swipe. Remove before shipping (or hide
-                    behind __DEV__ if you want it for debug-only). */}
-                {profile.is_owner && (
-                  <Pressable style={styles.carouselToggle} onPress={toggleCarouselPage}>
-                    <Text style={styles.carouselToggleText}>
-                      {carouselPage === 0 ? '→' : '←'}
-                    </Text>
-                  </Pressable>
-                )}
               </View>
             </>
           ) : (
@@ -730,7 +711,7 @@ export default function UserProfile() {
               </Pressable>
             </>
           )}
-        </Pressable>
+        </View>
       </View>
 
       {/* ---- MediaBar ---- */}
@@ -906,26 +887,6 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     borderRadius: 5,
   },
-  // TEMP simulator helper — small chip in the upper-right of the bio carousel
-  // that pages between Artist Statement and Comments without needing a swipe.
-  carouselToggle: {
-    position: 'absolute',
-    top: 6,
-    right: 8,
-    width: 26,
-    height: 22,
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 4,
-    backgroundColor: Colors.accentGolden,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  carouselToggleText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    lineHeight: 18,
-  },
   bioLabel: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.md,
@@ -986,6 +947,26 @@ const styles = StyleSheet.create({
   },
   portfolioLinkText: {
     fontSize: FontSizes.xxs,
+  },
+  editChip: {
+    // Small square button that replaces the old "tap-anywhere on userFields"
+    // edit gesture. No background — just a bordered chip with the •-• mark.
+    // Floats top-right inside the bio/comments carousel so it sits on the
+    // same horizontal as the "Artist Statement" header.
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'transparent',
+  },
+  editChipText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
+    color: Colors.black,
   },
   userTopRow: {
     flexDirection: 'row',
