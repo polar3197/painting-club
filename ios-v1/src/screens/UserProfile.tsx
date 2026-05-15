@@ -51,8 +51,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Minimum height of the bio/comments carousel. The Artist Statement otherwise
 // auto-sizes to its content; this floor guarantees the comments page (which
 // always wants to show ~4 rows) isn't squished when a bio is very short.
-// 4 lines × ~22px line height + label + hr + paddings ≈ 150.
-const BIO_PAGE_MIN_HEIGHT = 150;
+// Bumped to give each comment row more vertical room while still showing 4.
+const BIO_PAGE_MIN_HEIGHT = 180;
 // Visual gap between the two bordered pages of the carousel so the swipe feels
 // like moving to a separate frame rather than sliding content under one.
 const BIO_PAGE_GAP = 40;
@@ -449,6 +449,21 @@ export default function UserProfile() {
         setPendingScroll(null);
       }, 300);
     }
+  }, [pendingScroll]);
+
+  // Fallback path for the comments-panel tap-to-nav: when the target piece is
+  // already laid out (typical when the comment is on a piece in the medium
+  // you're currently viewing), handleArtLayout won't re-fire so it would never
+  // consume pendingScroll. This effect scrolls directly using the cached y.
+  useEffect(() => {
+    if (!pendingScroll) return;
+    const y = artPositions.current[pendingScroll];
+    if (y == null) return;
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y, animated: true });
+      setPendingScroll(null);
+    }, 100);
+    return () => clearTimeout(t);
   }, [pendingScroll]);
 
   const startEditing = () => {

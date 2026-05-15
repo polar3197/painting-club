@@ -19,10 +19,14 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 const PAGE_SIZE = 20;
 const VISIBLE_ROWS = 4;
-// Just the block's own padding now (10 top + 10 bottom). The "Comments" label
+// Just the block's own padding now (4 top + 4 bottom). The "Comments" label
 // and divider were removed at the parent's request — the surrounding bordered
-// page already frames the list visually.
-const PANEL_CHROME = 20;
+// page already frames the list visually. Trimmed from 10 → 4 to give the
+// bordered rows more horizontal room.
+const PANEL_CHROME = 8;
+// Small visual gap between bordered rows so they read as separate tiles
+// rather than one continuous list. Matches the rest of the app's spacing.
+const ROW_GAP = 4;
 
 interface CommentsReceivedPanelProps {
   // Fires when the user taps a comment. Caller is responsible for routing to
@@ -77,28 +81,35 @@ export default function CommentsReceivedPanel({ onTapComment }: CommentsReceived
   // sizes us via flex/alignItems, and depending on a prop here was what caused
   // the previous render-loop where each cycle added the border thickness.
   const [measuredHeight, setMeasuredHeight] = useState(0);
-  const rowHeight = Math.floor(Math.max(32, (measuredHeight - PANEL_CHROME) / VISIBLE_ROWS));
+  // 4 bordered rows + 3 gaps between them = available list height. ROW_GAP is
+  // applied via marginBottom on each row (we tolerate one extra trailing gap
+  // because it just lands inside the scrollable area).
+  const rowHeight = Math.floor(
+    Math.max(36, (measuredHeight - PANEL_CHROME - VISIBLE_ROWS * ROW_GAP) / VISIBLE_ROWS),
+  );
 
   const isUnseen = (createdAt: string) =>
     thresholdRef.current === null || createdAt > thresholdRef.current;
 
   const renderItem = ({ item }: { item: CommentReceivedOut }) => {
     const unseen = isUnseen(item.created_at);
-    const who = item.commenter_firstname || item.commenter_username;
     return (
       <Pressable
         onPress={() => onTapComment(item)}
         style={[
           styles.row,
-          { height: rowHeight, backgroundColor: unseen ? Colors.primaryGold : Colors.mainBg },
+          { height: rowHeight, backgroundColor: unseen ? Colors.primaryGold : Colors.secondary },
         ]}
       >
-        <Text style={styles.rowText} numberOfLines={2} ellipsizeMode="tail">
-          <Text style={styles.who}>{who}</Text>
-          <Text style={styles.metaSep}> on </Text>
-          <Text style={styles.artTitle}>{item.art_title || 'Untitled'}</Text>
-          {'  '}
-          <Text style={styles.commentText}>{item.text}</Text>
+        {/* Comment text takes the remaining row width and truncates with an
+            ellipsis if it doesn't fit. The " -username" tag is fixed-width on
+            the right so it's always visible. Tap routes to the art piece
+            (parent handles the medium switch + scroll). */}
+        <Text style={styles.commentText} numberOfLines={1} ellipsizeMode="tail">
+          {item.text}
+        </Text>
+        <Text style={styles.commenterTag} numberOfLines={1}>
+          {` -${item.commenter_username}`}
         </Text>
       </Pressable>
     );
@@ -138,34 +149,32 @@ export default function CommentsReceivedPanel({ onTapComment }: CommentsReceived
 const styles = StyleSheet.create({
   block: {
     flex: 1,
-    padding: 10,
+    padding: 4,
   },
   list: {
     flex: 1,
   },
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 6,
-    justifyContent: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#000',
-  },
-  rowText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    color: Colors.textPrimary,
-  },
-  who: {
-    fontWeight: '600',
-  },
-  metaSep: {
-    color: Colors.textTertiary,
-  },
-  artTitle: {
-    fontStyle: 'italic',
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#000',
+    marginBottom: ROW_GAP,
   },
   commentText: {
-    color: Colors.textSecondary,
+    flex: 1,
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+    textAlign: 'left',
+  },
+  commenterTag: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+    marginLeft: 4,
   },
   footer: {
     paddingVertical: 10,
