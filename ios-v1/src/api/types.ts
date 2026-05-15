@@ -149,6 +149,26 @@ export interface CommentOut {
   created_at: string;
 }
 
+export interface CommentReceivedOut {
+  id: string;
+  text: string;
+  created_at: string;
+  art_id: string;
+  art_title: string | null;
+  art_medium: string;
+  commenter_username: string;
+  commenter_firstname: string | null;
+}
+
+export interface CommentsReceivedPage {
+  comments: CommentReceivedOut[];
+  next_cursor: string | null;
+  // Snapshot of comments_last_viewed_at BEFORE the server bumped it on this
+  // first-page fetch. Compare each comment.created_at against this to decide
+  // seen (beige) vs unseen (gold).
+  previous_view_at: string | null;
+}
+
 export interface MediaType {
   id: string;
   name: string;

@@ -1,7 +1,9 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import datetime
 
-from db.models import Comment, Member, Art
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc
+
+from db.models import Comment, Member, Art, Media
 from db.db_ops.blocks import db_is_blocked
 
 
@@ -30,6 +32,47 @@ async def db_add_comment(db: AsyncSession, art_id: str, member_id, text: str) ->
     await db.commit()
     await db.refresh(comment)
     return comment
+
+
+async def db_get_comments_received(
+    db: AsyncSession,
+    viewer_id: str,
+    cursor: datetime | None,
+    limit: int,
+):
+    """Comments left by OTHER members on art owned by viewer, newest first.
+    Returns up to `limit` rows; pass the last row's created_at back as `cursor`
+    on subsequent calls to page through older comments.
+    """
+    q = (
+        select(
+            Comment,
+            Member.username,
+            Member.firstname,
+            Art.title,
+            Media.name,
+        )
+        .join(Art, Comment.art_id == Art.id)
+        .join(Member, Comment.member_id == Member.id)
+        .join(Media, Art.media_id == Media.id)
+        .filter(Art.creator_id == viewer_id)
+        .filter(Comment.member_id != viewer_id)
+        .order_by(desc(Comment.created_at))
+        .limit(limit)
+    )
+    if cursor is not None:
+        q = q.filter(Comment.created_at < cursor)
+    result = await db.execute(q)
+    return result.all()
+
+
+async def db_touch_comments_viewed(db: AsyncSession, member: Member) -> datetime | None:
+    """Bump member.comments_last_viewed_at to now() and return the PREVIOUS value.
+    Caller uses the previous value as the unseen-threshold to render rows."""
+    prev = member.comments_last_viewed_at
+    member.comments_last_viewed_at = datetime.utcnow()
+    await db.commit()
+    return prev
 
 
 async def db_delete_comment(db: AsyncSession, comment_id: str, member_id: str) -> str:

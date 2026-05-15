@@ -16,6 +16,7 @@ import type {
   SearchOptions,
   ArtResult,
   CommentOut,
+  CommentsReceivedPage,
   MediaType,
   MediaRequest,
 } from './types';
@@ -285,6 +286,19 @@ export function get_comments(art_id: string, token: string | null): Promise<Comm
   return request(`/art/${art_id}/comments`, {
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<CommentOut[]>;
+}
+
+export function get_comments_received(
+  token: string | null,
+  cursor: string | null,
+  limit = 20,
+): Promise<CommentsReceivedPage> {
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', cursor);
+  params.set('limit', String(limit));
+  return request(`/members/me/comments-received?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<CommentsReceivedPage>;
 }
 
 export function post_comment(art_id: string, text: string, token: string | null): Promise<CommentOut> {

@@ -42,9 +42,17 @@ import AddArtDialog from '../components/AddArtDialog';
 import AddMediaDialog from '../components/AddMediaDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Spinner from '../components/Spinner';
+import CommentsReceivedPanel from '../components/CommentsReceivedPanel';
+import type { CommentReceivedOut } from '../api/types';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Minimum height of the bio/comments carousel. The Artist Statement otherwise
+// auto-sizes to its content; this floor guarantees the comments page (which
+// always wants to show ~4 rows) isn't squished when a bio is very short.
+// 4 lines × ~22px line height + label + hr + paddings ≈ 150.
+const BIO_PAGE_MIN_HEIGHT = 150;
 
 type ProfileRoute = RouteProp<
   { UserProfile: { username: string; artId?: string; medium?: string } },
@@ -236,6 +244,25 @@ export default function UserProfile() {
   const [pendingPieces, setPendingPieces] = useState<
     { tempId: string; medium: string; uri: string; title: string; aspectRatio: number }[]
   >([]);
+  // Captured from onLayout so each page of the bio/comments carousel can size
+  // to match the container exactly (paging snaps cleanly to that width).
+  const [bioPageWidth, setBioPageWidth] = useState(0);
+  // Temporary state + ref for the debug toggle button — sim doesn't make
+  // horizontal swiping easy, so we expose a → / ← chip to programmatically
+  // page the carousel. Safe to delete once we're testing on hardware.
+  const carouselScrollRef = useRef<ScrollView>(null);
+  const [carouselPage, setCarouselPage] = useState(0);
+  const toggleCarouselPage = () => {
+    const next = carouselPage === 0 ? 1 : 0;
+    carouselScrollRef.current?.scrollTo({ x: next * bioPageWidth, animated: true });
+    setCarouselPage(next);
+  };
+  // Height of the bio content (label+hr+text). The carousel uses this so the
+  // comments page on the right mirrors whatever the bio's auto-size becomes,
+  // floored at BIO_PAGE_MIN_HEIGHT so very short bios still leave room for
+  // the comments rows.
+  const [bioContentHeight, setBioContentHeight] = useState(BIO_PAGE_MIN_HEIGHT);
+  const carouselHeight = Math.max(BIO_PAGE_MIN_HEIGHT, bioContentHeight);
 
   const startUpload = useCallback((payload: Visual2DIn) => {
     const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -334,6 +361,15 @@ export default function UserProfile() {
   const mediaBarY = useRef(0);
   const keywordsBarY = useRef(0);
   const [pendingScroll, setPendingScroll] = useState<string | null>(scrollToArtId ?? null);
+
+  // Tap a row in the comments-received panel: route to that art piece by reusing
+  // the existing scrollToArtId mechanism. Setting the medium triggers art refetch;
+  // when the piece mounts and fires handleArtLayout, the page scrolls to it.
+  const handleTapReceivedComment = useCallback((c: CommentReceivedOut) => {
+    setSelectedMedium(c.art_medium);
+    setSelectedKeywords([]);
+    setPendingScroll(c.art_id);
+  }, []);
 
   const handleKeywordFocus = useCallback(() => {
     // Put the keyword bar near the top of the visible area so it (and the
@@ -568,10 +604,59 @@ export default function UserProfile() {
                   </View>
                 )}
               </View>
-              <View style={styles.bioSection}>
-                <Text style={styles.bioLabel}>Artist Statement</Text>
-                <View style={styles.bioHr} />
-                {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
+              {/* Paged carousel: page 1 = artist statement, page 2 = comments
+                  received. Only the user's OWN profile shows the comments page
+                  (you can't see others' received-comments). The carousel auto-
+                  sizes to the bio content with a floor of BIO_PAGE_MIN_HEIGHT
+                  so the comments page is never too small. Using minHeight (not
+                  height) is important — a fixed height would constrain the bio
+                  page's onLayout measurement and prevent growth past the floor. */}
+              <View
+                style={[styles.bioCarouselWrap, { minHeight: carouselHeight }]}
+                onLayout={(e) => setBioPageWidth(e.nativeEvent.layout.width)}
+              >
+                <ScrollView
+                  ref={carouselScrollRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  // nestedScrollEnabled lets the FlatList inside CommentsReceivedPanel
+                  // vertically scroll without fighting the parent vertical scroll.
+                  nestedScrollEnabled
+                  onMomentumScrollEnd={(e) => {
+                    const page = Math.round(e.nativeEvent.contentOffset.x / Math.max(1, bioPageWidth));
+                    setCarouselPage(page);
+                  }}
+                >
+                  <View
+                    style={[styles.bioPage, { width: bioPageWidth }]}
+                    // Measure the bio page's content so the carousel (and the
+                    // sibling comments page) can match its height.
+                    onLayout={(e) => setBioContentHeight(e.nativeEvent.layout.height)}
+                  >
+                    <Text style={styles.bioLabel}>Artist Statement</Text>
+                    <View style={styles.bioHr} />
+                    {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
+                  </View>
+                  {profile.is_owner && bioPageWidth > 0 && (
+                    <View style={[styles.bioPage, { width: bioPageWidth, padding: 0 }]}>
+                      <CommentsReceivedPanel
+                        height={carouselHeight}
+                        onTapComment={handleTapReceivedComment}
+                      />
+                    </View>
+                  )}
+                </ScrollView>
+                {/* TEMP simulator-only toggle: lets us page the carousel without
+                    needing a horizontal swipe. Remove before shipping (or hide
+                    behind __DEV__ if you want it for debug-only). */}
+                {profile.is_owner && (
+                  <Pressable style={styles.carouselToggle} onPress={toggleCarouselPage}>
+                    <Text style={styles.carouselToggleText}>
+                      {carouselPage === 0 ? '→' : '←'}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             </>
           ) : (
@@ -784,6 +869,42 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     borderRadius: 5,
     padding: 10,
+  },
+  // Outer wrapper of the artist-statement <-> comments-received carousel.
+  // Height is driven by the bio content auto-size (floored at
+  // BIO_PAGE_MIN_HEIGHT) and applied inline by the renderer. The border moved
+  // to each page so swiping reveals a fresh framed block instead of swapping
+  // content inside one shared frame.
+  bioCarouselWrap: {
+    marginTop: 12,
+    marginHorizontal: -8,
+    overflow: 'hidden',
+  },
+  bioPage: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 5,
+  },
+  // TEMP simulator helper — small chip in the upper-right of the bio carousel
+  // that pages between Artist Statement and Comments without needing a swipe.
+  carouselToggle: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    width: 26,
+    height: 22,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 4,
+    backgroundColor: Colors.accentGolden,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carouselToggleText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    lineHeight: 18,
   },
   bioLabel: {
     fontFamily: Fonts.serif,

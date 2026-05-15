@@ -46,6 +46,8 @@ from api.models import (
     SetupAccountIn,
     SetupCodeIn,
     CommentOut,
+    CommentReceivedOut,
+    CommentsReceivedPage,
     CommentIn,
     ReportIn,
     ReportOut,
@@ -128,6 +130,8 @@ from db.db_ops.comments import (
     db_get_comments,
     db_add_comment,
     db_delete_comment,
+    db_get_comments_received,
+    db_touch_comments_viewed,
 )
     
 from db.session import get_db
@@ -1050,6 +1054,48 @@ async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db)):
 
 
 # ====================== COMMENTS =========================
+
+@app.get("/members/me/comments-received", response_model=CommentsReceivedPage)
+async def get_comments_received(
+    cursor: datetime | None = None,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """Paged list of comments left by OTHER members on the caller's art.
+    First page (cursor=None) snapshots and bumps `comments_last_viewed_at` so the
+    client can colour pre-existing rows as 'seen' and brand-new rows as 'unseen'.
+    """
+    # Cap limit to keep payloads predictable.
+    limit = max(1, min(limit, 50))
+    is_first_page = cursor is None
+    prev = (
+        await db_touch_comments_viewed(db, current_member)
+        if is_first_page
+        else current_member.comments_last_viewed_at
+    )
+
+    rows = await db_get_comments_received(db, current_member.id, cursor, limit)
+    comments = [
+        CommentReceivedOut(
+            id=c.id,
+            text=c.text,
+            created_at=c.created_at,
+            art_id=c.art_id,
+            art_title=art_title,
+            art_medium=art_medium,
+            commenter_username=username,
+            commenter_firstname=firstname,
+        )
+        for c, username, firstname, art_title, art_medium in rows
+    ]
+    next_cursor = comments[-1].created_at if len(comments) == limit else None
+    return CommentsReceivedPage(
+        comments=comments,
+        next_cursor=next_cursor,
+        previous_view_at=prev,
+    )
+
 
 @app.get("/art/{art_id}/comments", response_model=list[CommentOut])
 async def get_comments(

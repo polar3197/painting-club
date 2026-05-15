@@ -203,6 +203,26 @@ class CommentOut(BaseModel):
     created_at: datetime
 
 
+class CommentReceivedOut(BaseModel):
+    id: uuid.UUID
+    text: str
+    created_at: datetime
+    art_id: uuid.UUID
+    art_title: str | None
+    art_medium: str
+    commenter_username: str
+    commenter_firstname: str | None
+
+
+class CommentsReceivedPage(BaseModel):
+    comments: List[CommentReceivedOut]
+    next_cursor: datetime | None
+    # The PREVIOUS value of comments_last_viewed_at — clients compare each
+    # comment.created_at against this to decide seen vs unseen colouring.
+    # Only meaningful on the first page (cursor=null); subsequent pages echo it.
+    previous_view_at: datetime | None
+
+
 class Visual2DOut(BaseModel):
     id: uuid.UUID
     title: str
