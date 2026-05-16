@@ -8,9 +8,9 @@
   z-index: 1;
   /* border: 1px black solid; */
   width: 130px;
-  /* Taller than before so the non-member panel's three equal-height fields
-     (two buttons + the secret-code row) fit without overflowing the box. */
-  height: 160px;
+  /* Taller than before so the non-member panel's three 40px fields
+     (two buttons + the secret-code row) plus the footer fit the box. */
+  height: 190px;
   padding: 4px;
 }
 
@@ -74,6 +74,10 @@
   flex-direction: column;
   gap: 4px;
   align-items: center;
+  /* Fill the card and spread the three fields so the panel scales with the
+     box, mirroring how .user-form fills the member side. */
+  height: 100%;
+  justify-content: space-between;
 }
 
 .non-member button {
@@ -82,7 +86,7 @@
   cursor: pointer;
   text-align: center;
   border: 1px solid black;
-  height: 30px;
+  height: 40px;
   width: 100%;
   /* border-box so the 1px border + padding stay inside the 100% width
      instead of pushing the button past the container edge. */
@@ -100,7 +104,7 @@
   flex-direction: row;
   align-items: stretch;
   width: 100%;
-  height: 30px;
+  height: 40px;
   border: 1px solid #000;
   background: rgb(250, 244, 202);
   box-sizing: border-box;
@@ -345,18 +349,17 @@
     justify-content: space-between;
   }
 
+  /* Fixed height (not flex:1) so the fields stay a proportional size instead
+     of stretching to fill the tall mobile card — a stretched text input
+     looked broken. .non-member's space-between spreads them down the card. */
   .non-member button {
-    height: auto;
-    flex: 1;
-    padding: 14px;
+    height: 52px;
+    padding: 0 14px;
     font-size: 18px;
   }
 
-  /* Secret-code row joins the buttons as an equal-height flex sibling so all
-     three non-member fields are the same height on mobile. */
   .setup-code-row {
-    flex: 1;
-    height: auto;
+    height: 52px;
   }
 
   .setup-code-input {
