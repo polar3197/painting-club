@@ -1,6 +1,6 @@
 import { useState, FormEvent } from "react";
 import "../../styles/login.css";
-import { login_user, get_profile } from "../../api";
+import { login_user, get_profile, redeem_setup_code } from "../../api";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ApplicationDialog from "../Utils/ApplicationDialog";
@@ -14,8 +14,26 @@ export default function Login(
   const [member, setMember] = useState(true);
   const [memberStatus, setMemberStatus] = useState("not a member?");
   const [showApplication, setShowApplication] = useState(false);
+  const [setupCode, setSetupCode] = useState("");
   const { login } = useAuth()!;
   const navigate = useNavigate();
+
+  // Redeem a one-time setup code → temp-account token → setup page. Mirrors the
+  // iOS landing page's secret-code row.
+  const handleSetupCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const code = setupCode.trim();
+    if (!code) return;
+    try {
+      const res = await redeem_setup_code(code);
+      // No real username yet — the setup page reads the token from storage and
+      // the member picks their username there.
+      login("", res.access_token, "member");
+      navigate("/setup");
+    } catch (err) {
+      alert((err as Error).message || "Invalid or expired setup code");
+    }
+  };
 
   const handleClick = () => {
     if (member) {
@@ -104,6 +122,20 @@ export default function Login(
           <div className="non-member">
             <button onClick={() => navigate("/members")}>view artists profiles</button>
             <button onClick={() => setShowApplication(true)}>request account</button>
+            <form className="setup-code-row" onSubmit={handleSetupCode}>
+              <input
+                type="text"
+                className="setup-code-input"
+                placeholder="secret code?"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={setupCode}
+                onChange={(e) => setSetupCode(e.target.value)}
+              />
+              <button type="submit" className="setup-code-btn" aria-label="redeem code">
+                →
+              </button>
+            </form>
           </div>
         )}
       </div>

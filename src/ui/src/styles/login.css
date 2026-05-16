@@ -87,6 +87,47 @@
   background: #0c8c6e;
 }
 
+/* Secret-code redemption row — mirrors the iOS landing page: bordered row
+   with a flex-grow input and a square gold submit button. */
+.setup-code-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  height: 30px;
+  border: 1px solid #000;
+  background: rgb(250, 244, 202);
+  box-sizing: border-box;
+}
+
+.setup-code-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #000;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.setup-code-btn {
+  flex: 0 0 auto;
+  width: 30px;
+  background: rgb(238, 190, 100);
+  border: none;
+  border-left: 1px solid #000;
+  color: #000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.setup-code-btn:hover {
+  background: rgb(210, 160, 70);
+}
+
 .user-form {
   display: flex;
   flex-direction: column;

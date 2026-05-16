@@ -74,6 +74,15 @@ export interface SetupAccountIn {
   new_password: string;
 }
 
+// Redeem a one-time setup code (handed out by an admin) for a temp-account
+// token. Mirrors the iOS landing-page secret-code flow.
+export function redeem_setup_code(code: string): Promise<LoginResponse> {
+  return request("/members/redeem-setup-code", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  }) as Promise<LoginResponse>;
+}
+
 export function setup_account(payload: SetupAccountIn, token: string | null): Promise<{ id: string; username: string }> {
   return request("/members/setup-account", {
     method: "POST",
