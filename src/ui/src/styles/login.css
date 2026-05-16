@@ -8,9 +8,7 @@
   z-index: 1;
   /* border: 1px black solid; */
   width: 130px;
-  /* Taller than before so the non-member panel's three 40px fields
-     (two buttons + the secret-code row) plus the footer fit the box. */
-  height: 190px;
+  height: 110px;
   padding: 4px;
 }
 
@@ -55,7 +53,6 @@
   padding: 5px;
   width: 100%;
   height: auto;
-  box-sizing: border-box;
 }
 
 .login-footer button:hover {
@@ -74,10 +71,6 @@
   flex-direction: column;
   gap: 4px;
   align-items: center;
-  /* Fill the card and spread the three fields so the panel scales with the
-     box, mirroring how .user-form fills the member side. */
-  height: 100%;
-  justify-content: space-between;
 }
 
 .non-member button {
@@ -86,57 +79,12 @@
   cursor: pointer;
   text-align: center;
   border: 1px solid black;
-  height: 40px;
+  height: 30px;
   width: 100%;
-  /* border-box so the 1px border + padding stay inside the 100% width
-     instead of pushing the button past the container edge. */
-  box-sizing: border-box;
 }
 
 .non-member button:hover {
   background: #0c8c6e;
-}
-
-/* Secret-code redemption row — mirrors the iOS landing page: bordered row
-   with a flex-grow input and a square gold submit button. */
-.setup-code-row {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  width: 100%;
-  height: 40px;
-  border: 1px solid #000;
-  background: rgb(250, 244, 202);
-  box-sizing: border-box;
-}
-
-.setup-code-input {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #000;
-  padding: 0 8px;
-  box-sizing: border-box;
-}
-
-.setup-code-btn {
-  flex: 0 0 auto;
-  /* Square at any row height — width tracks the stretched height. */
-  aspect-ratio: 1;
-  background: rgb(238, 190, 100);
-  border: none;
-  border-left: 1px solid #000;
-  color: #000;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.setup-code-btn:hover {
-  background: rgb(210, 160, 70);
 }
 
 .user-form {
@@ -144,10 +92,6 @@
   flex-direction: column;
   max-width: 130px;
   gap: 5px;
-  /* Spread the un / pw / login elements to fill the (now taller) card so the
-     member pane scales with the box instead of clumping at the top. */
-  height: 100%;
-  justify-content: space-between;
 }
 
 .user-form input {
@@ -177,7 +121,6 @@
   text-align: center;
   border: 1px solid black;
   width: 100%;
-  box-sizing: border-box;
 }
 
 .user-form button:hover{
@@ -349,25 +292,10 @@
     justify-content: space-between;
   }
 
-  /* Fixed height (not flex:1) so the fields stay a proportional size instead
-     of stretching to fill the tall mobile card — a stretched text input
-     looked broken. .non-member's space-between spreads them down the card. */
   .non-member button {
-    height: 52px;
-    padding: 0 14px;
+    height: auto;
+    flex: 1;
+    padding: 14px;
     font-size: 18px;
-  }
-
-  .setup-code-row {
-    height: 52px;
-  }
-
-  .setup-code-input {
-    font-size: 18px;
-    padding: 0 14px;
-  }
-
-  .setup-code-btn {
-    font-size: 24px;
   }
 }
