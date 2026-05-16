@@ -8,7 +8,9 @@
   z-index: 1;
   /* border: 1px black solid; */
   width: 130px;
-  height: 110px;
+  /* Taller than before so the non-member panel's three equal-height fields
+     (two buttons + the secret-code row) fit without overflowing the box. */
+  height: 160px;
   padding: 4px;
 }
 
@@ -53,6 +55,7 @@
   padding: 5px;
   width: 100%;
   height: auto;
+  box-sizing: border-box;
 }
 
 .login-footer button:hover {
@@ -81,6 +84,9 @@
   border: 1px solid black;
   height: 30px;
   width: 100%;
+  /* border-box so the 1px border + padding stay inside the 100% width
+     instead of pushing the button past the container edge. */
+  box-sizing: border-box;
 }
 
 .non-member button:hover {
@@ -113,7 +119,8 @@
 
 .setup-code-btn {
   flex: 0 0 auto;
-  width: 30px;
+  /* Square at any row height — width tracks the stretched height. */
+  aspect-ratio: 1;
   background: rgb(238, 190, 100);
   border: none;
   border-left: 1px solid #000;
@@ -133,6 +140,10 @@
   flex-direction: column;
   max-width: 130px;
   gap: 5px;
+  /* Spread the un / pw / login elements to fill the (now taller) card so the
+     member pane scales with the box instead of clumping at the top. */
+  height: 100%;
+  justify-content: space-between;
 }
 
 .user-form input {
@@ -162,6 +173,7 @@
   text-align: center;
   border: 1px solid black;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .user-form button:hover{
@@ -338,5 +350,21 @@
     flex: 1;
     padding: 14px;
     font-size: 18px;
+  }
+
+  /* Secret-code row joins the buttons as an equal-height flex sibling so all
+     three non-member fields are the same height on mobile. */
+  .setup-code-row {
+    flex: 1;
+    height: auto;
+  }
+
+  .setup-code-input {
+    font-size: 18px;
+    padding: 0 14px;
+  }
+
+  .setup-code-btn {
+    font-size: 24px;
   }
 }
