@@ -109,7 +109,20 @@ export default function LandingPage() {
             instead of recentering every frame (which produces visible twitch). */}
         <View style={styles.flexSpacer} />
         <View style={styles.titleWrap}>
-          <Text style={styles.title} numberOfLines={1}>-. Painting Club .-</Text>
+          {/* adjustsFontSizeToFit scales the title down on narrow screens so
+              it stops at the box's inner edge. We bound it with a sensible
+              minimumFontScale so it won't shrink to a hairline on very narrow
+              devices. Re-adding this is fine now that the surrounding layout
+              uses flex spacers instead of justifyContent:center — the title
+              no longer re-fits on every keyboard-driven layout pass. */}
+          <Text
+            style={styles.title}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+          >
+            -• Painting Club •-
+          </Text>
         </View>
 
         <View style={styles.loginContainer}>
