@@ -35,8 +35,13 @@ from api.models import (
     MediaVisibilityUpdate,
     Visual2DOut,
     WrittenFormOut,
-    WrittenFormUpdate,
-    CollectionRename,
+    AudioOut,
+    SeriesRename,
+    SeriesOrderUpdate,
+    PromptOut,
+    PromptDetailOut,
+    PromptCreate,
+    PromptSummary,
     SearchOptions,
     ArtResult,
     ApplicationIn,
@@ -120,10 +125,27 @@ from db.db_ops.media import (
     db_get_written_form,
     db_update_written_form,
     db_remove_written_form,
+    db_add_audio,
+    db_get_audio,
+    db_update_audio,
+    db_remove_audio,
 )
 
-from db.db_ops.collections import (
-    db_rename_collection,
+from db.db_ops.series import (
+    db_rename_series,
+    db_set_series_order,
+)
+
+from db.db_ops.prompts import (
+    db_get_active_prompt,
+    db_get_prompt,
+    db_list_prompts,
+    db_list_prompt_submissions,
+    db_get_user_submission,
+    db_create_prompt,
+    db_activate_prompt,
+    db_archive_prompt,
+    db_validate_submission_medium,
 )
 
 from db.db_ops.comments import (
@@ -136,7 +158,7 @@ from db.db_ops.comments import (
     
 from db.session import get_db
 from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
-from db.models import Member, Media, Media_Members, Art, Comment, Visual2D
+from db.models import Member, Media, Media_Members, Art, Comment, Visual2D, WrittenForm, WeeklyPrompt
 
 from api.auth import create_token, decode_token
 
@@ -523,6 +545,24 @@ WRITTEN_FORM_MIME_TO_EXT = {
 }
 WRITTEN_FORM_EXTS = {"pdf", "txt", "md", "docx"}
 
+# Audio uploads (voice memos + music). libmagic's audio detection is messy:
+# .m4a/.aac containers are MP4 boxes often reported as 'audio/mp4', 'video/mp4',
+# or 'audio/x-m4a'; .wav as 'audio/x-wav' or 'audio/wav'. So, like written-form,
+# we resolve the extension from the filename first and only fall back to MIME.
+AUDIO_MIME_TO_EXT = {
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/aac": "aac",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/wave": "wav",
+    # iOS records .m4a; libmagic sometimes tags the MP4 container as video/*.
+    "video/mp4": "m4a",
+}
+AUDIO_EXTS = {"m4a", "mp3", "wav", "aac"}
+
 STATIC_ROOT = Path("/app")
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 
@@ -667,6 +707,7 @@ async def upload_visual_2d(
     height: int | None = Form(None),
     keywords: str | None = Form(None),
     comments_enabled: bool = Form(False),
+    collection_id: str | None = Form(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
@@ -674,6 +715,14 @@ async def upload_visual_2d(
     # verify ownership
     if current_member.username != username:
         raise HTTPException(status_code=403, detail="Cannot upload for another user")
+
+    # When submitting to a prompt: enforce medium match + one-per-user.
+    if collection_id:
+        if not await db_validate_submission_medium(db, collection_id, medium):
+            raise HTTPException(status_code=400, detail="Medium does not match the prompt's required medium")
+        existing = await db_get_user_submission(db, collection_id, current_member.id)
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="You already submitted to this prompt; edit your existing piece")
 
     # enforce file size limit
     contents = await file.read(MAX_UPLOAD_BYTES + 1)
@@ -725,6 +774,7 @@ async def upload_visual_2d(
             file_path=file_path,
             comments_enabled=comments_enabled,
             aspect_ratio=aspect_ratio,
+            collection_id=collection_id,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)
@@ -883,32 +933,48 @@ async def upload_written_form(
     date: date | None = Form(None),
     keywords: str | None = Form(None),
     comments_enabled: bool = Form(False),
-    collection_name: str | None = Form(None),
-    file: UploadFile = File(...),
+    series_name: str | None = Form(None),
+    file: UploadFile | None = File(None),
+    # Plaintext alternative to uploading a file. When set, the server writes
+    # the contents as a .txt under the user's written-form medium. Lets users
+    # bring text in from Notes / Google Docs / anywhere via copy-paste — no
+    # share-extension or file-provider round-trip required.
+    text: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
 ):
     if current_member.username != username:
         raise HTTPException(status_code=403, detail="Cannot upload for another user")
 
-    contents = await file.read(MAX_UPLOAD_BYTES + 1)
-    if len(contents) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+    if file is None and not text:
+        raise HTTPException(status_code=400, detail="Provide either a file or pasted text")
+    if file is not None and text:
+        raise HTTPException(status_code=400, detail="Send a file OR pasted text, not both")
 
-    # Resolve extension from filename first; libmagic can't distinguish .md from .txt
-    # (both 'text/plain') and sometimes reports .docx as 'application/zip'.
-    filename_ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
-    mime = magic.from_buffer(contents, mime=True)
-
-    if filename_ext in WRITTEN_FORM_EXTS:
-        file_ext = filename_ext
-        # Cross-check that the body bytes are plausible for the claimed extension.
-        if mime not in WRITTEN_FORM_MIME_TO_EXT and not (file_ext in {"txt", "md"} and mime == "text/plain"):
-            raise HTTPException(status_code=400, detail=f"File contents do not match extension .{file_ext} (detected {mime})")
-    elif mime in WRITTEN_FORM_MIME_TO_EXT:
-        file_ext = WRITTEN_FORM_MIME_TO_EXT[mime]
+    if text is not None:
+        contents = text.encode("utf-8")
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Text exceeds 20 MB limit")
+        file_ext = "txt"
     else:
-        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+        contents = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+
+        # Resolve extension from filename first; libmagic can't distinguish .md from .txt
+        # (both 'text/plain') and sometimes reports .docx as 'application/zip'.
+        filename_ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+        mime = magic.from_buffer(contents, mime=True)
+
+        if filename_ext in WRITTEN_FORM_EXTS:
+            file_ext = filename_ext
+            # Cross-check that the body bytes are plausible for the claimed extension.
+            if mime not in WRITTEN_FORM_MIME_TO_EXT and not (file_ext in {"txt", "md"} and mime == "text/plain"):
+                raise HTTPException(status_code=400, detail=f"File contents do not match extension .{file_ext} (detected {mime})")
+        elif mime in WRITTEN_FORM_MIME_TO_EXT:
+            file_ext = WRITTEN_FORM_MIME_TO_EXT[mime]
+        else:
+            raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
 
     art_id = uuid.uuid4()
     safe_medium = sanitize_path_segment(medium)
@@ -933,7 +999,7 @@ async def upload_written_form(
             keywords=keywords_list,
             file_path=file_path,
             comments_enabled=comments_enabled,
-            collection_name=collection_name,
+            series_name=series_name,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)
@@ -954,7 +1020,7 @@ async def get_written_form(
 
     pieces = []
     for result in results:
-        row, kws, collection_name = result
+        row, kws, series_name = result
         pieces.append(WrittenFormOut(
             id=row.id,
             title=row.title,
@@ -962,8 +1028,9 @@ async def get_written_form(
             keywords=kws,
             file_path=row.file_path,
             comments_enabled=row.comments_enabled,
-            collection_id=row.collection_id,
-            collection_name=collection_name,
+            series_id=row.series_id,
+            series_name=series_name,
+            order_index=row.order_index,
         ))
     return pieces
 
@@ -971,23 +1038,253 @@ async def get_written_form(
 @app.patch("/art/written-form/{art_id}")
 async def update_written_form(
     art_id: str,
-    payload: WrittenFormUpdate,
+    title: str = Form(...),
+    date: date | None = Form(None),
+    keywords: str | None = Form(None),
+    comments_enabled: bool = Form(False),
+    medium: str | None = Form(None),
+    series_name: str | None = Form(None),
+    clear_series: bool = Form(False),
+    file: UploadFile | None = File(None),
+    text: str | None = Form(None),
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
 ):
+    if file is not None and text:
+        raise HTTPException(status_code=400, detail="Send a file OR pasted text, not both")
+
+    keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
+
+    # File/text replacement path. Mirrors the Visual2D update flow: load existing,
+    # write the new bytes to a fresh path, swap file_path in the DB, then delete
+    # the old file on disk only after the commit succeeds.
+    new_file_path: str | None = None
+    written_path: Path | None = None
+    old_abs_to_delete: Path | None = None
+
+    if file is not None or text:
+        existing = (
+            await db.execute(select(WrittenForm).filter(WrittenForm.id == art_id))
+        ).scalar_one_or_none()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Art not found")
+        if str(existing.creator_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not your piece")
+
+        if text is not None:
+            contents = text.encode("utf-8")
+            if len(contents) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="Text exceeds 20 MB limit")
+            file_ext = "txt"
+        else:
+            contents = await file.read(MAX_UPLOAD_BYTES + 1)
+            if len(contents) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+            filename_ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+            mime = magic.from_buffer(contents, mime=True)
+            if filename_ext in WRITTEN_FORM_EXTS:
+                file_ext = filename_ext
+                if mime not in WRITTEN_FORM_MIME_TO_EXT and not (file_ext in {"txt", "md"} and mime == "text/plain"):
+                    raise HTTPException(status_code=400, detail=f"File contents do not match extension .{file_ext} (detected {mime})")
+            elif mime in WRITTEN_FORM_MIME_TO_EXT:
+                file_ext = WRITTEN_FORM_MIME_TO_EXT[mime]
+            else:
+                raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+
+        if existing.file_path:
+            old_abs_to_delete = abs_path(existing.file_path)
+
+        # Path uses the current medium's name (move-to is a DB column update only;
+        # we re-key the file on the existing medium's folder to keep things simple).
+        current_media = (
+            await db.execute(select(Media).filter(Media.id == existing.media_id))
+        ).scalar_one_or_none()
+        safe_medium = sanitize_path_segment(current_media.name if current_media else "written")
+        new_file_path = f"/static/written-form/{current_user.id}/{safe_medium}/{art_id}.{file_ext}"
+        written_path = abs_path(new_file_path)
+        written_path.parent.mkdir(parents=True, exist_ok=True)
+        written_path.write_bytes(contents)
+        if not written_path.exists() or written_path.stat().st_size == 0:
+            raise HTTPException(status_code=500, detail="Upload write failed")
+
     try:
         await db_update_written_form(
             db=db,
             art_id=art_id,
             current_member_id=current_user.id,
-            title=payload.title,
-            date=payload.date,
-            keywords=payload.keywords,
-            comments_enabled=payload.comments_enabled,
-            medium=payload.medium,
-            collection_name=payload.collection_name,
-            clear_collection=payload.clear_collection,
+            title=title,
+            date=date,
+            keywords=keywords_list,
+            comments_enabled=comments_enabled,
+            medium=medium,
+            series_name=series_name,
+            clear_series=clear_series,
+            file_path=new_file_path,
         )
+    except ValueError as e:
+        if written_path is not None:
+            written_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        if written_path is not None:
+            written_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=403, detail=str(e))
+
+    if new_file_path is not None and old_abs_to_delete is not None and old_abs_to_delete != written_path:
+        old_abs_to_delete.unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.get("/prompts", response_model=list[PromptSummary])
+async def list_prompts(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+) -> list[PromptSummary]:
+    rows = await db_list_prompts(db)
+    return [
+        PromptSummary(
+            id=prompt.id,
+            title=prompt.title,
+            media_name=media_name,
+            is_active=prompt.is_active,
+            created_at=prompt.created_at,
+        )
+        for prompt, media_name in rows
+    ]
+
+
+@app.get("/prompts/active", response_model=PromptOut | None)
+async def get_active_prompt(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+) -> PromptOut | None:
+    row = await db_get_active_prompt(db)
+    if row is None:
+        return None
+    prompt, media_name, count = row
+    return PromptOut(
+        id=prompt.id,
+        title=prompt.title,
+        short_summary=prompt.short_summary,
+        media_id=prompt.media_id,
+        media_name=media_name,
+        is_active=prompt.is_active,
+        submission_count=count,
+    )
+
+
+@app.get("/prompts/{prompt_id}", response_model=PromptDetailOut)
+async def get_prompt(
+    prompt_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+) -> PromptDetailOut:
+    row = await db_get_prompt(db, prompt_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    prompt, media_name = row
+    submissions = await db_list_prompt_submissions(db, prompt.id)
+    viewer_submission_id = await db_get_user_submission(db, prompt.id, current_member.id)
+    return PromptDetailOut(
+        id=prompt.id,
+        title=prompt.title,
+        short_summary=prompt.short_summary,
+        media_id=prompt.media_id,
+        media_name=media_name,
+        is_active=prompt.is_active,
+        submission_count=len(submissions),
+        submissions=submissions,
+        viewer_submission_id=viewer_submission_id,
+    )
+
+
+@app.post("/admin/prompts", response_model=PromptOut, status_code=status.HTTP_201_CREATED)
+async def admin_create_prompt(
+    payload: PromptCreate,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+) -> PromptOut:
+    media_id = (
+        await db.execute(select(Media.id, Media.name).filter(Media.name == payload.medium))
+    ).one_or_none()
+    if media_id is None:
+        raise HTTPException(status_code=404, detail=f"Medium '{payload.medium}' not found")
+    resolved_id, media_name = media_id
+    prompt = await db_create_prompt(
+        db,
+        title=payload.title,
+        short_summary=payload.short_summary,
+        media_id=resolved_id,
+        activate=payload.activate,
+    )
+    return PromptOut(
+        id=prompt.id,
+        title=prompt.title,
+        short_summary=prompt.short_summary,
+        media_id=prompt.media_id,
+        media_name=media_name,
+        is_active=prompt.is_active,
+        submission_count=0,
+    )
+
+
+@app.post("/admin/prompts/{prompt_id}/activate", response_model=PromptOut)
+async def admin_activate_prompt(
+    prompt_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+) -> PromptOut:
+    try:
+        prompt = await db_activate_prompt(db, prompt_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    media_name = (
+        await db.execute(select(Media.name).filter(Media.id == prompt.media_id))
+    ).scalar_one()
+    return PromptOut(
+        id=prompt.id,
+        title=prompt.title,
+        short_summary=prompt.short_summary,
+        media_id=prompt.media_id,
+        media_name=media_name,
+        is_active=prompt.is_active,
+        submission_count=0,
+    )
+
+
+@app.post("/admin/prompts/{prompt_id}/archive", response_model=PromptOut)
+async def admin_archive_prompt(
+    prompt_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+) -> PromptOut:
+    try:
+        prompt = await db_archive_prompt(db, prompt_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    media_name = (
+        await db.execute(select(Media.name).filter(Media.id == prompt.media_id))
+    ).scalar_one()
+    return PromptOut(
+        id=prompt.id,
+        title=prompt.title,
+        short_summary=prompt.short_summary,
+        media_id=prompt.media_id,
+        media_name=media_name,
+        is_active=prompt.is_active,
+        submission_count=0,
+    )
+
+
+@app.patch("/series/{series_id}/order")
+async def set_series_order(
+    series_id: str,
+    payload: SeriesOrderUpdate,
+    current_user: Member = Depends(get_current_member),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await db_set_series_order(db, series_id, current_user.id, [str(a) for a in payload.art_ids])
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
@@ -995,26 +1292,220 @@ async def update_written_form(
     return {"ok": True}
 
 
-@app.patch("/collections/{collection_id}")
-async def rename_collection(
-    collection_id: str,
-    payload: CollectionRename,
+@app.patch("/series/{series_id}")
+async def rename_series(
+    series_id: str,
+    payload: SeriesRename,
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        col = await db_rename_collection(db, collection_id, current_user.id, payload.name)
+        row = await db_rename_series(db, series_id, current_user.id, payload.name)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return {"id": str(col.id), "name": col.name}
+    return {"id": str(row.id), "name": row.name}
 
 
 @app.delete("/art/written-form/{art_id}")
 async def remove_written_form(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
     try:
         file_path = await db_remove_written_form(art_id=art_id, current_member_id=current_user.id, db=db)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if file_path:
+        abs_path(file_path).unlink(missing_ok=True)
+    return
+
+
+# ============================================================
+# Audio routes (voice memos + uploaded music). Mirror the
+# written-form file flow; no text mode, no series. Extra form
+# fields: artist (music only) and duration_seconds (client-measured).
+# ============================================================
+def _resolve_audio_ext(filename: str | None, contents: bytes) -> str:
+    """Resolve the stored extension for an audio upload. Extension-first because
+    libmagic's audio detection is unreliable for MP4-container formats (.m4a/.aac).
+    Falls back to the detected MIME, and raises 400 if neither yields an allowed type."""
+    filename_ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    mime = magic.from_buffer(contents, mime=True)
+    if filename_ext in AUDIO_EXTS:
+        # Trust the extension as long as the bytes look like *some* audio/MP4
+        # container — guards against a .mp3 that's actually a PDF, while staying
+        # permissive about the exact audio MIME variant.
+        if mime in AUDIO_MIME_TO_EXT or mime.startswith("audio/"):
+            return filename_ext
+        raise HTTPException(status_code=400, detail=f"File contents do not match extension .{filename_ext} (detected {mime})")
+    if mime in AUDIO_MIME_TO_EXT:
+        return AUDIO_MIME_TO_EXT[mime]
+    raise HTTPException(status_code=400, detail=f"Audio file type not allowed: {mime}")
+
+
+@app.post("/art/upload/audio")
+async def upload_audio(
+    username: str = Form(...),
+    medium: str = Form(...),
+    title: str = Form(...),
+    date: date | None = Form(None),
+    keywords: str | None = Form(None),
+    comments_enabled: bool = Form(False),
+    artist: str | None = Form(None),
+    duration_seconds: float | None = Form(None),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    if current_member.username != username:
+        raise HTTPException(status_code=403, detail="Cannot upload for another user")
+
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+    file_ext = _resolve_audio_ext(file.filename, contents)
+
+    art_id = uuid.uuid4()
+    safe_medium = sanitize_path_segment(medium)
+    file_path = f"/static/audio/{current_member.id}/{safe_medium}/{art_id}.{file_ext}"
+
+    path = abs_path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
+    if not path.exists() or path.stat().st_size == 0:
+        raise HTTPException(status_code=500, detail="Upload write failed")
+
+    keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
+
+    try:
+        await db_add_audio(
+            db=db,
+            art_id=art_id,
+            username=username,
+            medium=medium,
+            title=title,
+            date=date,
+            artist=artist,
+            duration_seconds=duration_seconds,
+            keywords=keywords_list,
+            file_path=file_path,
+            comments_enabled=comments_enabled,
+        )
+    except ValueError as e:
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return {"file_path": file_path}
+
+
+@app.get("/members/{username}/art/audio/{medium}", response_model=list[AudioOut])
+async def get_audio(
+    username: str,
+    medium: str,
+    db: AsyncSession = Depends(get_db),
+) -> list[AudioOut]:
+    results = await db_get_audio(db, username, medium)
+    if results is None:
+        raise HTTPException(status_code=404)
+
+    pieces = []
+    for row, kws in results:
+        pieces.append(AudioOut(
+            id=row.id,
+            title=row.title,
+            date=row.date,
+            keywords=kws,
+            file_path=row.file_path,
+            comments_enabled=row.comments_enabled,
+            artist=row.artist,
+            duration_seconds=row.duration_seconds,
+        ))
+    return pieces
+
+
+@app.patch("/art/audio/{art_id}")
+async def update_audio(
+    art_id: str,
+    title: str = Form(...),
+    date: date | None = Form(None),
+    keywords: str | None = Form(None),
+    comments_enabled: bool = Form(False),
+    medium: str | None = Form(None),
+    artist: str | None = Form(None),
+    duration_seconds: float | None = Form(None),
+    file: UploadFile | None = File(None),
+    current_user: Member = Depends(get_current_member),
+    db: AsyncSession = Depends(get_db),
+):
+    keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
+
+    # File replacement path: load existing, write new bytes to a fresh path,
+    # swap file_path in the DB, then delete the old file only after commit.
+    new_file_path: str | None = None
+    written_path: Path | None = None
+    old_abs_to_delete: Path | None = None
+
+    if file is not None:
+        existing = (
+            await db.execute(select(Audio).filter(Audio.id == art_id))
+        ).scalar_one_or_none()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Art not found")
+        if str(existing.creator_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not your piece")
+
+        contents = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+        file_ext = _resolve_audio_ext(file.filename, contents)
+
+        if existing.file_path:
+            old_abs_to_delete = abs_path(existing.file_path)
+
+        current_media = (
+            await db.execute(select(Media).filter(Media.id == existing.media_id))
+        ).scalar_one_or_none()
+        safe_medium = sanitize_path_segment(current_media.name if current_media else "audio")
+        new_file_path = f"/static/audio/{current_user.id}/{safe_medium}/{art_id}.{file_ext}"
+        written_path = abs_path(new_file_path)
+        written_path.parent.mkdir(parents=True, exist_ok=True)
+        written_path.write_bytes(contents)
+        if not written_path.exists() or written_path.stat().st_size == 0:
+            raise HTTPException(status_code=500, detail="Upload write failed")
+
+    try:
+        await db_update_audio(
+            db=db,
+            art_id=art_id,
+            current_member_id=current_user.id,
+            title=title,
+            date=date,
+            artist=artist,
+            duration_seconds=duration_seconds,
+            keywords=keywords_list,
+            comments_enabled=comments_enabled,
+            medium=medium,
+            file_path=new_file_path,
+        )
+    except ValueError as e:
+        if written_path is not None:
+            written_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        if written_path is not None:
+            written_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=403, detail=str(e))
+
+    if new_file_path is not None and old_abs_to_delete is not None and old_abs_to_delete != written_path:
+        old_abs_to_delete.unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.delete("/art/audio/{art_id}")
+async def remove_audio(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
+    try:
+        file_path = await db_remove_audio(art_id=art_id, current_member_id=current_user.id, db=db)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:

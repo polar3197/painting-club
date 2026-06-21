@@ -20,6 +20,9 @@ async def empty_db():
 # missing columns) and seeds overarching types for the known media rows.
 _VISUAL_2D_SEED = ("painting", "drawing", "stained glass", "photography", "self portraits")
 _WRITTEN_FORM_SEED = ("poetry", "writing")
+# Both share the polymorphic 'audio' Art type but are distinct media names so a
+# member can add either to their profile independently.
+_AUDIO_SEED = ("voice memo", "music")
 
 
 async def pre_init_migrations():
@@ -31,7 +34,12 @@ async def pre_init_migrations():
     - Stuck mid-migration: both tables exist because an earlier buggy boot ran
       create_all before this rename. The empty written_form is dropped and the
       legacy table is renamed in its place. Safe because written_form can't have
-      rows yet — the buggy boot crashed before serving any upload."""
+      rows yet — the buggy boot crashed before serving any upload.
+
+    Also handles the collection→series rename so a live DB upgrades cleanly:
+    the old per-creator "collection" table gets renamed to "series" (and the FK
+    column on art moves with it). create_all then creates the brand-new
+    polymorphic "collection" base + "weekly_prompt" subtype."""
     async with engine.begin() as conn:
         await conn.execute(text(
             """
@@ -47,6 +55,50 @@ async def pre_init_migrations():
             END $$;
             """
         ))
+
+        # Rename legacy per-creator collection table → series. We detect the legacy
+        # variant by the presence of the creator_id column (the new abstract
+        # collection table has no such column).
+        await conn.execute(text(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'collection'
+                ) AND EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'collection'
+                          AND column_name = 'creator_id'
+                ) THEN
+                    ALTER TABLE collection RENAME TO series;
+                END IF;
+            END $$;
+            """
+        ))
+
+        await conn.execute(text(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'art'
+                          AND column_name = 'collection_id'
+                ) AND NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'art'
+                          AND column_name = 'series_id'
+                ) THEN
+                    ALTER TABLE art RENAME COLUMN collection_id TO series_id;
+                END IF;
+            END $$;
+            """
+        ))
+
+        # Legacy profile-question tables are dropped — they were never used.
+        await conn.execute(text("DROP TABLE IF EXISTS prompt_records"))
+        await conn.execute(text("DROP TABLE IF EXISTS prompt"))
 
 
 async def run_migrations():
@@ -70,6 +122,27 @@ async def run_migrations():
             ),
             {"names": list(_WRITTEN_FORM_SEED)},
         )
+        # Seed the audio media forms. INSERT-WHERE-NOT-EXISTS keeps this
+        # idempotent: media.name has no unique constraint and create_all skips
+        # the Python-side id default, so we supply gen_random_uuid() explicitly.
+        for _audio_name in _AUDIO_SEED:
+            await conn.execute(
+                text(
+                    "INSERT INTO media (id, name, type) "
+                    "SELECT gen_random_uuid(), :name, 'audio' "
+                    "WHERE NOT EXISTS (SELECT 1 FROM media WHERE name = :name)"
+                ),
+                {"name": _audio_name},
+            )
+        # The `audio` subtype table is created by create_all on fresh DBs; these
+        # guards add the columns on any DB where the table predates them (mirrors
+        # the visual_2d.aspect_ratio pattern below).
+        await conn.execute(text(
+            "ALTER TABLE audio ADD COLUMN IF NOT EXISTS duration_seconds DOUBLE PRECISION"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE audio ADD COLUMN IF NOT EXISTS artist VARCHAR(255)"
+        ))
         await conn.execute(text(
             "ALTER TABLE media_members ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false"
         ))
@@ -81,10 +154,36 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE member ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP"
         ))
-        # Collections — created in create_all but the FK column on art needs
-        # to be added to existing databases.
+        # Series (the renamed per-creator grouping) — the FK column on art needs
+        # to exist on databases predating the column.
         await conn.execute(text(
-            "ALTER TABLE art ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES collection(id)"
+            "ALTER TABLE art ADD COLUMN IF NOT EXISTS series_id UUID REFERENCES series(id)"
+        ))
+        # Collection (the new polymorphic base) — link from art to the abstract base.
+        await conn.execute(text(
+            "ALTER TABLE art ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES collection(id) ON DELETE SET NULL"
+        ))
+        # One submission per user per collection.
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS one_submission_per_collection "
+            "ON art (creator_id, collection_id) WHERE collection_id IS NOT NULL"
+        ))
+        # User-defined ordering within a series for written_form pieces.
+        await conn.execute(text(
+            "ALTER TABLE written_form ADD COLUMN IF NOT EXISTS order_index INT"
+        ))
+        # Exactly one active weekly_prompt at a time.
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS one_active_weekly_prompt "
+            "ON weekly_prompt ((TRUE)) WHERE is_active = true"
+        ))
+        # SQLAlchemy create_all skips DB-side defaults — set them here so raw
+        # SQL inserts (seeds, future migrations) don't need to specify id/created_at.
+        await conn.execute(text(
+            "ALTER TABLE collection ALTER COLUMN id SET DEFAULT gen_random_uuid()"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE collection ALTER COLUMN created_at SET DEFAULT NOW()"
         ))
         # Per-user "last viewed" timestamp for the comments-on-my-art dialog,
         # used to render unseen comments in a different colour.

@@ -1,9 +1,9 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, func, desc, nulls_last
+from sqlalchemy import select, delete, func, desc, nulls_last, asc
 
-from db.models import Member, Media, Media_Members, Visual2D, WrittenForm, Keyword, KeywordArt, Art, Collection
-from db.db_ops.collections import db_get_or_create_collection
+from db.models import Member, Media, Media_Members, Visual2D, WrittenForm, Audio, Keyword, KeywordArt, Art, Series
+from db.db_ops.series import db_get_or_create_series
 
 async def db_list_media(db: AsyncSession):
     result = await db.execute(select(Media).order_by(Media.name))
@@ -128,6 +128,7 @@ async def db_add_visual_2d(
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
         aspect_ratio: float | None = None,
+        collection_id=None,
     ) -> str:
     username = username.lower()
     # find member_id, media_id
@@ -141,6 +142,20 @@ async def db_add_visual_2d(
     if not media_id:
         raise ValueError(f"Medium '{medium}' not found")
 
+    # Ensure the member has this medium on their profile. Creating the link with
+    # default hidden=false; if the row already exists (visible OR hidden), we
+    # leave it untouched so a previously-hidden medium stays hidden.
+    existing_link = (
+        await db.execute(
+            select(Media_Members).filter(
+                Media_Members.media_id == media_id,
+                Media_Members.member_id == member_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not existing_link:
+        db.add(Media_Members(media_id=media_id, member_id=member_id))
+
     # use this to create the entry in Art
     new_art = Visual2D(
         id=art_id,
@@ -148,6 +163,7 @@ async def db_add_visual_2d(
         date=date,
         creator_id=member_id,
         media_id=media_id,
+        collection_id=collection_id,
         location=location,
         song=song,
         song_artist=song_artist,
@@ -287,17 +303,20 @@ async def db_get_written_form(db: AsyncSession, username: str, medium: str):
         return None
 
     result = await db.execute(
-        select(WrittenForm, Collection.name)
-        .outerjoin(Collection, Collection.id == WrittenForm.collection_id)
+        select(WrittenForm, Series.name)
+        .outerjoin(Series, Series.id == WrittenForm.series_id)
         .filter(WrittenForm.creator_id == member_id, WrittenForm.media_id == media_id)
+        # Top-level ordering stays date-desc so each series's position in the
+        # gallery is set by its most recent piece. Intra-series ordering by
+        # order_index is applied client-side once the rows are grouped.
         .order_by(nulls_last(desc(WrittenForm.date)))
     )
     rows = result.all()
 
     art_with_keywords = []
-    for art, collection_name in rows:
+    for art, series_name in rows:
         keywords = await db_get_art_keywords(db=db, art_id=art.id)
-        art_with_keywords.append((art, keywords, collection_name))
+        art_with_keywords.append((art, keywords, series_name))
 
     return art_with_keywords
 
@@ -312,7 +331,7 @@ async def db_add_written_form(
         date=None,
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
-        collection_name: str | None = None,
+        series_name: str | None = None,
     ) -> str:
     username = username.lower()
     member_result = await db.execute(select(Member.id).filter(Member.username==username))
@@ -325,10 +344,10 @@ async def db_add_written_form(
     if not media_id:
         raise ValueError(f"Medium '{medium}' not found")
 
-    collection_id = None
-    if collection_name and collection_name.strip():
-        collection = await db_get_or_create_collection(db, member_id, media_id, collection_name)
-        collection_id = collection.id
+    series_id = None
+    if series_name and series_name.strip():
+        series = await db_get_or_create_series(db, member_id, media_id, series_name)
+        series_id = series.id
 
     new_art = WrittenForm(
         id=art_id,
@@ -336,7 +355,7 @@ async def db_add_written_form(
         date=date,
         creator_id=member_id,
         media_id=media_id,
-        collection_id=collection_id,
+        series_id=series_id,
         file_path=file_path,
         comments_enabled=comments_enabled,
     )
@@ -368,8 +387,9 @@ async def db_update_written_form(
     keywords: list[str] | None = None,
     comments_enabled: bool = False,
     medium: str | None = None,
-    collection_name: str | None = None,
-    clear_collection: bool = False,
+    series_name: str | None = None,
+    clear_series: bool = False,
+    file_path: str | None = None,
 ):
     result = await db.execute(select(WrittenForm).filter(WrittenForm.id == art_id))
     piece = result.scalar_one_or_none()
@@ -408,12 +428,14 @@ async def db_update_written_form(
     piece.title = title
     piece.date = date
     piece.comments_enabled = comments_enabled
+    if file_path is not None:
+        piece.file_path = file_path
 
-    if clear_collection:
-        piece.collection_id = None
-    elif collection_name is not None and collection_name.strip():
-        collection = await db_get_or_create_collection(db, piece.creator_id, piece.media_id, collection_name)
-        piece.collection_id = collection.id
+    if clear_series:
+        piece.series_id = None
+    elif series_name is not None and series_name.strip():
+        series = await db_get_or_create_series(db, piece.creator_id, piece.media_id, series_name)
+        piece.series_id = series.id
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
 
@@ -444,6 +466,196 @@ async def db_remove_written_form(db: AsyncSession, art_id: str, current_member_i
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
     await db.execute(delete(WrittenForm).filter(WrittenForm.id == art_id))
+    await db.execute(delete(Art).filter(Art.id == art_id))
+    await db.commit()
+    return file_path
+
+
+# ============================================================
+# Audio (voice memos + uploaded music). Modeled on visual_2d:
+# a single file on disk, keyword-tagged, no series grouping.
+# ============================================================
+async def db_get_audio(db: AsyncSession, username: str, medium: str):
+    username = username.lower()
+    member_result = await db.execute(select(Member.id).filter(Member.username == username))
+    member_id = member_result.scalars().first()
+    if not member_id:
+        return None
+
+    media_result = await db.execute(select(Media.id).filter(Media.name == medium))
+    media_id = media_result.scalars().first()
+    if not media_id:
+        return None
+
+    result = await db.execute(
+        select(Audio)
+        .filter(Audio.creator_id == member_id, Audio.media_id == media_id)
+        .order_by(nulls_last(desc(Audio.date)))
+    )
+    audios = result.scalars().all()
+
+    art_with_keywords = []
+    for art in audios:
+        keywords = await db_get_art_keywords(db=db, art_id=art.id)
+        art_with_keywords.append((art, keywords))
+
+    return art_with_keywords
+
+
+async def db_add_audio(
+        db: AsyncSession,
+        art_id,
+        username: str,
+        medium: str,
+        title: str,
+        file_path: str,
+        date=None,
+        artist: str | None = None,
+        duration_seconds: float | None = None,
+        keywords: list[str] | None = None,
+        comments_enabled: bool = False,
+    ) -> str:
+    username = username.lower()
+    member_result = await db.execute(select(Member.id).filter(Member.username == username))
+    member_id = member_result.scalars().first()
+    if not member_id:
+        raise ValueError(f"Member '{username}' not found")
+
+    media_result = await db.execute(select(Media.id).filter(Media.name == medium))
+    media_id = media_result.scalars().first()
+    if not media_id:
+        raise ValueError(f"Medium '{medium}' not found")
+
+    # Ensure the member has this medium on their profile (mirrors visual_2d):
+    # create the link if absent, leave a pre-existing (possibly hidden) one alone.
+    existing_link = (
+        await db.execute(
+            select(Media_Members).filter(
+                Media_Members.media_id == media_id,
+                Media_Members.member_id == member_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not existing_link:
+        db.add(Media_Members(media_id=media_id, member_id=member_id))
+
+    new_art = Audio(
+        id=art_id,
+        title=title,
+        date=date,
+        creator_id=member_id,
+        media_id=media_id,
+        file_path=file_path,
+        comments_enabled=comments_enabled,
+        artist=artist,
+        duration_seconds=duration_seconds,
+    )
+    db.add(new_art)
+    await db.flush()
+
+    for k in (keywords or []):
+        result = (await db.execute(select(Keyword).filter(Keyword.keyword == k))).scalar_one_or_none()
+        if result:
+            keyword_id = result.id
+        else:
+            new_keyword = Keyword(keyword=k)
+            db.add(new_keyword)
+            await db.flush()
+            keyword_id = new_keyword.id
+
+        db.add(KeywordArt(keyword_id=keyword_id, art_id=art_id))
+
+    await db.commit()
+    return str(art_id)
+
+
+async def db_update_audio(
+    db: AsyncSession,
+    art_id: str,
+    current_member_id: str,
+    title: str,
+    date=None,
+    artist: str | None = None,
+    duration_seconds: float | None = None,
+    keywords: list[str] | None = None,
+    comments_enabled: bool = False,
+    medium: str | None = None,
+    file_path: str | None = None,
+):
+    result = await db.execute(select(Audio).filter(Audio.id == art_id))
+    piece = result.scalar_one_or_none()
+
+    if piece is None:
+        raise ValueError("Art not found")
+    if str(piece.creator_id) != str(current_member_id):
+        raise PermissionError("Not your piece")
+
+    # Optional media move, restricted to compatible-type media (audio ↔ audio).
+    if medium is not None:
+        current_media = (
+            await db.execute(select(Media).filter(Media.id == piece.media_id))
+        ).scalar_one_or_none()
+        current_type = current_media.type if current_media else None
+        new_media = (
+            await db.execute(select(Media).filter(Media.name == medium))
+        ).scalar_one_or_none()
+        if new_media is None:
+            raise ValueError(f"Medium '{medium}' not found")
+        if current_type is None or new_media.type is None or new_media.type != current_type:
+            raise ValueError("Incompatible media type")
+        if str(new_media.id) != str(piece.media_id):
+            existing_link = (
+                await db.execute(
+                    select(Media_Members).filter(
+                        Media_Members.media_id == new_media.id,
+                        Media_Members.member_id == current_member_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if not existing_link:
+                db.add(Media_Members(media_id=new_media.id, member_id=current_member_id))
+            piece.media_id = new_media.id
+
+    piece.title = title
+    piece.date = date
+    piece.comments_enabled = comments_enabled
+    piece.artist = artist
+    # Only overwrite duration when a fresh value is supplied (e.g. file swap);
+    # a None on a metadata-only edit must not wipe the stored duration.
+    if duration_seconds is not None:
+        piece.duration_seconds = duration_seconds
+    if file_path is not None:
+        piece.file_path = file_path
+
+    await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
+
+    for k in (keywords or []):
+        kw = (await db.execute(select(Keyword).filter(Keyword.keyword == k))).scalar_one_or_none()
+        if kw:
+            keyword_id = kw.id
+        else:
+            new_keyword = Keyword(keyword=k)
+            db.add(new_keyword)
+            await db.flush()
+            keyword_id = new_keyword.id
+        db.add(KeywordArt(keyword_id=keyword_id, art_id=art_id))
+
+    await db.commit()
+
+
+async def db_remove_audio(db: AsyncSession, art_id: str, current_member_id: str) -> str | None:
+    result = await db.execute(select(Art.creator_id, Art.file_path).filter(Art.id == art_id))
+    row = result.one_or_none()
+
+    if row is None:
+        raise ValueError("Art not found")
+
+    creator_id, file_path = row
+    if str(creator_id) != str(current_member_id):
+        raise PermissionError("Not your piece")
+
+    await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
+    await db.execute(delete(Audio).filter(Audio.id == art_id))
     await db.execute(delete(Art).filter(Art.id == art_id))
     await db.commit()
     return file_path

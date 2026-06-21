@@ -245,8 +245,9 @@ class WrittenFormOut(BaseModel):
     keywords: list[str] | None
     file_path: str
     comments_enabled: bool = False
-    collection_id: uuid.UUID | None = None
-    collection_name: str | None = None
+    series_id: uuid.UUID | None = None
+    series_name: str | None = None
+    order_index: int | None = None
 
 
 class WrittenFormUpdate(BaseModel):
@@ -255,12 +256,69 @@ class WrittenFormUpdate(BaseModel):
     keywords: list[str] | None = None
     comments_enabled: bool = False
     medium: str | None = None
-    collection_name: str | None = None
-    # Explicit signal to detach from any collection. Sending collection_name=""
+    series_name: str | None = None
+    # Explicit signal to detach from any series. Sending series_name=""
     # is treated as "no change"; this flag is the unambiguous removal.
-    clear_collection: bool = False
+    clear_series: bool = False
 
 
-class CollectionRename(BaseModel):
+class AudioOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    date: Date | None
+    keywords: list[str] | None
+    file_path: str
+    comments_enabled: bool = False
+    artist: str | None = None
+    duration_seconds: float | None = None
+
+
+class AudioUpdate(BaseModel):
+    # Kept for parity/documentation; the PATCH route reads multipart Form fields
+    # (so the audio file can be swapped), matching the written-form update flow.
+    title: str
+    date: Date | None = None
+    keywords: list[str] | None = None
+    comments_enabled: bool = False
+    medium: str | None = None
+    artist: str | None = None
+    duration_seconds: float | None = None
+
+
+class SeriesRename(BaseModel):
     name: str
+
+
+class SeriesOrderUpdate(BaseModel):
+    art_ids: list[uuid.UUID]
+
+
+class PromptSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    media_name: str
+    is_active: bool
+    created_at: datetime
+
+
+class PromptOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    short_summary: str | None = None
+    media_id: uuid.UUID
+    media_name: str
+    is_active: bool
+    submission_count: int = 0
+
+
+class PromptDetailOut(PromptOut):
+    submissions: list[ArtResult] = []
+    viewer_submission_id: uuid.UUID | None = None
+
+
+class PromptCreate(BaseModel):
+    title: str
+    short_summary: str | None = None
+    medium: str  # medium name; resolved to media_id server-side
+    activate: bool = False
 

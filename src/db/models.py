@@ -1,5 +1,5 @@
 # src/db/models.py
-from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean, Float
+from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean, Float, Integer
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -52,11 +52,11 @@ class Media_Members(Base):
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), primary_key=True)
     hidden = Column(Boolean, nullable=False, default=False)
 
-class Collection(Base):
-    """Groups pieces under a shared name within one (creator, medium). Only the
-    WrittenForm UI uses this today, but the column lives on Art so any subtype
-    can adopt it later."""
-    __tablename__ = "collection"
+class Series(Base):
+    """Per-creator grouping of pieces under a shared name within one (creator, medium).
+    Used by WrittenForm today. Renamed from the original "collection" so the bare name
+    Collection can be reclaimed as the polymorphic base for app-wide groupings."""
+    __tablename__ = "series"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     creator_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
@@ -64,12 +64,37 @@ class Collection(Base):
     name = Column(String(300), nullable=False)
 
 
+class Collection(Base):
+    """Polymorphic base for app-wide groupings of Art (weekly prompts now, more later)."""
+    __tablename__ = "collection"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    type = Column(String(50), nullable=False)
+    title = Column(String(300), nullable=False)
+    short_summary = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __mapper_args__ = {"polymorphic_on": type}
+
+
+class WeeklyPrompt(Collection):
+    __tablename__ = "weekly_prompt"
+
+    id = Column(UUID(as_uuid=True), ForeignKey('collection.id', ondelete='CASCADE'), primary_key=True)
+    media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=False)
+    archived_at = Column(DateTime)
+
+    __mapper_args__ = {"polymorphic_identity": "weekly_prompt"}
+
+
 class Art(Base):
     __tablename__ = "art"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     creator_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
-    collection_id = Column(UUID(as_uuid=True), ForeignKey('collection.id'), nullable=True)
+    series_id = Column(UUID(as_uuid=True), ForeignKey('series.id'), nullable=True)
+    collection_id = Column(UUID(as_uuid=True), ForeignKey('collection.id', ondelete='SET NULL'), nullable=True)
     title = Column(String(300), default="Untitled")
     date = Column(Date)
     file_path = Column(String(300))
@@ -97,25 +122,28 @@ class WrittenForm(Art):
     __tablename__ = "written_form"
 
     id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
+    # User-defined position within a series. NULL ⇒ unset (sorted to the bottom).
+    order_index = Column(Integer)
 
     __mapper_args__ = {"polymorphic_identity": "written_form"}
 
 
+class Audio(Art):
+    """Sound pieces: voice memos and uploaded music. Like Visual2D, these are a
+    single file on disk (no series grouping for now). `title` (from Art) is the
+    track/memo name; `artist` is only meaningful for uploaded music."""
+    __tablename__ = "audio"
 
-class Prompt(Base):
-    # list of questions for members to choose from on their page
-    __tablename__ = "prompt"
+    id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
+    # Length in seconds, captured client-side at record/upload time so the
+    # profile tile can show a duration without loading the file.
+    duration_seconds = Column(Float)
+    # Optional performer/composer for uploaded music. NULL for voice memos.
+    artist = Column(String(255))
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    question = Column(String(255))
+    __mapper_args__ = {"polymorphic_identity": "audio"}
 
-class PromptRecords(Base):
-    # a join table to connect users to the prompt they chose and their answer
-    __tablename__ = "prompt_records"
 
-    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), primary_key=True)
-    prompt_id = Column(UUID(as_uuid=True), ForeignKey('prompt.id'), primary_key=True)
-    response = Column(String(300))
 
 # class Group(Base):
 #     __tablename__ = "group"
