@@ -1,15 +1,15 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import People from '../screens/People';
+import SearchTabs from '../screens/SearchTabs';
 import UserProfile from '../screens/UserProfile';
-import type { PeopleStackParamList } from './types';
+import type { SearchStackParamList } from './types';
 
-const Stack = createNativeStackNavigator<PeopleStackParamList>();
+const Stack = createNativeStackNavigator<SearchStackParamList>();
 
-export default function PeopleStack() {
+export default function SearchStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="PeopleList" component={People} />
+      <Stack.Screen name="SearchTabs" component={SearchTabs} />
       <Stack.Screen name="UserProfile" component={UserProfile} />
     </Stack.Navigator>
   );

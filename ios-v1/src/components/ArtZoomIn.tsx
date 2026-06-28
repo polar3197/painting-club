@@ -41,6 +41,10 @@ interface ArtZoomInProps {
   reportArtId?: string;
   // Set when this is a profile pic and the viewer should be able to block the owner.
   blockableUsername?: string;
+  // Optional override for the back-face content. When provided, the default
+  // owner/report/block UI is suppressed and this node is rendered instead.
+  // Used by the weekly-prompt grid to show creator + title on the back.
+  backContent?: React.ReactNode;
 }
 
 const MIN_SCALE = 1;
@@ -53,6 +57,7 @@ export default function ArtZoomIn({
   onChangePic,
   reportArtId,
   blockableUsername,
+  backContent,
 }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
@@ -337,32 +342,41 @@ export default function ArtZoomIn({
                   },
                 ]}
               >
-                {isOwner && onChangePic && (
-                  <Pressable
-                    style={styles.changePicBtn}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      onChangePic();
-                    }}
-                  >
-                    <Text style={styles.changePicBtnText}>change pic</Text>
-                  </Pressable>
-                )}
-                {showKebab && (
-                  <Pressable
-                    style={styles.backKebab}
-                    onPress={(e: any) => {
-                      e.stopPropagation?.();
-                      setPopupAnchor({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
-                    }}
-                    hitSlop={10}
-                  >
-                    <Text style={styles.backKebabText}>⋮</Text>
-                  </Pressable>
+                {backContent ? (
+                  // Custom back-face content (e.g. weekly-prompt grid shows
+                  // title + creator). Skips the owner/report/block defaults.
+                  backContent
+                ) : (
+                  <>
+                    {showKebab && (
+                      <Pressable
+                        style={styles.backKebab}
+                        onPress={(e: any) => {
+                          e.stopPropagation?.();
+                          setPopupAnchor({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+                        }}
+                        hitSlop={10}
+                      >
+                        <Text style={styles.backKebabText}>⋮</Text>
+                      </Pressable>
+                    )}
+                  </>
                 )}
               </RNAnimated.View>
             </Animated.View>
           </GestureDetector>
+
+          {/* Equal-width "change pic" below the image so the owner doesn't have
+              to flip the card. Sits outside the gesture-detected card, so the
+              flip/zoom mechanics stay isolated to the picture itself. */}
+          {isOwner && onChangePic && (
+            <Pressable
+              style={[styles.changePicBelow, { width: cappedWidth }]}
+              onPress={onChangePic}
+            >
+              <Text style={styles.changePicBelowText}>change pic</Text>
+            </Pressable>
+          )}
         </View>
 
         <ContextPopup
@@ -494,16 +508,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  changePicBtn: {
+  changePicBelow: {
+    marginTop: 14,
+    // Nudge the button down ~3/4" without moving the image. A translate (not
+    // margin) keeps it purely visual so the image stays centered as-is.
+    transform: [{ translateY: 72 }],
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.accentGolden,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
-  changePicBtnText: {
+  changePicBelowText: {
     fontFamily: Fonts.serif,
     fontSize: 16,
+    color: Colors.black,
   },
   backKebab: {
     position: 'absolute',

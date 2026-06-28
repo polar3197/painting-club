@@ -82,7 +82,31 @@ export interface Visual2DIn {
   width?: number | null;
   keywords?: string;
   comments_enabled?: boolean;
+  collection_id?: string | null;
   file: { uri: string; name: string; type: string };
+}
+
+export interface PromptOut {
+  id: string;
+  title: string;
+  short_summary: string | null;
+  media_id: string;
+  media_name: string;
+  is_active: boolean;
+  submission_count: number;
+}
+
+export interface PromptDetailOut extends PromptOut {
+  submissions: ArtResult[];
+  viewer_submission_id: string | null;
+}
+
+export interface PromptSummary {
+  id: string;
+  title: string;
+  media_name: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface Visual2DOut {
@@ -114,6 +138,80 @@ export interface Visual2DUpdatePayload {
   comments_enabled?: boolean;
   medium?: string | null;
   // When set, the on-disk file (and thumbnail) gets replaced.
+  file?: { uri: string; name: string; type: string } | null;
+}
+
+export interface WrittenFormIn {
+  username: string;
+  medium: string;
+  title: string;
+  date?: string;
+  keywords?: string;
+  comments_enabled?: boolean;
+  series_name?: string;
+  // Provide exactly one of file or text.
+  file?: { uri: string; name: string; type: string };
+  text?: string;
+}
+
+export interface WrittenFormOut {
+  id: string;
+  title: string;
+  date: string | null;
+  keywords: string[];
+  file_path: string;
+  comments_enabled: boolean;
+  series_id: string | null;
+  series_name: string | null;
+}
+
+export interface WrittenFormUpdatePayload {
+  title: string;
+  date?: string | null;
+  keywords?: string[] | null;
+  comments_enabled?: boolean;
+  medium?: string | null;
+  series_name?: string | null;
+  clear_series?: boolean;
+  // Optional file replacement (mutually exclusive with text).
+  file?: { uri: string; name: string; type: string } | null;
+  text?: string | null;
+}
+
+export interface AudioIn {
+  username: string;
+  medium: string;
+  title: string;
+  date?: string;
+  keywords?: string;
+  comments_enabled?: boolean;
+  // Performer/composer — only meaningful for uploaded music, left empty for memos.
+  artist?: string;
+  // Client-measured length in seconds, captured once the picked file loads.
+  duration_seconds?: number | null;
+  file: { uri: string; name: string; type: string };
+}
+
+export interface AudioOut {
+  id: string;
+  title: string;
+  date: string | null;
+  keywords: string[];
+  file_path: string;
+  comments_enabled: boolean;
+  artist: string | null;
+  duration_seconds: number | null;
+}
+
+export interface AudioUpdatePayload {
+  title: string;
+  date?: string | null;
+  keywords?: string[] | null;
+  comments_enabled?: boolean;
+  medium?: string | null;
+  artist?: string | null;
+  duration_seconds?: number | null;
+  // When set, the on-disk audio file gets replaced.
   file?: { uri: string; name: string; type: string } | null;
 }
 

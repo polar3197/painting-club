@@ -16,18 +16,32 @@ const tabIcons = {
 import LandingPage from '../screens/LandingPage';
 import SetupAccount from '../screens/SetupAccount';
 import NotMember from '../screens/NotMember';
-import Home from '../screens/Home';
 import UserProfile from '../screens/UserProfile';
 import Admin from '../screens/Admin';
 import Ethos from '../screens/Ethos';
 import Portfolio from '../screens/Portfolio';
-import PeopleStack from './PeopleStack';
-import ArtStack from './ArtStack';
+import SearchStack from './SearchStack';
+import HomeStack from './HomeStack';
+import AddArt from '../screens/AddArt';
 
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import type { MainTabParamList } from './types';
+
+// Hand-drawn plus so we control line weight (Ionicons' stroke is baked into the
+// font and can't be thinned). A simple thin black plus, no circle. Outer box is
+// the standard icon `size` so it aligns with the other tab icons + labels.
+function AddIcon({ size }: { size: number }) {
+  const stroke = 1;
+  const arm = Math.round(size * 0.8);
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute', width: arm, height: stroke, backgroundColor: '#000' }} />
+      <View style={{ position: 'absolute', width: stroke, height: arm, backgroundColor: '#000' }} />
+    </View>
+  );
+}
 
 function HomeIcon({ focused, size }: { focused: boolean; size: number }) {
   return (
@@ -37,7 +51,9 @@ function HomeIcon({ focused, size }: { focused: boolean; size: number }) {
       borderRadius: (size + 4) / 2,
       backgroundColor: Colors.accentGolden,
       borderWidth: 2,
-      borderColor: focused ? 'blue' : Colors.textTertiary,
+      // Border stays blue whether the tab is selected or not — no muted
+      // "inactive" treatment for the PC mark.
+      borderColor: 'blue',
       justifyContent: 'center',
       alignItems: 'center',
     }}>
@@ -62,9 +78,13 @@ function MoreScreen() {
     <View style={{ flex: 1, backgroundColor: Colors.mainBg, paddingTop: insets.top + 20, paddingHorizontal: 30 }}>
       <ConfirmDialog
         visible={showLogoutConfirm}
-        title="logout"
-        message="are you sure you want to logout?"
-        confirmLabel="logout"
+        title="u sure?"
+        confirmLabel="yes"
+        cancelLabel="no. shit. stop"
+        confirmColor={Colors.redLight}
+        cancelColor={Colors.greenBright}
+        confirmTextColor={Colors.black}
+        cancelTextColor={Colors.black}
         onConfirm={async () => {
           setShowLogoutConfirm(false);
           await logout();
@@ -82,7 +102,32 @@ function MoreScreen() {
           navigation.navigate('LandingPage');
         }}
       />
-      <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.xl, marginBottom: 30, borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 10 }}>more</Text>
+      <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.xl, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 10 }}>more</Text>
+
+      {/* Delete account stays at the top-left — third-width, intentionally
+          OUT of the thumb-friendly bottom zone so destructive action takes
+          deliberate reach. */}
+      {currentUser && currentRole !== 'admin' && (
+        <Pressable
+          style={{
+            borderWidth: 1,
+            borderColor: '#000',
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            backgroundColor: Colors.redCoral,
+            width: '33%',
+            alignSelf: 'flex-start',
+          }}
+          onPress={() => setShowDeleteDialog(true)}
+        >
+          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.xs, color: Colors.black, textAlign: 'center' }}>
+            delete acc
+          </Text>
+        </Pressable>
+      )}
+
+      {/* Spacer pushes the everyday action stack down to the thumb zone. */}
+      <View style={{ flex: 1 }} />
 
       {currentRole === 'admin' && (
         <Pressable
@@ -101,25 +146,18 @@ function MoreScreen() {
       </Pressable>
 
       {currentUser ? (
-        <>
-          <Pressable
-            style={{ borderWidth: 1, borderColor: '#000', padding: 14, marginBottom: 10, backgroundColor: Colors.redCoral }}
-            onPress={() => setShowLogoutConfirm(true)}
-          >
-            <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.white }}>logout</Text>
-          </Pressable>
-          {currentRole !== 'admin' && (
-            <Pressable
-              style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.white }}
-              onPress={() => setShowDeleteDialog(true)}
-            >
-              <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.redCoral }}>delete account</Text>
-            </Pressable>
-          )}
-        </>
+        <Pressable
+          // Cadmium yellow — saturated, slightly orange-leaning gold. Reads as
+          // the primary thumb-zone action without competing with the
+          // accentGolden tones used in the rest of the app.
+          style={{ borderWidth: 1, borderColor: '#000', padding: 14, marginBottom: insets.bottom + 20, backgroundColor: 'rgb(255, 215, 0)' }}
+          onPress={() => setShowLogoutConfirm(true)}
+        >
+          <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base, color: Colors.black }}>logout</Text>
+        </Pressable>
       ) : (
         <Pressable
-          style={{ borderWidth: 1, borderColor: '#000', padding: 14, backgroundColor: Colors.white }}
+          style={{ borderWidth: 1, borderColor: '#000', padding: 14, marginBottom: insets.bottom + 20, backgroundColor: Colors.white }}
           onPress={() => navigation.navigate('LandingPage')}
         >
           <Text style={{ fontFamily: Fonts.serif, fontSize: FontSizes.base }}>login</Text>
@@ -138,6 +176,7 @@ function MeScreen() {
   return <UserProfile />;
 }
 
+
 function MainTabs() {
 
   return (
@@ -149,13 +188,14 @@ function MainTabs() {
             return <HomeIcon focused={focused} size={size} />;
           }
           if (route.name === 'Me') {
-            return <Image source={tabIcons.me} style={{ width: size, height: size, opacity: focused ? 1 : 0.5 }} />;
+            return <Image source={tabIcons.me} style={{ width: size, height: size }} />;
           }
-          if (route.name === 'PeopleTab') {
-            return <Image source={tabIcons.people} style={{ width: size, height: size, opacity: focused ? 1 : 0.5 }} />;
+          if (route.name === 'SearchTab') {
+            // Consolidated art + people search keeps the art mark in the bar.
+            return <Image source={tabIcons.art} style={{ width: size, height: size }} />;
           }
-          if (route.name === 'ArtTab') {
-            return <Image source={tabIcons.art} style={{ width: size, height: size, opacity: focused ? 1 : 0.5 }} />;
+          if (route.name === 'AddTab') {
+            return <AddIcon size={size} />;
           }
           if (route.name === 'More') {
             return <Ionicons name={focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'} size={size} color={color} />;
@@ -163,7 +203,9 @@ function MainTabs() {
           return <Ionicons name="home-outline" size={size} color={color} />;
         },
         tabBarActiveTintColor: Colors.darkerGold,
-        tabBarInactiveTintColor: Colors.textTertiary,
+        // Inactive labels share the active color so unselected tabs read at
+        // full presence — no "muted/disabled" treatment for unselected.
+        tabBarInactiveTintColor: Colors.darkerGold,
         tabBarStyle: {
           backgroundColor: Colors.secondary,
           borderTopWidth: 1,
@@ -175,16 +217,21 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={Home}
+        component={HomeStack}
         options={{
-          tabBarLabel: () => null,
-          // Other tabs sit slightly higher to leave room for their label below.
-          // Nudge the home icon down so it visually centers in its tab item.
-          tabBarIconStyle: { marginTop: 10 },
+          // Render an empty (space) label so this tab reserves the same label
+          // height as the others — that keeps the PC icon on the same line as
+          // the labeled tab icons instead of centering lower.
+          tabBarLabel: ' ',
         }}
       />
-      <Tab.Screen name="PeopleTab" component={PeopleStack} options={{ tabBarLabel: 'people' }} />
-      <Tab.Screen name="ArtTab" component={ArtStack} options={{ tabBarLabel: 'art' }} />
+      <Tab.Screen name="SearchTab" component={SearchStack} options={{ tabBarLabel: 'stuff' }} />
+      <Tab.Screen
+        name="AddTab"
+        component={AddArt}
+        // Empty (space) label keeps the plus aligned with the labeled tabs.
+        options={{ tabBarLabel: ' ' }}
+      />
       <Tab.Screen
         name="Me"
         component={MeScreen}
@@ -216,7 +263,11 @@ export default function RootNavigator() {
       <RootStack.Screen
         name="SetupAccount"
         component={SetupAccount}
-        options={{ presentation: 'transparentModal', animation: 'fade' }}
+        // Plain card (not transparentModal): resetting the stack away from a
+        // transparentModal leaves an invisible touch-blocking layer on iOS,
+        // which made the app unresponsive after setup. SetupAccount paints its
+        // own dim backdrop, so it still reads as an overlay.
+        options={{ animation: 'fade' }}
       />
       <RootStack.Screen name="Ethos" component={Ethos} />
       <RootStack.Group screenOptions={{ presentation: 'modal' }}>

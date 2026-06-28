@@ -10,6 +10,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,9 +29,9 @@ export default function LandingPage() {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [notMember, setNotMember] = useState(false);
   const [setupCode, setSetupCode] = useState('');
   const [showApplication, setShowApplication] = useState(false);
+  const [showSecretCode, setShowSecretCode] = useState(false);
   const [pendingTerms, setPendingTerms] = useState<{
     username: string;
     token: string;
@@ -67,6 +68,7 @@ export default function LandingPage() {
     if (!code) return;
     try {
       const res = await redeem_setup_code({ code });
+      setShowSecretCode(false);
       (navigation as any).navigate('SetupAccount', { token: res.access_token });
     } catch (err: any) {
       Alert.alert('Setup failed', err.message || 'Invalid or expired setup code');
@@ -109,12 +111,6 @@ export default function LandingPage() {
             instead of recentering every frame (which produces visible twitch). */}
         <View style={styles.flexSpacer} />
         <View style={styles.titleWrap}>
-          {/* adjustsFontSizeToFit scales the title down on narrow screens so
-              it stops at the box's inner edge. We bound it with a sensible
-              minimumFontScale so it won't shrink to a hairline on very narrow
-              devices. Re-adding this is fine now that the surrounding layout
-              uses flex spacers instead of justifyContent:center — the title
-              no longer re-fits on every keyboard-driven layout pass. */}
           <Text
             style={styles.title}
             numberOfLines={1}
@@ -126,75 +122,48 @@ export default function LandingPage() {
         </View>
 
         <View style={styles.loginContainer}>
-          {!notMember ? (
-            <>
-              <View style={styles.inputRow}>
-                <Text style={styles.inputLabel}>un:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={username}
-                  onChangeText={(v) => setUsername(v.toLowerCase())}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholderTextColor={Colors.textMuted}
-                />
-              </View>
-              <View style={styles.inputRow}>
-                <Text style={styles.inputLabel}>pw:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  placeholderTextColor={Colors.textMuted}
-                />
-              </View>
-              <Pressable style={styles.actionBtn} onPress={handleLogin}>
-                <Text style={styles.actionBtnText}>login</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn} onPress={() => setNotMember(true)}>
-                <Text style={styles.actionBtnText}>not a member?</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Pressable
-                style={styles.actionBtn}
-                onPress={() => {
-                  setNotMember(false);
-                  (navigation as any).reset({
-                    index: 0,
-                    routes: [{ name: 'Main', state: { routes: [{ name: 'PeopleTab' }] } }],
-                  });
-                }}
-              >
-                <Text style={styles.actionBtnText}>view artists profiles</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn} onPress={() => setShowApplication(true)}>
-                <Text style={styles.actionBtnText}>request account</Text>
-              </Pressable>
-              <View style={styles.secretCodeRow}>
-                <TextInput
-                  style={styles.secretCodeInput}
-                  value={setupCode}
-                  onChangeText={setSetupCode}
-                  placeholder="secret code?"
-                  placeholderTextColor={Colors.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="go"
-                  onSubmitEditing={handleSetupCode}
-                />
-                <Pressable style={styles.secretCodeBtn} onPress={handleSetupCode}>
-                  <Text style={styles.secretCodeBtnArrow}>→</Text>
-                </Pressable>
-              </View>
-              <Pressable style={styles.actionBtn} onPress={() => setNotMember(false)}>
-                <Text style={styles.actionBtnText}>ur a member?</Text>
-              </Pressable>
-            </>
-          )}
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>un:</Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={(v) => setUsername(v.toLowerCase())}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>pw:</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+          <Pressable style={styles.actionBtn} onPress={handleLogin}>
+            <Text style={styles.actionBtnText}>login</Text>
+          </Pressable>
+          {/* Split row: direct access to both onboarding paths. Each button
+              flexes to half the row so the labels read as equally-weighted
+              alternatives. */}
+          <View style={styles.splitRow}>
+            <Pressable
+              style={[styles.actionBtn, styles.splitBtn]}
+              onPress={() => setShowApplication(true)}
+            >
+              <Text style={styles.actionBtnText}>request acc</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionBtn, styles.splitBtn]}
+              onPress={() => setShowSecretCode(true)}
+            >
+              <Text style={styles.actionBtnText}>secret code?</Text>
+            </Pressable>
+          </View>
         </View>
         <View style={styles.flexSpacer} />
       </KeyboardAvoidingView>
@@ -202,6 +171,43 @@ export default function LandingPage() {
       {showApplication && (
         <ApplicationDialog onClose={() => setShowApplication(false)} />
       )}
+
+      <Modal
+        transparent
+        visible={showSecretCode}
+        animationType="fade"
+        onRequestClose={() => setShowSecretCode(false)}
+      >
+        <View style={styles.secretBackdrop}>
+          {/* Backdrop dismiss layer behind the panel — same pattern as the
+              written-form reader, so tapping outside closes but taps on the
+              panel itself don't propagate. */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowSecretCode(false)}
+          />
+          <View style={styles.secretPanel}>
+            <Text style={styles.secretLabel}>secret code</Text>
+            <View style={styles.secretCodeRow}>
+              <TextInput
+                style={styles.secretCodeInput}
+                value={setupCode}
+                onChangeText={setSetupCode}
+                placeholder="paste it"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="go"
+                autoFocus
+                onSubmitEditing={handleSetupCode}
+              />
+              <Pressable style={styles.secretCodeBtn} onPress={handleSetupCode}>
+                <Text style={styles.secretCodeBtnArrow}>→</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <TermsModal
         visible={pendingTerms !== null}
@@ -277,6 +283,36 @@ const styles = StyleSheet.create({
     marginTop: 10,
     alignItems: 'center',
     backgroundColor: 'transparent',
+  },
+  splitRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  splitBtn: {
+    flex: 1,
+    // Tighter horizontal padding so longer labels ("secret code?") don't
+    // wrap inside the half-width buttons.
+    paddingHorizontal: 8,
+  },
+  secretBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+  secretPanel: {
+    width: '100%',
+    backgroundColor: 'lightgreen',
+    borderWidth: 1,
+    borderColor: '#000',
+    padding: 20,
+    ...Shadows.card,
+  },
+  secretLabel: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    marginBottom: 8,
   },
   actionBtnText: {
     fontFamily: Fonts.serif,

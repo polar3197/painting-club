@@ -17,6 +17,13 @@ interface AuthContextType {
   // canonical URL (`/static/profile/<id>.<ext>`) refetches.
   profilePicVersions: Record<string, number>;
   bumpProfilePic: (memberId: string) => void;
+  // Set to true on first-time login (after SetupAccount). A global modal in
+  // App.tsx watches this and prompts the new user to upload a profile pic.
+  // The modal clears the flag on dismiss or upload — kept off this context
+  // for the rest of the session.
+  needsProfilePicPrompt: boolean;
+  triggerProfilePicPrompt: () => void;
+  dismissProfilePicPrompt: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -32,6 +39,9 @@ const AuthContext = createContext<AuthContextType>({
   noteUnblocked: () => {},
   profilePicVersions: {},
   bumpProfilePic: () => {},
+  needsProfilePicPrompt: false,
+  triggerProfilePicPrompt: () => {},
+  dismissProfilePicPrompt: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -41,6 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [blockedUsernames, setBlockedUsernames] = useState<string[]>([]);
   const [profilePicVersions, setProfilePicVersions] = useState<Record<string, number>>({});
+  const [needsProfilePicPrompt, setNeedsProfilePicPrompt] = useState(false);
+
+  const triggerProfilePicPrompt = useCallback(() => setNeedsProfilePicPrompt(true), []);
+  const dismissProfilePicPrompt = useCallback(() => setNeedsProfilePicPrompt(false), []);
 
   const bumpProfilePic = useCallback((memberId: string) => {
     setProfilePicVersions((prev) => ({ ...prev, [memberId]: Date.now() }));
@@ -123,6 +137,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         noteUnblocked,
         profilePicVersions,
         bumpProfilePic,
+        needsProfilePicPrompt,
+        triggerProfilePicPrompt,
+        dismissProfilePicPrompt,
       }}
     >
       {children}

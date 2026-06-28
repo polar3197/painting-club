@@ -13,12 +13,21 @@ import type {
   Visual2DIn,
   Visual2DOut,
   Visual2DUpdatePayload,
+  WrittenFormIn,
+  WrittenFormOut,
+  WrittenFormUpdatePayload,
+  AudioIn,
+  AudioOut,
+  AudioUpdatePayload,
   SearchOptions,
   ArtResult,
   CommentOut,
   CommentsReceivedPage,
   MediaType,
   MediaRequest,
+  PromptOut,
+  PromptDetailOut,
+  PromptSummary,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -232,6 +241,7 @@ export function add_new_visual_2d(token: string | null, payload: Visual2DIn) {
   if (payload.height != null) fd.append('height', String(payload.height));
   if (payload.keywords != null) fd.append('keywords', String(payload.keywords));
   if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
+  if (payload.collection_id) fd.append('collection_id', payload.collection_id);
   fd.append('file', {
     uri: payload.file.uri,
     name: payload.file.name,
@@ -280,6 +290,127 @@ export function remove_visual_2d(id: string, token: string | null) {
 
 export function get_members_visual_2d(username: string, medium: string): Promise<Visual2DOut[]> {
   return request(`/members/${username}/art/${medium}`) as Promise<Visual2DOut[]>;
+}
+
+export function add_new_written_form(token: string | null, payload: WrittenFormIn) {
+  const fd = new FormData();
+  fd.append('username', payload.username);
+  fd.append('medium', payload.medium);
+  fd.append('title', payload.title);
+  if (payload.date) fd.append('date', payload.date);
+  if (payload.keywords != null) fd.append('keywords', String(payload.keywords));
+  if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
+  if (payload.series_name) fd.append('series_name', payload.series_name);
+  if (payload.file) {
+    fd.append('file', {
+      uri: payload.file.uri,
+      name: payload.file.name,
+      type: payload.file.type,
+    } as any);
+  }
+  if (payload.text) fd.append('text', payload.text);
+
+  return request('/art/upload/written-form', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function get_members_written_form(username: string, medium: string): Promise<WrittenFormOut[]> {
+  return request(`/members/${username}/art/written-form/${medium}`) as Promise<WrittenFormOut[]>;
+}
+
+export function update_written_form(id: string, token: string | null, payload: WrittenFormUpdatePayload) {
+  // PATCH is now multipart so the user can swap the underlying file or paste
+  // new text inline. Keep sending fields as form-data even when no file/text
+  // changes so the endpoint contract stays a single shape.
+  const fd = new FormData();
+  fd.append('title', payload.title);
+  if (payload.date) fd.append('date', payload.date);
+  if (payload.keywords != null) fd.append('keywords', payload.keywords.join(', '));
+  if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
+  if (payload.medium) fd.append('medium', payload.medium);
+  if (payload.series_name != null) fd.append('series_name', payload.series_name);
+  if (payload.clear_series) fd.append('clear_series', String(payload.clear_series));
+  if (payload.file) {
+    fd.append('file', {
+      uri: payload.file.uri,
+      name: payload.file.name,
+      type: payload.file.type,
+    } as any);
+  }
+  if (payload.text) fd.append('text', payload.text);
+
+  return request(`/art/written-form/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function remove_written_form(id: string, token: string | null) {
+  return request(`/art/written-form/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function add_new_audio(token: string | null, payload: AudioIn) {
+  const fd = new FormData();
+  fd.append('username', payload.username);
+  fd.append('medium', payload.medium);
+  fd.append('title', payload.title);
+  if (payload.date) fd.append('date', payload.date);
+  if (payload.keywords != null) fd.append('keywords', String(payload.keywords));
+  if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
+  if (payload.artist) fd.append('artist', payload.artist);
+  if (payload.duration_seconds != null) fd.append('duration_seconds', String(payload.duration_seconds));
+  fd.append('file', {
+    uri: payload.file.uri,
+    name: payload.file.name,
+    type: payload.file.type,
+  } as any);
+
+  return request('/art/upload/audio', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function get_members_audio(username: string, medium: string): Promise<AudioOut[]> {
+  return request(`/members/${username}/art/audio/${medium}`) as Promise<AudioOut[]>;
+}
+
+export function update_audio(id: string, token: string | null, payload: AudioUpdatePayload) {
+  const fd = new FormData();
+  fd.append('title', payload.title);
+  if (payload.date) fd.append('date', payload.date);
+  if (payload.keywords != null) fd.append('keywords', payload.keywords.join(', '));
+  if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
+  if (payload.medium) fd.append('medium', payload.medium);
+  if (payload.artist != null) fd.append('artist', payload.artist);
+  if (payload.duration_seconds != null) fd.append('duration_seconds', String(payload.duration_seconds));
+  if (payload.file) {
+    fd.append('file', {
+      uri: payload.file.uri,
+      name: payload.file.name,
+      type: payload.file.type,
+    } as any);
+  }
+  return request(`/art/audio/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function remove_audio(id: string, token: string | null) {
+  return request(`/art/audio/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
 export function get_comments(art_id: string, token: string | null): Promise<CommentOut[]> {
@@ -343,3 +474,22 @@ export function delete_application(id: string, token: string | null): Promise<un
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 }
+
+export function get_active_prompt(token: string | null): Promise<PromptOut | null> {
+  return request("/prompts/active", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }) as Promise<PromptOut | null>;
+}
+
+export function get_prompt(id: string, token: string | null): Promise<PromptDetailOut> {
+  return request(`/prompts/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }) as Promise<PromptDetailOut>;
+}
+
+export function list_prompts(token: string | null): Promise<PromptSummary[]> {
+  return request("/prompts", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }) as Promise<PromptSummary[]>;
+}
+

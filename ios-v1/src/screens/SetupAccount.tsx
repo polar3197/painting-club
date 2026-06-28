@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -55,7 +56,24 @@ export default function SetupAccount() {
       await accept_terms(token);
       const profile = await get_profile(result.username, token);
       await auth.login(profile.username, token, profile.role);
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      // Drop the new member straight into their own profile (the Me tab).
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Main',
+            state: {
+              index: 2,
+              routes: [
+                { name: 'Home' },
+                { name: 'SearchTab' },
+                { name: 'Me' },
+                { name: 'More' },
+              ],
+            },
+          },
+        ],
+      });
     } catch (err: any) {
       Alert.alert('Setup failed', err.message || 'could not complete setup');
     } finally {
@@ -75,6 +93,13 @@ export default function SetupAccount() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.card}>
+          {/* Scroll so the submit + cancel buttons ride above the keyboard
+              instead of getting pushed off-screen with no way to reach them. */}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.cardContent}
+          >
           <Text style={styles.heading}>set up your account</Text>
 
           <View style={styles.inputRow}>
@@ -129,13 +154,14 @@ export default function SetupAccount() {
             disabled={submitting}
           >
             <Text style={styles.actionBtnText}>
-              {submitting ? 'saving...' : 'sounds good, i agree'}
+              {submitting ? 'saving...' : 'I agree'}
             </Text>
           </Pressable>
 
           <Pressable style={styles.actionBtn} onPress={handleCancel}>
             <Text style={styles.actionBtnText}>no, i wanted to cause harm and create porn</Text>
           </Pressable>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -161,7 +187,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#000',
     width: width * 0.8,
+    maxHeight: '85%',
     ...Shadows.card,
+  },
+  cardContent: {
+    paddingBottom: 4,
   },
   heading: {
     fontFamily: Fonts.serif,

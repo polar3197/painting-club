@@ -58,7 +58,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               <Text style={styles.closeBtnText}>x</Text>
             </Pressable>
             <Text style={styles.successText}>
-              Your request has been submitted. We'll be in touch soon.
+              a current member will review ur request and you'll get a secret code to enter on the login screen
             </Text>
           </View>
         </View>

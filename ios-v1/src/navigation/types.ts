@@ -7,19 +7,22 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
-  PeopleTab: undefined;
-  ArtTab: undefined;
+  SearchTab: undefined;
+  AddTab: undefined;
   Me: undefined;
   Admin: undefined;
   More: undefined;
 };
 
-export type PeopleStackParamList = {
-  PeopleList: undefined;
+// Art + People search now live behind a single tab. The two galleries are
+// rendered side-by-side inside SearchTabs (a swipeable pager, not a
+// navigator), so UserProfile is the only pushed screen and is shared by both.
+export type SearchStackParamList = {
+  SearchTabs: undefined;
   UserProfile: { username: string; artId?: string; medium?: string };
 };
 
-export type ArtStackParamList = {
-  ArtGallery: undefined;
-  UserProfile: { username: string; artId?: string; medium?: string };
+export type HomeStackParamList = {
+  HomeFeed: undefined;
+  WeeklyPromptDetail: { promptId: string };
 };

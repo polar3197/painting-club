@@ -1,25 +1,19 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Animated } from 'react-native';
-import { Visual2DOut } from '../api';
+import { AudioOut } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
-interface PaintingFormProps {
+interface AudioFormProps {
   onDataChange: (data: Record<string, any>) => void;
-  initialData?: Visual2DOut;
-  // Optional node rendered on the right side of the comments-toggle row.
-  // AddArtDialog uses this to inline the submit button next to the toggle.
+  initialData?: AudioOut;
   rightSlot?: React.ReactNode;
 }
 
-export default function PaintingForm({ onDataChange, initialData, rightSlot }: PaintingFormProps) {
+export default function AudioForm({ onDataChange, initialData, rightSlot }: AudioFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
-    location: initialData?.location ?? '',
+    artist: initialData?.artist ?? '',
     date: initialData?.date ?? '',
-    song: initialData?.song ?? '',
-    song_artist: initialData?.song_artist ?? '',
-    width: initialData?.width ?? null as number | null,
-    height: initialData?.height ?? null as number | null,
     keywords: initialData?.keywords?.join(', ') ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
   });
@@ -50,63 +44,20 @@ export default function PaintingForm({ onDataChange, initialData, rightSlot }: P
       />
       <TextInput
         style={styles.input}
-        value={form.location}
-        placeholder="location"
+        value={form.artist}
+        placeholder="artist (optional)"
         placeholderTextColor={Colors.textMuted}
         autoCapitalize="none"
-        onChangeText={(v) => update({ location: v })}
+        onChangeText={(v) => update({ artist: v })}
       />
       <TextInput
         style={styles.input}
-        value={form.date}
+        value={form.date ?? ''}
         placeholder="date (YYYY-MM-DD)"
         placeholderTextColor={Colors.textMuted}
         autoCapitalize="none"
         onChangeText={(v) => update({ date: v })}
       />
-      <TextInput
-        style={styles.input}
-        value={form.song}
-        placeholder="song"
-        placeholderTextColor={Colors.textMuted}
-        autoCapitalize="none"
-        onChangeText={(v) => update({ song: v })}
-      />
-      <TextInput
-        style={styles.input}
-        value={form.song_artist}
-        placeholder="artist"
-        placeholderTextColor={Colors.textMuted}
-        autoCapitalize="none"
-        onChangeText={(v) => update({ song_artist: v })}
-      />
-      <TextInput
-        style={styles.input}
-        value={form.width != null ? String(form.width) : ''}
-        placeholder="width"
-        placeholderTextColor={Colors.textMuted}
-        keyboardType="numeric"
-        onChangeText={(v) => update({ width: v ? Number(v) : null })}
-      />
-      <TextInput
-        style={styles.input}
-        value={form.height != null ? String(form.height) : ''}
-        placeholder="height"
-        placeholderTextColor={Colors.textMuted}
-        keyboardType="numeric"
-        onChangeText={(v) => update({ height: v ? Number(v) : null })}
-      />
-      {/* Keywords input temporarily hidden — restore by removing the guard. */}
-      {false && (
-        <TextInput
-          style={styles.input}
-          value={form.keywords}
-          placeholder="keywords (comma separated)"
-          placeholderTextColor={Colors.textMuted}
-          autoCapitalize="none"
-          onChangeText={(v) => update({ keywords: v })}
-        />
-      )}
 
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>comments</Text>
@@ -126,9 +77,7 @@ export default function PaintingForm({ onDataChange, initialData, rightSlot }: P
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 8,
-  },
+  container: { gap: 8 },
   input: {
     borderBottomWidth: 1,
     borderBottomColor: '#000',
@@ -142,14 +91,8 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
   },
-  rightSlot: {
-    // Pushes the submit button (or whatever) to the far right of the comments row.
-    marginLeft: 'auto',
-  },
-  toggleLabel: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-  },
+  rightSlot: { marginLeft: 'auto' },
+  toggleLabel: { fontFamily: Fonts.mono, fontSize: FontSizes.xs },
   toggleTrack: {
     width: 36,
     height: 18,

@@ -1,0 +1,318 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  LayoutChangeEvent,
+  PanResponder,
+} from 'react-native';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAuth } from '../context/AuthContext';
+import { remove_audio, resolveImageUrl, AudioOut } from '../api';
+import ConfirmDialog from './ConfirmDialog';
+import { Colors, Fonts, FontSizes } from '../constants/theme';
+
+interface AudioPieceProps {
+  isOwner: boolean;
+  piece: AudioOut;
+  onRemove: () => void;
+  onEdit: () => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}
+
+function fmtTime(sec: number): string {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+ * The actual player. Mounted lazily (only after the first play tap) so a
+ * profile with many tracks doesn't spin up a native player per tile up front.
+ * Once mounted it auto-plays; background playback is handled globally by the
+ * setAudioModeAsync call in App.tsx + UIBackgroundModes in app.json.
+ */
+function AudioPlayerBar({ uri, fallbackDuration }: { uri: string; fallbackDuration: number | null }) {
+  const player = useAudioPlayer({ uri });
+  const status = useAudioPlayerStatus(player);
+  const [trackW, setTrackW] = useState(0);
+  // Local scrub position while dragging so the thumb tracks the finger 1:1
+  // instead of waiting for the (slightly lagged) status.currentTime to catch up.
+  const [scrubFrac, setScrubFrac] = useState<number | null>(null);
+
+  // Auto-play on mount (the parent only mounts this after the user taps play).
+  useEffect(() => {
+    player.play();
+  }, []);
+
+  // When a track finishes, rewind + pause so the play button is ready to replay
+  // rather than leaving it stuck at the end.
+  useEffect(() => {
+    if (status.didJustFinish) {
+      player.seekTo(0);
+      player.pause();
+    }
+  }, [status.didJustFinish]);
+
+  const duration = status.duration || fallbackDuration || 0;
+  const frac = scrubFrac != null
+    ? scrubFrac
+    : duration > 0
+    ? Math.min(1, status.currentTime / duration)
+    : 0;
+
+  const seekToFrac = (f: number) => {
+    const clamped = Math.max(0, Math.min(1, f));
+    if (duration > 0) player.seekTo(clamped * duration);
+  };
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+      },
+      onPanResponderMove: (e) => {
+        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+      },
+      onPanResponderRelease: (e) => {
+        if (trackW > 0) {
+          const f = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW));
+          seekToFrac(f);
+        }
+        setScrubFrac(null);
+      },
+      onPanResponderTerminate: () => setScrubFrac(null),
+    })
+  ).current;
+
+  const displayedTime = scrubFrac != null ? scrubFrac * duration : status.currentTime;
+
+  return (
+    <View style={styles.playerBar}>
+      <Pressable
+        style={styles.playBtn}
+        onPress={() => (status.playing ? player.pause() : player.play())}
+      >
+        <Text style={styles.playBtnText}>{status.playing ? '❚❚' : '▶'}</Text>
+      </Pressable>
+      <View style={styles.scrubCol}>
+        <View
+          style={styles.track}
+          onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
+          {...pan.panHandlers}
+        >
+          <View style={styles.trackBase} />
+          <View style={[styles.trackFill, { width: `${frac * 100}%` }]} />
+          <View style={[styles.trackThumb, { left: Math.max(0, frac * trackW - 6) }]} />
+        </View>
+        <View style={styles.timeRow}>
+          <Text style={styles.timeText}>{fmtTime(displayedTime)}</Text>
+          <Text style={styles.timeText}>{fmtTime(duration)}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout }: AudioPieceProps) {
+  const { token } = useAuth();
+  const [activated, setActivated] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+
+  const uri = resolveImageUrl(piece.file_path);
+
+  const removeArt = async () => {
+    await remove_audio(piece.id, token);
+    setShowRemoveConfirm(false);
+    onRemove();
+  };
+
+  return (
+    <>
+      <ConfirmDialog
+        visible={showRemoveConfirm}
+        title="u sure?"
+        confirmLabel="yes"
+        cancelLabel="no. shit. stop"
+        confirmColor={Colors.redLight}
+        cancelColor={Colors.greenBright}
+        confirmTextColor={Colors.black}
+        cancelTextColor={Colors.black}
+        onConfirm={removeArt}
+        onCancel={() => setShowRemoveConfirm(false)}
+      />
+      <View style={styles.element} onLayout={onLayout}>
+        <View style={styles.headerRow}>
+          <View style={styles.titleCol}>
+            <Text style={styles.artTitle} numberOfLines={2}>{piece.title}</Text>
+            {!!piece.artist && <Text style={styles.detailText}>{piece.artist}</Text>}
+            {!!piece.date && <Text style={styles.detailText}>{piece.date}</Text>}
+          </View>
+          {!!piece.duration_seconds && !activated && (
+            <Text style={styles.durationBadge}>{fmtTime(piece.duration_seconds)}</Text>
+          )}
+        </View>
+
+        {activated ? (
+          <AudioPlayerBar uri={uri} fallbackDuration={piece.duration_seconds} />
+        ) : (
+          <Pressable style={styles.bigPlay} onPress={() => setActivated(true)}>
+            <Text style={styles.bigPlayIcon}>▶</Text>
+            <Text style={styles.bigPlayLabel}>play</Text>
+          </Pressable>
+        )}
+
+        {isOwner && (
+          <View style={styles.buttons}>
+            <Pressable style={[styles.btn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+              <Text style={styles.btnText}>remove</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
+              <Text style={styles.btnText}>edit</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  element: {
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 10,
+  },
+  titleCol: {
+    flex: 1,
+    gap: 2,
+  },
+  artTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.lg,
+    marginBottom: 2,
+  },
+  detailText: {
+    fontSize: FontSizes.xs,
+  },
+  durationBadge: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  bigPlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderWidth: 2,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  bigPlayIcon: {
+    fontSize: 20,
+    color: Colors.black,
+  },
+  bigPlayLabel: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+  },
+  // Player bar
+  playerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    padding: 10,
+    marginBottom: 10,
+  },
+  playBtn: {
+    width: 44,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.primaryGold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playBtnText: {
+    fontSize: 16,
+    color: Colors.black,
+  },
+  scrubCol: {
+    flex: 1,
+    gap: 4,
+  },
+  track: {
+    height: 18,
+    justifyContent: 'center',
+  },
+  trackBase: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: Colors.textMuted,
+  },
+  trackFill: {
+    position: 'absolute',
+    left: 0,
+    height: 4,
+    backgroundColor: Colors.black,
+  },
+  // Base (unfilled) line drawn under the fill via the track's own border-less
+  // background; we add a thin baseline using a pseudo layer.
+  trackThumb: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.primaryGold,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  timeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.micro,
+    color: Colors.textSecondary,
+  },
+  buttons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  btn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  btnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+  },
+  editBtn: { backgroundColor: Colors.secondary },
+  removeBtn: { backgroundColor: Colors.secondary },
+});

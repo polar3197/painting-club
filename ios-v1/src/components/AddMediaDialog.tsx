@@ -23,6 +23,9 @@ interface AddMediaDialogProps {
   onAdd: (name: string) => void;
   onVisibilityChange: (name: string, hidden: boolean) => void;
   onClose: () => void;
+  // When set, only the "new" pane is shown (no hide/show tab) — used by the
+  // Add flow's medium picker.
+  onlyNew?: boolean;
 }
 
 type Tab = 'hide-show' | 'new';
@@ -33,9 +36,10 @@ export default function AddMediaDialog({
   onAdd,
   onVisibilityChange,
   onClose,
+  onlyNew = false,
 }: AddMediaDialogProps) {
   const { token } = useAuth();
-  const [tab, setTab] = useState<Tab>('hide-show');
+  const [tab, setTab] = useState<Tab>(onlyNew ? 'new' : 'hide-show');
   const [media, setMedia] = useState<MediaType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestName, setRequestName] = useState('');
@@ -82,22 +86,28 @@ export default function AddMediaDialog({
       <Pressable style={styles.backdrop} onPress={onClose}>
         <View style={styles.dialog} onStartShouldSetResponder={() => true}>
           <View style={styles.titleRow}>
-            <Pressable onPress={() => setTab('hide-show')}>
-              <Text
-                numberOfLines={1}
-                style={[styles.title, tab !== 'hide-show' && styles.titleInactive]}
-              >
-                hide/show
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => setTab('new')}>
-              <Text
-                numberOfLines={1}
-                style={[styles.title, tab !== 'new' && styles.titleInactive]}
-              >
-                new
-              </Text>
-            </Pressable>
+            {onlyNew ? (
+              <Text numberOfLines={1} style={styles.title}>new</Text>
+            ) : (
+              <>
+                <Pressable onPress={() => setTab('hide-show')}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.title, tab !== 'hide-show' && styles.titleInactive]}
+                  >
+                    hide/show
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => setTab('new')}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.title, tab !== 'new' && styles.titleInactive]}
+                  >
+                    new
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
 
           <View style={styles.panelArea}>

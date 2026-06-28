@@ -1,36 +1,35 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Keyboard } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
-import CentralFilter, { CentralFilterHandle } from '../components/CentralFilter';
 import Spinner from '../components/Spinner';
-import { useOptions } from '../hooks';
 import { search_art, resolveImageUrl, thumbUrl, ArtResult } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
-import type { ArtStackParamList } from '../navigation/types';
+import type { SearchStackParamList } from '../navigation/types';
 
-type Nav = NativeStackNavigationProp<ArtStackParamList, 'ArtGallery'>;
+type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - 60) / 2;
+const NUM_COLUMNS = 4;
+const COLUMN_GAP = 10;
+// List has 20px horizontal padding on each side; the rest is split into the
+// columns and the gaps between them.
+const CARD_WIDTH = (SCREEN_WIDTH - 40 - COLUMN_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+const ART_KEYS = ['title', 'medium', 'song', 'creator_username', 'location', 'keywords'];
 
-export default function ArtGallery() {
-  const insets = useSafeAreaInsets();
+interface Props {
+  // Search state is owned by SearchTabs so the bar can stay fixed above the
+  // swiping lists; this screen just renders the filtered grid.
+  query: string;
+  onResetFilters: () => void;
+  onListScroll: () => void;
+}
+
+export default function ArtGallery({ query, onResetFilters, onListScroll }: Props) {
   const navigation = useNavigation<Nav>();
-  const [options] = useOptions();
   const [art, setArt] = useState<ArtResult[]>([]);
-  const [query, setQuery] = useState('');
-  const [chips, setChips] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [filterKey, setFilterKey] = useState(0);
-  const filterRef = useRef<CentralFilterHandle>(null);
-
-  const dismissDropdown = useCallback(() => {
-    filterRef.current?.close();
-    Keyboard.dismiss();
-  }, []);
 
   useEffect(() => {
     search_art('').then(setArt).catch(() => {});
@@ -38,47 +37,17 @@ export default function ArtGallery() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setQuery('');
-    setChips([]);
-    setFilterKey((k) => k + 1);
+    onResetFilters();
     try {
-      const data = await search_art('');
-      setArt(data);
+      setArt(await search_art(''));
     } catch {}
     setRefreshing(false);
-  }, []);
-
-  const allOptions = useMemo(() => {
-    const o = options as any;
-    return [
-      ...(o.titles || []),
-      ...(o.mediums || []),
-      ...(o.keywords || []),
-      ...(o.songs || []),
-      ...(o.usernames || []),
-      ...(o.cities || []),
-    ];
-  }, [options]);
-
-  const ART_KEYS = ['title', 'medium', 'song', 'creator_username', 'location', 'keywords'];
+  }, [onResetFilters]);
 
   const filtered = useMemo(() => {
-    let result = art;
-    for (const chip of chips) {
-      result = new Fuse(result, { keys: ART_KEYS, threshold: 0.4 }).search(chip).map((r) => r.item);
-    }
-    if (query.trim()) {
-      result = new Fuse(result, { keys: ART_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
-    }
-    return result;
-  }, [art, chips, query]);
-
-  const addChip = useCallback((value: string) => {
-    setChips((prev) => (prev.includes(value) ? prev : [...prev, value]));
-  }, []);
-  const removeChip = useCallback((value: string) => {
-    setChips((prev) => prev.filter((c) => c !== value));
-  }, []);
+    if (!query.trim()) return art;
+    return new Fuse(art, { keys: ART_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
+  }, [art, query]);
 
   const renderCard = ({ item }: { item: ArtResult }) => (
     <Pressable
@@ -102,56 +71,23 @@ export default function ArtGallery() {
         <Text style={styles.cardTitle} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.cardMedium}>{item.medium}</Text>
-        <Pressable
-          onPress={() =>
-            navigation.navigate('UserProfile', { username: item.creator_username })
-          }
-        >
-          <Text style={styles.cardCreator}>@{item.creator_username}</Text>
-        </Pressable>
-        {item.location && (
-          <Text style={styles.cardLocation}>{item.location}</Text>
-        )}
-        {item.keywords && item.keywords.length > 0 && (
-          <Text style={styles.cardKeywords} numberOfLines={1}>
-            {item.keywords.join(', ')}
-          </Text>
-        )}
+        <Text style={styles.cardMedium} numberOfLines={1}>{item.medium}</Text>
       </View>
     </Pressable>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.bannerWrap}>
-        <Image
-          source={require('../../assets/imgs/art.png')}
-          style={styles.banner}
-          contentFit="contain"
-        />
-      </View>
-      <CentralFilter
-        key={filterKey}
-        ref={filterRef}
-        header="art"
-        options={allOptions}
-        chips={chips}
-        onAddChip={addChip}
-        onRemoveChip={removeChip}
-        onQueryChange={setQuery}
-        placeholder="search art..."
-      />
+    <View style={styles.container}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderCard}
-        numColumns={2}
+        numColumns={NUM_COLUMNS}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        onScrollBeginDrag={dismissDropdown}
+        onScrollBeginDrag={onListScroll}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -183,21 +119,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  bannerWrap: {
-    alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  banner: {
-    width: 80,
-    height: 80,
-  },
   list: {
     padding: 20,
     paddingBottom: 40,
   },
   row: {
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: COLUMN_GAP,
     marginBottom: 12,
   },
   card: {
@@ -225,22 +153,5 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.tiny,
     color: Colors.textSecondary,
     marginTop: 2,
-  },
-  cardCreator: {
-    fontSize: FontSizes.tiny,
-    color: Colors.blueLink,
-    textDecorationLine: 'underline',
-    marginTop: 2,
-  },
-  cardLocation: {
-    fontSize: FontSizes.tiny,
-    color: Colors.textTertiary,
-    marginTop: 2,
-  },
-  cardKeywords: {
-    fontSize: FontSizes.micro,
-    fontStyle: 'italic',
-    color: Colors.textTertiary,
-    marginTop: 4,
   },
 });

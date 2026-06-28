@@ -1,79 +1,52 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Keyboard } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
-import CentralFilter, { CentralFilterHandle } from '../components/CentralFilter';
 import Spinner from '../components/Spinner';
-import { useMembers, useOptions } from '../hooks';
+import { useMembers } from '../hooks';
 import { resolveImageUrl, profilePicSrc, Profile } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
-import type { PeopleStackParamList } from '../navigation/types';
+import type { SearchStackParamList } from '../navigation/types';
 
-type Nav = NativeStackNavigationProp<PeopleStackParamList, 'PeopleList'>;
+type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - 60) / 2;
+const NUM_COLUMNS = 3;
+const COLUMN_GAP = 10;
+// List has 20px horizontal padding on each side; the rest is split into the
+// columns and the gaps between them.
+const CARD_WIDTH = (SCREEN_WIDTH - 40 - COLUMN_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+const PEOPLE_KEYS = ['username', 'firstname', 'lastname', 'city', 'media'];
 
-export default function People() {
-  const insets = useSafeAreaInsets();
+interface Props {
+  // Search state is owned by SearchTabs so the bar can stay fixed above the
+  // swiping lists; this screen just renders the filtered grid.
+  query: string;
+  onResetFilters: () => void;
+  onListScroll: () => void;
+}
+
+export default function People({ query, onResetFilters, onListScroll }: Props) {
   const navigation = useNavigation<Nav>();
   const { profilePicVersions } = useAuth();
   const [members, , , refetchMembers] = useMembers('', '');
-  const [options] = useOptions();
-  const [query, setQuery] = useState('');
-  const [chips, setChips] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [filterKey, setFilterKey] = useState(0);
-  const filterRef = useRef<CentralFilterHandle>(null);
-
-  const dismissDropdown = useCallback(() => {
-    filterRef.current?.close();
-    Keyboard.dismiss();
-  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setQuery('');
-    setChips([]);
-    setFilterKey((k) => k + 1);
+    onResetFilters();
     try {
       await refetchMembers();
     } catch {}
     setRefreshing(false);
-  }, [refetchMembers]);
-
-  const allOptions = useMemo(() => {
-    const o = options as any;
-    return [
-      ...(o.usernames || []),
-      ...(o.fullnames || []),
-      ...(o.cities || []),
-      ...(o.mediums || []),
-    ];
-  }, [options]);
-
-  const PEOPLE_KEYS = ['username', 'firstname', 'lastname', 'city', 'media'];
+  }, [onResetFilters, refetchMembers]);
 
   const filtered = useMemo(() => {
-    let result = members;
-    for (const chip of chips) {
-      result = new Fuse(result, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(chip).map((r) => r.item);
-    }
-    if (query.trim()) {
-      result = new Fuse(result, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
-    }
-    return result;
-  }, [members, chips, query]);
-
-  const addChip = useCallback((value: string) => {
-    setChips((prev) => (prev.includes(value) ? prev : [...prev, value]));
-  }, []);
-  const removeChip = useCallback((value: string) => {
-    setChips((prev) => prev.filter((c) => c !== value));
-  }, []);
+    if (!query.trim()) return members;
+    return new Fuse(members, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
+  }, [members, query]);
 
   const renderCard = ({ item }: { item: Profile }) => (
     <Pressable
@@ -87,52 +60,23 @@ export default function People() {
         contentFit="cover"
       />
       <View style={styles.cardBody}>
-        <Text style={styles.cardUsername}>@{item.username}</Text>
-        <Text style={styles.cardName}>
-          {item.firstname} {item.lastname}
-        </Text>
-        {(item.city || item.state) && (
-          <Text style={styles.cardLocation}>
-            {[item.city, item.state].filter(Boolean).join(', ')}
-          </Text>
-        )}
-        {item.media && item.media.length > 0 && (
-          <Text style={styles.cardMedia}>{item.media.join(', ')}</Text>
-        )}
+        <Text style={styles.cardUsername} numberOfLines={1}>{item.username}</Text>
       </View>
     </Pressable>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.bannerWrap}>
-        <Image
-          source={require('../../assets/imgs/profiles.png')}
-          style={styles.banner}
-          contentFit="contain"
-        />
-      </View>
-      <CentralFilter
-        key={filterKey}
-        ref={filterRef}
-        header="members"
-        options={allOptions}
-        chips={chips}
-        onAddChip={addChip}
-        onRemoveChip={removeChip}
-        onQueryChange={setQuery}
-        placeholder="search people..."
-      />
+    <View style={styles.container}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.username}
         renderItem={renderCard}
-        numColumns={2}
+        numColumns={NUM_COLUMNS}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        onScrollBeginDrag={dismissDropdown}
+        onScrollBeginDrag={onListScroll}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -164,29 +108,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  bannerWrap: {
-    alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  banner: {
-    width: 80,
-    height: 80,
-    transform: [{ scale: 1.375 }],
-  },
   list: {
     padding: 20,
     paddingBottom: 40,
   },
   row: {
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: COLUMN_GAP,
     marginBottom: 12,
   },
   card: {
     width: CARD_WIDTH,
     borderWidth: 1,
     borderColor: '#000',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.artCardBg,
   },
   cardPressed: {
     transform: [{ scale: 0.97 }],
@@ -202,21 +137,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     fontWeight: '600',
-  },
-  cardName: {
-    fontSize: FontSizes.xxs,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  cardLocation: {
-    fontSize: FontSizes.tiny,
-    color: Colors.textTertiary,
-    marginTop: 2,
-  },
-  cardMedia: {
-    fontSize: FontSizes.tiny,
-    fontStyle: 'italic',
-    color: Colors.textTertiary,
-    marginTop: 4,
+    // Match the art search card title color (black).
+    color: Colors.textPrimary,
   },
 });

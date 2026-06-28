@@ -23,7 +23,8 @@ import {
   remove_visual_2d,
   update_profile,
   add_member_media,
-  add_new_visual_2d,
+  get_members_written_form,
+  get_members_audio,
   get_search_options,
   resolveImageUrl,
   profilePicSrc,
@@ -31,17 +32,23 @@ import {
   upload_profile_picture,
   get_media,
   Visual2DOut,
-  Visual2DIn,
+  WrittenFormOut,
+  AudioOut,
   Profile,
   MediaType,
 } from '../api';
 import Dropdown from '../components/Dropdown';
 import ArtZoomIn from '../components/ArtZoomIn';
+import ArtCarousel from '../components/ArtCarousel';
 import ArtComments from '../components/ArtComments';
 import AddArtDialog from '../components/AddArtDialog';
+import WrittenFormPiece from '../components/WrittenFormPiece';
+import AudioPiece from '../components/AudioPiece';
+import SeriesRow from '../components/SeriesRow';
 import AddMediaDialog from '../components/AddMediaDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Spinner from '../components/Spinner';
+import { useUploads } from '../context/UploadContext';
 import CommentsReceivedPanel from '../components/CommentsReceivedPanel';
 import type { CommentReceivedOut } from '../api/types';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
@@ -56,6 +63,10 @@ const BIO_PAGE_MIN_HEIGHT = 180;
 // Visual gap between the two bordered pages of the carousel so the swipe feels
 // like moving to a separate frame rather than sliding content under one.
 const BIO_PAGE_GAP = 40;
+// Horizontal inset of each bio page from the wrap edges. The wrap itself
+// spans the screen (so pages can slide fully off-screen) — this padding
+// keeps each page's framed border in the same visual position it had before.
+const BIO_PAGE_INSET = 22;
 
 type ProfileRoute = RouteProp<
   { UserProfile: { username: string; artId?: string; medium?: string } },
@@ -93,6 +104,7 @@ function Visual2DPiece({
   viewerBlockedByOwner,
   onRemove,
   onEdit,
+  onZoom,
   onLayout,
 }: {
   isOwner: boolean;
@@ -100,15 +112,19 @@ function Visual2DPiece({
   viewerBlockedByOwner: boolean;
   onRemove: () => void;
   onEdit: () => void;
+  // Open the shared zoom viewer on this piece. Zoom state lives on the screen
+  // so the viewer can swipe across all the profile's pieces.
+  onZoom: () => void;
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const { token, currentUser } = useAuth();
-  const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  // Use the server-provided canonical aspect ratio (captured at upload). No image
-  // measurement, no drift from thumbnail pixel rounding.
-  const aspectRatio = piece.aspect_ratio ?? 1;
+  // Start from the server-provided ratio captured at upload, but override it
+  // with the image's real dimensions once it loads. A wrong/stale stored ratio
+  // would otherwise letterbox the image (white bars) under contentFit:contain.
+  const [measuredRatio, setMeasuredRatio] = useState<number | null>(null);
+  const aspectRatio = measuredRatio ?? piece.aspect_ratio ?? 1;
 
   const removeArt = async () => {
     await remove_visual_2d(piece.id, token);
@@ -123,28 +139,20 @@ function Visual2DPiece({
         title="u sure?"
         confirmLabel="yes"
         cancelLabel="no. shit. stop"
-        confirmColor={Colors.greenBright}
-        cancelColor={Colors.redLight}
+        confirmColor={Colors.redLight}
+        cancelColor={Colors.greenBright}
         confirmTextColor={Colors.black}
         cancelTextColor={Colors.black}
         onConfirm={removeArt}
         onCancel={() => setShowRemoveConfirm(false)}
       />
-      {isZoomedIn && (
-        <ArtZoomIn
-          isOwner={isOwner}
-          imgPath={piece.file_path}
-          onClose={() => setIsZoomedIn(false)}
-          reportArtId={!isOwner && currentUser ? piece.id : undefined}
-        />
-      )}
       {showComments && (
         <ArtComments piece={piece} onClose={() => setShowComments(false)} />
       )}
       <View style={styles.artElement} onLayout={onLayout}>
         <Pressable
           style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
-          onPress={() => setIsZoomedIn(true)}
+          onPress={onZoom}
         >
           <View style={[styles.artVisualInner, { aspectRatio }]}>
             <Image
@@ -153,12 +161,22 @@ function Visual2DPiece({
               transition={200}
               style={styles.artImage}
               contentFit="contain"
+              onLoad={(e) => {
+                const { width, height } = e.source;
+                if (width > 0 && height > 0) setMeasuredRatio(width / height);
+              }}
             />
           </View>
         </Pressable>
         <View style={styles.artDetails}>
-          <Text style={styles.artTitle}>{piece.title}</Text>
-          {!!piece.date && <Text style={styles.artDetailText}>{piece.date}</Text>}
+          <View style={styles.titleRow}>
+            <Text style={styles.artTitle}>{piece.title}</Text>
+            {!!piece.date && (
+              <View style={styles.dateBadge}>
+                <Text style={styles.dateBadgeText}>{piece.date}</Text>
+              </View>
+            )}
+          </View>
           {!!piece.location && (
             <View style={styles.artDetailRow}>
               <Image source={require('../../assets/imgs/location.png')} style={styles.detailIcon} />
@@ -181,7 +199,10 @@ function Visual2DPiece({
               </Text>
             </View>
           )}
-          {piece.keywords && piece.keywords.length > 0 && (
+          {/* Keywords temporarily hidden — data still flows through (filter
+              bar, payloads); only the per-piece readout is suppressed for now.
+              Restore by removing this comment wrapper. */}
+          {false && piece.keywords && piece.keywords.length > 0 && (
             <Text style={styles.artDetailText}>
               <Text style={{ fontWeight: '700' }}>keywords: </Text>
               {piece.keywords.join(', ')}
@@ -190,31 +211,36 @@ function Visual2DPiece({
           <View style={styles.artFooter}>
             {isOwner ? (
               <View style={styles.artButtons}>
-                <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
-                  <Text style={styles.artBtnText}>edit</Text>
+                <Pressable style={[styles.artBtn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+                  <Text style={styles.artBtnText}>remove</Text>
                 </Pressable>
                 {piece.comments_enabled && (
+                  // Middle button flexes to fill the remaining width — paired
+                  // with the row's stretch layout this puts the three buttons
+                  // span the full art-element width with the same edge inset
+                  // on both sides.
                   <Pressable
-                    style={[styles.artBtn, styles.commentsBtn]}
+                    style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnStretch]}
                     onPress={() => setShowComments(true)}
                   >
                     <Text style={styles.artBtnText}>comments</Text>
                   </Pressable>
                 )}
-                <Pressable style={[styles.artBtn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
-                  <Text style={styles.artBtnText}>remove</Text>
+                <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
+                  <Text style={styles.artBtnText}>edit</Text>
                 </Pressable>
               </View>
             ) : (
               piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
-                <View style={styles.artButtons}>
-                  <Pressable
-                    style={[styles.artBtn, styles.commentsBtn]}
-                    onPress={() => setShowComments(true)}
-                  >
-                    <Text style={styles.artBtnText}>comments</Text>
-                  </Pressable>
-                </View>
+                // Single button when viewing someone else's piece — stretch to
+                // the full row width so it reads as the primary (only) action,
+                // matching the visual weight of the owner-side three-button row.
+                <Pressable
+                  style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnFull]}
+                  onPress={() => setShowComments(true)}
+                >
+                  <Text style={styles.artBtnText}>comments</Text>
+                </Pressable>
               )
             )}
           </View>
@@ -223,6 +249,10 @@ function Visual2DPiece({
     </>
   );
 }
+
+// Temp feature flag — hide the keyword dropdown without removing the wiring.
+// Flip back to true when we want it surfaced again.
+const SHOW_KEYWORDS_BAR = false;
 
 // --- Main UserProfile screen ---
 export default function UserProfile() {
@@ -242,11 +272,20 @@ export default function UserProfile() {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<string[]>([]);
   const [art, setArt] = useState<Visual2DOut[]>([]);
+  const [writtenArt, setWrittenArt] = useState<WrittenFormOut[]>([]);
+  const [audioArt, setAudioArt] = useState<AudioOut[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [pendingPieces, setPendingPieces] = useState<
-    { tempId: string; medium: string; uri: string; title: string; aspectRatio: number }[]
-  >([]);
+  // Optimistic upload state + the upload triggers live in UploadContext so the
+  // global "+" Add flow can fire an upload and have its placeholder/spinner tile
+  // appear here once the user lands on this profile. `version` bumps on each
+  // completed upload to refetch the grid.
+  const {
+    pendingPieces,
+    pendingWritten,
+    pendingAudio,
+    version: uploadVersion,
+  } = useUploads();
   // Captured from onLayout so each page of the bio/comments carousel can size
   // to match the container exactly (paging snaps cleanly to that width).
   const [bioPageWidth, setBioPageWidth] = useState(0);
@@ -257,33 +296,6 @@ export default function UserProfile() {
   // that produced a recursive growth loop because the page border kept adding
   // 2px to the measured value each cycle).
 
-  const startUpload = useCallback((payload: Visual2DIn) => {
-    const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const aspectRatio =
-      payload.width && payload.height && payload.height > 0
-        ? Number(payload.width) / Number(payload.height)
-        : 1;
-    setPendingPieces((p) => [
-      ...p,
-      {
-        tempId,
-        medium: payload.medium,
-        uri: payload.file.uri,
-        title: payload.title || 'uploading…',
-        aspectRatio,
-      },
-    ]);
-    add_new_visual_2d(token, payload)
-      .then(() => {
-        setRefresh((r) => r + 1);
-      })
-      .catch((err: any) => {
-        Alert.alert('Error', err?.message || 'Upload failed');
-      })
-      .finally(() => {
-        setPendingPieces((p) => p.filter((x) => x.tempId !== tempId));
-      });
-  }, [token]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -294,9 +306,13 @@ export default function UserProfile() {
     setRefreshing(false);
   }, [refetchProfile]);
   const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingWritten, setEditingWritten] = useState<WrittenFormOut | null>(null);
+  const [editingAudio, setEditingAudio] = useState<AudioOut | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
+  // Index into filteredArt of the piece shown in the zoom viewer (null = closed).
+  // Held here (not per-tile) so the viewer can swipe across the whole gallery.
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
 
   const handleAddMedia = useCallback(async (name: string) => {
     if (!profile) return;
@@ -399,8 +415,19 @@ export default function UserProfile() {
   useEffect(() => {
     get_media().then(setAllMedia).catch(() => {});
   }, []);
-  const isV2d =
-    !!selectedMedium && allMedia.find((m) => m.name === selectedMedium)?.type === 'visual_2d';
+  const selectedMediumType = selectedMedium
+    ? allMedia.find((m) => m.name === selectedMedium)?.type ?? null
+    : null;
+  const isV2d = selectedMediumType === 'visual_2d';
+  const isWritten = selectedMediumType === 'written_form';
+  const isAudio = selectedMediumType === 'audio';
+
+  // Keep the medium tab in sync when navigated here with a medium param — e.g.
+  // landing from the Add flow on the piece's medium, even if this profile was
+  // already mounted on a different tab.
+  useEffect(() => {
+    if (mediumParam) setSelectedMedium(mediumParam);
+  }, [mediumParam]);
 
   // Fetch art
   useEffect(() => {
@@ -409,23 +436,101 @@ export default function UserProfile() {
       get_members_visual_2d(username, selectedMedium)
         .then((data) => {
           setArt(data);
+          setWrittenArt([]);
+          setAudioArt([]);
           const unique = [...new Set(data.flatMap((p) => p.keywords ?? []))];
           setAvailableKeywords(unique);
         })
         .catch(() => {
           setArt([]);
+          setWrittenArt([]);
+          setAudioArt([]);
+          setAvailableKeywords([]);
+        });
+    } else if (isWritten) {
+      get_members_written_form(username, selectedMedium)
+        .then((data) => {
+          setWrittenArt(data);
+          setArt([]);
+          setAudioArt([]);
+          const unique = [...new Set(data.flatMap((p) => p.keywords ?? []))];
+          setAvailableKeywords(unique);
+        })
+        .catch(() => {
+          setWrittenArt([]);
+          setArt([]);
+          setAudioArt([]);
+          setAvailableKeywords([]);
+        });
+    } else if (isAudio) {
+      get_members_audio(username, selectedMedium)
+        .then((data) => {
+          setAudioArt(data);
+          setArt([]);
+          setWrittenArt([]);
+          const unique = [...new Set(data.flatMap((p) => p.keywords ?? []))];
+          setAvailableKeywords(unique);
+        })
+        .catch(() => {
+          setAudioArt([]);
+          setArt([]);
+          setWrittenArt([]);
           setAvailableKeywords([]);
         });
     } else {
       setArt([]);
+      setWrittenArt([]);
+      setAudioArt([]);
       setAvailableKeywords([]);
     }
-  }, [username, selectedMedium, refresh, isV2d]);
+  }, [username, selectedMedium, refresh, uploadVersion, isV2d, isWritten, isAudio]);
 
   const filteredArt = useMemo(() => {
     if (selectedKeywords.length === 0) return art;
     return art.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
   }, [art, selectedKeywords]);
+
+  const filteredWrittenArt = useMemo(() => {
+    if (selectedKeywords.length === 0) return writtenArt;
+    return writtenArt.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
+  }, [writtenArt, selectedKeywords]);
+
+  const filteredAudioArt = useMemo(() => {
+    if (selectedKeywords.length === 0) return audioArt;
+    return audioArt.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
+  }, [audioArt, selectedKeywords]);
+
+  // Group filtered written pieces into rows: standalone pieces render
+  // individually, pieces sharing a series_id collapse into one SeriesRow.
+  // A series' position in the list is set by its FIRST member's index, so
+  // adding a new piece to a series doesn't reshuffle the feed.
+  const writtenRows = useMemo(() => {
+    type Row =
+      | { kind: 'piece'; piece: WrittenFormOut }
+      | { kind: 'series'; id: string; name: string; pieces: WrittenFormOut[] };
+    const rows: Row[] = [];
+    const seriesIndex = new Map<string, Extract<Row, { kind: 'series' }>>();
+    for (const p of filteredWrittenArt) {
+      if (p.series_id) {
+        const existing = seriesIndex.get(p.series_id);
+        if (existing) {
+          existing.pieces.push(p);
+        } else {
+          const row: Extract<Row, { kind: 'series' }> = {
+            kind: 'series',
+            id: p.series_id,
+            name: p.series_name ?? 'series',
+            pieces: [p],
+          };
+          seriesIndex.set(p.series_id, row);
+          rows.push(row);
+        }
+      } else {
+        rows.push({ kind: 'piece', piece: p });
+      }
+    }
+    return rows;
+  }, [filteredWrittenArt]);
 
   const handleArtLayout = useCallback((pieceId: string, e: LayoutChangeEvent) => {
     const y = e.nativeEvent.layout.y + artSectionY.current;
@@ -523,16 +628,28 @@ export default function UserProfile() {
         />
       )}
 
-      {/* Add/Edit dialog */}
-      {showAddDialog && selectedMedium && (
-        <AddArtDialog
-          selectedMedium={selectedMedium}
-          username={username}
-          onSuccess={() => setRefresh((r) => r + 1)}
-          onClose={() => setShowAddDialog(false)}
-          onCreate={startUpload}
+      {/* Shared 2D-art zoom viewer: a paged carousel you can swipe through to
+          see every piece in the current (filtered) medium without closing. */}
+      {zoomIndex !== null && filteredArt[zoomIndex] && (
+        <ArtCarousel
+          pieces={filteredArt}
+          initialIndex={zoomIndex}
+          isOwner={profile.is_owner}
+          creatorUsername={profile.username}
+          onClose={(lastIndex) => {
+            // Land the profile on whatever piece was on screen in the viewer.
+            // Every tile is laid out (ScrollView mounts them all), so its y is
+            // already cached; scroll instantly so it's there as the viewer fades.
+            const piece = filteredArt[lastIndex];
+            const y = piece ? artPositions.current[piece.id] : undefined;
+            if (y != null) scrollRef.current?.scrollTo({ y, animated: false });
+            setZoomIndex(null);
+          }}
         />
       )}
+
+      {/* Create now lives in the full-screen Add flow (the "+" tab / per-medium
+          add button route to it). AddArtDialog is kept only for editing. */}
       {editingPiece && selectedMedium && (
         <AddArtDialog
           selectedMedium={selectedMedium}
@@ -545,6 +662,34 @@ export default function UserProfile() {
             setSelectedKeywords([]);
           }}
           piece={editingPiece}
+        />
+      )}
+      {editingWritten && selectedMedium && (
+        <AddArtDialog
+          selectedMedium={selectedMedium}
+          username={username}
+          onSuccess={() => setRefresh((r) => r + 1)}
+          onClose={() => setEditingWritten(null)}
+          onMoved={(newMedium) => {
+            setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
+            setSelectedMedium(newMedium);
+            setSelectedKeywords([]);
+          }}
+          writtenPiece={editingWritten}
+        />
+      )}
+      {editingAudio && selectedMedium && (
+        <AddArtDialog
+          selectedMedium={selectedMedium}
+          username={username}
+          onSuccess={() => setRefresh((r) => r + 1)}
+          onClose={() => setEditingAudio(null)}
+          onMoved={(newMedium) => {
+            setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
+            setSelectedMedium(newMedium);
+            setSelectedKeywords([]);
+          }}
+          audioPiece={editingAudio}
         />
       )}
       {showAddMedia && (
@@ -624,21 +769,26 @@ export default function UserProfile() {
                 style={[styles.bioCarouselWrap, { minHeight: BIO_PAGE_MIN_HEIGHT }]}
                 onLayout={(e) => setBioPageWidth(e.nativeEvent.layout.width)}
               >
+                {/* Each page keeps its prior visible inset (BIO_PAGE_INSET on
+                    each side) via paddingHorizontal on the ScrollView's
+                    contentContainer. The wrap itself is now screen-wide so
+                    overflow:hidden clips at the screen edge, but the pages
+                    themselves still look like before. */}
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  // snapToInterval (not pagingEnabled) — pagingEnabled snaps to
-                  // multiples of the ScrollView's own width, which is correct
-                  // only when pages are flush. With BIO_PAGE_GAP between pages,
-                  // we need to snap to multiples of pageWidth + gap instead.
                   decelerationRate="fast"
-                  snapToInterval={bioPageWidth + BIO_PAGE_GAP}
+                  snapToInterval={(bioPageWidth - BIO_PAGE_INSET * 2) + BIO_PAGE_GAP}
                   snapToAlignment="start"
-                  // nestedScrollEnabled lets the FlatList inside CommentsReceivedPanel
-                  // vertically scroll without fighting the parent vertical scroll.
                   nestedScrollEnabled
+                  // Only your own profile has a second (comments) page to swipe
+                  // to — on everyone else's, lock it so the lone artist-statement
+                  // card can't drag/bounce around.
+                  scrollEnabled={profile.is_owner}
+                  bounces={profile.is_owner}
+                  contentContainerStyle={{ paddingHorizontal: BIO_PAGE_INSET }}
                 >
-                  <View style={[styles.bioPage, { width: bioPageWidth, marginRight: BIO_PAGE_GAP }]}>
+                  <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, marginRight: BIO_PAGE_GAP }]}>
                     <Text style={styles.bioLabel}>Artist Statement</Text>
                     <View style={styles.bioHr} />
                     {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
@@ -648,12 +798,12 @@ export default function UserProfile() {
                         editing. */}
                     {profile.is_owner && !editing && (
                       <Pressable style={styles.editChip} onPress={startEditing}>
-                        <Text style={styles.editChipText}>•-•</Text>
+                        <Text style={styles.editChipText}>edit</Text>
                       </Pressable>
                     )}
                   </View>
                   {profile.is_owner && bioPageWidth > 0 && (
-                    <View style={[styles.bioPage, { width: bioPageWidth, padding: 0 }]}>
+                    <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, padding: 0 }]}>
                       <CommentsReceivedPanel onTapComment={handleTapReceivedComment} />
                     </View>
                   )}
@@ -749,6 +899,7 @@ export default function UserProfile() {
         </View>
 
         {/* Keywords sub-bar */}
+        {SHOW_KEYWORDS_BAR && (
         <View
           style={styles.keywordsBar}
           onLayout={(e) => { keywordsBarY.current = e.nativeEvent.layout.y; }}
@@ -778,6 +929,7 @@ export default function UserProfile() {
               ))}
             </ScrollView>
         </View>
+        )}
       </View>
 
       {/* ---- Art Section ---- */}
@@ -785,16 +937,11 @@ export default function UserProfile() {
         style={styles.artSection}
         onLayout={(e) => { artSectionY.current = e.nativeEvent.layout.y; }}
       >
-        {profile.is_owner && (
-          <Pressable style={styles.addBtn} onPress={() => setShowAddDialog(true)}>
-            <Text style={styles.addBtnText}>+</Text>
-          </Pressable>
-        )}
-
+        {/* Add now lives in the center "+" tab — no per-medium add button here. */}
         {selectedMedium && isV2d ? (
           <>
             {pendingPieces
-              .filter((p) => p.medium === selectedMedium)
+              .filter((p) => p.medium === selectedMedium && p.username === username)
               .map((p) => (
                 <PendingPiece
                   key={p.tempId}
@@ -803,7 +950,7 @@ export default function UserProfile() {
                   aspectRatio={p.aspectRatio}
                 />
               ))}
-            {filteredArt.map((piece) => (
+            {filteredArt.map((piece, idx) => (
               <Visual2DPiece
                 key={piece.id}
                 isOwner={profile.is_owner}
@@ -811,6 +958,68 @@ export default function UserProfile() {
                 viewerBlockedByOwner={!!profile.viewer_blocked_by_owner}
                 onRemove={() => setRefresh((r) => r + 1)}
                 onEdit={() => setEditingPiece(piece)}
+                onZoom={() => setZoomIndex(idx)}
+                onLayout={(e) => handleArtLayout(piece.id, e)}
+              />
+            ))}
+          </>
+        ) : selectedMedium && isWritten ? (
+          <>
+            {pendingWritten
+              .filter((p) => p.medium === selectedMedium && p.username === username)
+              .map((p) => (
+                <View key={p.tempId} style={styles.pendingWrittenTile}>
+                  <Text style={styles.artTitle}>{p.title}</Text>
+                  <Text style={styles.artDetailText}>uploading…</Text>
+                </View>
+              ))}
+            {writtenRows.map((row) =>
+              row.kind === 'piece' ? (
+                <WrittenFormPiece
+                  key={row.piece.id}
+                  isOwner={profile.is_owner}
+                  piece={row.piece}
+                  onRemove={() => setRefresh((r) => r + 1)}
+                  onEdit={() => setEditingWritten(row.piece)}
+                  onLayout={(e) => handleArtLayout(row.piece.id, e)}
+                />
+              ) : (
+                <SeriesRow
+                  key={row.id}
+                  isOwner={profile.is_owner}
+                  seriesId={row.id}
+                  seriesName={row.name}
+                  pieces={row.pieces}
+                  selectedMedium={selectedMedium!}
+                  username={username}
+                  onRefresh={() => setRefresh((r) => r + 1)}
+                  onMediumMove={(newMedium) => {
+                    setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
+                    setSelectedMedium(newMedium);
+                    setSelectedKeywords([]);
+                  }}
+                  onLayout={(e) => handleArtLayout(row.id, e)}
+                />
+              )
+            )}
+          </>
+        ) : selectedMedium && isAudio ? (
+          <>
+            {pendingAudio
+              .filter((p) => p.medium === selectedMedium && p.username === username)
+              .map((p) => (
+                <View key={p.tempId} style={styles.pendingWrittenTile}>
+                  <Text style={styles.artTitle}>{p.title}</Text>
+                  <Text style={styles.artDetailText}>uploading…</Text>
+                </View>
+              ))}
+            {filteredAudioArt.map((piece) => (
+              <AudioPiece
+                key={piece.id}
+                isOwner={profile.is_owner}
+                piece={piece}
+                onRemove={() => setRefresh((r) => r + 1)}
+                onEdit={() => setEditingAudio(piece)}
                 onLayout={(e) => handleArtLayout(piece.id, e)}
               />
             ))}
@@ -829,7 +1038,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.mainBg,
   },
   contentContainer: {
-    paddingBottom: 40,
+    // No bottom padding — the artSection owns the bottom of the page (with
+    // its beige background). flexGrow:1 lets the artSection's flex:1 stretch
+    // it down to the tab bar so the beige fills any leftover space.
+    flexGrow: 1,
   },
   centered: {
     flex: 1,
@@ -878,7 +1090,11 @@ const styles = StyleSheet.create({
   // content inside one shared frame.
   bioCarouselWrap: {
     marginTop: 12,
-    marginHorizontal: -8,
+    // Cancel out the surrounding paddings (userDetails paddingHorizontal: 20
+    // + userFields padding: 10) so the carousel — and therefore the slide-off
+    // clip boundary — reaches the actual screen edge. Pages now glide fully
+    // off-screen instead of vanishing 30px before the edge.
+    marginHorizontal: -30,
     overflow: 'hidden',
   },
   bioPage: {
@@ -890,7 +1106,7 @@ const styles = StyleSheet.create({
   bioLabel: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.md,
-    fontWeight: '500',
+    fontWeight: '400',
     textAlign: 'center',
     marginBottom: 4,
   },
@@ -924,9 +1140,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   submitEditBtn: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
+    // Sits in normal flow below the bio input (instead of floating over its
+    // bottom border) so it reads as the final step under the line.
+    alignSelf: 'flex-end',
+    marginTop: 12,
     backgroundColor: 'lightgreen',
     borderWidth: 1,
     borderColor: '#000',
@@ -1002,13 +1219,25 @@ const styles = StyleSheet.create({
   mediaBar: {
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    // The artist statement leaves ~20px of padding above the bar but there were
+    // only 8px below the tabs, so the block sat low. Pull the bar up and grow
+    // the bottom padding by the same amount: the tabs rise to sit evenly between
+    // the statement and the border line, while the line itself stays put.
+    marginTop: -10,
+    paddingTop: 8,
+    paddingBottom: 18,
+    // Match the userDetails horizontal inset (20) so the media tabs align
+    // with the artist-statement card above them.
+    paddingHorizontal: 20,
   },
   mediaTabs: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    // space-between pushes each pair to both edges of the row so the right
+    // tab reaches the right inset instead of leaving an ~8pt gap. The
+    // configured rowGap still separates the two rows vertically.
+    justifyContent: 'space-between',
+    rowGap: 6,
     width: '100%',
   },
   mediaTab: {
@@ -1082,22 +1311,29 @@ const styles = StyleSheet.create({
   // Art Section
   artSection: {
     padding: 16,
+    paddingBottom: 56,
+    backgroundColor: Colors.mainBg,
+    // flex:1 (paired with contentContainer's flexGrow:1) lets this view
+    // stretch to fill any leftover vertical space — keeps the page bg
+    // consistent down to the tab bar even with few pieces.
+    flex: 1,
   },
   addBtn: {
-    width: 25,
-    height: 25,
-    borderRadius: 9999,
+    // Full-width bordered button — beige (matches the bottom nav bar) so
+    // the add-art affordance reads as a utility chrome row, not content.
+    height: 28,
     backgroundColor: Colors.secondary,
     borderWidth: 1,
     borderColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    alignSelf: 'flex-end',
+    marginBottom: 16,
   },
   addBtnText: {
-    fontSize: FontSizes.sm,
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
     fontWeight: '600',
+    lineHeight: 18,
   },
   emptyText: {
     fontFamily: Fonts.serif,
@@ -1108,10 +1344,11 @@ const styles = StyleSheet.create({
 
   // Art element
   artElement: {
-    marginBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-    paddingBottom: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    padding: 12,
+    backgroundColor: '#fff',
   },
   artVisual: {
     width: '100%',
@@ -1131,6 +1368,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  pendingWrittenTile: {
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    padding: 16,
+    opacity: 0.7,
+  },
   refreshSpinnerOverlay: {
     position: 'absolute',
     top: 8,
@@ -1144,8 +1389,29 @@ const styles = StyleSheet.create({
   },
   artTitle: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.xxl,
+    // ~2/3 of the original xxl (36 → 24) — still reads as a title but
+    // less dominant than the artwork.
+    fontSize: FontSizes.lg,
+  },
+  titleRow: {
+    // Title left, date badge pinned to the right edge via marginLeft:'auto'
+    // on the badge itself.
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 6,
+  },
+  dateBadge: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginLeft: 'auto',
+  },
+  dateBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
+    color: Colors.textPrimary,
   },
   artDetailRow: {
     flexDirection: 'row',
@@ -1167,6 +1433,9 @@ const styles = StyleSheet.create({
   artButtons: {
     flexDirection: 'row',
     gap: 8,
+    // Span the full art-element width so the middle (comments) button's
+    // flex:1 has somewhere to grow into.
+    alignSelf: 'stretch',
   },
   artBtn: {
     borderWidth: 1,
@@ -1179,12 +1448,24 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
   },
   editBtn: {
-    backgroundColor: Colors.greenBright,
+    // Same neutral cream as the comments button — no candy colors competing
+    // with the artwork itself.
+    backgroundColor: Colors.secondary,
   },
   commentsBtn: {
     backgroundColor: Colors.secondary,
   },
+  commentsBtnFull: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  commentsBtnStretch: {
+    // Inside the owner button row: flex:1 absorbs whatever width remove +
+    // edit don't, centering the label between them.
+    flex: 1,
+    alignItems: 'center',
+  },
   removeBtn: {
-    backgroundColor: Colors.redLight,
+    backgroundColor: Colors.secondary,
   },
 });

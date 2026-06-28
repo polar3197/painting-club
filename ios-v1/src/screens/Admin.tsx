@@ -41,8 +41,8 @@ function ApplicationRow({
         title="u sure?"
         confirmLabel="yes"
         cancelLabel="no. shit. stop"
-        confirmColor={Colors.greenBright}
-        cancelColor={Colors.redLight}
+        confirmColor={Colors.redLight}
+        cancelColor={Colors.greenBright}
         confirmTextColor={Colors.black}
         cancelTextColor={Colors.black}
         onConfirm={() => {
@@ -185,6 +185,12 @@ function MediaRequestRow({
               onPress={() => onResolve(req.id, 'approved', 'written_word', finalName())}
             >
               <Text style={styles.actionBtnText}>written_word</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
+              onPress={() => onResolve(req.id, 'approved', 'audio', finalName())}
+            >
+              <Text style={styles.actionBtnText}>audio</Text>
             </Pressable>
           </View>
         )}
@@ -501,6 +507,7 @@ const styles = StyleSheet.create({
   },
   actionBtns: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
   },
   actionBtn: {
