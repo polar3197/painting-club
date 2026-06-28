@@ -10,6 +10,7 @@ import { UploadProvider } from './src/context/UploadContext';
 import { Colors } from './src/constants/theme';
 import { setAuthExpiredHandler } from './src/api/client';
 import RootNavigator from './src/navigation';
+import UpdateBanner from './src/components/UpdateBanner';
 
 const navTheme = {
   ...DefaultTheme,
@@ -59,6 +60,7 @@ export default function App() {
             <NavigationContainer theme={navTheme} ref={navigationRef}>
               <AuthExpiryBridge />
               <RootNavigator />
+              <UpdateBanner />
               <StatusBar style="dark" />
             </NavigationContainer>
           </UploadProvider>
