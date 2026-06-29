@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Image, Pressable, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue,
@@ -235,15 +234,7 @@ export default function Home() {
   }, [token]);
 
   return (
-    <LinearGradient
-      // High-key, washed-out lime: near-white in the top-right fading into a
-      // soft yellow-green toward the bottom-left.
-      colors={['#ffffff', '#f4fbd4', '#dff198', '#cdec6e']}
-      locations={[0, 0.45, 0.78, 1]}
-      start={{ x: 1, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={styles.gradient}
-    >
+    <View style={[styles.gradient, styles.homeBg]}>
     {/* Fixed (non-scrollable) so vertical flicks spin the diamond instead of
         being captured by a scroll view. */}
     <View style={[styles.container, styles.content, { paddingTop: insets.top + 20 }]}>
@@ -290,13 +281,21 @@ export default function Home() {
       )}
 
     </View>
-    </LinearGradient>
+
+    {/* Pinned to the bottom-left corner of the screen. */}
+    <Pressable style={styles.aboutBtn} onPress={() => navigation.navigate('About')}>
+      <Text style={styles.aboutBtnText}>about the app</Text>
+    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
+  },
+  homeBg: {
+    backgroundColor: 'rgb(216, 237, 138)',
   },
   homeTitle: {
     fontFamily: 'CourierNewPS-BoldMT',
@@ -305,6 +304,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
+  aboutBtn: {
+    position: 'absolute',
+    left: 20,
+    bottom: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  aboutBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+
   diamondsWrap: {
     // Fill the space below the title and center the chain vertically so the
     // zigzag sits evenly in the available height rather than bunching at top.

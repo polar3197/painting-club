@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -46,6 +47,7 @@ import WrittenFormPiece from '../components/WrittenFormPiece';
 import AudioPiece from '../components/AudioPiece';
 import SeriesRow from '../components/SeriesRow';
 import AddMediaDialog from '../components/AddMediaDialog';
+import ShareMediaDialog from '../components/ShareMediaDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Spinner from '../components/Spinner';
 import { useUploads } from '../context/UploadContext';
@@ -309,6 +311,7 @@ export default function UserProfile() {
   const [editingWritten, setEditingWritten] = useState<WrittenFormOut | null>(null);
   const [editingAudio, setEditingAudio] = useState<AudioOut | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
   // Index into filteredArt of the piece shown in the zoom viewer (null = closed).
   // Held here (not per-tile) so the viewer can swipe across the whole gallery.
@@ -410,6 +413,17 @@ export default function UserProfile() {
     });
     return unsubscribe;
   }, [navigation, isFocused]);
+
+  // Refresh the profile whenever this screen regains focus — e.g. after sharing
+  // a piece (possibly to a previously-hidden medium), so its now-unhidden state
+  // is reflected here instead of showing a stale local copy. refetchProfile
+  // updates in the background (no loading flash).
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refetchProfile();
+    });
+    return unsubscribe;
+  }, [navigation, refetchProfile]);
 
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
   useEffect(() => {
@@ -636,15 +650,9 @@ export default function UserProfile() {
           initialIndex={zoomIndex}
           isOwner={profile.is_owner}
           creatorUsername={profile.username}
-          onClose={(lastIndex) => {
-            // Land the profile on whatever piece was on screen in the viewer.
-            // Every tile is laid out (ScrollView mounts them all), so its y is
-            // already cached; scroll instantly so it's there as the viewer fades.
-            const piece = filteredArt[lastIndex];
-            const y = piece ? artPositions.current[piece.id] : undefined;
-            if (y != null) scrollRef.current?.scrollTo({ y, animated: false });
-            setZoomIndex(null);
-          }}
+          // Just close — leave the profile scrolled where the user was when they
+          // opened the viewer (no jump to the last-viewed piece).
+          onClose={() => setZoomIndex(null)}
         />
       )}
 
@@ -701,6 +709,12 @@ export default function UserProfile() {
           onClose={() => setShowAddMedia(false)}
         />
       )}
+      <ShareMediaDialog
+        visible={showShareDialog}
+        username={username}
+        media={profile.media ?? []}
+        onClose={() => setShowShareDialog(false)}
+      />
 
       {/* ---- UserDetails ---- */}
       <View style={styles.userDetails}>
@@ -721,19 +735,33 @@ export default function UserProfile() {
                       {[profile.city, profile.state].filter(Boolean).join(', ')}
                     </Text>
                   )}
-                  {selectedMedium && (
-                    <Pressable
-                      style={styles.portfolioLink}
-                      onPress={() =>
-                        navigation.navigate('Portfolio', {
-                          username,
-                          medium: selectedMedium,
-                          keywords: selectedKeywords,
-                        })
-                      }
-                    >
-                      <Text style={styles.portfolioLinkText}>portfolio view</Text>
-                    </Pressable>
+                  {profile.is_owner && (
+                    <View style={styles.ownerActions}>
+                      <Pressable
+                        style={styles.ownerActionBtn}
+                        onPress={() => navigation.navigate('Settings')}
+                      >
+                        <Ionicons name="settings-outline" size={22} color={Colors.black} />
+                      </Pressable>
+                      <Pressable
+                        style={styles.ownerActionBtn}
+                        onPress={startEditing}
+                      >
+                        <Ionicons name="pencil-outline" size={22} color={Colors.black} />
+                      </Pressable>
+                      <Pressable
+                        style={styles.ownerActionBtn}
+                        onPress={() => navigation.navigate('Messages')}
+                      >
+                        <Ionicons name="mail-outline" size={22} color={Colors.black} />
+                      </Pressable>
+                      <Pressable
+                        style={styles.ownerActionBtn}
+                        onPress={() => setShowShareDialog(true)}
+                      >
+                        <Ionicons name="paper-plane-outline" size={22} color={Colors.black} />
+                      </Pressable>
+                    </View>
                   )}
                 </View>
                 {profile.profile_pic_path ? (
@@ -792,15 +820,6 @@ export default function UserProfile() {
                     <Text style={styles.bioLabel}>Artist Statement</Text>
                     <View style={styles.bioHr} />
                     {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
-                    {/* Edit chip lives INSIDE the bio page so it slides off
-                        with the rest of the artist statement when the user
-                        swipes to the comments page. Owner-only, hidden while
-                        editing. */}
-                    {profile.is_owner && !editing && (
-                      <Pressable style={styles.editChip} onPress={startEditing}>
-                        <Text style={styles.editChipText}>edit</Text>
-                      </Pressable>
-                    )}
                   </View>
                   {profile.is_owner && bioPageWidth > 0 && (
                     <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, padding: 0 }]}>
@@ -1154,36 +1173,20 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
   },
-  portfolioLink: {
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
+  ownerActions: {
+    flexDirection: 'row',
+    gap: 8,
     marginTop: 6,
+    alignSelf: 'flex-start',
   },
-  portfolioLinkText: {
-    fontSize: FontSizes.xxs,
-  },
-  editChip: {
-    // Small square button that replaces the old "tap-anywhere on userFields"
-    // edit gesture. No background — just a bordered chip with the •-• mark.
-    // Floats top-right inside the bio/comments carousel so it sits on the
-    // same horizontal as the "Artist Statement" header.
-    position: 'absolute',
-    top: 6,
-    right: 8,
-    zIndex: 10,
+  ownerActionBtn: {
+    width: 38,
+    height: 38,
     borderWidth: 1,
     borderColor: '#000',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: 'transparent',
-  },
-  editChipText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xxs,
-    color: Colors.black,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   userTopRow: {
     flexDirection: 'row',

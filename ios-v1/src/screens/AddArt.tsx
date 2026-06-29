@@ -23,6 +23,7 @@ import { useProfile } from '../hooks';
 import {
   get_media,
   add_member_media,
+  set_media_visibility,
   MediaType,
   Visual2DIn,
   WrittenFormIn,
@@ -35,7 +36,7 @@ import AddMediaDialog from '../components/AddMediaDialog';
 import SegmentedProgress from '../components/SegmentedProgress';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
-const STEPS = ['medium', 'details', 'publish'];
+const STEPS = ['medium', 'details', 'share'];
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_GAP = 12;
@@ -164,8 +165,16 @@ export default function AddArt() {
   const handleAddMedia = useCallback(async (name: string) => {
     if (!profile || !currentUser) return;
     try {
+      // The picker can now surface media the user has *hidden* — selecting one
+      // un-hides it so the piece they're about to add will actually show.
+      const wasHidden = (profile.hidden_media ?? []).includes(name);
       await add_member_media(currentUser, name, token);
-      setProfile({ ...profile, media: [...(profile.media ?? []), name] });
+      if (wasHidden) await set_media_visibility(name, false, token);
+      setProfile({
+        ...profile,
+        media: [...(profile.media ?? []).filter((x) => x !== name), name],
+        hidden_media: (profile.hidden_media ?? []).filter((x) => x !== name),
+      });
       chooseMedium(name);
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'failed to add media');
@@ -207,6 +216,18 @@ export default function AddArt() {
       if (!myMedia.includes(selectedMedium)) {
         await add_member_media(currentUser, selectedMedium, token);
       }
+      // Always make sure the medium is visible — sharing to a hidden medium
+      // un-hides it so the piece actually appears (no-op if already shown).
+      await set_media_visibility(selectedMedium, false, token);
+      setProfile((p) =>
+        p
+          ? {
+              ...p,
+              media: [...(p.media ?? []).filter((x) => x !== selectedMedium), selectedMedium],
+              hidden_media: (p.hidden_media ?? []).filter((x) => x !== selectedMedium),
+            }
+          : p,
+      );
 
       if (isVisual) {
         if (!pickedFile) { Alert.alert('Missing', 'Please select an image.'); setPosting(false); return; }
@@ -258,7 +279,7 @@ export default function AddArt() {
       Alert.alert('Error', err?.message || 'Something went wrong');
       setPosting(false);
     }
-  }, [selectedMedium, currentUser, formData, myMedia, token, isVisual, isWritten, isAudio, pickedFile, pastedText, writeMode, startUpload, startWrittenUpload, startAudioUpload, goToDestination]);
+  }, [selectedMedium, currentUser, formData, myMedia, token, isVisual, isWritten, isAudio, pickedFile, pastedText, writeMode, startUpload, startWrittenUpload, startAudioUpload, goToDestination, profile, setProfile]);
 
   if (!currentUser) {
     return (
@@ -279,18 +300,18 @@ export default function AddArt() {
       {/* --- Step content: a horizontal row that slides between stages --- */}
       <View style={styles.pagerViewport}>
         <Animated.View style={[styles.pagerRow, { transform: [{ translateX: slideX }] }]}>
-          {/* Stage 1 — medium: a full-width "new" button + the user's own forms
-              as a 2-per-row grid of squares. */}
+          {/* Stage 1 — medium: a top-aligned 2-per-row grid of square tiles,
+              ending with a "new" + square that opens the media picker. */}
           <View style={styles.mediumPage}>
-            <Pressable style={styles.newMediaBtn} onPress={() => setShowAddMedia(true)}>
-              <Text style={styles.newMediaBtnText}>new</Text>
-            </Pressable>
             <ScrollView style={styles.gridScroll} contentContainerStyle={styles.squareGrid} showsVerticalScrollIndicator={false}>
               {myMedia.map((m) => (
                 <Pressable key={m} style={styles.gridSquare} onPress={() => chooseMedium(m)}>
                   <Text style={styles.mediumSquareText} numberOfLines={3}>{m}</Text>
                 </Pressable>
               ))}
+              <Pressable style={[styles.gridSquare, styles.newSquare]} onPress={() => setShowAddMedia(true)}>
+                <Text style={styles.newSquarePlus}>+</Text>
+              </Pressable>
             </ScrollView>
           </View>
 
@@ -332,7 +353,7 @@ export default function AddArt() {
             {isAudio && <AudioForm onDataChange={setFormData} />}
           </ScrollView>
 
-          {/* Stage 3 — publish */}
+          {/* Stage 3 — share */}
           <ScrollView style={styles.page} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
             {isVisual && pickedFile && (
               <Image source={{ uri: pickedFile.uri }} style={styles.reviewImage} contentFit="cover" />
@@ -351,14 +372,6 @@ export default function AddArt() {
                 <Text style={styles.reviewValue}>{formData.series}</Text>
               </View>
             ) : null}
-
-            <Pressable
-              style={[styles.postBtn, posting && styles.postBtnDisabled]}
-              onPress={submit}
-              disabled={posting}
-            >
-              <Text style={styles.postBtnText}>{posting ? 'publishing…' : 'publish'}</Text>
-            </Pressable>
           </ScrollView>
         </Animated.View>
       </View>
@@ -383,6 +396,15 @@ export default function AddArt() {
               disabled={!detailsReady}
             >
               <Text style={styles.navBtnText}>next</Text>
+            </Pressable>
+          )}
+          {step === 2 && (
+            <Pressable
+              style={[styles.navBtn, styles.navBtnShare, posting && styles.navBtnDisabled]}
+              onPress={submit}
+              disabled={posting}
+            >
+              <Text style={styles.navBtnText}>{posting ? 'sharing…' : 'share'}</Text>
             </Pressable>
           )}
         </View>
@@ -424,7 +446,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     // Explicit total width so the later pages aren't cross-stretched out of
-    // bounds (which left the details/publish stages blank).
+    // bounds (which left the details/share stages blank).
     width: SCREEN_WIDTH * 3,
   },
   page: {
@@ -436,17 +458,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 12,
   },
-  newMediaBtn: {
-    borderWidth: 1,
-    borderColor: '#000',
+  newSquare: {
+    // Same square as the media tiles, distinguished by the cream fill + big +.
     backgroundColor: Colors.secondary,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 16,
   },
-  newMediaBtnText: {
+  newSquarePlus: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.md,
+    fontSize: 48,
+    lineHeight: 52,
+    color: Colors.textPrimary,
   },
   gridScroll: {
     flex: 1,
@@ -455,9 +475,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    // Bottom-align the wrapped rows of squares when there's room above.
-    alignContent: 'flex-end',
+    // Top-align the wrapped rows of squares.
+    alignContent: 'flex-start',
     gap: GRID_GAP,
+    paddingTop: 4,
     paddingBottom: 12,
   },
   gridSquare: {
@@ -534,20 +555,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginLeft: 12,
   },
-  postBtn: {
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: '#000',
+  navBtnShare: {
     backgroundColor: Colors.greenBright,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  postBtnDisabled: {
-    opacity: 0.5,
-  },
-  postBtnText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.md,
   },
   footer: {
     paddingHorizontal: 20,

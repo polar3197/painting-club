@@ -25,7 +25,8 @@ import Animated, {
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
-import { resolveImageUrl, block_user, unblock_user, Visual2DOut } from '../api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { resolveImageUrl, block_user, unblock_user } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
@@ -36,15 +37,28 @@ import { Colors, Fonts } from '../constants/theme';
 // more margin; the page stays full-width so paging snap is unaffected.
 const IMAGE_H_PAD = 18;
 
+// Vertical bands reserved (below the safe-area insets) for the caption boxes so
+// the image never reaches into them. The image is contained in the space left
+// between these bands.
+const TITLE_BAND = 80;
+const NAME_BAND = 56;
+
 interface ArtCarouselProps {
-  pieces: Visual2DOut[];
+  // Minimal shape so both profile pieces (Visual2DOut) and prompt submissions
+  // (ArtResult) can be passed.
+  pieces: { id: string; file_path: string }[];
   initialIndex: number;
   isOwner: boolean;
   // Username of the profile these pieces belong to (used for block/unblock).
+  // When the pieces have mixed creators (e.g. a prompt gallery), pass `captions`
+  // instead — block/report then targets the current piece's creator.
   creatorUsername: string;
-  // Receives the index of the piece on screen when the viewer is dismissed, so
-  // the profile can scroll to land on whatever you were last looking at.
-  onClose: (lastIndex: number) => void;
+  onClose: () => void;
+  // Optional per-piece caption: title shown above the image, creator below.
+  // aspectRatio (w/h) lets the boxes hug the contain-fitted image's edges.
+  captions?: { title: string; creator: string; aspectRatio?: number }[];
+  // Hide the report/block kebab (e.g. the prompt gallery).
+  hideKebab?: boolean;
 }
 
 /**
@@ -55,8 +69,9 @@ interface ArtCarouselProps {
  * panning a zoomed image stays inside that page. While any page is zoomed we
  * disable the outer paging so a pan moves the image instead of changing pages.
  */
-export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUsername, onClose }: ArtCarouselProps) {
+export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUsername, onClose, captions, hideKebab }: ArtCarouselProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { token, currentUser, blockedUsernames, noteBlocked, noteUnblocked } = useAuth();
 
   const outerRef = useRef<ScrollView>(null);
@@ -72,18 +87,24 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
   // The viewer is opened from someone's profile; reporting/blocking only makes
   // sense when it isn't yours and you're signed in.
   const canReport = !isOwner && !!currentUser && !!current;
-  const blockUsername = !isOwner ? creatorUsername : undefined;
+  const blockUsername = !isOwner ? (captions?.[index]?.creator ?? creatorUsername) : undefined;
+  const caption = captions?.[index];
+
+  // Reserve fixed top/bottom bands for the caption boxes so the image is
+  // contained in the middle region and the boxes never overlap it — whatever
+  // the aspect ratio. Bands are only reserved when captions are shown.
+  const imgTopInset = caption ? insets.top + TITLE_BAND : 0;
+  const imgBottomInset = caption ? insets.bottom + NAME_BAND : 0;
   const canBlock = !!blockUsername && !!currentUser;
   const isBlocked = blockUsername ? blockedUsernames.includes(blockUsername) : false;
-  const showKebab = canReport || canBlock;
+  const showKebab = (canReport || canBlock) && !hideKebab;
 
   const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / screenW);
     if (i !== index && i >= 0 && i < pieces.length) setIndex(i);
   };
 
-  // Close, handing back the piece currently on screen so the caller can sync.
-  const dismiss = () => onClose(index);
+  const dismiss = onClose;
 
   // Pull-down-to-dismiss. The vertical pan yields to horizontal paging
   // (failOffsetX) and is disabled while a page is zoomed so the zoom ScrollView
@@ -175,6 +196,8 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
                   uri={resolveImageUrl(p.file_path)}
                   width={screenW}
                   height={screenH}
+                  topInset={imgTopInset}
+                  bottomInset={imgBottomInset}
                   active={i === index}
                   onZoomChange={setZoomed}
                 />
@@ -191,6 +214,17 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
               >
                 <Text style={styles.kebabText}>⋮</Text>
               </Pressable>
+            )}
+
+            {caption && !zoomed && (
+              <>
+                <View style={[styles.captionTop, { top: insets.top + 8 }]} pointerEvents="none">
+                  <Text style={styles.captionTitle} numberOfLines={2}>{caption.title}</Text>
+                </View>
+                <View style={[styles.captionBox, { bottom: insets.bottom + 8 }]} pointerEvents="none">
+                  <Text style={styles.captionCreator} numberOfLines={1}>{caption.creator}</Text>
+                </View>
+              </>
             )}
           </Animated.View>
         </GestureDetector>
@@ -275,12 +309,16 @@ function ZoomablePage({
   uri,
   width,
   height,
+  topInset = 0,
+  bottomInset = 0,
   active,
   onZoomChange,
 }: {
   uri: string;
   width: number;
   height: number;
+  topInset?: number;
+  bottomInset?: number;
   active: boolean;
   onZoomChange: (zoomed: boolean) => void;
 }) {
@@ -300,7 +338,7 @@ function ZoomablePage({
     <ScrollView
       ref={ref}
       style={{ width, height }}
-      contentContainerStyle={styles.pageContent}
+      contentContainerStyle={[styles.pageContent, { paddingTop: topInset, paddingBottom: bottomInset }]}
       minimumZoomScale={1}
       maximumZoomScale={4}
       bouncesZoom
@@ -325,8 +363,9 @@ function ZoomablePage({
         source={{ uri }}
         // Inset from the screen edges so wide pieces don't run full-bleed.
         // contentFit="contain" keeps every piece's own proportions; the page
-        // itself stays screen-width so paging still snaps cleanly.
-        style={{ width: width - IMAGE_H_PAD * 2, height }}
+        // itself stays screen-width so paging still snaps cleanly. Height is the
+        // screen minus the reserved caption bands so the image never overlaps them.
+        style={{ width: width - IMAGE_H_PAD * 2, height: height - topInset - bottomInset }}
         contentFit="contain"
       />
     </ScrollView>
@@ -368,5 +407,39 @@ const styles = StyleSheet.create({
   popupText: {
     fontFamily: Fonts.serif,
     fontSize: 15,
+  },
+  captionTop: {
+    // Full width above the image (matches the image's side inset).
+    position: 'absolute',
+    left: IMAGE_H_PAD,
+    right: IMAGE_H_PAD,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  captionBox: {
+    // Creator pinned to the bottom-right, below the image.
+    position: 'absolute',
+    right: IMAGE_H_PAD,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  captionTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.black,
+  },
+  captionCreator: {
+    fontFamily: Fonts.serif,
+    fontSize: 13,
+    color: Colors.textSecondary,
   },
 });

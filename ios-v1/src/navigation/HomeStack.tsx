@@ -2,6 +2,10 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Home from '../screens/Home';
 import WeeklyPromptDetail from '../screens/WeeklyPromptDetail';
+import About from '../screens/About';
+import AboutSection from '../screens/AboutSection';
+import AboutPost from '../screens/AboutPost';
+import ComingSoon from '../screens/ComingSoon';
 import type { HomeStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -17,6 +21,10 @@ export default function HomeStack() {
       }}
     >
       <Stack.Screen name="HomeFeed" component={Home} />
+      <Stack.Screen name="About" component={About} />
+      <Stack.Screen name="AboutSection" component={AboutSection} />
+      <Stack.Screen name="AboutPost" component={AboutPost} />
+      <Stack.Screen name="ComingSoon" component={ComingSoon} />
       <Stack.Screen
         name="WeeklyPromptDetail"
         component={WeeklyPromptDetail}

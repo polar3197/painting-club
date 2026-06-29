@@ -1,14 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   Pressable,
-  ScrollView,
   StyleSheet,
   ActivityIndicator,
   Alert,
   Modal,
   FlatList,
+  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -24,223 +24,28 @@ import {
   thumbUrl,
   PromptDetailOut,
   PromptSummary,
-  ArtResult,
   Visual2DIn,
   Visual2DOut,
 } from '../api';
 import AddArtDialog from '../components/AddArtDialog';
-import ArtZoomIn from '../components/ArtZoomIn';
-import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
+import ArtCarousel from '../components/ArtCarousel';
+import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { HomeStackParamList } from '../navigation/types';
 
 type RouteT = RouteProp<HomeStackParamList, 'WeeklyPromptDetail'>;
 type NavT = NativeStackNavigationProp<HomeStackParamList, 'WeeklyPromptDetail'>;
 
-// --- Salon wall ------------------------------------------------------------
-// A horizontally-scrollable gallery wall. The newest submission hangs dead
-// center; older pieces fan out symmetrically to either side and trail off the
-// visible edges, revealed by swiping. Pieces keep their true aspect ratio and
-// are kept small enough (~under half the wall) that columns hold either one
-// piece or two stacked vertically — so the wall fills both axes — with each
-// column staggered for a hung-by-hand look.
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GRID_GAP = 8;
+const H_PAD = 16;
+const GRID_BOX_PAD = 8;
+// Width available for cells inside the bordered grid box (body padding + box
+// border + box padding).
+const GRID_INNER_W = SCREEN_WIDTH - H_PAD * 2 - 2 - GRID_BOX_PAD * 2;
 
-const GAP = 18; // horizontal spacing between columns
-const GAP_V = 14; // vertical spacing between two pieces stacked in one column
-const EDGE = 40; // brown wall extends this far past the outermost columns
-const FRAME = 11; // gold frame thickness around the image
-const RIM = 1.5; // thin black rim around the outside of the frame
-const PAD = FRAME + RIM;
-
-// Deterministic per-piece pseudo-randomness, keyed off the submission id so a
-// piece always hangs the same way across renders (no jitter on refresh).
-function hashStr(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-function unit(id: string, salt: string): number {
-  return hashStr(id + salt) / 4294967296; // [0, 1)
-}
-
-interface HungPiece {
-  art: ArtResult;
-  imgW: number;
-  imgH: number;
-  frameW: number;
-  frameH: number;
-}
-
-interface Column {
-  pieces: HungPiece[];
-  width: number;
-  offsetTop: number;
-}
-
-// Size one piece to a target image height, preserving its true aspect ratio and
-// clamping very wide pieces so they don't blow out the column width.
-function sizePiece(art: ArtResult, targetH: number, maxW: number): HungPiece {
-  const ar = art.aspect_ratio && art.aspect_ratio > 0 ? art.aspect_ratio : 1;
-  let imgH = targetH;
-  let imgW = imgH * ar;
-  if (imgW > maxW) {
-    const s = maxW / imgW;
-    imgW = maxW;
-    imgH = imgH * s;
-  }
-  return { art, imgW, imgH, frameW: imgW + PAD * 2, frameH: imgH + PAD * 2 };
-}
-
-// Assemble a column from 1–2 pieces and pick its vertical offset. A single
-// piece staggers freely across the full vertical slack; a stacked pair sits
-// nearer the middle so the two read as a unit.
-function makeColumn(pieces: HungPiece[], availH: number, seedId: string): Column {
-  const width = Math.max(...pieces.map((p) => p.frameW));
-  const totalH =
-    pieces.reduce((s, p) => s + p.frameH, 0) + GAP_V * (pieces.length - 1);
-  const slack = Math.max(0, availH - totalH);
-  const frac =
-    pieces.length > 1
-      ? 0.3 + unit(seedId, 'v') * 0.4
-      : 0.1 + unit(seedId, 'v') * 0.8;
-  return { pieces, width, offsetTop: slack * frac };
-}
-
-// Build the wall as columns. The newest submission is its own centered column;
-// older pieces fan outward symmetrically (L/R/L/R…) and get packed into columns
-// of one or two stacked pieces (deterministic by id, ~half stacked) so the wall
-// distributes vertically as well as horizontally.
-function buildColumns(
-  items: ArtResult[],
-  availW: number,
-  availH: number,
-): { columns: Column[]; centerIdx: number } {
-  const singleH = Math.min(availH * 0.4, availH - PAD * 2 - 8);
-  // Two stacked pieces + the gap fill ~84% of the wall, so each reads as
-  // clearly smaller than a single hung piece while the pair still uses the
-  // vertical space.
-  const stackH = Math.max(40, (availH * 0.84 - GAP_V) / 2 - PAD * 2);
-  const maxW = availW * 0.55;
-
-  // Pack the older pieces (everything but the centered newest) into columns of
-  // one or two from the FULL sequence — pairing draws from the whole pool, so
-  // stacks actually form even with a modest number of submissions. Then the
-  // finished columns get distributed outward, alternating L/R around center.
-  const rest = items.slice(1);
-  const packed: Column[] = [];
-  let i = 0;
-  while (i < rest.length) {
-    const a = rest[i];
-    const next = rest[i + 1];
-    // Stack consecutive pairs by default so two pieces share a vertical line;
-    // only leave a single occasionally (~1 in 4, deterministic by id) for
-    // variety, plus whenever there's an odd piece left over with no partner.
-    const leaveSingle = hashStr(a.id) % 4 === 0;
-    if (next != null && !leaveSingle) {
-      packed.push(
-        makeColumn([sizePiece(a, stackH, maxW), sizePiece(next, stackH, maxW)], availH, a.id),
-      );
-      i += 2;
-    } else {
-      const h = singleH * (0.9 + unit(a.id, 'h') * 0.18);
-      packed.push(makeColumn([sizePiece(a, h, maxW)], availH, a.id));
-      i += 1;
-    }
-  }
-
-  const rightCols: Column[] = [];
-  const leftCols: Column[] = [];
-  packed.forEach((c, idx) => (idx % 2 === 0 ? rightCols : leftCols).push(c));
-
-  const centerCol = makeColumn([sizePiece(items[0], singleH, maxW)], availH, items[0].id);
-  return {
-    columns: [...leftCols.reverse(), centerCol, ...rightCols],
-    centerIdx: leftCols.length,
-  };
-}
-
-function SalonWall({ submissions, onPress }: { submissions: ArtResult[]; onPress: (a: ArtResult) => void }) {
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const scrollRef = useRef<ScrollView>(null);
-
-  const layout = useMemo(() => {
-    const { w: availW, h: availH } = size;
-    if (availW === 0 || availH === 0 || submissions.length === 0) return null;
-
-    const { columns, centerIdx } = buildColumns(submissions, availW, availH);
-
-    // Horizontal offset that puts the center column in the middle of the box.
-    // Leading padding is EDGE, so x starts there; when the wall overflows the
-    // box the center column scrolls to the middle, and when it fits the whole
-    // cluster is centered by the contentContainer instead.
-    let x = EDGE;
-    for (let i = 0; i < centerIdx; i++) x += columns[i].width + GAP;
-    const scrollX = Math.max(0, x + columns[centerIdx].width / 2 - availW / 2);
-
-    return { columns, scrollX };
-  }, [size, submissions]);
-
-  // contentOffset handles the initial position; this catches re-layouts (e.g.
-  // a new piece arriving after submit shifts the center).
-  useEffect(() => {
-    if (layout && scrollRef.current) {
-      scrollRef.current.scrollTo({ x: layout.scrollX, animated: false });
-    }
-  }, [layout]);
-
-  return (
-    <View
-      style={styles.wall}
-      onLayout={(e) =>
-        setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
-      }
-    >
-      {layout && (
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: layout.scrollX, y: 0 }}
-          contentContainerStyle={{ paddingHorizontal: EDGE, flexGrow: 1, justifyContent: 'center' }}
-        >
-          {layout.columns.map((col, ci) => (
-            <View
-              key={col.pieces[0].art.id}
-              style={{
-                width: col.width,
-                height: size.h,
-                marginRight: ci < layout.columns.length - 1 ? GAP : 0,
-              }}
-            >
-              <View style={{ marginTop: col.offsetTop, alignItems: 'center', gap: GAP_V }}>
-                {col.pieces.map((p) => (
-                  <Pressable
-                    key={p.art.id}
-                    onPress={() => onPress(p.art)}
-                    style={({ pressed }) => [
-                      styles.frame,
-                      { width: p.frameW, height: p.frameH },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Image
-                      source={{ uri: resolveImageUrl(p.art.file_path) }}
-                      placeholder={{ uri: thumbUrl(p.art.id) }}
-                      transition={200}
-                      style={{ width: p.imgW, height: p.imgH }}
-                      contentFit="cover"
-                    />
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-    </View>
-  );
+// Columns grow ~square with the submission count: ceil(sqrt(n)), clamped 1..5.
+function columnsFor(n: number): number {
+  return Math.min(5, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n)))));
 }
 
 export default function WeeklyPromptDetail() {
@@ -255,10 +60,9 @@ export default function WeeklyPromptDetail() {
   const [showDialog, setShowDialog] = useState(false);
   const [showPromptList, setShowPromptList] = useState(false);
   const [allPrompts, setAllPrompts] = useState<PromptSummary[]>([]);
-  const [zoomed, setZoomed] = useState<ArtResult | null>(null);
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
   // When the viewer has already submitted, eagerly fetch their Visual2DOut so
-  // tapping "edit your submission" opens the dialog pre-populated with the
-  // existing piece (AddArtDialog requires the full Visual2DOut to enter edit mode).
+  // tapping "edit your submission" opens the dialog pre-populated.
   const [viewerPiece, setViewerPiece] = useState<Visual2DOut | null>(null);
 
   const refresh = useCallback(() => {
@@ -270,8 +74,6 @@ export default function WeeklyPromptDetail() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Fetch the viewer's own piece (if they've submitted) so the edit flow is ready
-  // to open instantly on tap.
   useEffect(() => {
     if (!prompt?.viewer_submission_id || !currentUser) {
       setViewerPiece(null);
@@ -288,13 +90,10 @@ export default function WeeklyPromptDetail() {
     return () => { cancelled = true; };
   }, [prompt?.viewer_submission_id, prompt?.media_name, currentUser]);
 
-  // Lazy-load the past-prompts list only when the user taps the title.
   const openPromptList = () => {
     setShowPromptList(true);
     if (allPrompts.length === 0) {
-      list_prompts(token)
-        .then(setAllPrompts)
-        .catch(() => {});
+      list_prompts(token).then(setAllPrompts).catch(() => {});
     }
   };
 
@@ -321,29 +120,53 @@ export default function WeeklyPromptDetail() {
     );
   }
 
+  const submissions = prompt.submissions;
+  const numColumns = columnsFor(submissions.length);
+  const cellSize = (GRID_INNER_W - GRID_GAP * (numColumns - 1)) / numColumns;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.body}>
-        <Pressable
-          style={({ pressed }) => [styles.promptCard, pressed && styles.pressed]}
-          onPress={openPromptList}
-        >
-          <View style={styles.topRow}>
-            <Text style={styles.heading}>{prompt.title}</Text>
-            <View style={styles.mediumBadge}>
-              <Text style={styles.mediumText}>{prompt.media_name}</Text>
-            </View>
-          </View>
-          <View style={styles.summaryWrap}>
-            <Text style={styles.summary}>{prompt.short_summary || ''}</Text>
-          </View>
+        {/* Title + summary occupy the top third. Tap to browse past prompts. */}
+        <Pressable style={styles.header} onPress={openPromptList}>
+          <Text style={styles.heading}>
+            {prompt.title} ({prompt.media_name})
+          </Text>
+          {!!prompt.short_summary && (
+            <Text style={styles.summary}>{prompt.short_summary}</Text>
+          )}
         </Pressable>
 
-        <View style={styles.submissionsBox}>
-          {prompt.submissions.length === 0 ? (
+        {/* Image-only 4-up grid of submissions, inside a bordered box. */}
+        <View style={styles.gridBox}>
+          {submissions.length === 0 ? (
             <Text style={styles.emptyText}>be the first to submit</Text>
           ) : (
-            <SalonWall submissions={prompt.submissions} onPress={setZoomed} />
+            <FlatList
+              // numColumns can't change without a new key, and columnWrapperStyle
+              // is illegal when numColumns === 1.
+              key={numColumns}
+              data={submissions}
+              keyExtractor={(item) => item.id}
+              numColumns={numColumns}
+              columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
+              contentContainerStyle={styles.gridContent}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item, index }) => (
+                <Pressable
+                  style={({ pressed }) => [styles.cell, { width: cellSize, height: cellSize }, pressed && styles.pressed]}
+                  onPress={() => setZoomIndex(index)}
+                >
+                  <Image
+                    source={{ uri: resolveImageUrl(item.file_path) }}
+                    placeholder={{ uri: thumbUrl(item.id) }}
+                    transition={200}
+                    style={styles.cellImage}
+                    contentFit="cover"
+                  />
+                </Pressable>
+              )}
+            />
           )}
         </View>
 
@@ -354,6 +177,13 @@ export default function WeeklyPromptDetail() {
           <Text style={styles.dropFrameText}>
             {prompt.viewer_submission_id ? 'edit your submission' : 'add your art'}
           </Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.proposeBtn, pressed && styles.dropFramePressed]}
+          onPress={() => navigation.navigate('ComingSoon', { title: "propose next week's prompt" })}
+        >
+          <Text style={styles.proposeBtnText}>propose next week's prompt</Text>
         </Pressable>
       </View>
 
@@ -370,18 +200,15 @@ export default function WeeklyPromptDetail() {
         />
       )}
 
-      {zoomed && (
-        <ArtZoomIn
+      {zoomIndex !== null && submissions[zoomIndex] && (
+        <ArtCarousel
+          pieces={submissions}
+          initialIndex={zoomIndex}
           isOwner={false}
-          imgPath={zoomed.file_path}
-          reportArtId={zoomed.id}
-          onClose={() => setZoomed(null)}
-          backContent={
-            <View style={styles.backContent}>
-              <Text style={styles.backTitle}>{zoomed.title}</Text>
-              <Text style={styles.backCreator}>@{zoomed.creator_username}</Text>
-            </View>
-          }
+          creatorUsername=""
+          captions={submissions.map((s) => ({ title: s.title, creator: s.creator_username }))}
+          hideKebab
+          onClose={() => setZoomIndex(null)}
         />
       )}
 
@@ -446,52 +273,67 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    padding: 16,
+    padding: H_PAD,
     gap: 12,
   },
   pressed: {
     opacity: 0.85,
-  },
-  promptCard: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.secondary,
-    padding: 12,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   heading: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.lg,
     fontWeight: '700',
     color: Colors.textPrimary,
-  },
-  summaryWrap: {
-    // Reserve 4 lines of mono text height regardless of content length, so the
-    // layout doesn't jump when prompts have shorter or longer descriptions.
-    minHeight: 18 * 4,
-    paddingVertical: 4,
+    textAlign: 'center',
   },
   summary: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
     lineHeight: 18,
     color: Colors.textPrimary,
+    textAlign: 'center',
+    marginTop: 6,
   },
-  mediumBadge: {
+  header: {
+    // A shorter top band with the title at the top, so the title and the grid
+    // box below both sit higher up the page.
+    flex: 0.6,
+    justifyContent: 'flex-start',
+  },
+  gridBox: {
+    // Lower two-thirds: a bordered box that holds the image grid.
+    flex: 2,
+    minHeight: 0,
     borderWidth: 1,
     borderColor: '#000',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
     backgroundColor: Colors.mainBg,
+    padding: GRID_BOX_PAD,
+    overflow: 'hidden',
   },
-  mediumText: {
+  gridContent: {
+    paddingVertical: 4,
+  },
+  gridRow: {
+    gap: GRID_GAP,
+  },
+  cell: {
+    // Per-row vertical spacing lives here so it works for single-column too
+    // (where there's no columnWrapper). Horizontal gap comes from gridRow.
+    marginBottom: GRID_GAP,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.artCardBg,
+  },
+  cellImage: {
+    width: '100%',
+    height: '100%',
+  },
+  emptyText: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
-    color: Colors.textPrimary,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 30,
   },
   dropFrame: {
     borderWidth: 1,
@@ -509,39 +351,18 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.base,
     color: Colors.textPrimary,
   },
-  submissionsBox: {
-    flex: 1,
-    minHeight: 0,
-    // Break out of the body's 16px horizontal padding so the wall bleeds to
-    // the left/right screen edges. Top/bottom borders stay; side borders drop
-    // since there's no longer an inset edge to draw them against.
-    marginHorizontal: -16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+  proposeBtn: {
+    borderWidth: 1,
     borderColor: '#000',
-    backgroundColor: Colors.mainBg,
-    overflow: 'hidden',
+    backgroundColor: Colors.secondary,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyText: {
+  proposeBtnText: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    paddingVertical: 30,
-  },
-  wall: {
-    flex: 1,
-    // Warm, light gallery-wall brown behind the hung pieces.
-    backgroundColor: 'rgb(150, 117, 94)',
-  },
-  frame: {
-    // Gold frame fill (the padding) with a thin black rim around the outside.
-    // The image butts directly against the inner edge of the gold.
-    borderWidth: RIM,
-    borderColor: '#000',
-    backgroundColor: Colors.primaryGold,
-    padding: FRAME,
-    ...Shadows.card,
+    color: Colors.textPrimary,
   },
   errorText: {
     fontFamily: Fonts.mono,
@@ -549,24 +370,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     textAlign: 'center',
     marginTop: 40,
-  },
-  backContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 8,
-  },
-  backTitle: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xxl,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-  backCreator: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.base,
-    color: Colors.textSecondary,
   },
   modalBackdrop: {
     flex: 1,

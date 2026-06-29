@@ -37,16 +37,16 @@ const ICON_SCALE_MIN = 0.55;
 // weight as the art mark.
 const TABS = [
   {
-    key: 'art',
-    icon: require('../../assets/imgs/art.png'),
-    iconScale: 1,
-    placeholder: 'search art (by city, person, title, medium, ...)',
-  },
-  {
     key: 'people',
     icon: require('../../assets/imgs/profiles.png'),
     iconScale: 1.375,
     placeholder: 'search people (by city, person, title, medium, ...)',
+  },
+  {
+    key: 'art',
+    icon: require('../../assets/imgs/art.png'),
+    iconScale: 1,
+    placeholder: 'search art (by city, person, title, medium, ...)',
   },
 ];
 
@@ -176,14 +176,14 @@ export default function SearchTabs() {
           onMomentumScrollEnd={onMomentumEnd}
         >
           <View style={[styles.page, { height: pageHeight }]}>
-            <ArtGallery
+            <People
               query={query}
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
             />
           </View>
           <View style={[styles.page, { height: pageHeight }]}>
-            <People
+            <ArtGallery
               query={query}
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}

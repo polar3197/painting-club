@@ -1,3 +1,5 @@
+import type { AboutSectionKey } from '../constants/aboutContent';
+
 export type AuthStackParamList = {
   LandingPage: undefined;
   NotMember: undefined;
@@ -11,7 +13,6 @@ export type MainTabParamList = {
   AddTab: undefined;
   Me: undefined;
   Admin: undefined;
-  More: undefined;
 };
 
 // Art + People search now live behind a single tab. The two galleries are
@@ -25,4 +26,8 @@ export type SearchStackParamList = {
 export type HomeStackParamList = {
   HomeFeed: undefined;
   WeeklyPromptDetail: { promptId: string };
+  About: undefined;
+  AboutSection: { section: AboutSectionKey };
+  AboutPost: { section: AboutSectionKey; postIndex: number };
+  ComingSoon: { title?: string };
 };

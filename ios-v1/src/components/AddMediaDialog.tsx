@@ -55,7 +55,11 @@ export default function AddMediaDialog({
       .catch((e) => setError(e?.message || 'failed to load media'));
   }, []);
 
-  const existing = new Set([...shown, ...hidden]);
+  // The standalone "new" picker (Add flow) lets you pick a medium you've hidden
+  // as well as brand-new ones, so only exclude the currently-shown ones. The
+  // profile dialog keeps hidden media out of "new" since its hide/show tab
+  // already manages them.
+  const existing = onlyNew ? new Set(shown) : new Set([...shown, ...hidden]);
   const available = (media ?? []).filter((m) => !existing.has(m.name));
 
   const handleRequest = async () => {

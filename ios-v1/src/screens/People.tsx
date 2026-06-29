@@ -13,11 +13,14 @@ import type { SearchStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const NUM_COLUMNS = 3;
 const COLUMN_GAP = 10;
-// List has 20px horizontal padding on each side; the rest is split into the
-// columns and the gaps between them.
-const CARD_WIDTH = (SCREEN_WIDTH - 40 - COLUMN_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+const LIST_PAD = 20; // horizontal padding on each side of the list
+
+// Cards per row grow ~square with the result count, capped at 4 — a full
+// directory stays dense, and a narrowed search slims to fewer, larger cards.
+function columnsFor(n: number): number {
+  return Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n)))));
+}
 const PEOPLE_KEYS = ['username', 'firstname', 'lastname', 'city', 'media'];
 
 interface Props {
@@ -48,15 +51,18 @@ export default function People({ query, onResetFilters, onListScroll }: Props) {
     return new Fuse(members, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
   }, [members, query]);
 
+  const numColumns = columnsFor(filtered.length);
+  const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
+
   const renderCard = ({ item }: { item: Profile }) => (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
       onPress={() => navigation.navigate('UserProfile', { username: item.username })}
     >
       <Image
         source={{ uri: profilePicSrc(item, profilePicVersions) ?? resolveImageUrl(`/imgs/${item.id}.png`) }}
         transition={200}
-        style={styles.cardImage}
+        style={[styles.cardImage, { height: cardWidth }]}
         contentFit="cover"
       />
       <View style={styles.cardBody}>
@@ -71,8 +77,9 @@ export default function People({ query, onResetFilters, onListScroll }: Props) {
         data={filtered}
         keyExtractor={(item) => item.username}
         renderItem={renderCard}
-        numColumns={NUM_COLUMNS}
-        columnWrapperStyle={styles.row}
+        key={numColumns}
+        numColumns={numColumns}
+        columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
         contentContainerStyle={styles.list}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
@@ -118,7 +125,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   card: {
-    width: CARD_WIDTH,
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.artCardBg,
@@ -128,7 +134,6 @@ const styles = StyleSheet.create({
   },
   cardImage: {
     width: '100%',
-    height: CARD_WIDTH,
   },
   cardBody: {
     padding: 8,
