@@ -29,8 +29,10 @@ const NAV_TAB_HEIGHT = 90;
 // The toggle bar shrinks toward the smaller height while the keyboard is up so
 // the icons "minimize" and hand their vertical space to the grid.
 const TAB_BAR_HEIGHT = 84;
-const TAB_BAR_HEIGHT_MIN = 44;
-const ICON_SCALE_MIN = 0.55;
+const TAB_BAR_HEIGHT_MIN = 50;
+const ICON_SCALE_MIN = 0.42;
+// How much the selection box narrows when the keyboard is up.
+const BOX_SCALE_X_MIN = 0.6;
 
 // The two halves of the search tab. `iconScale` mirrors the per-asset scaling
 // the standalone banners used so the profiles mark reads at the same visual
@@ -101,6 +103,9 @@ export default function SearchTabs() {
   const barTranslateY = Animated.multiply(kb, lift);
   const iconScale = kb.interpolate({ inputRange: [0, 1], outputRange: [1, ICON_SCALE_MIN] });
   const iconTranslateY = kb.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  // Narrow the selection box (in addition to the bar's height shrink) when the
+  // keyboard is up.
+  const boxScaleX = kb.interpolate({ inputRange: [0, 1], outputRange: [1, BOX_SCALE_X_MIN] });
   const tabBarHeight = kbH.interpolate({
     inputRange: [0, 1],
     outputRange: [TAB_BAR_HEIGHT, TAB_BAR_HEIGHT_MIN],
@@ -136,7 +141,15 @@ export default function SearchTabs() {
         <Animated.View
           style={[
             styles.selectionBox,
-            { transform: [{ translateX: boxTranslate }, { translateY: 8 }] },
+            {
+              transform: [
+                { translateX: boxTranslate },
+                // Track the icon's vertical position so the box stays centered
+                // on it in both the tall and shrunk states.
+                { translateY: iconTranslateY },
+                { scaleX: boxScaleX },
+              ],
+            },
           ]}
         />
         {TABS.map((t, i) => (
@@ -231,8 +244,10 @@ const styles = StyleSheet.create({
   },
   selectionBox: {
     position: 'absolute',
-    top: 10,
-    bottom: 10,
+    // Smaller vertical inset so the box stays tall enough to contain the icon
+    // even in the shrunk (keyboard-up) state.
+    top: 7,
+    bottom: 7,
     left: 0,
     width: HALF - BOX_MARGIN * 2,
     backgroundColor: Colors.primaryGold,
