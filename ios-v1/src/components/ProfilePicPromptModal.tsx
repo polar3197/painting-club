@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
-import { upload_profile_picture, get_profile } from '../api';
+import { upload_profile_picture } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 // Global one-time "welcome, add a profile pic" prompt for users who just
@@ -23,8 +23,6 @@ export default function ProfilePicPromptModal() {
     needsProfilePicPrompt,
     dismissProfilePicPrompt,
     token,
-    currentUser,
-    bumpProfilePic,
   } = useAuth();
   const [uploading, setUploading] = useState(false);
 
@@ -42,17 +40,8 @@ export default function ProfilePicPromptModal() {
       const type = asset.mimeType || 'image/jpeg';
       setUploading(true);
       await upload_profile_picture({ uri: asset.uri, name, type }, token);
-      // Bump the cache so any already-mounted profile view (UserProfile)
-      // re-pulls the canonical /static/profile/<id>.<ext> URL — without this
-      // the user lands on Main with a stale empty-pic state.
-      if (currentUser) {
-        try {
-          const profile = await get_profile(currentUser, token);
-          bumpProfilePic(profile.id);
-        } catch {
-          // non-fatal: pic uploaded; UserProfile will refetch on next focus
-        }
-      }
+      // The server returns a freshly-versioned path; UserProfile picks it up on
+      // its next fetch (e.g. when the Me tab focuses).
       dismissProfilePicPrompt();
     } catch (err: any) {
       Alert.alert('Upload failed', err?.message || 'Try again');

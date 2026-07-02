@@ -262,7 +262,7 @@ export default function UserProfile() {
   const route = useRoute<ProfileRoute>();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
-  const { currentUser, token, profilePicVersions, bumpProfilePic } = useAuth();
+  const { currentUser, token } = useAuth();
 
   const params = route.params as { username?: string; artId?: string; medium?: string } | undefined;
   const username = params?.username || currentUser || '';
@@ -360,10 +360,9 @@ export default function UserProfile() {
     const name = asset.uri.split('/').pop() || 'pic.jpg';
     const type = asset.mimeType || 'image/jpeg';
     const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
+    // res.profile_pic_path already carries the server's `?v=<mtime>`, so this
+    // new URL busts the image cache on every upload — no client version needed.
     setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
-    // Same-extension re-uploads write to the same URL — bump the version so
-    // every surface that reads `profilePicSrc(profile, versions)` refetches.
-    bumpProfilePic(profile.id);
     setProfileZoom(false);
   };
 
@@ -635,7 +634,7 @@ export default function UserProfile() {
       {profileZoom && profile.profile_pic_path && (
         <ArtZoomIn
           isOwner={profile.is_owner}
-          imgPath={profilePicSrc(profile, profilePicVersions) ?? profile.profile_pic_path}
+          imgPath={profilePicSrc(profile) ?? profile.profile_pic_path}
           onClose={() => setProfileZoom(false)}
           onChangePic={profile.is_owner ? pickAndUploadProfilePic : undefined}
           blockableUsername={!profile.is_owner ? profile.username : undefined}
@@ -767,7 +766,7 @@ export default function UserProfile() {
                 {profile.profile_pic_path ? (
                   <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                     <Image
-                      source={{ uri: profilePicSrc(profile, profilePicVersions) ?? '' }}
+                      source={{ uri: profilePicSrc(profile) ?? '' }}
                       transition={200}
                       priority="high"
                       style={styles.profilePic}
@@ -1190,7 +1189,9 @@ const styles = StyleSheet.create({
   },
   userTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // Top-align the name/location with the top of the profile pic (rather than
+    // centering, which dropped them when the row's left column got shorter).
+    alignItems: 'flex-start',
     gap: 12,
   },
   userIdentity: {

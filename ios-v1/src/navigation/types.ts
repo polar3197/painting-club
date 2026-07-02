@@ -30,4 +30,5 @@ export type HomeStackParamList = {
   AboutSection: { section: AboutSectionKey };
   AboutPost: { section: AboutSectionKey; postIndex: number };
   ComingSoon: { title?: string };
+  RequestFeature: undefined;
 };

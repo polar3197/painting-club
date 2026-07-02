@@ -286,9 +286,15 @@ export default function Home() {
     <Pressable style={styles.aboutBtn} onPress={() => navigation.navigate('About')}>
       <Text style={styles.aboutBtnText}>about the app</Text>
     </Pressable>
+
+    {/* Pinned to the bottom-right corner, mirroring "about the app". */}
+    <Pressable style={styles.requestBtn} onPress={() => navigation.navigate('RequestFeature')}>
+      <Text style={styles.requestBtnText}>request something for the app</Text>
+    </Pressable>
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   gradient: {
@@ -315,6 +321,21 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   aboutBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+  requestBtn: {
+    position: 'absolute',
+    right: 20,
+    bottom: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  requestBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.black,

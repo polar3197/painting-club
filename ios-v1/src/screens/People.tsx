@@ -7,7 +7,6 @@ import Fuse from 'fuse.js';
 import Spinner from '../components/Spinner';
 import { useMembers } from '../hooks';
 import { resolveImageUrl, profilePicSrc, Profile } from '../api';
-import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { SearchStackParamList } from '../navigation/types';
 
@@ -33,7 +32,6 @@ interface Props {
 
 export default function People({ query, onResetFilters, onListScroll }: Props) {
   const navigation = useNavigation<Nav>();
-  const { profilePicVersions } = useAuth();
   const [members, , , refetchMembers] = useMembers('', '');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -60,7 +58,7 @@ export default function People({ query, onResetFilters, onListScroll }: Props) {
       onPress={() => navigation.navigate('UserProfile', { username: item.username })}
     >
       <Image
-        source={{ uri: profilePicSrc(item, profilePicVersions) ?? resolveImageUrl(`/imgs/${item.id}.png`) }}
+        source={{ uri: profilePicSrc(item) ?? resolveImageUrl(`/imgs/${item.id}.png`) }}
         transition={200}
         style={[styles.cardImage, { height: cardWidth }]}
         contentFit="cover"

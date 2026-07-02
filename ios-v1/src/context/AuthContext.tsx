@@ -13,10 +13,6 @@ interface AuthContextType {
   refreshBlocks: () => Promise<void>;
   noteBlocked: (username: string) => void;
   noteUnblocked: (username: string) => void;
-  // Per-member cache-bust counters. Bump on profile-pic re-upload so the same
-  // canonical URL (`/static/profile/<id>.<ext>`) refetches.
-  profilePicVersions: Record<string, number>;
-  bumpProfilePic: (memberId: string) => void;
   // Set to true on first-time login (after SetupAccount). A global modal in
   // App.tsx watches this and prompts the new user to upload a profile pic.
   // The modal clears the flag on dismiss or upload — kept off this context
@@ -37,8 +33,6 @@ const AuthContext = createContext<AuthContextType>({
   refreshBlocks: async () => {},
   noteBlocked: () => {},
   noteUnblocked: () => {},
-  profilePicVersions: {},
-  bumpProfilePic: () => {},
   needsProfilePicPrompt: false,
   triggerProfilePicPrompt: () => {},
   dismissProfilePicPrompt: () => {},
@@ -50,15 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [blockedUsernames, setBlockedUsernames] = useState<string[]>([]);
-  const [profilePicVersions, setProfilePicVersions] = useState<Record<string, number>>({});
   const [needsProfilePicPrompt, setNeedsProfilePicPrompt] = useState(false);
 
   const triggerProfilePicPrompt = useCallback(() => setNeedsProfilePicPrompt(true), []);
   const dismissProfilePicPrompt = useCallback(() => setNeedsProfilePicPrompt(false), []);
-
-  const bumpProfilePic = useCallback((memberId: string) => {
-    setProfilePicVersions((prev) => ({ ...prev, [memberId]: Date.now() }));
-  }, []);
 
   const refreshBlocks = useCallback(async () => {
     try {
@@ -135,8 +124,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshBlocks,
         noteBlocked,
         noteUnblocked,
-        profilePicVersions,
-        bumpProfilePic,
         needsProfilePicPrompt,
         triggerProfilePicPrompt,
         dismissProfilePicPrompt,

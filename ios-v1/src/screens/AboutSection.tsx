@@ -76,7 +76,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.white,
-    paddingVertical: 16,
+    justifyContent: 'center',
+    height: 84,
     paddingHorizontal: 16,
   },
   postBtnFirst: {

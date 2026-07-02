@@ -59,16 +59,15 @@ export function profileThumbUrl(memberId: string): string {
   return `${SERVER_ORIGIN}/static/profile-thumbs/${memberId}.jpg`;
 }
 
-/** Cache-busted absolute URL for a member's profile pic — null if none uploaded.
- *  `versions` comes from AuthContext; it bumps when the current user re-uploads,
- *  so re-uploads of the same extension still force expo-image / browser to refetch. */
+/** Absolute URL for a member's profile pic — null if none uploaded.
+ *  The server already appends `?v=<file-mtime>` (see versioned_pic_path), so the
+ *  URL changes whenever the bytes on disk change and every client refetches after
+ *  any re-upload. No extra client-side cache-busting needed. */
 export function profilePicSrc(
-  profile: { id: string; profile_pic_path: string | null },
-  versions: Record<string, number> = {},
+  profile: { profile_pic_path: string | null },
 ): string | null {
   if (!profile.profile_pic_path) return null;
-  const v = versions[profile.id];
-  return `${resolveImageUrl(profile.profile_pic_path)}${v ? `?v=${v}` : ''}`;
+  return resolveImageUrl(profile.profile_pic_path);
 }
 
 export function getPortfolioUrl(username: string, medium?: string, keywords?: string[]): string {
