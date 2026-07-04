@@ -36,6 +36,7 @@ import AudioForm from '../components/AudioForm';
 import AddMediaDialog from '../components/AddMediaDialog';
 import SegmentedProgress from '../components/SegmentedProgress';
 import { AudioPlayerBar } from '../components/AudioPiece';
+import VoiceRecorder from '../components/VoiceRecorder';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 // True when this OTA bundle runs against the build-#8 stubs — file pickers and
@@ -437,11 +438,27 @@ export default function AddArt() {
                       autoPlay={false}
                       onDuration={setPickedDuration}
                     />
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => { setPickedFile(null); setPickedDuration(null); }}
+                    >
+                      <Text style={styles.clearLink}>✕ clear — pick or record again</Text>
+                    </Pressable>
                   </View>
                 ) : (
-                  <Text style={styles.dropboxHint}>
-                    from voice memos: share a recording → "save to files", then pick it here
-                  </Text>
+                  <>
+                    {!PICKER_IS_STUB && (
+                      <VoiceRecorder
+                        onRecorded={(file, dur) => {
+                          setPickedDuration(dur > 0 ? dur : null);
+                          setPickedFile(file);
+                        }}
+                      />
+                    )}
+                    <Text style={styles.dropboxHint}>
+                      from voice memos: share a recording → "save to files", then pick it here
+                    </Text>
+                  </>
                 )}
               </>
             )}
@@ -666,6 +683,13 @@ const styles = StyleSheet.create({
   // Wraps the audio pre-listen player under the dropbox.
   previewWrap: {
     marginTop: 8,
+    gap: 6,
+  },
+  clearLink: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xxs,
+    color: Colors.textSecondary,
+    textDecorationLine: 'underline',
   },
   textArea: {
     height: 200,

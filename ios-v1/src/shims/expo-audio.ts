@@ -27,3 +27,33 @@ export function useAudioPlayerStatus(_player?: unknown) {
 // Lets OTA code detect it's running against the stub (real module lacks this)
 // and degrade gracefully instead of rendering dead controls.
 export const IS_STUB = true;
+
+// --- Recording stubs (VoiceRecorder is hidden on stub builds, but the bundle
+// still needs these exports to resolve) ---
+export const RecordingPresets = { HIGH_QUALITY: {}, LOW_QUALITY: {} };
+
+export async function requestRecordingPermissionsAsync() {
+  return { granted: false, status: 'denied' as const };
+}
+
+export function useAudioRecorder(_options?: unknown) {
+  return {
+    id: 0,
+    uri: null as string | null,
+    currentTime: 0,
+    isRecording: false,
+    record() {},
+    async stop() {},
+    async prepareToRecordAsync() {},
+  };
+}
+
+export function useAudioRecorderState(_recorder?: unknown) {
+  return {
+    canRecord: false,
+    isRecording: false,
+    durationMillis: 0,
+    mediaServicesDidReset: false,
+    url: null as string | null,
+  };
+}
