@@ -36,6 +36,7 @@ from api.models import (
     FeatureRequestOut,
     FeatureRequestVoteIn,
     FeatureRequestVoteOut,
+    MemberDirectoryEntry,
     DmOpenIn,
     GroupCreateIn,
     ConversationOut,
@@ -79,6 +80,7 @@ from db.db_ops.members import (
     db_complete_setup,
     db_export_member_data,
     db_delete_member,
+    db_get_member_directory,
 )
 
 from db.db_ops.profile import (
@@ -1912,6 +1914,18 @@ def _conversation_out(row: dict) -> ConversationOut:
         last_sender_username=row["last_sender_username"],
         unread=row["unread"],
     )
+
+
+@app.get("/members/directory", response_model=list[MemberDirectoryEntry])
+async def member_directory_endpoint(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    rows = await db_get_member_directory(db, current_member.id)
+    return [
+        MemberDirectoryEntry(username=u, firstname=f, lastname=l)
+        for u, f, l in rows
+    ]
 
 
 @app.get("/conversations", response_model=list[ConversationOut])

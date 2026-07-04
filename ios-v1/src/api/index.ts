@@ -30,6 +30,7 @@ import type {
   ConversationOut,
   MessageOut,
   MessagesPage,
+  MemberDirectoryEntry,
   PromptOut,
   PromptDetailOut,
   PromptSummary,
@@ -511,6 +512,12 @@ export function delete_feature_request(request_id: string, token: string | null)
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+export function get_member_directory(token: string | null): Promise<MemberDirectoryEntry[]> {
+  return request('/members/directory', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MemberDirectoryEntry[]>;
 }
 
 export function get_conversations(token: string | null): Promise<ConversationOut[]> {

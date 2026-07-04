@@ -148,6 +148,11 @@ class FeatureRequestVoteOut(BaseModel):
     my_vote: int | None = None
 
 
+class MemberDirectoryEntry(BaseModel):
+    username: str
+    firstname: str | None = None
+    lastname: str | None = None
+
 class DmOpenIn(BaseModel):
     username: str
 

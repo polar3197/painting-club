@@ -1,6 +1,6 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, and_, or_
 import bcrypt
 
 from db.models import (
@@ -12,6 +12,28 @@ from db.models import (
 async def db_get_members(db: AsyncSession):
     result = await db.execute(select(Member))
     return result.scalars().all()
+
+
+async def db_get_member_directory(db: AsyncSession, viewer_id):
+    """All other members, for the messaging compose picker. Excludes the viewer
+    and anyone in a block relationship with them (either direction)."""
+    blocked_pair = (
+        select(BlockedMember.blocker_id)
+        .where(
+            or_(
+                and_(BlockedMember.blocker_id == Member.id, BlockedMember.blockee_id == viewer_id),
+                and_(BlockedMember.blocker_id == viewer_id, BlockedMember.blockee_id == Member.id),
+            )
+        )
+        .exists()
+    )
+    result = await db.execute(
+        select(Member.username, Member.firstname, Member.lastname)
+        .filter(Member.id != viewer_id)
+        .filter(~blocked_pair)
+        .order_by(Member.username)
+    )
+    return result.all()
 
 async def db_login_user(db: AsyncSession, username: str, password: str):
     username = username.lower()

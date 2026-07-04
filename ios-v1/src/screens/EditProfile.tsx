@@ -11,7 +11,7 @@ import {
   PanResponder,
   GestureResponderEvent,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -407,23 +407,25 @@ export default function EditProfile() {
                   }}
                   {...svResponder.panHandlers}
                 >
+                  {/* The gradients are static PNGs stretched by expo-image
+                      (only the base hue varies, and that's a plain View) —
+                      no expo-linear-gradient, so this renders identically on
+                      the shimmed 1.0.3 binary and the 1.0.4 native build. */}
                   <View
                     style={[
                       StyleSheet.absoluteFill,
                       { backgroundColor: rgbToHex(hsvToRgb({ h: hsv.h, s: 1, v: 1 })) },
                     ]}
                   />
-                  <LinearGradient
-                    colors={['#ffffff', 'rgba(255,255,255,0)']}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
+                  <Image
+                    source={require('../../assets/imgs/sv-white.png')}
                     style={StyleSheet.absoluteFill}
+                    contentFit="fill"
                   />
-                  <LinearGradient
-                    colors={['rgba(0,0,0,0)', '#000000']}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
+                  <Image
+                    source={require('../../assets/imgs/sv-black.png')}
                     style={StyleSheet.absoluteFill}
+                    contentFit="fill"
                   />
                   {svSize.w > 0 && (
                     <View
@@ -447,11 +449,10 @@ export default function EditProfile() {
                   }}
                   {...hueResponder.panHandlers}
                 >
-                  <LinearGradient
-                    colors={['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff', '#ff0000']}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
+                  <Image
+                    source={require('../../assets/imgs/hue-bar.png')}
                     style={StyleSheet.absoluteFill}
+                    contentFit="fill"
                   />
                   {hueW > 0 && (
                     <View

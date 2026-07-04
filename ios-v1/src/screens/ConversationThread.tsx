@@ -191,14 +191,6 @@ export default function ConversationThread() {
           onEndReachedThreshold={0.3}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              {/* inverted list flips children — flip back */}
-              <Text style={[styles.emptyText, { transform: [{ scaleY: -1 }] }]}>
-                say something to start the thread
-              </Text>
-            </View>
-          }
         />
         <View style={[styles.inputBar, { paddingBottom: 8 + insets.bottom }]}>
           <TextInput
@@ -263,16 +255,6 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 10,
     flexGrow: 1,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
   },
   msgRow: {
     flexDirection: 'row',

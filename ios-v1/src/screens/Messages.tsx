@@ -21,11 +21,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import {
   get_conversations,
-  get_profiles,
+  get_member_directory,
   open_dm,
   create_group,
   ConversationOut,
-  Profile,
+  MemberDirectoryEntry,
 } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -50,7 +50,7 @@ export default function Messages() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
-  const { currentUser, token, blockedUsernames } = useAuth();
+  const { currentUser, token } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   // Horizontal pagers don't hand a vertical size to flex children, so each page
@@ -63,7 +63,7 @@ export default function Messages() {
   // Compose sheet state. In '1:1' mode a single tap opens the DM; in 'groups'
   // mode members toggle in/out of a selection posted with the title.
   const [showCompose, setShowCompose] = useState(false);
-  const [members, setMembers] = useState<Profile[]>([]);
+  const [members, setMembers] = useState<MemberDirectoryEntry[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupTitle, setGroupTitle] = useState('');
   const [creating, setCreating] = useState(false);
@@ -121,11 +121,8 @@ export default function Messages() {
     anim.setValue(0);
     Animated.timing(anim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
     try {
-      const profiles = await get_profiles();
-      const blocked = new Set(blockedUsernames ?? []);
-      setMembers(
-        profiles.filter((p) => p.username !== currentUser && !blocked.has(p.username)),
-      );
+      // Server-side directory already excludes the caller and blocked pairs.
+      setMembers(await get_member_directory(token));
     } catch {
       setMembers([]);
     }

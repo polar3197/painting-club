@@ -293,6 +293,12 @@ export interface FeatureRequestVoteOut {
   my_vote: number | null;
 }
 
+export interface MemberDirectoryEntry {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+}
+
 export interface ConversationOut {
   id: string;
   type: 'dm' | 'group';
