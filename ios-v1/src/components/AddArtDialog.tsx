@@ -515,7 +515,10 @@ export default function AddArtDialog({
             )}
             {isAudio && (
               <View {...dropboxPanResponder.panHandlers}>
-                <Pressable style={styles.dropbox} onPress={pickAudio}>
+                <Pressable
+                  style={[styles.dropbox, PICKER_IS_STUB && styles.dropboxDisabled]}
+                  onPress={PICKER_IS_STUB ? undefined : pickAudio}
+                >
                   {pickedFile ? (
                     <View style={styles.docPreview}>
                       <View style={styles.docBadge}>
@@ -527,7 +530,9 @@ export default function AddArtDialog({
                     </View>
                   ) : (
                     <Text style={styles.dropboxText}>
-                      {audioPiece ? 'tap to replace audio' : 'tap to select audio'}
+                      {PICKER_IS_STUB
+                        ? 'audio uploads arrive with the next app update'
+                        : audioPiece ? 'tap to replace audio' : 'tap to select audio'}
                     </Text>
                   )}
                 </Pressable>
@@ -690,6 +695,10 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.textPrimary,
     backgroundColor: Colors.secondary,
+  },
+  dropboxDisabled: {
+    opacity: 0.5,
+    borderStyle: 'dashed',
   },
   dropbox: {
     height: 160,

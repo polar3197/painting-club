@@ -422,11 +422,18 @@ export default function AddArt() {
             )}
             {isAudio && (
               <>
-                <Pressable style={styles.dropbox} onPress={pickAudio}>
+                <Pressable
+                  style={[styles.dropbox, PICKER_IS_STUB && styles.dropboxDisabled]}
+                  onPress={PICKER_IS_STUB ? undefined : pickAudio}
+                >
                   {pickedFile ? (
                     <Text style={styles.docFilename} numberOfLines={2}>{pickedFile.name}</Text>
                   ) : (
-                    <Text style={styles.dropboxText}>tap to select audio</Text>
+                    <Text style={styles.dropboxText}>
+                      {PICKER_IS_STUB
+                        ? 'audio uploads arrive with the next app update'
+                        : 'tap to select audio'}
+                    </Text>
                   )}
                 </Pressable>
                 {pickedFile && !PICKER_IS_STUB ? (
@@ -612,6 +619,10 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.sm,
     textAlign: 'center',
+  },
+  dropboxDisabled: {
+    opacity: 0.5,
+    borderStyle: 'dashed',
   },
   dropbox: {
     height: 200,
