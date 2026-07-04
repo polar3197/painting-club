@@ -64,7 +64,11 @@ async def db_redeem_setup_code(db: AsyncSession, code: str) -> Member | None:
     return member
 
 
-async def db_start_password_reset(db: AsyncSession, email: str) -> tuple[Member, str] | None:
+async def db_start_password_reset(
+    db: AsyncSession,
+    email: str | None = None,
+    username: str | None = None,
+) -> tuple[Member, str] | None:
     """Forgot-password: mint a fresh setup code for the member with this email.
 
     Reuses the invite machinery (temp_password_plaintext + must_change_password),
@@ -77,12 +81,18 @@ async def db_start_password_reset(db: AsyncSession, email: str) -> tuple[Member,
     from sqlalchemy import func
     from db.db_ops.applications import _gen_temp_password
 
-    normalized = (email or "").strip().lower()
-    if not normalized:
-        return None
-    member = (await db.execute(
-        select(Member).filter(func.lower(Member.email) == normalized)
-    )).scalar_one_or_none()
+    member = None
+    uname = (username or "").strip().lower()
+    if uname:
+        member = (await db.execute(
+            select(Member).filter(Member.username == uname)
+        )).scalar_one_or_none()
+    if member is None:
+        normalized = (email or "").strip().lower()
+        if normalized:
+            member = (await db.execute(
+                select(Member).filter(func.lower(Member.email) == normalized)
+            )).scalar_one_or_none()
     if member is None:
         return None
 

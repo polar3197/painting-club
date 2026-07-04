@@ -303,7 +303,7 @@ async def forgot_password_endpoint(
     # Email delivery is intentionally OFF for now — the code lands in the
     # admin panel's "password resets" section and the admin sends it manually.
     # (Restore the background send_email task here once EMAIL_* is configured.)
-    await db_start_password_reset(db, payload.email)
+    await db_start_password_reset(db, email=payload.email, username=payload.username)
     return {"ok": True}
 
 

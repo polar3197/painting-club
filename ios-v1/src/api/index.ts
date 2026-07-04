@@ -45,10 +45,10 @@ export function login_user(payload: LoginPayload): Promise<LoginResponse> {
   }) as Promise<LoginResponse>;
 }
 
-export function forgot_password(email: string): Promise<{ ok: boolean }> {
+export function forgot_password(username: string): Promise<{ ok: boolean }> {
   return request('/members/forgot-password', {
     method: 'POST',
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ username }),
   }) as Promise<{ ok: boolean }>;
 }
 

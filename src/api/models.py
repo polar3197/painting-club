@@ -93,7 +93,10 @@ class SetupCodeIn(BaseModel):
     code: str
 
 class ForgotPasswordIn(BaseModel):
-    email: str
+    # Either identifier works; username is what the app sends (every member
+    # has one — email is optional in the schema).
+    email: str | None = None
+    username: str | None = None
 
 class MemberFilters(BaseModel):
     uname: str | None
