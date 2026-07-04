@@ -22,7 +22,7 @@ _VISUAL_2D_SEED = ("painting", "drawing", "stained glass", "photography", "self 
 _WRITTEN_FORM_SEED = ("poetry", "writing")
 # Both share the polymorphic 'audio' Art type but are distinct media names so a
 # member can add either to their profile independently.
-_AUDIO_SEED = ("voice memo", "music")
+_AUDIO_SEED = ("music",)
 
 
 async def pre_init_migrations():

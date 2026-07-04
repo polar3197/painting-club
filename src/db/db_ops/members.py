@@ -4,7 +4,7 @@ from sqlalchemy import select, delete
 import bcrypt
 
 from db.models import (
-    Member, Application, Art, Visual2D, WrittenForm, Comment,
+    Member, Application, Art, Visual2D, WrittenForm, Audio, Comment,
     Media, Media_Members, MediaRequest, Report, BlockedMember,
     KeywordArt,
 )
@@ -298,6 +298,7 @@ async def db_delete_member(db: AsyncSession, member_id) -> tuple[list[str], list
         await db.execute(delete(KeywordArt).filter(KeywordArt.art_id.in_(art_ids)))
         await db.execute(delete(Visual2D).filter(Visual2D.id.in_(art_ids)))
         await db.execute(delete(WrittenForm).filter(WrittenForm.id.in_(art_ids)))
+        await db.execute(delete(Audio).filter(Audio.id.in_(art_ids)))
         await db.execute(delete(Art).filter(Art.id.in_(art_ids)))
 
     await db.execute(delete(Member).filter(Member.id == member_id))
