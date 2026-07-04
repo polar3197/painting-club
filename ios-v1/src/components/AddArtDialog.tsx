@@ -24,7 +24,12 @@ import PaintingForm from './PaintingForm';
 import WrittenFormForm from './WrittenFormForm';
 import AudioForm from './AudioForm';
 import Dropdown from './Dropdown';
+import { AudioPlayerBar } from './AudioPiece';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
+
+// True when this OTA bundle runs against the build-#8 picker stub — the audio
+// pre-listen is hidden (playback is also stubbed there).
+const PICKER_IS_STUB = (DocumentPicker as any).IS_STUB === true;
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -119,6 +124,9 @@ export default function AddArtDialog({
   // drag-down gesture dismiss the sheet reliably (the same pattern as the
   // top grab bar). Inside the ScrollView, iOS native scroll wins the gesture.
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+  // Measured length of a newly picked audio file (via the pre-listen player),
+  // sent as duration_seconds with the create/replace payload.
+  const [pickedDuration, setPickedDuration] = useState<number | null>(null);
   // Written-form-only: choose between picking a file and pasting text. Pasted
   // text exists so users can pull from Notes / Google Docs / anywhere a file
   // picker can't reach.
@@ -207,6 +215,7 @@ export default function AddArtDialog({
       mp4: 'audio/mp4',
     };
     const type = asset.mimeType || mimeByExt[ext] || 'audio/m4a';
+    setPickedDuration(null);
     setPickedFile({ uri: asset.uri, name, type });
   };
 
@@ -392,7 +401,9 @@ export default function AddArtDialog({
           : null,
         comments_enabled: formData.comments_enabled,
         medium: moving,
-        ...(pickedFile ? { file: pickedFile } : {}),
+        // duration only travels with a replacement file — otherwise the stored
+        // value still describes the existing audio.
+        ...(pickedFile ? { file: pickedFile, duration_seconds: pickedDuration ?? undefined } : {}),
       };
       onClose();
       update_audio(audioPiece.id, token, updatePayload)
@@ -421,6 +432,7 @@ export default function AddArtDialog({
         date: formData.date || undefined,
         keywords: formData.keywords,
         comments_enabled: formData.comments_enabled,
+        duration_seconds: pickedDuration ?? undefined,
         file: pickedFile,
       };
       onClose();
@@ -517,9 +529,22 @@ export default function AddArtDialog({
                     </Text>
                   )}
                 </Pressable>
-                <Text style={styles.dropboxHint}>
-                  from voice memos: share a recording → "save to files", then pick it here
-                </Text>
+                {pickedFile && !PICKER_IS_STUB ? (
+                  // Pre-listen the picked file; also measures duration_seconds.
+                  <View style={styles.previewWrap}>
+                    <AudioPlayerBar
+                      key={pickedFile.uri}
+                      uri={pickedFile.uri}
+                      fallbackDuration={null}
+                      autoPlay={false}
+                      onDuration={setPickedDuration}
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.dropboxHint}>
+                    from voice memos: share a recording → "save to files", then pick it here
+                  </Text>
+                )}
               </View>
             )}
             {/* ScrollView lets the user reach every field (and the submit button)
@@ -690,6 +715,11 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 4,
     marginHorizontal: 16,
+  },
+  // Wraps the audio pre-listen player under the dropbox.
+  previewWrap: {
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
   docPreview: {
     alignItems: 'center',

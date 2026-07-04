@@ -14,3 +14,7 @@ export type DocumentPickerResult = {
 export async function getDocumentAsync(_options?: unknown): Promise<DocumentPickerResult> {
   return { canceled: true, assets: null, type: 'cancel', output: null };
 }
+
+// Lets OTA code detect it's running against the stub (real module lacks this)
+// and hide file-upload affordances instead of showing a dead picker.
+export const IS_STUB = true;

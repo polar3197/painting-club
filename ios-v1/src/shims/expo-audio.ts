@@ -23,3 +23,7 @@ export function useAudioPlayerStatus(_player?: unknown) {
     didJustFinish: false,
   };
 }
+
+// Lets OTA code detect it's running against the stub (real module lacks this)
+// and degrade gracefully instead of rendering dead controls.
+export const IS_STUB = true;

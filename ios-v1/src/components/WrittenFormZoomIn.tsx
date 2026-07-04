@@ -8,11 +8,16 @@ import {
   Linking,
   PanResponder,
 } from 'react-native';
+import * as WebViewModule from 'react-native-webview';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resolveImageUrl } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
+
+// True when this OTA bundle runs against the build-#8 WebView stub — PDFs then
+// keep the "open file" fallback instead of rendering a blank canvas.
+const WEBVIEW_IS_STUB = (WebViewModule as any).IS_STUB === true;
 
 // Font-size slider config: pinned to a JS-only custom slider so we don't pull
 // in @react-native-community/slider (would require another prebuild + resubmit).
@@ -218,6 +223,9 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
   const insets = useSafeAreaInsets();
   const ext = extFromPath(filePath);
   const previewable = isTextExt(ext);
+  // WKWebView renders PDFs natively (paged, pinch-zoom) — view them in-app on
+  // builds with the real WebView; stub builds keep the "open file" fallback.
+  const pdfInApp = ext === 'pdf' && !WEBVIEW_IS_STUB;
   const text = useWrittenFormText(filePath);
 
   const [fontSize, setFontSize] = useState(DEFAULT_FONT);
@@ -287,7 +295,18 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
             <Text style={styles.xBtnText}>×</Text>
           </Pressable>
         </View>
-        {!previewable ? (
+        {pdfInApp ? (
+          <View style={styles.readerWrap}>
+            <WebView
+              source={{ uri: resolveImageUrl(filePath) }}
+              style={styles.webview}
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
+              automaticallyAdjustContentInsets={false}
+              contentInsetAdjustmentBehavior="never"
+            />
+          </View>
+        ) : !previewable ? (
           <View style={styles.fallback}>
             <Pressable style={styles.openBtn} onPress={openExternal}>
               <Text style={styles.openBtnText}>open file</Text>

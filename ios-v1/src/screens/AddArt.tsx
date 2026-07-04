@@ -35,7 +35,12 @@ import WrittenFormForm from '../components/WrittenFormForm';
 import AudioForm from '../components/AudioForm';
 import AddMediaDialog from '../components/AddMediaDialog';
 import SegmentedProgress from '../components/SegmentedProgress';
+import { AudioPlayerBar } from '../components/AudioPiece';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
+
+// True when this OTA bundle runs against the build-#8 stubs — file pickers and
+// audio playback degrade gracefully instead of showing dead controls.
+const PICKER_IS_STUB = (DocumentPicker as any).IS_STUB === true;
 
 const STEPS = ['medium', 'details', 'share'];
 
@@ -68,8 +73,13 @@ export default function AddArt() {
   // Form + file state for the details step.
   const [formData, setFormData] = useState<Record<string, any> | null>(null);
   const [pickedFile, setPickedFile] = useState<PickedFile>(null);
-  const [writeMode, setWriteMode] = useState<'file' | 'text'>('file');
+  // Written-form input mode. File upload needs a real document picker, so
+  // stub builds (1.0.3) are pinned to text.
+  const [writeMode, setWriteMode] = useState<'file' | 'text'>(PICKER_IS_STUB ? 'text' : 'file');
   const [pastedText, setPastedText] = useState('');
+  // Measured length of a picked audio file (via the preview player) — sent as
+  // duration_seconds so tiles can show a duration without loading the file.
+  const [pickedDuration, setPickedDuration] = useState<number | null>(null);
   const [posting, setPosting] = useState(false);
 
   // Horizontal position of the stage pager (slides between medium/details/post).
@@ -89,7 +99,8 @@ export default function AddArt() {
       setFormData(null);
       setPickedFile(null);
       setPastedText('');
-      setWriteMode('file');
+      setWriteMode(PICKER_IS_STUB ? 'text' : 'file');
+      setPickedDuration(null);
       setPosting(false);
       // Snap (no animation) to the right page when (re)entering the tab.
       slideX.setValue(-(m ? 1 : 0) * SCREEN_WIDTH);
@@ -137,7 +148,35 @@ export default function AddArt() {
     const mimeByExt: Record<string, string> = {
       m4a: 'audio/m4a', mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', mp4: 'audio/mp4',
     };
+    setPickedDuration(null);
     setPickedFile({ uri: asset.uri, name, type: asset.mimeType || mimeByExt[ext] || 'audio/m4a' });
+  };
+
+  // Document picker for written-form files. Mirrors AddArtDialog: matches the
+  // web's accept=".pdf,.txt,.docx,.md"; backend re-checks MIME against extension.
+  const pickDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: [
+        'application/pdf',
+        'text/plain',
+        'text/markdown',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/octet-stream',
+      ],
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const name = asset.name || (asset.uri.split('/').pop() ?? 'document');
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    const mimeByExt: Record<string, string> = {
+      pdf: 'application/pdf',
+      txt: 'text/plain',
+      md: 'text/markdown',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+    setPickedFile({ uri: asset.uri, name, type: asset.mimeType || mimeByExt[ext] || 'application/octet-stream' });
   };
 
   // When everything required for the current medium is present, the user can
@@ -146,8 +185,7 @@ export default function AddArt() {
     const title = (formData?.title || '').trim();
     if (!title) return false;
     if (isVisual || isAudio) return !!pickedFile;
-    // File upload for written word is temporarily disabled — text only.
-    if (isWritten) return !!pastedText.trim();
+    if (isWritten) return writeMode === 'file' ? !!pickedFile : !!pastedText.trim();
     return false;
   }, [formData, pickedFile, writeMode, pastedText, isVisual, isAudio, isWritten]);
 
@@ -157,7 +195,8 @@ export default function AddArt() {
     setFormData(null);
     setPickedFile(null);
     setPastedText('');
-    setWriteMode('file');
+    setWriteMode(PICKER_IS_STUB ? 'text' : 'file');
+    setPickedDuration(null);
     setStep(1);
   }, []);
 
@@ -248,6 +287,8 @@ export default function AddArt() {
         };
         startUpload(payload);
       } else if (isWritten) {
+        const useFile = writeMode === 'file' && !PICKER_IS_STUB;
+        if (useFile && !pickedFile) { Alert.alert('Missing', 'Please select a file.'); setPosting(false); return; }
         const trimmedText = pastedText.trim();
         const payload: WrittenFormIn = {
           username: currentUser,
@@ -257,8 +298,8 @@ export default function AddArt() {
           keywords: formData.keywords,
           comments_enabled: formData.comments_enabled,
           series_name: formData.series || undefined,
-          // File upload temporarily disabled — always submit pasted/typed text.
-          text: trimmedText,
+          // Exactly one of file / text, per the API contract.
+          ...(useFile ? { file: pickedFile! } : { text: trimmedText }),
         };
         startWrittenUpload(payload);
       } else if (isAudio) {
@@ -271,6 +312,7 @@ export default function AddArt() {
           date: formData.date || undefined,
           keywords: formData.keywords,
           comments_enabled: formData.comments_enabled,
+          duration_seconds: pickedDuration ?? undefined,
           file: pickedFile,
         };
         startAudioUpload(payload);
@@ -327,13 +369,49 @@ export default function AddArt() {
                 )}
               </Pressable>
             )}
-            {isWritten && (
-              // File upload for written word is temporarily disabled — text only.
+            {isWritten && !PICKER_IS_STUB && (
+              <View style={styles.modeTabs}>
+                <Pressable
+                  style={[styles.modeTab, writeMode === 'file' && styles.modeTabActive]}
+                  onPress={() => { setWriteMode('file'); setPastedText(''); Keyboard.dismiss(); }}
+                >
+                  <Text style={styles.modeTabText}>upload a file</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modeTab, writeMode === 'text' && styles.modeTabActive]}
+                  onPress={() => { setWriteMode('text'); setPickedFile(null); }}
+                >
+                  <Text style={styles.modeTabText}>paste text</Text>
+                </Pressable>
+              </View>
+            )}
+            {isWritten && writeMode === 'file' && !PICKER_IS_STUB && (
+              <>
+                <Pressable style={styles.dropbox} onPress={pickDocument}>
+                  {pickedFile ? (
+                    <View style={styles.docPreview}>
+                      <View style={styles.docBadge}>
+                        <Text style={styles.docBadgeText}>
+                          {(pickedFile.name.split('.').pop() || '').toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.docFilename} numberOfLines={2}>{pickedFile.name}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.dropboxText}>tap to select writing</Text>
+                  )}
+                </Pressable>
+                <Text style={styles.dropboxHint}>
+                  .pdf, .txt, .docx or .md — from notes or google docs: share → save to files
+                </Text>
+              </>
+            )}
+            {isWritten && writeMode === 'text' && (
               <TextInput
                 style={styles.textArea}
                 value={pastedText}
                 onChangeText={setPastedText}
-                placeholder="paste or write your text here. Im sorry there are no file uploads yet :("
+                placeholder="paste or write your text here"
                 placeholderTextColor={Colors.textTertiary}
                 multiline
                 textAlignVertical="top"
@@ -348,9 +426,23 @@ export default function AddArt() {
                     <Text style={styles.dropboxText}>tap to select audio</Text>
                   )}
                 </Pressable>
-                <Text style={styles.dropboxHint}>
-                  from voice memos: share a recording → "save to files", then pick it here
-                </Text>
+                {pickedFile && !PICKER_IS_STUB ? (
+                  // Pre-listen: confirm it's the right recording before sharing.
+                  // Also measures duration_seconds for the upload payload.
+                  <View style={styles.previewWrap}>
+                    <AudioPlayerBar
+                      key={pickedFile.uri}
+                      uri={pickedFile.uri}
+                      fallbackDuration={null}
+                      autoPlay={false}
+                      onDuration={setPickedDuration}
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.dropboxHint}>
+                    from voice memos: share a recording → "save to files", then pick it here
+                  </Text>
+                )}
               </>
             )}
 
@@ -531,6 +623,49 @@ const styles = StyleSheet.create({
     color: Colors.black,
     textAlign: 'center',
     paddingHorizontal: 16,
+  },
+  // Written-form input mode tabs (mirrors AddArtDialog).
+  modeTabs: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    gap: 6,
+  },
+  modeTab: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+  },
+  modeTabActive: {
+    backgroundColor: Colors.secondary,
+  },
+  modeTabText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textPrimary,
+  },
+  docPreview: {
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  docBadge: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.primaryGold,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  docBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+  },
+  // Wraps the audio pre-listen player under the dropbox.
+  previewWrap: {
+    marginTop: 8,
   },
   textArea: {
     height: 200,

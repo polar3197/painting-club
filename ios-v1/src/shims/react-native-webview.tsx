@@ -26,3 +26,7 @@ export const WebView = React.forwardRef<unknown, WebViewProps>(({ style }, ref) 
 });
 
 export default WebView;
+
+// Lets OTA code detect it's running against the stub (real module lacks this)
+// and keep the "open file" fallback instead of rendering a blank canvas.
+export const IS_STUB = true;

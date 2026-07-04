@@ -7,11 +7,27 @@ import {
   LayoutChangeEvent,
   PanResponder,
 } from 'react-native';
+import * as ExpoAudio from 'expo-audio';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useAuth } from '../context/AuthContext';
 import { remove_audio, resolveImageUrl, AudioOut } from '../api';
 import ConfirmDialog from './ConfirmDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
+
+// True when this bundle runs against the OTA stub (build #8 lacks the native
+// module) — playback controls are hidden in favour of an update hint.
+const AUDIO_IS_STUB = (ExpoAudio as any).IS_STUB === true;
+
+// One-at-a-time playback: starting any player pauses whichever other player
+// was going. Module-scoped so it spans every tile (and the AddArt preview).
+let _activePause: (() => void) | null = null;
+function claimPlayback(pauseSelf: () => void) {
+  if (_activePause && _activePause !== pauseSelf) _activePause();
+  _activePause = pauseSelf;
+}
+function releasePlayback(pauseSelf: () => void) {
+  if (_activePause === pauseSelf) _activePause = null;
+}
 
 interface AudioPieceProps {
   isOwner: boolean;
@@ -34,7 +50,20 @@ function fmtTime(sec: number): string {
  * Once mounted it auto-plays; background playback is handled globally by the
  * setAudioModeAsync call in App.tsx + UIBackgroundModes in app.json.
  */
-function AudioPlayerBar({ uri, fallbackDuration }: { uri: string; fallbackDuration: number | null }) {
+export function AudioPlayerBar({
+  uri,
+  fallbackDuration,
+  autoPlay = true,
+  onDuration,
+}: {
+  uri: string;
+  fallbackDuration: number | null;
+  // false = preview mode (AddArt pre-listen): mount silently, play on demand.
+  autoPlay?: boolean;
+  // Reports the measured duration once the file loads (used to capture
+  // duration_seconds at upload time).
+  onDuration?: (seconds: number) => void;
+}) {
   const player = useAudioPlayer({ uri });
   const status = useAudioPlayerStatus(player);
   const [trackW, setTrackW] = useState(0);
@@ -42,10 +71,26 @@ function AudioPlayerBar({ uri, fallbackDuration }: { uri: string; fallbackDurati
   // instead of waiting for the (slightly lagged) status.currentTime to catch up.
   const [scrubFrac, setScrubFrac] = useState<number | null>(null);
 
-  // Auto-play on mount (the parent only mounts this after the user taps play).
-  useEffect(() => {
+  // Stable pause closure for the one-at-a-time registry.
+  const pauseSelfRef = useRef<() => void>(() => {});
+  pauseSelfRef.current = () => player.pause();
+  const pauseSelf = useRef(() => pauseSelfRef.current()).current;
+
+  const startPlay = () => {
+    claimPlayback(pauseSelf);
     player.play();
+  };
+
+  // Auto-play on mount (profile tiles only mount this after the play tap).
+  useEffect(() => {
+    if (autoPlay) startPlay();
+    return () => releasePlayback(pauseSelf);
   }, []);
+
+  // Surface the real duration to the parent once known.
+  useEffect(() => {
+    if (onDuration && status.duration > 0) onDuration(status.duration);
+  }, [status.duration]);
 
   // When a track finishes, rewind + pause so the play button is ready to replay
   // rather than leaving it stuck at the end.
@@ -95,9 +140,11 @@ function AudioPlayerBar({ uri, fallbackDuration }: { uri: string; fallbackDurati
     <View style={styles.playerBar}>
       <Pressable
         style={styles.playBtn}
-        onPress={() => (status.playing ? player.pause() : player.play())}
+        onPress={() => (status.playing ? player.pause() : startPlay())}
       >
-        <Text style={styles.playBtnText}>{status.playing ? '❚❚' : '▶'}</Text>
+        <Text style={styles.playBtnText}>
+          {!status.isLoaded ? '…' : status.playing ? '❚❚' : '▶'}
+        </Text>
       </Pressable>
       <View style={styles.scrubCol}>
         <View
@@ -157,7 +204,11 @@ export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout 
           )}
         </View>
 
-        {activated ? (
+        {AUDIO_IS_STUB ? (
+          <View style={[styles.bigPlay, styles.bigPlayDisabled]}>
+            <Text style={styles.bigPlayLabel}>update the app to play audio</Text>
+          </View>
+        ) : activated ? (
           <AudioPlayerBar uri={uri} fallbackDuration={piece.duration_seconds} />
         ) : (
           <Pressable style={styles.bigPlay} onPress={() => setActivated(true)}>
@@ -229,6 +280,10 @@ const styles = StyleSheet.create({
   bigPlayIcon: {
     fontSize: 20,
     color: Colors.black,
+  },
+  bigPlayDisabled: {
+    opacity: 0.45,
+    borderStyle: 'dashed',
   },
   bigPlayLabel: {
     fontFamily: Fonts.serif,
