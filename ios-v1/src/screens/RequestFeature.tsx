@@ -62,6 +62,16 @@ export default function RequestFeature() {
   const [newTitle, setNewTitle] = useState('');
   const [posting, setPosting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<FeatureRequestOut | null>(null);
+  // Rows whose full title is shown (tap toggles truncation for long requests).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const load = useCallback(async () => {
     try {
@@ -162,10 +172,21 @@ export default function RequestFeature() {
               <Pressable
                 key={r.id}
                 style={styles.row}
+                onPress={() => toggleExpanded(r.id)}
                 onLongPress={canDelete(r) ? () => setPendingDelete(r) : undefined}
                 delayLongPress={400}
               >
-                <Text style={styles.rowTitle} numberOfLines={2}>{r.title}</Text>
+                <View style={styles.rowMain}>
+                  <Text
+                    style={styles.rowTitle}
+                    numberOfLines={expanded.has(r.id) ? undefined : 2}
+                  >
+                    {r.title}
+                  </Text>
+                  {r.username != null && (
+                    <Text style={styles.rowRequester}>@{r.username}</Text>
+                  )}
+                </View>
                 <View style={styles.voteRow}>
                   <Pressable
                     style={[styles.voteItem, r.my_vote === 1 && styles.voteItemActive]}
@@ -283,11 +304,20 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     marginBottom: -1,
   },
-  rowTitle: {
+  rowMain: {
     flex: 1,
+    paddingVertical: 12,
+  },
+  rowTitle: {
     // System font (San Francisco) = sans-serif.
     fontSize: FontSizes.md,
     color: Colors.black,
+  },
+  rowRequester: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.micro,
+    color: Colors.textMuted,
+    marginTop: 4,
   },
   voteRow: {
     flexDirection: 'row',

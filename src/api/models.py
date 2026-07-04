@@ -131,7 +131,9 @@ class FeatureRequestIn(BaseModel):
 
 class FeatureRequestOut(BaseModel):
     id: uuid.UUID
-    username: str
+    # Requester identity — only populated for admin callers; None for members
+    # so the board stays anonymous to everyone else.
+    username: str | None = None
     title: str
     up: int = 0
     down: int = 0

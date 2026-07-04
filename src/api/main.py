@@ -1833,10 +1833,12 @@ async def list_feature_requests_endpoint(
     current_member: Member = Depends(get_current_member),
 ):
     rows = await db_list_feature_requests(db, current_member.id)
+    is_admin = current_member.role == "admin"
     return [
         FeatureRequestOut(
             id=req.id,
-            username=username,
+            # Board is anonymous to members; only admins see who asked.
+            username=username if is_admin else None,
             title=req.title,
             up=up,
             down=down,
@@ -1860,7 +1862,7 @@ async def submit_feature_request(
     row = await db_create_feature_request(db, current_member.id, title)
     return FeatureRequestOut(
         id=row.id,
-        username=current_member.username,
+        username=current_member.username if current_member.role == "admin" else None,
         title=row.title,
         is_owner=True,
         created_at=row.created_at,

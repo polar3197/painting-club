@@ -278,7 +278,8 @@ export interface MediaType {
 
 export interface FeatureRequestOut {
   id: string;
-  username: string;
+  // Requester — only present when the viewer is an admin.
+  username: string | null;
   title: string;
   up: number;
   down: number;

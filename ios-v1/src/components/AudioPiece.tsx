@@ -6,6 +6,7 @@ import {
   StyleSheet,
   LayoutChangeEvent,
   PanResponder,
+  Animated,
 } from 'react-native';
 import * as ExpoAudio from 'expo-audio';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -42,6 +43,47 @@ function fmtTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// Little animated level bars shown while a track plays (echoes the recorder's
+// live waveform). Purely decorative — staggered scaleY loops on the native
+// driver, so it costs nothing on the JS thread.
+const EQ_BARS = [0, 1, 2, 3];
+const EQ_DURATIONS = [340, 260, 420, 300];
+
+function EqBars({ playing }: { playing: boolean }) {
+  const anims = useRef(EQ_BARS.map(() => new Animated.Value(0.25))).current;
+  const loops = useRef<Animated.CompositeAnimation[]>([]);
+
+  useEffect(() => {
+    if (playing) {
+      loops.current = anims.map((v, i) =>
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(v, { toValue: 1, duration: EQ_DURATIONS[i], useNativeDriver: true }),
+            Animated.timing(v, { toValue: 0.2, duration: EQ_DURATIONS[(i + 2) % 4], useNativeDriver: true }),
+            Animated.timing(v, { toValue: 0.65, duration: EQ_DURATIONS[(i + 1) % 4], useNativeDriver: true }),
+            Animated.timing(v, { toValue: 0.3, duration: EQ_DURATIONS[(i + 3) % 4], useNativeDriver: true }),
+          ]),
+        ),
+      );
+      loops.current.forEach((l) => l.start());
+    } else {
+      loops.current.forEach((l) => l.stop());
+      anims.forEach((v) =>
+        Animated.timing(v, { toValue: 0.25, duration: 160, useNativeDriver: true }).start(),
+      );
+    }
+    return () => loops.current.forEach((l) => l.stop());
+  }, [playing]);
+
+  return (
+    <View style={styles.eqWrap}>
+      {EQ_BARS.map((i) => (
+        <Animated.View key={i} style={[styles.eqBar, { transform: [{ scaleY: anims[i] }] }]} />
+      ))}
+    </View>
+  );
 }
 
 /**
@@ -146,6 +188,7 @@ export function AudioPlayerBar({
           {!status.isLoaded ? '…' : status.playing ? '❚❚' : '▶'}
         </Text>
       </Pressable>
+      <EqBars playing={status.playing} />
       <View style={styles.scrubCol}>
         <View
           style={styles.track}
@@ -312,6 +355,19 @@ const styles = StyleSheet.create({
   playBtnText: {
     fontSize: 16,
     color: Colors.black,
+  },
+  // Playback level bars (between play button and scrubber).
+  eqWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 20,
+  },
+  eqBar: {
+    width: 3,
+    height: 20,
+    borderRadius: 1.5,
+    backgroundColor: Colors.black,
   },
   scrubCol: {
     flex: 1,
