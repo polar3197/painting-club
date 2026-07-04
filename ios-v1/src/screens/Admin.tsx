@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import {
   get_applications,
+  get_password_resets,
   update_application_status,
   delete_application,
   ApplicationOut,
+  PasswordResetOut,
   get_media_requests,
   update_media_request,
   MediaRequest,
@@ -258,11 +260,13 @@ export default function Admin() {
   const { token } = useAuth();
   const [tab, setTab] = useState<'applications' | 'media-requests' | 'reports'>('applications');
   const [applications, setApplications] = useState<ApplicationOut[]>([]);
+  const [resets, setResets] = useState<PasswordResetOut[]>([]);
   const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
   const [reports, setReports] = useState<ReportOut[]>([]);
 
   const fetchApps = () => {
     get_applications(token).then(setApplications).catch(() => {});
+    get_password_resets(token).then(setResets).catch(() => {});
   };
 
   const fetchRequests = () => {
@@ -372,7 +376,23 @@ export default function Admin() {
         </>
       ) : tab === 'applications' ? (
         <>
-          <Text style={styles.sectionHeader}>pending</Text>
+          {resets.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>password resets</Text>
+              {resets.map((r) => (
+                <View key={r.username} style={styles.resetRow}>
+                  <Text style={styles.resetName}>
+                    {r.username}
+                    {r.firstname ? `  (${r.firstname} ${r.lastname ?? ''})` : ''}
+                  </Text>
+                  {!!r.email && <Text style={styles.resetMeta}>{r.email}</Text>}
+                  <Text style={styles.resetMeta}>send them this code (expires in 24h):</Text>
+                  <Text selectable style={styles.resetCode}>{r.code}</Text>
+                </View>
+              ))}
+            </>
+          )}
+          <Text style={[styles.sectionHeader, resets.length > 0 && { marginTop: 24 }]}>pending</Text>
           {pending.length === 0 ? (
             <Text style={styles.emptyText}>no pending applications</Text>
           ) : (
@@ -440,6 +460,30 @@ const styles = StyleSheet.create({
   },
   titleInactive: {
     opacity: 0.4,
+  },
+  resetRow: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    padding: 12,
+    marginBottom: 8,
+    gap: 2,
+  },
+  resetName: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    fontWeight: '600',
+  },
+  resetMeta: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xxs,
+    color: Colors.textSecondary,
+  },
+  resetCode: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.md,
+    letterSpacing: 1,
+    marginTop: 4,
   },
   sectionHeader: {
     fontFamily: Fonts.serif,

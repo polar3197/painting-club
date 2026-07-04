@@ -59,6 +59,15 @@ export interface ApplicationIn {
   reason?: string;
 }
 
+export interface PasswordResetOut {
+  username: string;
+  email: string | null;
+  firstname: string | null;
+  lastname: string | null;
+  code: string;
+  expires_at: string | null;
+}
+
 export interface ApplicationOut {
   id: string;
   firstname: string;

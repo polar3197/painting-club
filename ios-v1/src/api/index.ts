@@ -8,6 +8,7 @@ import type {
   Profile,
   ApplicationIn,
   ApplicationOut,
+  PasswordResetOut,
   SetupAccountIn,
   SetupCodePayload,
   Visual2DIn,
@@ -466,6 +467,12 @@ export function submit_application(payload: ApplicationIn): Promise<unknown> {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export function get_password_resets(token: string | null): Promise<PasswordResetOut[]> {
+  return request('/admin/password-resets', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }) as Promise<PasswordResetOut[]>;
 }
 
 export function get_applications(token: string | null): Promise<ApplicationOut[]> {
