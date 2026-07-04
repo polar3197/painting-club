@@ -91,6 +91,28 @@ class MediaRequestUpdate(BaseModel):
     name: str | None = None  # admin may rename before approving
 
 
+class FeatureRequestIn(BaseModel):
+    title: str
+
+class FeatureRequestOut(BaseModel):
+    id: uuid.UUID
+    username: str
+    title: str
+    up: int = 0
+    down: int = 0
+    my_vote: int | None = None  # +1 | -1 | None
+    is_owner: bool = False
+    created_at: datetime
+
+class FeatureRequestVoteIn(BaseModel):
+    value: int  # +1 | -1
+
+class FeatureRequestVoteOut(BaseModel):
+    up: int
+    down: int
+    my_vote: int | None = None
+
+
 class MediaVisibilityUpdate(BaseModel):
     hidden: bool
 

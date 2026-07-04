@@ -32,6 +32,10 @@ from api.models import (
     MediaRequestIn,
     MediaRequestOut,
     MediaRequestUpdate,
+    FeatureRequestIn,
+    FeatureRequestOut,
+    FeatureRequestVoteIn,
+    FeatureRequestVoteOut,
     MediaVisibilityUpdate,
     Visual2DOut,
     WrittenFormOut,
@@ -102,6 +106,13 @@ from db.db_ops.media_requests import (
     db_create_media_request,
     db_list_media_requests,
     db_resolve_media_request,
+)
+
+from db.db_ops.feature_requests import (
+    db_create_feature_request,
+    db_list_feature_requests,
+    db_vote_feature_request,
+    db_delete_feature_request,
 )
 
 from db.db_ops.applications import (
@@ -1794,6 +1805,82 @@ async def resolve_media_request(
         resolved_type=row.resolved_type,
         created_at=row.created_at,
     )
+
+
+# ====================== FEATURE REQUESTS =========================
+
+@app.get("/feature-requests", response_model=list[FeatureRequestOut])
+async def list_feature_requests_endpoint(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    rows = await db_list_feature_requests(db, current_member.id)
+    return [
+        FeatureRequestOut(
+            id=req.id,
+            username=username,
+            title=req.title,
+            up=up,
+            down=down,
+            my_vote=my_vote,
+            is_owner=req.member_id == current_member.id,
+            created_at=req.created_at,
+        )
+        for req, username, up, down, my_vote in rows
+    ]
+
+
+@app.post("/feature-requests", response_model=FeatureRequestOut, status_code=201)
+async def submit_feature_request(
+    payload: FeatureRequestIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    title = (payload.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title required")
+    row = await db_create_feature_request(db, current_member.id, title)
+    return FeatureRequestOut(
+        id=row.id,
+        username=current_member.username,
+        title=row.title,
+        is_owner=True,
+        created_at=row.created_at,
+    )
+
+
+@app.put("/feature-requests/{request_id}/vote", response_model=FeatureRequestVoteOut)
+async def vote_feature_request_endpoint(
+    request_id: str,
+    payload: FeatureRequestVoteIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        up, down, my_vote = await db_vote_feature_request(
+            db, request_id, current_member.id, payload.value
+        )
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "not found" in msg else 400, detail=msg)
+    return FeatureRequestVoteOut(up=up, down=down, my_vote=my_vote)
+
+
+@app.delete("/feature-requests/{request_id}")
+async def delete_feature_request_endpoint(
+    request_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        await db_delete_feature_request(
+            db, request_id, current_member.id, is_admin=current_member.role == "admin"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return {"ok": True}
 
 
 # ====================== REPORTS + BLOCKS =========================

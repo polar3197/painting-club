@@ -30,11 +30,11 @@ const ThumbCell = ({ piece, onClick }: { piece: WrittenFormOut; onClick: () => v
 };
 
 const CollectionZoomIn = ({
-    collectionName,
+    seriesName,
     pieces,
     onClose,
 }: {
-    collectionName: string;
+    seriesName: string;
     pieces: WrittenFormOut[];
     onClose: () => void;
 }) => {
@@ -61,7 +61,7 @@ const CollectionZoomIn = ({
         <div className="collection-zoom-backdrop" onClick={onClose}>
             <div className="collection-zoom-panel" onClick={(e) => e.stopPropagation()}>
                 <div className="collection-zoom-header">
-                    <div className="collection-zoom-title">{collectionName}</div>
+                    <div className="collection-zoom-title">{seriesName}</div>
                     <button className="collection-zoom-close" onClick={onClose}>x</button>
                 </div>
                 <div className="collection-zoom-grid">

@@ -5,7 +5,7 @@ from db.models import Member, MediaRequest
 from db.db_ops.media import db_create_media
 
 
-VALID_TYPES = {"visual_2d", "written_form"}
+VALID_TYPES = {"visual_2d", "written_form", "audio"}
 
 
 async def db_create_media_request(db: AsyncSession, member_id: str, name: str) -> MediaRequest:

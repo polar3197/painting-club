@@ -227,9 +227,15 @@
   }
 
   .login-container--setup {
+    /* Drop the 40vh downward shift so the card flows in normal document order
+       and the page (overflow-y: auto) can scroll the whole form. The extra
+       bottom margin guarantees room to scroll the submit button up above the
+       on-screen keyboard. */
+    top: auto !important;
     aspect-ratio: auto !important;
     height: auto !important;
     max-height: none !important;
+    margin: 1.5rem auto 4rem auto !important;
   }
 
   .login-setup-heading {

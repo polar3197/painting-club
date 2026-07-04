@@ -10,22 +10,27 @@ function detectExt(name: string): string {
     return m ? m[1] : "";
 }
 
+type Mode = "file" | "text";
+
 const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: Record<string, any>) => void; initialData?: WrittenFormOut }) => {
+    const [mode, setMode] = useState<Mode>("file");
     const [form, setForm] = useState<{
         title: string;
         date: string;
         keywords: string;
-        collection: string;
+        series: string;
         comments_enabled: boolean;
-        files: File | null; }>
-        ({
-            title: initialData?.title ?? "",
-            date: initialData?.date ?? "",
-            keywords: initialData?.keywords?.join(", ") ?? "",
-            collection: initialData?.collection_name ?? "",
-            comments_enabled: initialData?.comments_enabled ?? false,
-            files: null,
-        });
+        files: File | null;
+        text: string;
+    }>({
+        title: initialData?.title ?? "",
+        date: initialData?.date ?? "",
+        keywords: initialData?.keywords?.join(", ") ?? "",
+        series: initialData?.series_name ?? "",
+        comments_enabled: initialData?.comments_enabled ?? false,
+        files: null,
+        text: "",
+    });
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [snippet, setSnippet] = useState<string | null>(null);
 
@@ -33,6 +38,16 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
         const next = { ...form, ...patch };
         setForm(next);
         onDataChange(next);
+    };
+
+    // Reset the side that isn't active so AddArtDialog never reads stale data
+    // from the inactive mode (we already do that on submit, but this keeps the
+    // payload preview honest while typing).
+    const pickMode = (next: Mode) => {
+        if (next === mode) return;
+        setMode(next);
+        if (next === "file") update({ text: "" });
+        else update({ files: null });
     };
 
     useEffect(() => {
@@ -53,25 +68,52 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
 
     return (
         <div className="written-form-form">
-        <div className="written-form-dropbox" onClick={() => fileInputRef.current?.click()}>
-            <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                accept={ACCEPTED}
-                onChange={(e) => update({ files: e.target.files?.[0] ?? null })}
-            />
-            {form.files ? (
-                <div className="written-form-preview">
-                    <div className="written-form-badge">{fileExt}</div>
-                    {snippet ? (
-                        <pre className="written-form-preview-snippet">{snippet}</pre>
+        <div className="written-form-frame">
+            <div className="written-form-mode-tabs">
+                <button
+                    type="button"
+                    className={`written-form-mode-tab${mode === "file" ? " active" : ""}`}
+                    onClick={() => pickMode("file")}
+                >
+                    upload .txt
+                </button>
+                <button
+                    type="button"
+                    className={`written-form-mode-tab${mode === "text" ? " active" : ""}`}
+                    onClick={() => pickMode("text")}
+                >
+                    paste text
+                </button>
+            </div>
+            {mode === "file" ? (
+                <div className="written-form-dropbox" onClick={() => fileInputRef.current?.click()}>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: "none" }}
+                        accept={ACCEPTED}
+                        onChange={(e) => update({ files: e.target.files?.[0] ?? null })}
+                    />
+                    {form.files ? (
+                        <div className="written-form-preview">
+                            <div className="written-form-badge">{fileExt}</div>
+                            {snippet ? (
+                                <pre className="written-form-preview-snippet">{snippet}</pre>
+                            ) : (
+                                <div className="written-form-filename">{form.files.name}</div>
+                            )}
+                        </div>
                     ) : (
-                        <div className="written-form-filename">{form.files.name}</div>
+                        "drop your writing here"
                     )}
                 </div>
             ) : (
-                "drop your writing here"
+                <textarea
+                    className="written-form-dropbox written-form-textarea"
+                    value={form.text}
+                    placeholder="paste your text here"
+                    onChange={(e) => update({ text: e.target.value })}
+                />
             )}
         </div>
         <div className="painting-title">
@@ -98,9 +140,9 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
         </div>
         <div className="written-form-collection-field">
             <input
-                value={form.collection}
-                placeholder="collection (optional)"
-                onChange={(e) => update({ collection: e.target.value })}
+                value={form.series}
+                placeholder="series (optional)"
+                onChange={(e) => update({ series: e.target.value })}
             />
         </div>
         <div className="painting-comments-toggle">

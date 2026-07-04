@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS audio (
 ALTER TABLE audio ADD COLUMN IF NOT EXISTS duration_seconds DOUBLE PRECISION;
 ALTER TABLE audio ADD COLUMN IF NOT EXISTS artist VARCHAR(255);
 
+-- Relabel the pre-existing 'song' media (historically type=NULL) as audio.
+UPDATE media SET type='audio' WHERE name='song' AND type IS NULL;
+
 -- Seed the two audio media names (both share type='audio').
 INSERT INTO media (id, name, type)
 SELECT gen_random_uuid(), 'voice memo', 'audio'

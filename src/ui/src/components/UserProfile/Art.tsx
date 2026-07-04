@@ -139,7 +139,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
 
     const startWrittenFormUpload = (payload: WrittenFormIn) => {
         const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const ext = (payload.file.name.match(/\.([a-z0-9]+)$/i)?.[1] ?? "FILE").toUpperCase();
+        const ext = (payload.file?.name.match(/\.([a-z0-9]+)$/i)?.[1] ?? "TXT").toUpperCase();
         setPendingWrittenForms(p => [...p, { tempId, medium: payload.medium, title: payload.title || "uploading…", ext }]);
         const token = localStorage.getItem("token");
         add_new_written_form(token, payload)
@@ -263,23 +263,23 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                         const filtered = (selectedKeywords.length > 0
                             ? writtenForms.filter(p => selectedKeywords.every(k => p.keywords?.includes(k)))
                             : writtenForms);
-                        // Group by collection_id while preserving the original (date-desc)
+                        // Group by series_id while preserving the original (date-desc)
                         // ordering: a group's position in the list is set by its first piece.
                         type Row =
                             | { kind: "piece"; piece: WrittenFormOut }
-                            | { kind: "collection"; id: string; name: string; pieces: WrittenFormOut[] };
+                            | { kind: "series"; id: string; name: string; pieces: WrittenFormOut[] };
                         const groups: Record<string, { id: string; name: string; pieces: WrittenFormOut[] }> = {};
                         const rows: Row[] = [];
                         for (const p of filtered) {
-                            if (!p.collection_id) {
+                            if (!p.series_id) {
                                 rows.push({ kind: "piece", piece: p });
                                 continue;
                             }
-                            if (!groups[p.collection_id]) {
-                                groups[p.collection_id] = { id: p.collection_id, name: p.collection_name ?? "(untitled collection)", pieces: [] };
-                                rows.push({ kind: "collection", id: p.collection_id, name: groups[p.collection_id].name, pieces: groups[p.collection_id].pieces });
+                            if (!groups[p.series_id]) {
+                                groups[p.series_id] = { id: p.series_id, name: p.series_name ?? "(untitled series)", pieces: [] };
+                                rows.push({ kind: "series", id: p.series_id, name: groups[p.series_id].name, pieces: groups[p.series_id].pieces });
                             }
-                            groups[p.collection_id].pieces.push(p);
+                            groups[p.series_id].pieces.push(p);
                         }
                         return <>
                             {pendingWrittenForms.filter(p => p.medium === selectedMedium).map(p => (
@@ -315,8 +315,8 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                                     key={row.id}
                                     isOwner={profile.is_owner}
                                     pieces={row.pieces}
-                                    collectionId={row.id}
-                                    collectionName={row.name}
+                                    seriesId={row.id}
+                                    seriesName={row.name}
                                     username={profile.username}
                                     selectedMedium={selectedMedium!}
                                     onRefresh={onRefresh}

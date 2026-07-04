@@ -95,6 +95,20 @@
         max-width: 100%;
     }
 
+    /* Anchor to the top instead of vertically centering. A centered fixed
+       dialog gets its lower half (the submit button) hidden behind the
+       on-screen keyboard with no way to reach it. Top-anchored + height:auto
+       capped to the visible viewport lets the form scroll, keeping submit
+       reachable above the keyboard. (.dialog.application-dialog beats the
+       shared .dialog rules regardless of stylesheet order.) */
+    .dialog.application-dialog {
+        top: 1rem;
+        transform: translateX(-50%);
+        height: auto;
+        max-height: calc(100vh - 2rem);
+        max-height: calc(100dvh - 2rem);
+    }
+
     .application-body {
         padding: 24px 18px 18px 18px;
     }

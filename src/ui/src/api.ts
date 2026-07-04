@@ -192,6 +192,7 @@ export interface Visual2DIn {
   width?: number | null;
   keywords?: string;
   comments_enabled?: boolean;
+  collection_id?: string | null;
   file: File;
 }
 
@@ -384,6 +385,7 @@ export function add_new_visual_2d(token: string | null, payload: Visual2DIn) {
   if (payload.height != null) fd.append("height", String(payload.height));
   if (payload.keywords != null) fd.append("keywords", String(payload.keywords));
   if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
+  if (payload.collection_id) fd.append("collection_id", payload.collection_id);
   fd.append("file", payload.file);
 
   return request("/art/upload/visual-2d", {
@@ -443,8 +445,10 @@ export interface WrittenFormIn {
   date?: string;
   keywords?: string;
   comments_enabled?: boolean;
-  collection_name?: string;
-  file: File;
+  series_name?: string;
+  // Provide exactly one of file or text.
+  file?: File;
+  text?: string;
 }
 
 export interface WrittenFormOut {
@@ -454,8 +458,9 @@ export interface WrittenFormOut {
   keywords: string[];
   file_path: string;
   comments_enabled: boolean;
-  collection_id: string | null;
-  collection_name: string | null;
+  series_id: string | null;
+  series_name: string | null;
+  order_index: number | null;
 }
 
 export function add_new_written_form(token: string | null, payload: WrittenFormIn) {
@@ -466,8 +471,9 @@ export function add_new_written_form(token: string | null, payload: WrittenFormI
   if (payload.date) fd.append("date", payload.date);
   if (payload.keywords != null) fd.append("keywords", String(payload.keywords));
   if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
-  if (payload.collection_name) fd.append("collection_name", payload.collection_name);
-  fd.append("file", payload.file);
+  if (payload.series_name) fd.append("series_name", payload.series_name);
+  if (payload.file) fd.append("file", payload.file);
+  if (payload.text) fd.append("text", payload.text);
 
   return request("/art/upload/written-form", {
     method: "POST",
@@ -490,8 +496,8 @@ export interface WrittenFormUpdatePayload {
   keywords?: string[] | null;
   comments_enabled?: boolean;
   medium?: string | null;
-  collection_name?: string | null;
-  clear_collection?: boolean;
+  series_name?: string | null;
+  clear_series?: boolean;
 }
 
 export function update_written_form(id: string, token: string | null, payload: WrittenFormUpdatePayload) {
@@ -502,12 +508,47 @@ export function update_written_form(id: string, token: string | null, payload: W
   });
 }
 
-export function rename_collection(id: string, name: string, token: string | null): Promise<{ id: string; name: string }> {
-  return request(`/collections/${id}`, {
+export function rename_series(id: string, name: string, token: string | null): Promise<{ id: string; name: string }> {
+  return request(`/series/${id}`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ name }),
   }) as Promise<{ id: string; name: string }>;
+}
+
+export function set_series_order(id: string, art_ids: string[], token: string | null): Promise<{ ok: true }> {
+  return request(`/series/${id}/order`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ art_ids }),
+  }) as Promise<{ ok: true }>;
+}
+
+export interface PromptOut {
+  id: string;
+  title: string;
+  short_summary: string | null;
+  media_id: string;
+  media_name: string;
+  is_active: boolean;
+  submission_count: number;
+}
+
+export interface PromptDetailOut extends PromptOut {
+  submissions: ArtResult[];
+  viewer_submission_id: string | null;
+}
+
+export function get_active_prompt(token: string | null): Promise<PromptOut | null> {
+  return request("/prompts/active", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }) as Promise<PromptOut | null>;
+}
+
+export function get_prompt(id: string, token: string | null): Promise<PromptDetailOut> {
+  return request(`/prompts/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }) as Promise<PromptDetailOut>;
 }
 
 export interface CommentOut {

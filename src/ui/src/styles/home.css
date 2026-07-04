@@ -75,6 +75,47 @@
     box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
 }
 
+.prompt-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 28px 36px;
+    background-color: rgb(210, 243, 210);
+    border: 2px solid black;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    cursor: pointer;
+}
+
+.prompt-banner-label {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: lowercase;
+    color: #333;
+}
+
+.prompt-banner-title {
+    font-size: 28px;
+    font-weight: 500;
+    color: #000;
+    text-align: center;
+}
+
+.prompt-banner-medium {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    color: #555;
+}
+
+.prompt-banner-empty {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    color: #555;
+    opacity: 0.6;
+}
+
 .stamp-wrapper {
     display: flex;
     width: 100%;

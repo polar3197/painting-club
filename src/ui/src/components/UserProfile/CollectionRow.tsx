@@ -11,36 +11,41 @@ function previewSnippet(text: string | null): string {
     return text.split(/\r?\n/).slice(0, PREVIEW_LINES).join("\n");
 }
 
-// Sort pieces inside a collection oldest-first so the "top of the stack"
-// (rendered last so it sits on top visually) is the most recent piece.
+// Sort pieces inside a series by user-defined order_index (nulls last),
+// with date desc as tiebreak. ordered[0] is the "top of the stack".
 function sortPieces(pieces: WrittenFormOut[]): WrittenFormOut[] {
     return [...pieces].sort((a, b) => {
-        const ad = a.date ?? "";
-        const bd = b.date ?? "";
-        if (ad === bd) return 0;
-        return ad < bd ? -1 : 1;
+        const ai = a.order_index;
+        const bi = b.order_index;
+        if (ai == null && bi == null) {
+            return (b.date ?? "").localeCompare(a.date ?? "");
+        }
+        if (ai == null) return 1;
+        if (bi == null) return -1;
+        if (ai !== bi) return ai - bi;
+        return (b.date ?? "").localeCompare(a.date ?? "");
     });
 }
 
 const CollectionRow = ({
     isOwner,
     pieces,
-    collectionId,
-    collectionName,
+    seriesId,
+    seriesName,
     username,
     selectedMedium,
     onRefresh,
 }: {
     isOwner: boolean;
     pieces: WrittenFormOut[];
-    collectionId: string;
-    collectionName: string;
+    seriesId: string;
+    seriesName: string;
     username: string;
     selectedMedium: string;
     onRefresh: () => void;
 }) => {
     const ordered = sortPieces(pieces);
-    const topPiece = ordered[ordered.length - 1] ?? pieces[0];
+    const topPiece = ordered[0] ?? pieces[0];
     const [isZoomedIn, setIsZoomedIn] = useState(false);
     const [showPanel, setShowPanel] = useState(false);
 
@@ -55,7 +60,7 @@ const CollectionRow = ({
         <>
         {isZoomedIn && (
             <CollectionZoomIn
-                collectionName={collectionName}
+                seriesName={seriesName}
                 pieces={ordered}
                 onClose={() => setIsZoomedIn(false)}
             />
@@ -63,15 +68,15 @@ const CollectionRow = ({
         {showPanel && (
             <CollectionPanel
                 pieces={ordered}
-                collectionId={collectionId}
-                collectionName={collectionName}
+                seriesId={seriesId}
+                seriesName={seriesName}
                 username={username}
                 selectedMedium={selectedMedium}
                 onClose={() => setShowPanel(false)}
                 onRefresh={onRefresh}
             />
         )}
-        <div id={`collection-${collectionId}`} className="art-element written-form collection clickable" onClick={() => setIsZoomedIn(true)}>
+        <div id={`series-${seriesId}`} className="art-element written-form collection clickable" onClick={() => setIsZoomedIn(true)}>
             <div className="art-visual">
                 <div className="written-form-stack">
                     {/* Back layers stay within the art-visual footprint by rotating
@@ -103,7 +108,7 @@ const CollectionRow = ({
             <div className="art-right">
                 <div className="art-details">
                     <div className="art-details-header">
-                        <div className="art-details-title">{collectionName}</div>
+                        <div className="art-details-title">{seriesName}</div>
                         <div className="art-details-element">{ordered.length} piece{ordered.length === 1 ? "" : "s"}</div>
                     </div>
                 </div>

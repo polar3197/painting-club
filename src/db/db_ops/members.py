@@ -6,7 +6,7 @@ import bcrypt
 from db.models import (
     Member, Application, Art, Visual2D, WrittenForm, Comment,
     Media, Media_Members, MediaRequest, Report, BlockedMember,
-    PromptRecords, KeywordArt,
+    KeywordArt,
 )
 
 async def db_get_members(db: AsyncSession):
@@ -292,7 +292,6 @@ async def db_delete_member(db: AsyncSession, member_id) -> tuple[list[str], list
     await db.execute(delete(Report).filter(Report.reporter_id == member_id))
     await db.execute(delete(MediaRequest).filter(MediaRequest.member_id == member_id))
     await db.execute(delete(Application).filter(Application.member_id == member_id))
-    await db.execute(delete(PromptRecords).filter(PromptRecords.member_id == member_id))
     await db.execute(delete(Media_Members).filter(Media_Members.member_id == member_id))
 
     if art_ids:

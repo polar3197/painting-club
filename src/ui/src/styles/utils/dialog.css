@@ -289,17 +289,50 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 }
 
 /* =============== WRITTEN FORM ============= */
-/* Mirrors .painting-dropbox 1:1 except the proportions: portrait 8.5x11
-   instead of a free aspect ratio. Same border, hover, font, and corner anchor. */
-.written-form-dropbox {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+/* The frame owns the corner-anchored portrait box that used to be the dropbox.
+   Inside, a tabs row sits above the file/text frame so the user picks the
+   input mode without leaving the same visual footprint. */
+.written-form-frame {
     position: absolute;
     height: 70%;
     aspect-ratio: 8.5 / 11;
     top: 20px;
     left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.written-form-mode-tabs {
+    flex: 0 0 32px;
+    display: flex;
+    gap: 6px;
+}
+
+.written-form-mode-tab {
+    flex: 1;
+    border: 1px solid black;
+    background-color: transparent;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.written-form-mode-tab.active {
+    background-color: rgb(250, 244, 202);
+}
+
+.written-form-mode-tab:hover {
+    background-color: rgb(250, 244, 202);
+}
+
+.written-form-dropbox {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     border: 1px black solid;
     font-family: 'Times New Roman', Times, serif;
     cursor: pointer;
@@ -307,6 +340,20 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
 
 .written-form-dropbox:hover {
     background-color: rgb(250, 244, 202);
+}
+
+.written-form-textarea {
+    cursor: text;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.4;
+    resize: none;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.written-form-textarea:hover {
+    background-color: transparent;
 }
 
 .written-form-preview {
@@ -462,6 +509,23 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     padding: 10px 12px;
     background-color: #ffffff;
     border: 1px black solid;
+    cursor: grab;
+}
+
+.collection-panel-row.dragging {
+    opacity: 0.4;
+}
+
+.collection-panel-row.drop-target {
+    border-top: 2px solid rgb(238, 190, 100);
+}
+
+.collection-panel-drag-handle {
+    font-family: monospace;
+    font-size: 18px;
+    color: #888;
+    user-select: none;
+    padding: 0 4px;
 }
 
 .collection-panel-meta {
@@ -714,8 +778,10 @@ input[type="checkbox"]:checked + .toggle-track .toggle-thumb {
     .dialog {
         width: 95vw;
         height: 90vh;
+        height: 90dvh;
         max-width: 95vw;
         max-height: 90vh;
+        max-height: 90dvh;
     }
 
     .blowup-wrapper {

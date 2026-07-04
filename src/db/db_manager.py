@@ -122,6 +122,12 @@ async def run_migrations():
             ),
             {"names": list(_WRITTEN_FORM_SEED)},
         )
+        # Relabel the pre-existing 'song' media (historically type=NULL) as audio
+        # so it renders/uploads through the audio pipeline. Scoped to type IS NULL
+        # so we never clobber an intentional type set later.
+        await conn.execute(text(
+            "UPDATE media SET type='audio' WHERE name='song' AND type IS NULL"
+        ))
         # Seed the audio media forms. INSERT-WHERE-NOT-EXISTS keeps this
         # idempotent: media.name has no unique constraint and create_all skips
         # the Python-side id default, so we supply gen_random_uuid() explicitly.

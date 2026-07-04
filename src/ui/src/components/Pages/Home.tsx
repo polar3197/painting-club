@@ -1,24 +1,22 @@
-
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import "../../styles/app-layout.css";
-import "../../styles/home.css"
-
-const HomeConfig = {
-  // coords are measured in rem from bottom left
-  "login_left": 32,
-  "login_bottom": 16,
-  "login_background_color": "lightgreen",
-  // coords are measured in rem from bottom left
-  "title_left": 14,
-  "title_bottom": 36,
-  // coords are measured in rem from bottom left
-  "announcements_left": 45,
-  "announcements_bottom": 3
-}
+import "../../styles/home.css";
+import { get_active_prompt, PromptOut } from "../../api";
 
 export default function Home() {
-  // pick a random number
-  const config = HomeConfig;
+  const navigate = useNavigate();
+  const [prompt, setPrompt] = useState<PromptOut | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    let cancelled = false;
+    get_active_prompt(token)
+      .then((p) => { if (!cancelled) setPrompt(p); })
+      .catch(() => { if (!cancelled) setPrompt(null); });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <main className="page">
@@ -26,12 +24,21 @@ export default function Home() {
         <div className="home-left">
           <div className="home-left-top">
             <div className="home-left-title">-• Painting Club •-</div>
-
           </div>
           <div className="home-left-content">
-            weekly prompt
+            {prompt ? (
+              <button
+                className="prompt-banner"
+                onClick={() => navigate(`/prompts/${prompt.id}`)}
+              >
+                <div className="prompt-banner-label">this week's prompt</div>
+                <div className="prompt-banner-title">{prompt.title}</div>
+                <div className="prompt-banner-medium">medium: {prompt.media_name}</div>
+              </button>
+            ) : (
+              <div className="prompt-banner-empty">no prompt this week</div>
+            )}
           </div>
-
         </div>
         <div className="home-right">
             <div className="painting-club-message">
@@ -54,9 +61,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        {/* <div className="home-right">
-          <Announcements />
-        </div> */}
       </div>
     </main>
   );

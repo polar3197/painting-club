@@ -208,6 +208,26 @@ class MediaRequest(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class FeatureRequest(Base):
+    __tablename__ = "feature_request"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
+    title = Column(String(300), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FeatureRequestVote(Base):
+    __tablename__ = "feature_request_vote"
+
+    # Composite PK = one vote per member per request. Re-voting the same
+    # direction retracts; the opposite direction switches (handled in db_ops).
+    request_id = Column(UUID(as_uuid=True), ForeignKey('feature_request.id', ondelete='CASCADE'), primary_key=True)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
+    value = Column(Integer, nullable=False)  # +1 up, -1 down
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Report(Base):
     __tablename__ = "report"
 

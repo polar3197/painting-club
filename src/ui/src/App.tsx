@@ -14,6 +14,8 @@ import Support from "./components/Pages/Support";
 import SetupAccount from "./components/Pages/SetupAccount";
 import "./styles/app-layout.css";
 import Home from "./components/Pages/Home";
+import WeeklyPrompt from "./components/Pages/WeeklyPrompt";
+import WeeklyPromptGrid from "./components/Pages/WeeklyPromptGrid";
 
 export default function App() {
   useEffect(() => {
@@ -33,6 +35,8 @@ export default function App() {
         <Route element={<PageLayout />}>
           <Route path="/not-a-member" element={<NotMember />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/prompts/:id" element={<WeeklyPrompt />} />
+          <Route path="/prompts/:id/grid" element={<WeeklyPromptGrid />} />
           <Route path="/members/:username/profile" element={<UserProfile />} />
           <Route path="/members" element={<People />} />
           <Route path="/art" element={<ArtGallery />} />
