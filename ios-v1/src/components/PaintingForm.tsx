@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { TextInput } from './AppTextInput';
 import { Visual2DOut } from '../api';
+import { todayLocalISO } from '../utils/date';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 interface PaintingFormProps {
@@ -16,7 +17,9 @@ export default function PaintingForm({ onDataChange, initialData, rightSlot }: P
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
     location: initialData?.location ?? '',
-    date: initialData?.date ?? '',
+    // New pieces default to today (device-local) so profiles naturally order
+    // newest-first; editing keeps whatever the piece already has.
+    date: initialData ? initialData.date ?? '' : todayLocalISO(),
     song: initialData?.song ?? '',
     song_artist: initialData?.song_artist ?? '',
     width: initialData?.width ?? null as number | null,

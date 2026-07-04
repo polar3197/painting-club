@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { TextInput } from './AppTextInput';
 import { WrittenFormOut } from '../api';
+import { todayLocalISO } from '../utils/date';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 interface WrittenFormFormProps {
@@ -13,7 +14,7 @@ interface WrittenFormFormProps {
 export default function WrittenFormForm({ onDataChange, initialData, rightSlot }: WrittenFormFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
-    date: initialData?.date ?? '',
+    date: initialData ? initialData.date ?? '' : todayLocalISO(),
     keywords: initialData?.keywords?.join(', ') ?? '',
     series: initialData?.series_name ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
