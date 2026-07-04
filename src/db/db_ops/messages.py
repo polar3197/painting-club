@@ -269,6 +269,46 @@ async def db_send_message(db: AsyncSession, conversation_id, me_id, body: str) -
     return msg
 
 
+async def db_get_participants(db: AsyncSession, conversation_id, me_id):
+    """Roster of a conversation, participants-only visibility."""
+    part = await _db_get_participant(db, conversation_id, me_id)
+    if part is None:
+        raise PermissionError("Not a participant in this conversation")
+    rows = (
+        await db.execute(
+            select(Member.username, Member.firstname, Member.lastname, ConversationParticipant.role)
+            .join(ConversationParticipant, ConversationParticipant.member_id == Member.id)
+            .filter(ConversationParticipant.conversation_id == conversation_id)
+            .order_by(Member.username)
+        )
+    ).all()
+    return rows
+
+
+async def db_add_group_members(db: AsyncSession, conversation_id, me_id, member_ids) -> int:
+    """Add members to a group. Any current participant can invite; DMs are
+    immutable pairs. Already-present members are skipped. Returns # added."""
+    convo = (
+        await db.execute(select(Conversation).filter(Conversation.id == conversation_id))
+    ).scalar_one_or_none()
+    if convo is None:
+        raise ValueError("Conversation not found")
+    if convo.type != "group":
+        raise ValueError("Members can only be added to group conversations")
+    part = await _db_get_participant(db, conversation_id, me_id)
+    if part is None:
+        raise PermissionError("Not a participant in this conversation")
+
+    added = 0
+    for mid in member_ids:
+        existing = await _db_get_participant(db, conversation_id, mid)
+        if existing is None:
+            db.add(ConversationParticipant(conversation_id=conversation_id, member_id=mid))
+            added += 1
+    await db.commit()
+    return added
+
+
 async def db_leave_group(db: AsyncSession, conversation_id, me_id):
     convo = (
         await db.execute(select(Conversation).filter(Conversation.id == conversation_id))

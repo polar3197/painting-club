@@ -300,6 +300,13 @@ export interface MemberDirectoryEntry {
   lastname: string | null;
 }
 
+export interface ParticipantOut {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+  role: string;
+}
+
 export interface ConversationOut {
   id: string;
   type: 'dm' | 'group';

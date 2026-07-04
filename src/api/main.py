@@ -39,6 +39,8 @@ from api.models import (
     MemberDirectoryEntry,
     DmOpenIn,
     GroupCreateIn,
+    GroupInviteIn,
+    ParticipantOut,
     ConversationOut,
     MessageIn,
     MessageOut,
@@ -126,6 +128,8 @@ from db.db_ops.feature_requests import (
 from db.db_ops.messages import (
     db_get_or_create_dm,
     db_create_group,
+    db_get_participants,
+    db_add_group_members,
     db_list_conversations,
     db_get_unread_count,
     db_get_messages,
@@ -1992,6 +1996,45 @@ async def create_group_endpoint(
         type="group",
         title=payload.title.strip(),
     )
+
+
+@app.get("/conversations/{conversation_id}/participants", response_model=list[ParticipantOut])
+async def list_participants_endpoint(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        rows = await db_get_participants(db, conversation_id, current_member.id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return [
+        ParticipantOut(username=u, firstname=f, lastname=l, role=role)
+        for u, f, l, role in rows
+    ]
+
+
+@app.post("/conversations/{conversation_id}/participants")
+async def add_participants_endpoint(
+    conversation_id: str,
+    payload: GroupInviteIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    member_ids = []
+    for username in payload.usernames:
+        target = await db_resolve_username(db, username)
+        if target is None:
+            raise HTTPException(status_code=404, detail=f"Member not found: {username}")
+        member_ids.append(target.id)
+    try:
+        added = await db_add_group_members(db, conversation_id, current_member.id, member_ids)
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "not found" in msg else 400, detail=msg)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return {"ok": True, "added": added}
 
 
 @app.get("/conversations/{conversation_id}/messages", response_model=MessagesPage)

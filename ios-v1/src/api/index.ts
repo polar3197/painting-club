@@ -31,6 +31,7 @@ import type {
   MessageOut,
   MessagesPage,
   MemberDirectoryEntry,
+  ParticipantOut,
   PromptOut,
   PromptDetailOut,
   PromptSummary,
@@ -576,6 +577,27 @@ export function send_message(
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ body }),
   }) as Promise<MessageOut>;
+}
+
+export function get_participants(
+  conversation_id: string,
+  token: string | null,
+): Promise<ParticipantOut[]> {
+  return request(`/conversations/${conversation_id}/participants`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<ParticipantOut[]>;
+}
+
+export function add_group_members(
+  conversation_id: string,
+  usernames: string[],
+  token: string | null,
+): Promise<{ ok: boolean; added: number }> {
+  return request(`/conversations/${conversation_id}/participants`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ usernames }),
+  }) as Promise<{ ok: boolean; added: number }>;
 }
 
 export function leave_group(conversation_id: string, token: string | null) {

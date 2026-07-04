@@ -4,17 +4,29 @@ import {
   Text,
   Pressable,
   FlatList,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Alert,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { TextInput } from '../components/AppTextInput';
 import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { get_messages, send_message, leave_group, MessageOut } from '../api';
+import {
+  get_messages,
+  send_message,
+  leave_group,
+  get_participants,
+  add_group_members,
+  get_member_directory,
+  MessageOut,
+  MemberDirectoryEntry,
+} from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -80,6 +92,48 @@ export default function ConversationThread() {
   const firstLoadDone = useRef(false);
   const [input, setInput] = useState('');
   const [confirmLeave, setConfirmLeave] = useState(false);
+
+  // Invite-to-group sheet: directory members not already in the thread.
+  const [showInvite, setShowInvite] = useState(false);
+  const [invitable, setInvitable] = useState<MemberDirectoryEntry[]>([]);
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [inviting, setInviting] = useState(false);
+
+  const openInvite = async () => {
+    setInvited(new Set());
+    setShowInvite(true);
+    try {
+      const [directory, participants] = await Promise.all([
+        get_member_directory(token),
+        get_participants(conversationId, token),
+      ]);
+      const already = new Set(participants.map((p) => p.username));
+      setInvitable(directory.filter((m) => !already.has(m.username)));
+    } catch {
+      setInvitable([]);
+    }
+  };
+
+  const toggleInvite = (username: string) =>
+    setInvited((prev) => {
+      const next = new Set(prev);
+      if (next.has(username)) next.delete(username);
+      else next.add(username);
+      return next;
+    });
+
+  const submitInvite = async () => {
+    if (invited.size === 0 || inviting) return;
+    setInviting(true);
+    try {
+      await add_group_members(conversationId, Array.from(invited), token);
+      setShowInvite(false);
+    } catch (err: any) {
+      Alert.alert('Could not add members', err?.message || 'try again');
+    } finally {
+      setInviting(false);
+    }
+  };
 
   const mergeNewest = useCallback((incoming: MessageOut[]) => {
     setMessages((prev) => {
@@ -222,13 +276,57 @@ export default function ConversationThread() {
           )}
         </View>
         {type === 'group' ? (
-          <Pressable style={styles.leaveBtn} hitSlop={10} onPress={() => setConfirmLeave(true)}>
-            <Ionicons name="exit-outline" size={22} color={Colors.black} />
-          </Pressable>
+          <>
+            <Pressable style={styles.leaveBtn} hitSlop={10} onPress={openInvite}>
+              <Ionicons name="person-add-outline" size={22} color={Colors.black} />
+            </Pressable>
+            <Pressable style={styles.leaveBtn} hitSlop={10} onPress={() => setConfirmLeave(true)}>
+              <Ionicons name="exit-outline" size={22} color={Colors.black} />
+            </Pressable>
+          </>
         ) : (
           <View style={styles.leaveBtn} />
         )}
       </View>
+
+      {/* ---- Invite members (groups) ---- */}
+      <Modal visible={showInvite} transparent animationType="slide" onRequestClose={() => setShowInvite(false)}>
+        <View style={styles.inviteRoot}>
+          <Pressable style={styles.inviteBackdrop} onPress={() => setShowInvite(false)} />
+          <View style={[styles.inviteSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.inviteHeader}>
+              <Text style={styles.inviteTitle}>add to “{title}”</Text>
+              <Pressable
+                style={[styles.inviteBtn, (invited.size === 0 || inviting) && styles.inviteBtnDisabled]}
+                disabled={invited.size === 0 || inviting}
+                onPress={submitInvite}
+              >
+                <Text style={styles.inviteBtnText}>{inviting ? 'adding…' : 'add'}</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.inviteList}>
+              {invitable.map((m) => {
+                const picked = invited.has(m.username);
+                return (
+                  <Pressable
+                    key={m.username}
+                    style={[styles.inviteRow, picked && styles.inviteRowPicked]}
+                    onPress={() => toggleInvite(m.username)}
+                  >
+                    <Text style={styles.inviteName}>
+                      {[m.firstname, m.lastname].filter(Boolean).join(' ') || m.username}
+                    </Text>
+                    <Text style={styles.inviteUsername}>@{m.username}</Text>
+                  </Pressable>
+                );
+              })}
+              {invitable.length === 0 && (
+                <Text style={styles.inviteEmpty}>everyone's already here</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <KeyboardAvoidingView
         style={styles.body}
@@ -375,6 +473,85 @@ const styles = StyleSheet.create({
   msgText: {
     fontFamily: Fonts.serif,
     fontSize: 15,
+  },
+  // --- invite sheet ---
+  inviteRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  inviteBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.overlay,
+  },
+  inviteSheet: {
+    backgroundColor: Colors.mainBg,
+    borderTopWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    gap: 12,
+    maxHeight: Dimensions.get('window').height * 0.6,
+  },
+  inviteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inviteTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
+    flexShrink: 1,
+  },
+  inviteBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.greenBright,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginLeft: 12,
+  },
+  inviteBtnDisabled: {
+    opacity: 0.4,
+  },
+  inviteBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+  inviteList: {
+    flexGrow: 0,
+  },
+  inviteRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  inviteRowPicked: {
+    backgroundColor: Colors.accentGolden,
+  },
+  inviteName: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
+  },
+  inviteUsername: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textTertiary,
+  },
+  inviteEmpty: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   inputBar: {
     flexDirection: 'row',

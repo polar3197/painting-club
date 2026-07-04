@@ -162,6 +162,15 @@ class GroupCreateIn(BaseModel):
     title: str
     usernames: list[str]
 
+class GroupInviteIn(BaseModel):
+    usernames: list[str]
+
+class ParticipantOut(BaseModel):
+    username: str
+    firstname: str | None = None
+    lastname: str | None = None
+    role: str = "member"
+
 class ConversationOut(BaseModel):
     id: uuid.UUID
     type: str  # 'dm' | 'group'
