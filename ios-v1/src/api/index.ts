@@ -27,6 +27,9 @@ import type {
   MediaRequest,
   FeatureRequestOut,
   FeatureRequestVoteOut,
+  ConversationOut,
+  MessageOut,
+  MessagesPage,
   PromptOut,
   PromptDetailOut,
   PromptSummary,
@@ -506,6 +509,65 @@ export function vote_feature_request(
 export function delete_feature_request(request_id: string, token: string | null) {
   return request(`/feature-requests/${request_id}`, {
     method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function get_conversations(token: string | null): Promise<ConversationOut[]> {
+  return request('/conversations', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<ConversationOut[]>;
+}
+
+export function open_dm(username: string, token: string | null): Promise<ConversationOut> {
+  return request('/conversations/dm', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username }),
+  }) as Promise<ConversationOut>;
+}
+
+export function create_group(
+  title: string,
+  usernames: string[],
+  token: string | null,
+): Promise<ConversationOut> {
+  return request('/conversations/group', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title, usernames }),
+  }) as Promise<ConversationOut>;
+}
+
+export function get_messages(
+  conversation_id: string,
+  token: string | null,
+  cursor: string | null = null,
+  limit = 30,
+): Promise<MessagesPage> {
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', cursor);
+  params.set('limit', String(limit));
+  return request(`/conversations/${conversation_id}/messages?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MessagesPage>;
+}
+
+export function send_message(
+  conversation_id: string,
+  body: string,
+  token: string | null,
+): Promise<MessageOut> {
+  return request(`/conversations/${conversation_id}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ body }),
+  }) as Promise<MessageOut>;
+}
+
+export function leave_group(conversation_id: string, token: string | null) {
+  return request(`/conversations/${conversation_id}/leave`, {
+    method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
 }

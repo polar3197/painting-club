@@ -24,6 +24,7 @@ import AddArt from '../screens/AddArt';
 import Settings from '../screens/Settings';
 import EditProfile from '../screens/EditProfile';
 import Messages from '../screens/Messages';
+import ConversationThread from '../screens/ConversationThread';
 
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { MainTabParamList } from './types';
@@ -167,6 +168,7 @@ export default function RootNavigator() {
       <RootStack.Screen name="Settings" component={Settings} />
       <RootStack.Screen name="EditProfile" component={EditProfile} />
       <RootStack.Screen name="Messages" component={Messages} />
+      <RootStack.Screen name="ConversationThread" component={ConversationThread} />
       <RootStack.Group screenOptions={{ presentation: 'modal' }}>
         <RootStack.Screen name="Portfolio" component={Portfolio} />
         <RootStack.Screen name="Admin" component={Admin} />

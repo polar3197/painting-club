@@ -30,6 +30,7 @@ import {
   thumbUrl,
   upload_profile_picture,
   get_media,
+  open_dm,
   Visual2DOut,
   WrittenFormOut,
   AudioOut,
@@ -714,6 +715,28 @@ export default function UserProfile() {
                     <Text style={styles.userLocation}>
                       {[profile.city, profile.state].filter(Boolean).join(', ')}
                     </Text>
+                  )}
+                  {!profile.is_owner && !profile.viewer_blocked_by_owner && (
+                    <View style={styles.ownerActions}>
+                      <Pressable
+                        style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
+                        onPress={async () => {
+                          try {
+                            const convo = await open_dm(profile.username, token);
+                            navigation.navigate('ConversationThread', {
+                              conversationId: convo.id,
+                              title: convo.title,
+                              type: 'dm',
+                              partnerUsername: convo.partner_username,
+                            });
+                          } catch (err: any) {
+                            Alert.alert('Could not open messages', err?.message || 'try again');
+                          }
+                        }}
+                      >
+                        <Ionicons name="mail-outline" size={22} color={Colors.black} />
+                      </Pressable>
+                    </View>
                   )}
                   {profile.is_owner && (
                     <View style={styles.ownerActions}>

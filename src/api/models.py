@@ -148,6 +148,41 @@ class FeatureRequestVoteOut(BaseModel):
     my_vote: int | None = None
 
 
+class DmOpenIn(BaseModel):
+    username: str
+
+class GroupCreateIn(BaseModel):
+    title: str
+    usernames: list[str]
+
+class ConversationOut(BaseModel):
+    id: uuid.UUID
+    type: str  # 'dm' | 'group'
+    title: str  # partner display name for dm, group title for group
+    partner_username: str | None = None
+    last_message: str | None = None
+    last_message_at: datetime | None = None
+    last_sender_username: str | None = None
+    unread: int = 0
+
+class MessageOut(BaseModel):
+    id: uuid.UUID
+    sender_username: str
+    sender_firstname: str | None = None
+    body: str
+    created_at: datetime
+
+class MessageIn(BaseModel):
+    body: str
+
+class MessagesPage(BaseModel):
+    messages: List[MessageOut]  # newest first
+    next_cursor: datetime | None
+    # Read cursor BEFORE this fetch bumped it (first page only) — messages newer
+    # than this were unseen. Mirrors CommentsReceivedPage.previous_view_at.
+    previous_read_at: datetime | None
+
+
 class MediaVisibilityUpdate(BaseModel):
     hidden: bool
 

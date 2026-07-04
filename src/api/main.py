@@ -36,6 +36,12 @@ from api.models import (
     FeatureRequestOut,
     FeatureRequestVoteIn,
     FeatureRequestVoteOut,
+    DmOpenIn,
+    GroupCreateIn,
+    ConversationOut,
+    MessageIn,
+    MessageOut,
+    MessagesPage,
     MediaVisibilityUpdate,
     Visual2DOut,
     WrittenFormOut,
@@ -113,6 +119,15 @@ from db.db_ops.feature_requests import (
     db_list_feature_requests,
     db_vote_feature_request,
     db_delete_feature_request,
+)
+
+from db.db_ops.messages import (
+    db_get_or_create_dm,
+    db_create_group,
+    db_list_conversations,
+    db_get_messages,
+    db_send_message,
+    db_leave_group,
 )
 
 from db.db_ops.applications import (
@@ -1879,6 +1894,144 @@ async def delete_feature_request_endpoint(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return {"ok": True}
+
+
+# ====================== MESSAGING =========================
+
+def _conversation_out(row: dict) -> ConversationOut:
+    return ConversationOut(
+        id=row["id"],
+        type=row["type"],
+        title=row["title"],
+        partner_username=row["partner_username"],
+        last_message=row["last_message"],
+        last_message_at=row["last_message_at"],
+        last_sender_username=row["last_sender_username"],
+        unread=row["unread"],
+    )
+
+
+@app.get("/conversations", response_model=list[ConversationOut])
+async def list_conversations_endpoint(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    rows = await db_list_conversations(db, current_member.id)
+    return [_conversation_out(r) for r in rows]
+
+
+@app.post("/conversations/dm", response_model=ConversationOut)
+async def open_dm_endpoint(
+    payload: DmOpenIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    target = await db_resolve_username(db, payload.username)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    try:
+        conversation_id, _created = await db_get_or_create_dm(db, current_member.id, target.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return ConversationOut(
+        id=conversation_id,
+        type="dm",
+        title=target.firstname or target.username,
+        partner_username=target.username,
+    )
+
+
+@app.post("/conversations/group", response_model=ConversationOut, status_code=201)
+async def create_group_endpoint(
+    payload: GroupCreateIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    member_ids = []
+    for username in payload.usernames:
+        target = await db_resolve_username(db, username)
+        if target is None:
+            raise HTTPException(status_code=404, detail=f"Member not found: {username}")
+        member_ids.append(target.id)
+    try:
+        conversation_id = await db_create_group(db, current_member.id, payload.title, member_ids)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return ConversationOut(
+        id=conversation_id,
+        type="group",
+        title=payload.title.strip(),
+    )
+
+
+@app.get("/conversations/{conversation_id}/messages", response_model=MessagesPage)
+async def get_messages_endpoint(
+    conversation_id: str,
+    cursor: datetime | None = None,
+    limit: int = 30,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    limit = max(1, min(limit, 100))
+    try:
+        rows, prev_read = await db_get_messages(db, conversation_id, current_member.id, cursor, limit)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    messages = [
+        MessageOut(
+            id=msg.id,
+            sender_username=username,
+            sender_firstname=firstname,
+            body=msg.body,
+            created_at=msg.created_at,
+        )
+        for msg, username, firstname in rows
+    ]
+    return MessagesPage(
+        messages=messages,
+        next_cursor=messages[-1].created_at if len(messages) == limit else None,
+        previous_read_at=prev_read,
+    )
+
+
+@app.post("/conversations/{conversation_id}/messages", response_model=MessageOut, status_code=201)
+async def send_message_endpoint(
+    conversation_id: str,
+    payload: MessageIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        msg = await db_send_message(db, conversation_id, current_member.id, payload.body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return MessageOut(
+        id=msg.id,
+        sender_username=current_member.username,
+        sender_firstname=current_member.firstname,
+        body=msg.body,
+        created_at=msg.created_at,
+    )
+
+
+@app.post("/conversations/{conversation_id}/leave")
+async def leave_group_endpoint(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        await db_leave_group(db, conversation_id, current_member.id)
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "not found" in msg else 400, detail=msg)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     return {"ok": True}

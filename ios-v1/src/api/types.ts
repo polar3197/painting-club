@@ -293,6 +293,34 @@ export interface FeatureRequestVoteOut {
   my_vote: number | null;
 }
 
+export interface ConversationOut {
+  id: string;
+  type: 'dm' | 'group';
+  // Partner display name for DMs, group title for groups.
+  title: string;
+  partner_username: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  last_sender_username: string | null;
+  unread: number;
+}
+
+export interface MessageOut {
+  id: string;
+  sender_username: string;
+  sender_firstname: string | null;
+  body: string;
+  created_at: string;
+}
+
+export interface MessagesPage {
+  messages: MessageOut[]; // newest first
+  next_cursor: string | null;
+  // Read cursor BEFORE this fetch bumped it (first page only) — messages newer
+  // than this were unseen when the thread was opened.
+  previous_read_at: string | null;
+}
+
 export interface MediaRequest {
   id: string;
   member_id: string;
