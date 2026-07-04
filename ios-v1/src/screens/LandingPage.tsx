@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   ImageBackground,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { TextInput } from '../components/AppTextInput';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';

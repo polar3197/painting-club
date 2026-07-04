@@ -1,5 +1,6 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
-import { View, TextInput, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { useFocusEffect } from '@react-navigation/native';
 import Fuse from 'fuse.js';
 import { Colors } from '../constants/theme';
@@ -22,7 +23,7 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
 ) {
   const [query, setQuery] = useState('');
   const [showList, setShowList] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const fuseRef = useRef(new Fuse(options, { threshold: 0.4 }));
 
   // Update fuse when options change

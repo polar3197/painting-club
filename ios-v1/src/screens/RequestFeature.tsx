@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,57 +6,146 @@ import {
   Pressable,
   StyleSheet,
   Modal,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
+  Animated,
+  Dimensions,
+  Alert,
+  RefreshControl,
 } from 'react-native';
+import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
-
-type Request = { id: string; title: string; description: string; up: number; down: number };
+import { Colors, Fonts, FontSizes } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from '../components/ConfirmDialog';
+import {
+  FeatureRequestOut,
+  get_feature_requests,
+  create_feature_request,
+  vote_feature_request,
+  delete_feature_request,
+} from '../api';
 
 // Blank placeholder rows shown before any requests exist.
 const EMPTY_ROWS = 7;
-let _nextId = 1;
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Feature-request board. Local (in-session) state for now — persisting and
-// sharing requests across users needs the backend (DB + API). Back is the
-// native swipe gesture.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// Optimistic vote math mirroring the server rules: same direction retracts,
+// opposite direction switches.
+function applyVote(r: FeatureRequestOut, value: 1 | -1): FeatureRequestOut {
+  const next = { ...r };
+  if (r.my_vote === value) {
+    next.my_vote = null;
+    if (value === 1) next.up -= 1;
+    else next.down -= 1;
+  } else {
+    if (r.my_vote === 1) next.up -= 1;
+    if (r.my_vote === -1) next.down -= 1;
+    next.my_vote = value;
+    if (value === 1) next.up += 1;
+    else next.down += 1;
+  }
+  return next;
+}
+
+// Feature-request board, backed by /feature-requests. Back is the native
+// swipe gesture.
 export default function RequestFeature() {
   const insets = useSafeAreaInsets();
-  const [requests, setRequests] = useState<Request[]>([]);
+  const { token, currentRole } = useAuth();
+  const [requests, setRequests] = useState<FeatureRequestOut[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [detail, setDetail] = useState<Request | null>(null);
-
   const [newTitle, setNewTitle] = useState('');
-  const [newDesc, setNewDesc] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<FeatureRequestOut | null>(null);
 
+  const load = useCallback(async () => {
+    try {
+      setRequests(await get_feature_requests(token));
+    } catch {
+      // keep whatever is on screen; pull-to-refresh retries
+    }
+  }, [token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  // Popup animation: the backdrop fades in place while the sheet slides up
+  // (so the dim layer doesn't slide in with it).
+  const anim = useRef(new Animated.Value(0)).current;
+
+  const openAdd = () => {
+    setShowAdd(true);
+    anim.setValue(0);
+    Animated.timing(anim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+  };
   const closeAdd = () => {
-    setShowAdd(false);
-    setNewTitle('');
-    setNewDesc('');
+    Keyboard.dismiss();
+    Animated.timing(anim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
+      setShowAdd(false);
+      setNewTitle('');
+    });
   };
 
-  const submitAdd = () => {
+  const submitAdd = async () => {
     const t = newTitle.trim();
-    if (!t) return;
-    setRequests((prev) => [
-      { id: String(_nextId++), title: t, description: newDesc.trim(), up: 0, down: 0 },
-      ...prev,
-    ]);
-    closeAdd();
+    if (!t || posting) return;
+    setPosting(true);
+    try {
+      const created = await create_feature_request(t, token);
+      setRequests((prev) => [created, ...prev]);
+      closeAdd();
+    } catch (e) {
+      Alert.alert('could not post', e instanceof Error ? e.message : 'try again');
+    } finally {
+      setPosting(false);
+    }
   };
 
-  const vote = (id: string, dir: 'up' | 'down') => {
-    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, [dir]: r[dir] + 1 } : r)));
-    setDetail((d) => (d && d.id === id ? { ...d, [dir]: d[dir] + 1 } : d));
+  const vote = (id: string, value: 1 | -1) => {
+    setRequests((prev) => prev.map((r) => (r.id === id ? applyVote(r, value) : r)));
+    vote_feature_request(id, value, token)
+      .then((tally) =>
+        setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, ...tally } : r))),
+      )
+      .catch(load); // out of sync with the server — refetch the truth
   };
+
+  const confirmDelete = async () => {
+    const target = pendingDelete;
+    if (!target) return;
+    setPendingDelete(null);
+    setRequests((prev) => prev.filter((r) => r.id !== target.id));
+    try {
+      await delete_feature_request(target.id, token);
+    } catch {
+      load();
+    }
+  };
+
+  const canDelete = (r: FeatureRequestOut) => r.is_owner || currentRole === 'admin';
+
+  const sheetTranslateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_HEIGHT * 0.5, 0],
+  });
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>request something for the app</Text>
-        <Pressable style={styles.addBtn} hitSlop={12} onPress={() => setShowAdd(true)}>
+        <Pressable style={styles.addBtn} hitSlop={12} onPress={openAdd}>
           <Text style={styles.addBtnText}>+</Text>
         </Pressable>
       </View>
@@ -65,18 +154,32 @@ export default function RequestFeature() {
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {requests.length === 0
           ? Array.from({ length: EMPTY_ROWS }).map((_, i) => <View key={i} style={styles.row} />)
           : requests.map((r) => (
-              <Pressable key={r.id} style={styles.row} onPress={() => setDetail(r)}>
+              <Pressable
+                key={r.id}
+                style={styles.row}
+                onLongPress={canDelete(r) ? () => setPendingDelete(r) : undefined}
+                delayLongPress={400}
+              >
                 <Text style={styles.rowTitle} numberOfLines={2}>{r.title}</Text>
                 <View style={styles.voteRow}>
-                  <Pressable style={styles.voteItem} hitSlop={6} onPress={() => vote(r.id, 'up')}>
+                  <Pressable
+                    style={[styles.voteItem, r.my_vote === 1 && styles.voteItemActive]}
+                    hitSlop={6}
+                    onPress={() => vote(r.id, 1)}
+                  >
                     <Text style={styles.voteArrow}>↑</Text>
                     <Text style={styles.voteCount}>{r.up}</Text>
                   </Pressable>
-                  <Pressable style={styles.voteItem} hitSlop={6} onPress={() => vote(r.id, 'down')}>
+                  <Pressable
+                    style={[styles.voteItem, r.my_vote === -1 && styles.voteItemActive]}
+                    hitSlop={6}
+                    onPress={() => vote(r.id, -1)}
+                  >
                     <Text style={styles.voteArrow}>↓</Text>
                     <Text style={styles.voteCount}>{r.down}</Text>
                   </Pressable>
@@ -85,22 +188,27 @@ export default function RequestFeature() {
             ))}
       </ScrollView>
 
-      {/* ---- Add popup: title + description, rises with the keyboard ---- */}
-      <Modal visible={showAdd} transparent animationType="slide" onRequestClose={closeAdd}>
+      {/* ---- Add popup: title only. Backdrop fades in place; sheet slides up. ---- */}
+      <Modal visible={showAdd} transparent animationType="none" onRequestClose={closeAdd}>
         <KeyboardAvoidingView
           style={styles.modalRoot}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <Pressable style={styles.backdrop} onPress={closeAdd} />
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <AnimatedPressable style={[styles.backdrop, { opacity: anim }]} onPress={closeAdd} />
+          <Animated.View
+            style={[
+              styles.sheet,
+              { paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetTranslateY }] },
+            ]}
+          >
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>request something for the app</Text>
               <Pressable
-                style={[styles.postBtn, !newTitle.trim() && styles.postBtnDisabled]}
-                disabled={!newTitle.trim()}
+                style={[styles.postBtn, (!newTitle.trim() || posting) && styles.postBtnDisabled]}
+                disabled={!newTitle.trim() || posting}
                 onPress={submitAdd}
               >
-                <Text style={styles.postBtnText}>post</Text>
+                <Text style={styles.postBtnText}>{posting ? 'posting…' : 'post'}</Text>
               </Pressable>
             </View>
             <TextInput
@@ -110,47 +218,21 @@ export default function RequestFeature() {
               value={newTitle}
               onChangeText={setNewTitle}
               autoFocus
-              returnKeyType="next"
+              returnKeyType="done"
+              onSubmitEditing={submitAdd}
             />
-            <TextInput
-              style={styles.descInput}
-              placeholder="description"
-              placeholderTextColor={Colors.textMuted}
-              value={newDesc}
-              onChangeText={setNewDesc}
-              multiline
-            />
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ---- Detail popup: opened by tapping a row ---- */}
-      <Modal visible={!!detail} transparent animationType="fade" onRequestClose={() => setDetail(null)}>
-        <Pressable style={styles.detailBackdrop} onPress={() => setDetail(null)}>
-          <View style={styles.detailCard} onStartShouldSetResponder={() => true}>
-            {detail && (
-              <>
-                <View style={styles.detailTop}>
-                  <Text style={styles.detailTitle}>{detail.title}</Text>
-                  <View style={styles.voteRow}>
-                    <Pressable style={styles.voteItem} hitSlop={6} onPress={() => vote(detail.id, 'up')}>
-                      <Text style={styles.voteArrow}>↑</Text>
-                      <Text style={styles.voteCount}>{detail.up}</Text>
-                    </Pressable>
-                    <Pressable style={styles.voteItem} hitSlop={6} onPress={() => vote(detail.id, 'down')}>
-                      <Text style={styles.voteArrow}>↓</Text>
-                      <Text style={styles.voteCount}>{detail.down}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-                <Text style={styles.detailDesc}>
-                  {detail.description || 'no description'}
-                </Text>
-              </>
-            )}
-          </View>
-        </Pressable>
-      </Modal>
+      <ConfirmDialog
+        visible={pendingDelete !== null}
+        title="delete this request?"
+        message={pendingDelete?.title}
+        confirmLabel="delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </View>
   );
 }
@@ -203,8 +285,8 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     flex: 1,
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
+    // System font (San Francisco) = sans-serif.
+    fontSize: FontSizes.md,
     color: Colors.black,
   },
   voteRow: {
@@ -222,6 +304,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     minWidth: 40,
+  },
+  voteItemActive: {
+    backgroundColor: Colors.accentGolden,
   },
   voteArrow: {
     fontSize: 20,
@@ -285,51 +370,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.black,
-  },
-  descInput: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.white,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    minHeight: 110,
-    textAlignVertical: 'top',
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.sm,
-    color: Colors.black,
-  },
-  // --- detail popup ---
-  detailBackdrop: {
-    flex: 1,
-    backgroundColor: Colors.overlay,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  detailCard: {
-    backgroundColor: Colors.mainBg,
-    borderWidth: 1,
-    borderColor: '#000',
-    padding: 20,
-    ...Shadows.card,
-  },
-  detailTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 12,
-  },
-  detailTitle: {
-    flex: 1,
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.lg,
-    fontWeight: '700',
-    color: Colors.black,
-  },
-  detailDesc: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.sm,
-    lineHeight: 22,
-    color: Colors.textPrimary,
   },
 });

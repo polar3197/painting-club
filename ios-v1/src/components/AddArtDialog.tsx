@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions, Keyboard, Platform, TextInput } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions, Keyboard, Platform } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -234,6 +235,9 @@ export default function AddArtDialog({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // Grabbing the handle collapses the keyboard so the sheet has room to
+      // slide down (otherwise the keyboard blocks the drag's travel).
+      onPanResponderGrant: () => Keyboard.dismiss(),
       onPanResponderMove: (_, g) => handleDrag(g.dy),
       onPanResponderRelease: (_, g) => handleRelease(g.dy),
       onPanResponderTerminationRequest: () => false,
@@ -513,6 +517,9 @@ export default function AddArtDialog({
                     </Text>
                   )}
                 </Pressable>
+                <Text style={styles.dropboxHint}>
+                  from voice memos: share a recording → "save to files", then pick it here
+                </Text>
               </View>
             )}
             {/* ScrollView lets the user reach every field (and the submit button)
@@ -522,6 +529,7 @@ export default function AddArtDialog({
               style={styles.scrollArea}
               contentContainerStyle={styles.formContent}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
             >
               {isWrittenForm && writeMode === 'text' && (
@@ -675,6 +683,13 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.textTertiary,
+  },
+  dropboxHint: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xxs,
+    color: Colors.textMuted,
+    marginTop: 4,
+    marginHorizontal: 16,
   },
   docPreview: {
     alignItems: 'center',

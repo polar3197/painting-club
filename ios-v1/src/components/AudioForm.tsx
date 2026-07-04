@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Animated } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { AudioOut } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -12,7 +13,6 @@ interface AudioFormProps {
 export default function AudioForm({ onDataChange, initialData, rightSlot }: AudioFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
-    artist: initialData?.artist ?? '',
     date: initialData?.date ?? '',
     keywords: initialData?.keywords?.join(', ') ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
@@ -41,14 +41,6 @@ export default function AudioForm({ onDataChange, initialData, rightSlot }: Audi
         placeholderTextColor={Colors.textMuted}
         autoCapitalize="none"
         onChangeText={(v) => update({ title: v })}
-      />
-      <TextInput
-        style={styles.input}
-        value={form.artist}
-        placeholder="artist (optional)"
-        placeholderTextColor={Colors.textMuted}
-        autoCapitalize="none"
-        onChangeText={(v) => update({ artist: v })}
       />
       <TextInput
         style={styles.input}

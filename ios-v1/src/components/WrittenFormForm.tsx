@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Animated } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { WrittenFormOut } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 

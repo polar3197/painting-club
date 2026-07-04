@@ -25,6 +25,8 @@ import type {
   CommentsReceivedPage,
   MediaType,
   MediaRequest,
+  FeatureRequestOut,
+  FeatureRequestVoteOut,
   PromptOut,
   PromptDetailOut,
   PromptSummary,
@@ -472,6 +474,39 @@ export function delete_application(id: string, token: string | null): Promise<un
   return request(`/admin/applications/${id}`, {
     method: 'DELETE',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+}
+
+export function get_feature_requests(token: string | null): Promise<FeatureRequestOut[]> {
+  return request('/feature-requests', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<FeatureRequestOut[]>;
+}
+
+export function create_feature_request(title: string, token: string | null): Promise<FeatureRequestOut> {
+  return request('/feature-requests', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title }),
+  }) as Promise<FeatureRequestOut>;
+}
+
+export function vote_feature_request(
+  request_id: string,
+  value: 1 | -1,
+  token: string | null,
+): Promise<FeatureRequestVoteOut> {
+  return request(`/feature-requests/${request_id}/vote`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ value }),
+  }) as Promise<FeatureRequestVoteOut>;
+}
+
+export function delete_feature_request(request_id: string, token: string | null) {
+  return request(`/feature-requests/${request_id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 

@@ -7,11 +7,11 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  TextInput,
   Alert,
   Animated,
   LayoutChangeEvent,
 } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
 import { get_media, submit_media_request, set_media_visibility, MediaType } from '../api';
 import { useAuth } from '../context/AuthContext';

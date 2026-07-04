@@ -4,11 +4,11 @@ import {
   Text,
   Modal,
   Pressable,
-  TextInput,
   StyleSheet,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';

@@ -3,13 +3,13 @@ import {
   Modal,
   View,
   Text,
-  TextInput,
   Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { useAuth } from '../context/AuthContext';
 import { submit_report } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';

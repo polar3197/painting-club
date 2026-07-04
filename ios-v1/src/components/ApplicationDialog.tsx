@@ -4,13 +4,13 @@ import {
   Text,
   Modal,
   Pressable,
-  TextInput,
   ScrollView,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { submit_application } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 

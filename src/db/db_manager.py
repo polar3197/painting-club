@@ -208,4 +208,9 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE member ADD COLUMN IF NOT EXISTS profile_colors JSONB"
         ))
+        # Thread history is always read newest-first per conversation.
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_message_conversation_created "
+            "ON message (conversation_id, created_at DESC)"
+        ))
     print("Migrations applied.")

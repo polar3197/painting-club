@@ -33,6 +33,9 @@ export interface Profile {
   terms_accepted_at: string | null;
   viewer_blocked_by_owner: boolean;
   blocked_usernames: string[] | null;
+  // Component-key -> color string from the edit-profile color tab.
+  // null/absent = never customized (client falls back to defaults).
+  profile_colors?: Record<string, string> | null;
 }
 
 export interface ReportOut {
@@ -271,6 +274,23 @@ export interface MediaType {
   id: string;
   name: string;
   type?: string | null;
+}
+
+export interface FeatureRequestOut {
+  id: string;
+  username: string;
+  title: string;
+  up: number;
+  down: number;
+  my_vote: number | null; // +1 | -1 | null
+  is_owner: boolean;
+  created_at: string;
+}
+
+export interface FeatureRequestVoteOut {
+  up: number;
+  down: number;
+  my_vote: number | null;
 }
 
 export interface MediaRequest {

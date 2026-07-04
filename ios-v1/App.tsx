@@ -5,21 +5,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { TextInput } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { UploadProvider } from './src/context/UploadContext';
 import { Colors } from './src/constants/theme';
 import { setAuthExpiredHandler } from './src/api/client';
 import RootNavigator from './src/navigation';
 import UpdateBanner from './src/components/UpdateBanner';
-
-// Turn off autocorrect + the iOS QuickType suggestion bar for every TextInput
-// in the app (individual inputs can still opt back in).
-(TextInput as any).defaultProps = {
-  ...(TextInput as any).defaultProps,
-  autoCorrect: false,
-  spellCheck: false,
-};
 
 const navTheme = {
   ...DefaultTheme,

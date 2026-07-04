@@ -5,13 +5,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   Alert,
   Dimensions,
   Animated,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from 'react-native';
+import { TextInput } from '../components/AppTextInput';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -316,7 +317,7 @@ export default function AddArt() {
           </View>
 
           {/* Stage 2 — details */}
-          <ScrollView style={styles.page} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.page} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
             {isVisual && (
               <Pressable style={styles.dropbox} onPress={pickImage}>
                 {pickedFile ? (
@@ -339,13 +340,18 @@ export default function AddArt() {
               />
             )}
             {isAudio && (
-              <Pressable style={styles.dropbox} onPress={pickAudio}>
-                {pickedFile ? (
-                  <Text style={styles.docFilename} numberOfLines={2}>{pickedFile.name}</Text>
-                ) : (
-                  <Text style={styles.dropboxText}>tap to select audio</Text>
-                )}
-              </Pressable>
+              <>
+                <Pressable style={styles.dropbox} onPress={pickAudio}>
+                  {pickedFile ? (
+                    <Text style={styles.docFilename} numberOfLines={2}>{pickedFile.name}</Text>
+                  ) : (
+                    <Text style={styles.dropboxText}>tap to select audio</Text>
+                  )}
+                </Pressable>
+                <Text style={styles.dropboxHint}>
+                  from voice memos: share a recording → "save to files", then pick it here
+                </Text>
+              </>
             )}
 
             {isVisual && <PaintingForm onDataChange={setFormData} />}
@@ -383,7 +389,7 @@ export default function AddArt() {
         <SegmentedProgress steps={STEPS} currentIndex={step} />
         <View style={styles.navRow}>
           {step > 0 ? (
-            <Pressable style={styles.navBtn} onPress={() => setStep((s) => s - 1)}>
+            <Pressable style={styles.navBtn} onPress={() => { Keyboard.dismiss(); setStep((s) => s - 1); }}>
               <Text style={styles.navBtnText}>back</Text>
             </Pressable>
           ) : (
@@ -392,7 +398,7 @@ export default function AddArt() {
           {step === 1 && (
             <Pressable
               style={[styles.navBtn, styles.navBtnPrimary, !detailsReady && styles.navBtnDisabled]}
-              onPress={() => detailsReady && setStep(2)}
+              onPress={() => { if (detailsReady) { Keyboard.dismiss(); setStep(2); } }}
               disabled={!detailsReady}
             >
               <Text style={styles.navBtnText}>next</Text>
@@ -512,6 +518,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.textTertiary,
+  },
+  dropboxHint: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xxs,
+    color: Colors.textMuted,
+    marginTop: 6,
   },
   docFilename: {
     fontFamily: Fonts.serif,

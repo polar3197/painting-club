@@ -1,5 +1,5 @@
 # src/db/models.py
-from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean, Float, Integer
+from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean, Float, Integer, UniqueConstraint, CheckConstraint
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -156,6 +156,72 @@ class Audio(Art):
 #     name = Column(Text)
 #     location = Column(String(255))
 #     # 3NF roles, type
+
+
+# =============================================
+''' Messaging '''
+
+class Conversation(Base):
+    """Polymorphic base for message threads (mirrors the Collection pattern).
+    DM-only and group-only attributes live on their subtype tables, so no
+    base-row column is NULL-by-type (3NF)."""
+    __tablename__ = "conversation"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    type = Column(String(20), nullable=False)  # discriminator: 'dm' | 'group'
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __mapper_args__ = {"polymorphic_on": type}
+
+
+class DmConversation(Conversation):
+    """One row per member pair. The (low, high) UUID ordering plus the unique
+    constraint makes "one DM per pair" a database guarantee, not an app check."""
+    __tablename__ = "dm_conversation"
+
+    id = Column(UUID(as_uuid=True), ForeignKey('conversation.id', ondelete='CASCADE'), primary_key=True)
+    member_low_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
+    member_high_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('member_low_id', 'member_high_id', name='uq_dm_pair'),
+        CheckConstraint('member_low_id < member_high_id', name='ck_dm_pair_ordered'),
+    )
+    __mapper_args__ = {"polymorphic_identity": "dm"}
+
+
+class GroupConversation(Conversation):
+    __tablename__ = "group_conversation"
+
+    id = Column(UUID(as_uuid=True), ForeignKey('conversation.id', ondelete='CASCADE'), primary_key=True)
+    title = Column(String(300), nullable=False)
+    # SET NULL so the group survives its creator deleting their account.
+    created_by = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='SET NULL'), nullable=True)
+
+    __mapper_args__ = {"polymorphic_identity": "group"}
+
+
+class ConversationParticipant(Base):
+    __tablename__ = "conversation_participant"
+
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey('conversation.id', ondelete='CASCADE'), primary_key=True)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
+    role = Column(String(20), nullable=False, default="member")  # 'member' | 'admin' (group management)
+    joined_at = Column(DateTime, default=datetime.utcnow)
+    # Per-member read cursor: messages with created_at > this are unread
+    # (mirrors member.comments_last_viewed_at).
+    last_read_at = Column(DateTime)
+
+
+class Message(Base):
+    __tablename__ = "message"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey('conversation.id', ondelete='CASCADE'), nullable=False)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+# =============================================
 
 
 # =============================================

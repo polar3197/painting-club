@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Pressable,
-  TextInput,
   StyleSheet,
   Dimensions,
   Animated,
@@ -11,10 +10,11 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ArtGallery from './ArtGallery';
 import People from './People';
-import { Colors } from '../constants/theme';
+import { Colors, Fonts } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HALF = SCREEN_WIDTH / 2;
@@ -103,6 +103,9 @@ export default function SearchTabs() {
   const barTranslateY = Animated.multiply(kb, lift);
   const iconScale = kb.interpolate({ inputRange: [0, 1], outputRange: [1, ICON_SCALE_MIN] });
   const iconTranslateY = kb.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  // Fade the little icon labels out as the bar minimizes (keyboard up) so they
+  // never get clipped by the shrinking bar.
+  const labelOpacity = kb.interpolate({ inputRange: [0, 0.5], outputRange: [1, 0], extrapolate: 'clamp' });
   // Narrow the selection box (in addition to the bar's height shrink) when the
   // keyboard is up.
   const boxScaleX = kb.interpolate({ inputRange: [0, 1], outputRange: [1, BOX_SCALE_X_MIN] });
@@ -167,6 +170,11 @@ export default function SearchTabs() {
               ]}
               resizeMode="contain"
             />
+            <Animated.Text
+              style={[styles.tabLabel, { opacity: labelOpacity, transform: [{ translateY: iconTranslateY }] }]}
+            >
+              {t.key}
+            </Animated.Text>
           </Pressable>
         ))}
       </Animated.View>
@@ -239,8 +247,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabIcon: {
-    width: 56,
-    height: 56,
+    width: 46,
+    height: 46,
+  },
+  tabLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: 11,
+    color: Colors.black,
+    marginTop: 1,
   },
   selectionBox: {
     position: 'absolute',

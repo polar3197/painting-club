@@ -22,6 +22,7 @@ import SearchStack from './SearchStack';
 import HomeStack from './HomeStack';
 import AddArt from '../screens/AddArt';
 import Settings from '../screens/Settings';
+import EditProfile from '../screens/EditProfile';
 import Messages from '../screens/Messages';
 
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -164,6 +165,7 @@ export default function RootNavigator() {
       />
       <RootStack.Screen name="Ethos" component={Ethos} />
       <RootStack.Screen name="Settings" component={Settings} />
+      <RootStack.Screen name="EditProfile" component={EditProfile} />
       <RootStack.Screen name="Messages" component={Messages} />
       <RootStack.Group screenOptions={{ presentation: 'modal' }}>
         <RootStack.Screen name="Portfolio" component={Portfolio} />

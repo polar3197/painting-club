@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   Pressable,
-  TextInput,
   StyleSheet,
   Alert,
   Dimensions,
@@ -22,7 +21,6 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   get_members_visual_2d,
   remove_visual_2d,
-  update_profile,
   add_member_media,
   get_members_written_form,
   get_members_audio,
@@ -54,6 +52,10 @@ import { useUploads } from '../context/UploadContext';
 import CommentsReceivedPanel from '../components/CommentsReceivedPanel';
 import type { CommentReceivedOut } from '../api/types';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
+import {
+  DEFAULT_PROFILE_COLORS,
+  ProfilePageColors,
+} from '../constants/profileColors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -76,9 +78,9 @@ type ProfileRoute = RouteProp<
 >;
 
 // --- Placeholder tile shown while an upload is in flight ---
-function PendingPiece({ uri, title, aspectRatio }: { uri: string; title: string; aspectRatio: number }) {
+function PendingPiece({ uri, title, aspectRatio, cardBg }: { uri: string; title: string; aspectRatio: number; cardBg: string }) {
   return (
-    <View style={styles.artElement}>
+    <View style={[styles.artElement, { backgroundColor: cardBg }]}>
       <View style={styles.artVisual}>
         <View style={[styles.artVisualInner, { aspectRatio }]}>
           <Image
@@ -104,6 +106,7 @@ function Visual2DPiece({
   isOwner,
   piece,
   viewerBlockedByOwner,
+  cardBg,
   onRemove,
   onEdit,
   onZoom,
@@ -112,6 +115,8 @@ function Visual2DPiece({
   isOwner: boolean;
   piece: Visual2DOut;
   viewerBlockedByOwner: boolean;
+  // Art element fill from the owner's profile colors.
+  cardBg: string;
   onRemove: () => void;
   onEdit: () => void;
   // Open the shared zoom viewer on this piece. Zoom state lives on the screen
@@ -151,7 +156,7 @@ function Visual2DPiece({
       {showComments && (
         <ArtComments piece={piece} onClose={() => setShowComments(false)} />
       )}
-      <View style={styles.artElement} onLayout={onLayout}>
+      <View style={[styles.artElement, { backgroundColor: cardBg }]} onLayout={onLayout}>
         <Pressable
           style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
           onPress={onZoom}
@@ -270,6 +275,12 @@ export default function UserProfile() {
   const mediumParam = params?.medium;
 
   const [profile, setProfile, error, loading, refetchProfile] = useProfile(username);
+  // The owner's saved page colors (partial), merged over the app defaults.
+  // Viewers get the owner's scheme too — it rides the profile payload.
+  const pageColors: ProfilePageColors = useMemo(
+    () => ({ ...DEFAULT_PROFILE_COLORS, ...(profile?.profile_colors ?? {}) }),
+    [profile?.profile_colors]
+  );
   const [selectedMedium, setSelectedMedium] = useState<string | null>(mediumParam ?? null);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<string[]>([]);
@@ -391,12 +402,6 @@ export default function UserProfile() {
       scrollRef.current?.scrollTo({ y: target, animated: true });
     }, 50);
   }, []);
-
-  // Edit mode state
-  const [editing, setEditing] = useState(false);
-  const [editBio, setEditBio] = useState('');
-  const [editCity, setEditCity] = useState('');
-  const [editState, setEditState] = useState('');
 
   useEffect(() => {
     if (!mediumParam && profile?.media?.[0]) {
@@ -571,26 +576,6 @@ export default function UserProfile() {
     return () => clearTimeout(t);
   }, [pendingScroll]);
 
-  const startEditing = () => {
-    if (!profile) return;
-    setEditBio(profile.bio || '');
-    setEditCity(profile.city || '');
-    setEditState(profile.state || '');
-    setEditing(true);
-  };
-
-  const submitEdit = async () => {
-    if (!profile) return;
-    try {
-      const updated = { ...profile, bio: editBio, city: editCity, state: editState };
-      await update_profile(username, updated, token);
-      setProfile(updated);
-      setEditing(false);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    }
-  };
-
   if (loading) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
@@ -611,7 +596,7 @@ export default function UserProfile() {
   return (
     <ScrollView
       ref={scrollRef}
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, { paddingTop: insets.top, backgroundColor: pageColors.bg }]}
       contentContainerStyle={styles.contentContainer}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
@@ -717,13 +702,9 @@ export default function UserProfile() {
 
       {/* ---- UserDetails ---- */}
       <View style={styles.userDetails}>
-        {/* The user details used to wrap a single Pressable that started the
-            edit flow on any tap. That intercepted horizontal swipes on the
-            artist-statement carousel — so the tap-to-edit moved into the
-            small `•-•` button rendered inside userIdentity below. */}
+        {/* Editing no longer happens inline — the pencil button routes to the
+            EditProfile screen (details + color scheme tabs). */}
         <View style={styles.userFields}>
-          {!editing ? (
-            <>
               <View style={styles.userTopRow}>
                 <View style={styles.userIdentity}>
                   <Text style={styles.userName}>
@@ -737,25 +718,25 @@ export default function UserProfile() {
                   {profile.is_owner && (
                     <View style={styles.ownerActions}>
                       <Pressable
-                        style={styles.ownerActionBtn}
+                        style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
                         onPress={() => navigation.navigate('Settings')}
                       >
                         <Ionicons name="settings-outline" size={22} color={Colors.black} />
                       </Pressable>
                       <Pressable
-                        style={styles.ownerActionBtn}
-                        onPress={startEditing}
+                        style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
+                        onPress={() => navigation.navigate('EditProfile')}
                       >
                         <Ionicons name="pencil-outline" size={22} color={Colors.black} />
                       </Pressable>
                       <Pressable
-                        style={styles.ownerActionBtn}
+                        style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
                         onPress={() => navigation.navigate('Messages')}
                       >
                         <Ionicons name="mail-outline" size={22} color={Colors.black} />
                       </Pressable>
                       <Pressable
-                        style={styles.ownerActionBtn}
+                        style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
                         onPress={() => setShowShareDialog(true)}
                       >
                         <Ionicons name="paper-plane-outline" size={22} color={Colors.black} />
@@ -769,19 +750,19 @@ export default function UserProfile() {
                       source={{ uri: profilePicSrc(profile) ?? '' }}
                       transition={200}
                       priority="high"
-                      style={styles.profilePic}
+                      style={[styles.profilePic, { borderColor: pageColors.picFrame }]}
                       contentFit="cover"
                     />
                   </Pressable>
                 ) : profile.is_owner ? (
                   <Pressable onPress={pickAndUploadProfilePic} style={styles.profilePicContainer}>
-                    <View style={[styles.profilePic, styles.profilePicEmpty]}>
+                    <View style={[styles.profilePic, styles.profilePicEmpty, { borderColor: pageColors.picFrame }]}>
                       <Text style={styles.profilePicPlus}>add prof pic</Text>
                     </View>
                   </Pressable>
                 ) : (
                   <View style={styles.profilePicContainer}>
-                    <View style={[styles.profilePic, styles.profilePicEmpty]} />
+                    <View style={[styles.profilePic, styles.profilePicEmpty, { borderColor: pageColors.picFrame }]} />
                   </View>
                 )}
               </View>
@@ -815,7 +796,7 @@ export default function UserProfile() {
                   bounces={profile.is_owner}
                   contentContainerStyle={{ paddingHorizontal: BIO_PAGE_INSET }}
                 >
-                  <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, marginRight: BIO_PAGE_GAP }]}>
+                  <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, marginRight: BIO_PAGE_GAP, backgroundColor: pageColors.statementBox }]}>
                     <Text style={styles.bioLabel}>Artist Statement</Text>
                     <View style={styles.bioHr} />
                     {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
@@ -827,58 +808,6 @@ export default function UserProfile() {
                   )}
                 </ScrollView>
               </View>
-            </>
-          ) : (
-            <>
-              <TextInput
-                style={styles.editNameInput}
-                value={profile.firstname}
-                placeholder="firstname"
-                placeholderTextColor={Colors.textMuted}
-                autoCapitalize="none"
-                onChangeText={(v) => setProfile({ ...profile!, firstname: v })}
-              />
-              <TextInput
-                style={styles.editNameInput}
-                value={profile.lastname}
-                placeholder="lastname"
-                placeholderTextColor={Colors.textMuted}
-                autoCapitalize="none"
-                onChangeText={(v) => setProfile({ ...profile!, lastname: v })}
-              />
-              <View style={styles.editLocationRow}>
-                <TextInput
-                  style={[styles.editInput, { flex: 3 }]}
-                  value={editCity}
-                  onChangeText={setEditCity}
-                  placeholder="city"
-                  placeholderTextColor={Colors.textMuted}
-                  autoCapitalize="none"
-                />
-                <TextInput
-                  style={[styles.editInput, { flex: 1 }]}
-                  value={editState}
-                  onChangeText={setEditState}
-                  placeholder="state"
-                  placeholderTextColor={Colors.textMuted}
-                  autoCapitalize="none"
-                />
-              </View>
-              <Text style={styles.bioLabel}>artist statement</Text>
-              <TextInput
-                style={[styles.editInput, { minHeight: 120, textAlignVertical: 'top' }]}
-                value={editBio}
-                onChangeText={setEditBio}
-                autoCapitalize="none"
-                placeholder="no pressure"
-                placeholderTextColor={Colors.textMuted}
-                multiline
-              />
-              <Pressable style={styles.submitEditBtn} onPress={submitEdit}>
-                <Text style={styles.submitEditBtnText}>submit</Text>
-              </Pressable>
-            </>
-          )}
         </View>
       </View>
 
@@ -893,7 +822,10 @@ export default function UserProfile() {
               key={m}
               style={[
                 styles.mediaTab,
-                selectedMedium === m && styles.mediaTabSelected,
+                {
+                  backgroundColor:
+                    selectedMedium === m ? pageColors.mediaTabSelected : pageColors.mediaTab,
+                },
               ]}
               onPress={() => {
                 setSelectedMedium(m);
@@ -907,6 +839,7 @@ export default function UserProfile() {
             <Pressable
               style={[
                 styles.addMediaBtn,
+                { backgroundColor: pageColors.mediaTab },
                 (profile.media?.length ?? 0) === 0 && styles.addMediaBtnFull,
               ]}
               onPress={() => setShowAddMedia(true)}
@@ -952,7 +885,7 @@ export default function UserProfile() {
 
       {/* ---- Art Section ---- */}
       <View
-        style={styles.artSection}
+        style={[styles.artSection, { backgroundColor: pageColors.bg }]}
         onLayout={(e) => { artSectionY.current = e.nativeEvent.layout.y; }}
       >
         {/* Add now lives in the center "+" tab — no per-medium add button here. */}
@@ -966,6 +899,7 @@ export default function UserProfile() {
                   uri={p.uri}
                   title={p.title}
                   aspectRatio={p.aspectRatio}
+                  cardBg={pageColors.artCardBg}
                 />
               ))}
             {filteredArt.map((piece, idx) => (
@@ -974,6 +908,7 @@ export default function UserProfile() {
                 isOwner={profile.is_owner}
                 piece={piece}
                 viewerBlockedByOwner={!!profile.viewer_blocked_by_owner}
+                cardBg={pageColors.artCardBg}
                 onRemove={() => setRefresh((r) => r + 1)}
                 onEdit={() => setEditingPiece(piece)}
                 onZoom={() => setZoomIndex(idx)}
@@ -1137,41 +1072,6 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     lineHeight: 22,
   },
-  editNameInput: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-    paddingVertical: 4,
-    marginBottom: 4,
-  },
-  editLocationRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  editInput: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    paddingVertical: 6,
-  },
-  submitEditBtn: {
-    // Sits in normal flow below the bio input (instead of floating over its
-    // bottom border) so it reads as the final step under the line.
-    alignSelf: 'flex-end',
-    marginTop: 12,
-    backgroundColor: 'lightgreen',
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  submitEditBtnText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-  },
   ownerActions: {
     flexDirection: 'row',
     gap: 8,
@@ -1252,9 +1152,6 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     paddingHorizontal: 12,
     paddingVertical: 6,
-  },
-  mediaTabSelected: {
-    backgroundColor: Colors.primaryGold,
   },
   mediaTabText: {
     fontFamily: Fonts.serif,

@@ -4,7 +4,6 @@ import {
   Text,
   Modal,
   Pressable,
-  TextInput,
   FlatList,
   KeyboardAvoidingView,
   Keyboard,
@@ -15,6 +14,7 @@ import {
   PanResponder,
   Alert,
 } from 'react-native';
+import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
