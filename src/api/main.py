@@ -63,6 +63,7 @@ from api.models import (
     ApplicationApproveOut,
     SetupAccountIn,
     SetupCodeIn,
+    ForgotPasswordIn,
     CommentOut,
     CommentReceivedOut,
     CommentsReceivedPage,
@@ -78,6 +79,7 @@ from db.db_ops.members import (
     db_create_full_member,
     db_login_user,
     db_redeem_setup_code,
+    db_start_password_reset,
     db_get_members,
     db_complete_setup,
     db_export_member_data,
@@ -194,6 +196,7 @@ from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
 from db.models import Member, Media, Media_Members, Art, Comment, Visual2D, WrittenForm, WeeklyPrompt
 
 from api.auth import create_token, decode_token
+from api.emailer import send_email
 
 
 bearer = HTTPBearer()
@@ -284,6 +287,35 @@ async def redeem_setup_code_endpoint(payload: SetupCodeIn, db: AsyncSession = De
         raise HTTPException(status_code=401, detail="Invalid or expired setup code")
     token = create_token(member)
     return Token(access_token=token, must_setup=True)
+
+
+@app.post("/members/forgot-password")
+async def forgot_password_endpoint(
+    payload: ForgotPasswordIn,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Self-serve password reset. Always answers {ok: true} so the endpoint
+    can't be used to probe which emails have accounts; when the email matches
+    a member, a fresh setup code is generated and emailed in the background
+    (also keeps response timing uniform). The user finishes through the
+    existing 'secret code?' -> setup-account flow."""
+    result = await db_start_password_reset(db, payload.email)
+    if result is not None:
+        member, code = result
+        first = (member.firstname or member.username or "").strip()
+        body = (
+            f"hi {first},\n\n"
+            f"here's your painting club reset code:\n\n"
+            f"    {code}\n\n"
+            "open the app, tap \"secret code?\" on the login page, and enter it. "
+            "the code expires in 24 hours.\n\n"
+            f"your username is \"{member.username}\" — when the app asks, you can type it "
+            "again to keep it (or pick a new one), then choose your new password.\n\n"
+            "didn't ask for this? just ignore this email — your current password still works.\n"
+        )
+        background_tasks.add_task(send_email, member.email, "painting club — your reset code", body)
+    return {"ok": True}
 
 
 @app.post("/members/setup-account", response_model=MemberOut)

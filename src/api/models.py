@@ -92,6 +92,9 @@ class SetupAccountIn(BaseModel):
 class SetupCodeIn(BaseModel):
     code: str
 
+class ForgotPasswordIn(BaseModel):
+    email: str
+
 class MemberFilters(BaseModel):
     uname: str | None
     city: str | None

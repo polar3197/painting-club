@@ -64,6 +64,48 @@ async def db_redeem_setup_code(db: AsyncSession, code: str) -> Member | None:
     return member
 
 
+async def db_start_password_reset(db: AsyncSession, email: str) -> tuple[Member, str] | None:
+    """Forgot-password: mint a fresh setup code for the member with this email.
+
+    Reuses the invite machinery (temp_password_plaintext + must_change_password),
+    so the user finishes through the existing 'secret code?' → setup-account flow.
+    Deliberately does NOT touch password_hash — the current password keeps
+    working until the code is redeemed, so a malicious reset request can't lock
+    the real owner out. Returns (member, plaintext_code), or None when no
+    member has that email (callers should respond identically either way)."""
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+    from db.db_ops.applications import _gen_temp_password
+
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return None
+    member = (await db.execute(
+        select(Member).filter(func.lower(Member.email) == normalized)
+    )).scalar_one_or_none()
+    if member is None:
+        return None
+
+    # Unique among active plaintext codes — redeem looks members up by this value.
+    for _ in range(5):
+        code = _gen_temp_password()
+        clash = (await db.execute(
+            select(Member.id).filter(Member.temp_password_plaintext == code)
+        )).scalar_one_or_none()
+        if clash is None:
+            break
+    else:
+        raise RuntimeError("Could not generate a unique reset code after 5 attempts")
+
+    member.temp_password_plaintext = code
+    # Reset codes are shorter-lived than invite codes (1 day vs 7).
+    member.temp_password_expires_at = datetime.utcnow() + timedelta(days=1)
+    member.must_change_password = True
+    await db.commit()
+    await db.refresh(member)
+    return member, code
+
+
 async def db_create_member(db: AsyncSession, username: str, password: str) -> Member:
     username = username.lower()
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
