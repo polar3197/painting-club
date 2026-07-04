@@ -57,3 +57,19 @@ export function useAudioRecorderState(_recorder?: unknown) {
     url: null as string | null,
   };
 }
+
+// Non-hook player factory used by the global playback singleton. Inert, like
+// the hook stubs above.
+export function createAudioPlayer(_source?: unknown, _options?: unknown) {
+  return {
+    id: 0,
+    play() {},
+    pause() {},
+    seekTo(_seconds: number) {},
+    replace(_source: unknown) {},
+    remove() {},
+    addListener(_event: string, _cb: unknown) {
+      return { remove() {} };
+    },
+  };
+}

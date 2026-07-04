@@ -10,6 +10,14 @@ import {
 } from 'react-native';
 import * as ExpoAudio from 'expo-audio';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import {
+  playTrack,
+  getActiveUri,
+  getActivePlayer,
+  subscribeActiveTrack,
+  claimPlayback,
+  releasePlayback,
+} from '../audio/playback';
 import { useAuth } from '../context/AuthContext';
 import { remove_audio, resolveImageUrl, AudioOut } from '../api';
 import ConfirmDialog from './ConfirmDialog';
@@ -18,17 +26,6 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 // True when this bundle runs against the OTA stub (build #8 lacks the native
 // module) — playback controls are hidden in favour of an update hint.
 const AUDIO_IS_STUB = (ExpoAudio as any).IS_STUB === true;
-
-// One-at-a-time playback: starting any player pauses whichever other player
-// was going. Module-scoped so it spans every tile (and the AddArt preview).
-let _activePause: (() => void) | null = null;
-function claimPlayback(pauseSelf: () => void) {
-  if (_activePause && _activePause !== pauseSelf) _activePause();
-  _activePause = pauseSelf;
-}
-function releasePlayback(pauseSelf: () => void) {
-  if (_activePause === pauseSelf) _activePause = null;
-}
 
 interface AudioPieceProps {
   isOwner: boolean;
@@ -87,61 +84,55 @@ function EqBars({ playing }: { playing: boolean }) {
 }
 
 /**
- * The actual player. Mounted lazily (only after the first play tap) so a
- * profile with many tracks doesn't spin up a native player per tile up front.
- * Once mounted it auto-plays; background playback is handled globally by the
- * setAudioModeAsync call in App.tsx + UIBackgroundModes in app.json.
+ * Profile-tile player bar, bound to the app-wide playback singleton — audio
+ * keeps playing when the user navigates anywhere else; only starting another
+ * track (or pausing) stops it. While this tile's track isn't the active one,
+ * an idle bar renders (play button + stored duration) and tapping play claims
+ * the global player.
  */
 export function AudioPlayerBar({
   uri,
   fallbackDuration,
-  autoPlay = true,
-  onDuration,
 }: {
   uri: string;
   fallbackDuration: number | null;
-  // false = preview mode (AddArt pre-listen): mount silently, play on demand.
-  autoPlay?: boolean;
-  // Reports the measured duration once the file loads (used to capture
-  // duration_seconds at upload time).
-  onDuration?: (seconds: number) => void;
 }) {
-  const player = useAudioPlayer({ uri });
+  // Re-render when the active track changes so tiles swap active/idle modes.
+  const [, setTick] = useState(0);
+  useEffect(() => subscribeActiveTrack(() => setTick((t) => t + 1)), []);
+
+  const active = getActiveUri() === uri && !!getActivePlayer();
+  if (active) {
+    return <ActiveTrackBar uri={uri} fallbackDuration={fallbackDuration} />;
+  }
+  return (
+    <View style={styles.playerBar}>
+      <Pressable style={styles.playBtn} onPress={() => playTrack(uri)}>
+        <Text style={styles.playBtnText}>▶</Text>
+      </Pressable>
+      <EqBars playing={false} />
+      <View style={styles.scrubCol}>
+        <View style={styles.track}>
+          <View style={styles.trackBase} />
+          <View style={[styles.trackThumb, { left: 0 }]} />
+        </View>
+        <View style={styles.timeRow}>
+          <Text style={styles.timeText}>{fmtTime(0)}</Text>
+          <Text style={styles.timeText}>{fmtTime(fallbackDuration || 0)}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// The bound (active-track) bar: full controls against the global player.
+function ActiveTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDuration: number | null }) {
+  const player = getActivePlayer()!;
   const status = useAudioPlayerStatus(player);
   const [trackW, setTrackW] = useState(0);
   // Local scrub position while dragging so the thumb tracks the finger 1:1
   // instead of waiting for the (slightly lagged) status.currentTime to catch up.
   const [scrubFrac, setScrubFrac] = useState<number | null>(null);
-
-  // Stable pause closure for the one-at-a-time registry.
-  const pauseSelfRef = useRef<() => void>(() => {});
-  pauseSelfRef.current = () => player.pause();
-  const pauseSelf = useRef(() => pauseSelfRef.current()).current;
-
-  const startPlay = () => {
-    claimPlayback(pauseSelf);
-    player.play();
-  };
-
-  // Auto-play on mount (profile tiles only mount this after the play tap).
-  useEffect(() => {
-    if (autoPlay) startPlay();
-    return () => releasePlayback(pauseSelf);
-  }, []);
-
-  // Surface the real duration to the parent once known.
-  useEffect(() => {
-    if (onDuration && status.duration > 0) onDuration(status.duration);
-  }, [status.duration]);
-
-  // When a track finishes, rewind + pause so the play button is ready to replay
-  // rather than leaving it stuck at the end.
-  useEffect(() => {
-    if (status.didJustFinish) {
-      player.seekTo(0);
-      player.pause();
-    }
-  }, [status.didJustFinish]);
 
   const duration = status.duration || fallbackDuration || 0;
   const frac = scrubFrac != null
@@ -169,6 +160,102 @@ export function AudioPlayerBar({
         if (trackW > 0) {
           const f = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW));
           seekToFrac(f);
+        }
+        setScrubFrac(null);
+      },
+      onPanResponderTerminate: () => setScrubFrac(null),
+    })
+  ).current;
+
+  const displayedTime = scrubFrac != null ? scrubFrac * duration : status.currentTime;
+
+  return (
+    <View style={styles.playerBar}>
+      <Pressable
+        style={styles.playBtn}
+        onPress={() => (status.playing ? player.pause() : playTrack(uri))}
+      >
+        <Text style={styles.playBtnText}>
+          {!status.isLoaded ? '…' : status.playing ? '❚❚' : '▶'}
+        </Text>
+      </Pressable>
+      <EqBars playing={status.playing} />
+      <View style={styles.scrubCol}>
+        <View
+          style={styles.track}
+          onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
+          {...pan.panHandlers}
+        >
+          <View style={styles.trackBase} />
+          <View style={[styles.trackFill, { width: `${frac * 100}%` }]} />
+          <View style={[styles.trackThumb, { left: Math.max(0, frac * trackW - 6) }]} />
+        </View>
+        <View style={styles.timeRow}>
+          <Text style={styles.timeText}>{fmtTime(displayedTime)}</Text>
+          <Text style={styles.timeText}>{fmtTime(duration)}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Pre-listen bar for the share/edit flows. Owns a LOCAL player (released when
+ * the form unmounts — previews shouldn't outlive the flow) and reports the
+ * measured duration for the upload payload. Coordinates with the global
+ * player through the claim registry so only one thing plays at a time.
+ */
+export function AudioPreviewBar({
+  uri,
+  onDuration,
+}: {
+  uri: string;
+  onDuration?: (seconds: number) => void;
+}) {
+  const player = useAudioPlayer({ uri });
+  const status = useAudioPlayerStatus(player);
+  const [trackW, setTrackW] = useState(0);
+  const [scrubFrac, setScrubFrac] = useState<number | null>(null);
+
+  // Stable pause closure for the one-at-a-time registry.
+  const pauseSelfRef = useRef<() => void>(() => {});
+  pauseSelfRef.current = () => player.pause();
+  const pauseSelf = useRef(() => pauseSelfRef.current()).current;
+
+  useEffect(() => () => releasePlayback(pauseSelf), []);
+
+  const startPlay = () => {
+    claimPlayback(pauseSelf);
+    player.play();
+  };
+
+  useEffect(() => {
+    if (onDuration && status.duration > 0) onDuration(status.duration);
+  }, [status.duration]);
+
+  useEffect(() => {
+    if (status.didJustFinish) {
+      player.seekTo(0);
+      player.pause();
+    }
+  }, [status.didJustFinish]);
+
+  const duration = status.duration || 0;
+  const frac = scrubFrac != null ? scrubFrac : duration > 0 ? Math.min(1, status.currentTime / duration) : 0;
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+      },
+      onPanResponderMove: (e) => {
+        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+      },
+      onPanResponderRelease: (e) => {
+        if (trackW > 0 && duration > 0) {
+          player.seekTo(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)) * duration);
         }
         setScrubFrac(null);
       },
@@ -248,11 +335,7 @@ export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout 
             <Text style={styles.bigPlayLabel}>update the app to play audio</Text>
           </View>
         ) : (
-          <AudioPlayerBar
-            uri={uri}
-            fallbackDuration={piece.duration_seconds}
-            autoPlay={false}
-          />
+          <AudioPlayerBar uri={uri} fallbackDuration={piece.duration_seconds} />
         )}
 
         {isOwner && (

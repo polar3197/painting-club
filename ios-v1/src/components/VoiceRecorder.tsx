@@ -7,6 +7,7 @@ import {
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
 } from 'expo-audio';
+import { pauseActive } from '../audio/playback';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 interface VoiceRecorderProps {
@@ -67,6 +68,8 @@ export default function VoiceRecorder({ onRecorded }: VoiceRecorderProps) {
         );
         return;
       }
+      // Recording and playback don't mix — stop whatever's playing.
+      pauseActive();
       // iOS: the session must allow recording while we capture.
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       waveRef.current = [];

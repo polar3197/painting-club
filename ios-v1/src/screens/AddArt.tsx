@@ -35,7 +35,7 @@ import WrittenFormForm from '../components/WrittenFormForm';
 import AudioForm from '../components/AudioForm';
 import AddMediaDialog from '../components/AddMediaDialog';
 import SegmentedProgress from '../components/SegmentedProgress';
-import { AudioPlayerBar } from '../components/AudioPiece';
+import { AudioPreviewBar } from '../components/AudioPiece';
 import VoiceRecorder from '../components/VoiceRecorder';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -440,11 +440,9 @@ export default function AddArt() {
                   // Pre-listen: confirm it's the right recording before sharing.
                   // Also measures duration_seconds for the upload payload.
                   <View style={styles.previewWrap}>
-                    <AudioPlayerBar
+                    <AudioPreviewBar
                       key={pickedFile.uri}
                       uri={pickedFile.uri}
-                      fallbackDuration={null}
-                      autoPlay={false}
                       onDuration={setPickedDuration}
                     />
                     <Pressable

@@ -24,7 +24,7 @@ import PaintingForm from './PaintingForm';
 import WrittenFormForm from './WrittenFormForm';
 import AudioForm from './AudioForm';
 import Dropdown from './Dropdown';
-import { AudioPlayerBar } from './AudioPiece';
+import { AudioPreviewBar } from './AudioPiece';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 // True when this OTA bundle runs against the build-#8 picker stub — the audio
@@ -539,11 +539,9 @@ export default function AddArtDialog({
                 {pickedFile && !PICKER_IS_STUB ? (
                   // Pre-listen the picked file; also measures duration_seconds.
                   <View style={styles.previewWrap}>
-                    <AudioPlayerBar
+                    <AudioPreviewBar
                       key={pickedFile.uri}
                       uri={pickedFile.uri}
-                      fallbackDuration={null}
-                      autoPlay={false}
                       onDuration={setPickedDuration}
                     />
                   </View>
