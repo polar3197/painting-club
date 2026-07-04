@@ -32,26 +32,37 @@ export default function LandingPage() {
   const [setupCode, setSetupCode] = useState('');
   const [showApplication, setShowApplication] = useState(false);
   const [showSecretCode, setShowSecretCode] = useState(false);
-  // Forgot-password: one tap lodges a reset request (identified by the
-  // username typed in the login box) and shows a confirmation. The admin
-  // sends the code manually; it's redeemed via the "secret code?" flow.
+  // Forgot-password: username prompt -> POST -> confirmation. The admin sends
+  // the code manually; it's redeemed via the "secret code?" flow.
   const [showForgot, setShowForgot] = useState(false);
+  const [forgotUname, setForgotUname] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotSending, setForgotSending] = useState(false);
 
   const handleForgotPress = () => {
-    const uname = username.trim();
-    if (uname) {
-      setForgotSent(true);
-      // Fire-and-forget; the endpoint always answers ok.
-      forgot_password(uname).catch(() => {});
-    } else {
-      setForgotSent(false); // panel will ask for the username first
-    }
+    // Seed from the login box when they've already typed it there.
+    setForgotUname(username.trim());
+    setForgotSent(false);
     setShowForgot(true);
+  };
+
+  const handleForgotSubmit = async () => {
+    const uname = forgotUname.trim();
+    if (!uname || forgotSending) return;
+    setForgotSending(true);
+    try {
+      await forgot_password(uname);
+    } catch {
+      // Endpoint always answers ok; a network error lands on the same copy.
+    } finally {
+      setForgotSending(false);
+      setForgotSent(true);
+    }
   };
 
   const closeForgot = () => {
     setShowForgot(false);
+    setForgotUname('');
     setForgotSent(false);
   };
   const [pendingTerms, setPendingTerms] = useState<{
@@ -255,14 +266,27 @@ export default function LandingPage() {
               <>
                 <Text style={styles.secretLabel}>forgot password</Text>
                 <Text style={styles.forgotBody}>
-                  type your username in the "un:" box first, then tap "forgot
-                  password?" again so we know who you are.
+                  enter your username to request a new secret code.
                 </Text>
+                <View style={styles.secretCodeRow}>
+                  <TextInput
+                    style={styles.secretCodeInput}
+                    value={forgotUname}
+                    onChangeText={(v) => setForgotUname(v.toLowerCase())}
+                    placeholder="username"
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="send"
+                    autoFocus
+                    onSubmitEditing={handleForgotSubmit}
+                  />
+                  <Pressable style={styles.secretCodeBtn} onPress={handleForgotSubmit}>
+                    <Text style={styles.secretCodeBtnArrow}>{forgotSending ? '…' : '→'}</Text>
+                  </Pressable>
+                </View>
               </>
             )}
-            <Pressable style={styles.secretCodeBtn} onPress={closeForgot}>
-              <Text style={styles.secretCodeBtnArrow}>ok</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
