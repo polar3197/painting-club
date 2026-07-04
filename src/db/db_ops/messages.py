@@ -193,6 +193,31 @@ async def db_list_conversations(db: AsyncSession, me_id):
     return out
 
 
+async def db_get_unread_count(db: AsyncSession, me_id) -> int:
+    """Total unread messages across all of the member's conversations:
+    messages from others newer than the per-conversation read cursor."""
+    return (
+        await db.execute(
+            select(func.count())
+            .select_from(Message)
+            .join(
+                ConversationParticipant,
+                and_(
+                    ConversationParticipant.conversation_id == Message.conversation_id,
+                    ConversationParticipant.member_id == me_id,
+                ),
+            )
+            .filter(Message.sender_id != me_id)
+            .filter(
+                or_(
+                    ConversationParticipant.last_read_at.is_(None),
+                    Message.created_at > ConversationParticipant.last_read_at,
+                )
+            )
+        )
+    ).scalar_one()
+
+
 async def db_get_messages(db: AsyncSession, conversation_id, me_id, cursor, limit: int):
     """Newest-first keyset page of a thread. The first page (cursor=None) bumps
     the caller's read cursor and returns its previous value as the unseen

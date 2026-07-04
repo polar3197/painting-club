@@ -127,6 +127,7 @@ from db.db_ops.messages import (
     db_get_or_create_dm,
     db_create_group,
     db_list_conversations,
+    db_get_unread_count,
     db_get_messages,
     db_send_message,
     db_leave_group,
@@ -1937,6 +1938,14 @@ async def list_conversations_endpoint(
 ):
     rows = await db_list_conversations(db, current_member.id)
     return [_conversation_out(r) for r in rows]
+
+
+@app.get("/conversations/unread-count")
+async def unread_count_endpoint(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+) -> dict[str, int]:
+    return {"unread": await db_get_unread_count(db, current_member.id)}
 
 
 @app.post("/conversations/dm", response_model=ConversationOut)

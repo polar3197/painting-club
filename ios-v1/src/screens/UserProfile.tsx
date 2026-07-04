@@ -31,6 +31,7 @@ import {
   upload_profile_picture,
   get_media,
   open_dm,
+  get_unread_count,
   Visual2DOut,
   WrittenFormOut,
   AudioOut,
@@ -289,6 +290,24 @@ export default function UserProfile() {
   const [writtenArt, setWrittenArt] = useState<WrittenFormOut[]>([]);
   const [audioArt, setAudioArt] = useState<AudioOut[]>([]);
   const [refresh, setRefresh] = useState(0);
+  // Unread-messages dot on the owner's mail button. Polled while the profile
+  // is focused; server counts messages newer than each thread's read cursor.
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    if (!isFocused || !profile?.is_owner) return;
+    let live = true;
+    const check = () =>
+      get_unread_count(token)
+        .then((r) => { if (live) setUnreadMessages(r.unread); })
+        .catch(() => {});
+    check();
+    const iv = setInterval(check, 15000);
+    return () => {
+      live = false;
+      clearInterval(iv);
+    };
+  }, [isFocused, profile?.is_owner, token]);
   const [refreshing, setRefreshing] = useState(false);
   // Optimistic upload state + the upload triggers live in UploadContext so the
   // global "+" Add flow can fire an upload and have its placeholder/spinner tile
@@ -757,6 +776,7 @@ export default function UserProfile() {
                         onPress={() => navigation.navigate('Messages')}
                       >
                         <Ionicons name="mail-outline" size={22} color={Colors.black} />
+                        {unreadMessages > 0 && <View style={styles.unreadDot} />}
                       </Pressable>
                       <Pressable
                         style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
@@ -1109,6 +1129,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.redBright,
   },
   userTopRow: {
     flexDirection: 'row',

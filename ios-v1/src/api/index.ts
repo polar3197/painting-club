@@ -520,6 +520,12 @@ export function get_member_directory(token: string | null): Promise<MemberDirect
   }) as Promise<MemberDirectoryEntry[]>;
 }
 
+export function get_unread_count(token: string | null): Promise<{ unread: number }> {
+  return request('/conversations/unread-count', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ unread: number }>;
+}
+
 export function get_conversations(token: string | null): Promise<ConversationOut[]> {
   return request('/conversations', {
     headers: { Authorization: `Bearer ${token}` },
