@@ -15,7 +15,7 @@ import { TextInput } from '../components/AppTextInput';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { login_user, redeem_setup_code, get_profile, accept_terms } from '../api';
+import { login_user, redeem_setup_code, get_profile, accept_terms, forgot_password } from '../api';
 import ApplicationDialog from '../components/ApplicationDialog';
 import TermsModal from '../components/TermsModal';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
@@ -32,6 +32,33 @@ export default function LandingPage() {
   const [setupCode, setSetupCode] = useState('');
   const [showApplication, setShowApplication] = useState(false);
   const [showSecretCode, setShowSecretCode] = useState(false);
+  // Forgot-password: email prompt -> POST -> confirmation. The emailed code is
+  // then redeemed through the existing "secret code?" flow.
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotSending, setForgotSending] = useState(false);
+
+  const handleForgot = async () => {
+    const email = forgotEmail.trim();
+    if (!email || forgotSending) return;
+    setForgotSending(true);
+    try {
+      await forgot_password(email);
+    } catch {
+      // Deliberately silent — the endpoint always answers ok; a network error
+      // still lands on the same confirmation copy ("if that email is on file").
+    } finally {
+      setForgotSending(false);
+      setForgotSent(true);
+    }
+  };
+
+  const closeForgot = () => {
+    setShowForgot(false);
+    setForgotEmail('');
+    setForgotSent(false);
+  };
   const [pendingTerms, setPendingTerms] = useState<{
     username: string;
     token: string;
@@ -164,6 +191,9 @@ export default function LandingPage() {
               <Text style={styles.actionBtnText}>secret code?</Text>
             </Pressable>
           </View>
+          <Pressable onPress={() => setShowForgot(true)} hitSlop={6}>
+            <Text style={styles.forgotLink}>forgot password?</Text>
+          </Pressable>
         </View>
         <View style={styles.flexSpacer} />
       </KeyboardAvoidingView>
@@ -205,6 +235,56 @@ export default function LandingPage() {
                 <Text style={styles.secretCodeBtnArrow}>→</Text>
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        visible={showForgot}
+        animationType="fade"
+        onRequestClose={closeForgot}
+      >
+        <View style={styles.secretBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeForgot} />
+          <View style={styles.secretPanel}>
+            {forgotSent ? (
+              <>
+                <Text style={styles.secretLabel}>check your email</Text>
+                <Text style={styles.forgotBody}>
+                  if that email is on file, a reset code is on its way. once you
+                  have it, tap "secret code?" to get back in.
+                </Text>
+                <Pressable style={styles.secretCodeBtn} onPress={closeForgot}>
+                  <Text style={styles.secretCodeBtnArrow}>ok</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.secretLabel}>forgot password</Text>
+                <Text style={styles.forgotBody}>
+                  enter your email and we'll send you a reset code.
+                </Text>
+                <View style={styles.secretCodeRow}>
+                  <TextInput
+                    style={styles.secretCodeInput}
+                    value={forgotEmail}
+                    onChangeText={setForgotEmail}
+                    placeholder="email"
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    returnKeyType="send"
+                    autoFocus
+                    onSubmitEditing={handleForgot}
+                  />
+                  <Pressable style={styles.secretCodeBtn} onPress={handleForgot}>
+                    <Text style={styles.secretCodeBtnArrow}>{forgotSending ? '…' : '→'}</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -313,6 +393,21 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     marginBottom: 8,
+  },
+  forgotLink: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    marginTop: 10,
+  },
+  forgotBody: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.textPrimary,
+    lineHeight: 18,
+    marginBottom: 10,
   },
   actionBtnText: {
     fontFamily: Fonts.serif,

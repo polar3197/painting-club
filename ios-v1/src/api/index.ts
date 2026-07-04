@@ -44,6 +44,13 @@ export function login_user(payload: LoginPayload): Promise<LoginResponse> {
   }) as Promise<LoginResponse>;
 }
 
+export function forgot_password(email: string): Promise<{ ok: boolean }> {
+  return request('/members/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }) as Promise<{ ok: boolean }>;
+}
+
 export function redeem_setup_code(payload: SetupCodePayload): Promise<LoginResponse> {
   return request('/members/redeem-setup-code', {
     method: 'POST',
