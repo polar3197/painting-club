@@ -250,10 +250,10 @@ export default function LandingPage() {
           <View style={styles.secretPanel}>
             {forgotSent ? (
               <>
-                <Text style={styles.secretLabel}>check your email</Text>
+                <Text style={styles.secretLabel}>request sent</Text>
                 <Text style={styles.forgotBody}>
-                  if that email is on file, a reset code is on its way. once you
-                  have it, tap "secret code?" to get back in.
+                  we'll send you a new secret code asap. once you have it, tap
+                  "secret code?" to get back in.
                 </Text>
                 <Pressable style={styles.secretCodeBtn} onPress={closeForgot}>
                   <Text style={styles.secretCodeBtnArrow}>ok</Text>
@@ -263,7 +263,7 @@ export default function LandingPage() {
               <>
                 <Text style={styles.secretLabel}>forgot password</Text>
                 <Text style={styles.forgotBody}>
-                  enter your email and we'll send you a reset code.
+                  enter your email to request a new secret code.
                 </Text>
                 <View style={styles.secretCodeRow}>
                   <TextInput
