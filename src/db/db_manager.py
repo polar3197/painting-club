@@ -131,12 +131,15 @@ async def run_migrations():
         # Seed the audio media forms. INSERT-WHERE-NOT-EXISTS keeps this
         # idempotent: media.name has no unique constraint and create_all skips
         # the Python-side id default, so we supply gen_random_uuid() explicitly.
+        # CAST is required: :name appears in both the SELECT list (untyped) and
+        # the VARCHAR comparison, and asyncpg's prepared statements refuse the
+        # ambiguity ("text versus character varying") without it.
         for _audio_name in _AUDIO_SEED:
             await conn.execute(
                 text(
                     "INSERT INTO media (id, name, type) "
-                    "SELECT gen_random_uuid(), :name, 'audio' "
-                    "WHERE NOT EXISTS (SELECT 1 FROM media WHERE name = :name)"
+                    "SELECT gen_random_uuid(), CAST(:name AS VARCHAR), 'audio' "
+                    "WHERE NOT EXISTS (SELECT 1 FROM media WHERE name = CAST(:name AS VARCHAR))"
                 ),
                 {"name": _audio_name},
             )
