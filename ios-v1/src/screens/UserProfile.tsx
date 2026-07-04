@@ -1118,8 +1118,12 @@ const styles = StyleSheet.create({
   ownerActions: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 6,
     alignSelf: 'flex-start',
+    // Grow to fill the identity column below the location line (the column
+    // stretches to the profile pic's height), and center the buttons in that
+    // space — vertically midway between the location and the pic bottom.
+    flex: 1,
+    alignItems: 'center',
   },
   ownerActionBtn: {
     width: 38,
@@ -1151,6 +1155,10 @@ const styles = StyleSheet.create({
   userIdentity: {
     flex: 1,
     gap: 4,
+    // Match the profile pic's height (userTopRow top-aligns children, which
+    // would otherwise shrink-wrap this column) so the action row's flex:1
+    // has the full pic-height space to center within.
+    alignSelf: 'stretch',
   },
   profilePicContainer: {
     width: SCREEN_WIDTH * 0.32,

@@ -358,14 +358,6 @@ export default function EditProfile() {
           >
             <MiniProfile colors={pageColors} highlight={selectedElement} />
 
-            <Text style={styles.paletteHint}>
-              {selectedElement
-                ? `pick a color for ${
-                    PROFILE_COLOR_ELEMENTS.find((e) => e.key === selectedElement)?.label
-                  }`
-                : 'tap a button to recolor that part of your page'}
-            </Text>
-
             {/* The 7 component buttons — each controls one part of the page.
                 Each button wears its component's current color. */}
             <View style={styles.elementRow}>
@@ -550,14 +542,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
   },
-  paletteHint: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 14,
-    marginBottom: 10,
-  },
   pickerWrap: {
     marginTop: 16,
     gap: 10,
@@ -619,6 +603,7 @@ const styles = StyleSheet.create({
   elementRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 16,
   },
   elementBtnWrap: {
     alignItems: 'center',

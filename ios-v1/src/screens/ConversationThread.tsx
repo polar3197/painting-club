@@ -171,7 +171,8 @@ export default function ConversationThread() {
           </View>
         )}
         <View style={[styles.msgRow, isOwn ? styles.msgRowOwn : styles.msgRowOther]}>
-          {!isOwn && (
+          {/* Sender labels only in groups — in a DM the other party is obvious. */}
+          {!isOwn && type === 'group' && (
             <Pressable
               style={styles.msgLabel}
               onPress={() => navigation.navigate('Main', {
@@ -189,7 +190,7 @@ export default function ConversationThread() {
             </View>
             <Text style={styles.msgTime}>{formatTime(when)}</Text>
           </View>
-          {isOwn && (
+          {isOwn && type === 'group' && (
             <View style={styles.msgLabel}>
               <Text style={styles.msgLabelName}>{'<'}</Text>
             </View>
