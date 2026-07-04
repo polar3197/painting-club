@@ -40,9 +40,12 @@ export function getActivePlayer(): AudioPlayer | null {
 }
 
 // ---- controls ---------------------------------------------------------------
-export function playTrack(uri: string): void {
+export function playTrack(uri: string, startAtSeconds?: number): void {
   claimPlayback(_pauseGlobal);
   if (_player && _activeUri === uri) {
+    if (startAtSeconds != null) {
+      try { _player.seekTo(startAtSeconds); } catch {}
+    }
     _player.play();
     return;
   }
@@ -69,6 +72,11 @@ export function playTrack(uri: string): void {
     });
   }
   _activeUri = uri;
+  if (startAtSeconds != null && startAtSeconds > 0) {
+    // Seek is queued against the freshly-loaded item; lets an idle-tile drag
+    // start playback from the dragged position.
+    try { _player.seekTo(startAtSeconds); } catch {}
+  }
   _player.play();
   notify();
 }

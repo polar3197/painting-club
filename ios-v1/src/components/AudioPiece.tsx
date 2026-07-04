@@ -105,6 +105,42 @@ export function AudioPlayerBar({
   if (active) {
     return <ActiveTrackBar uri={uri} fallbackDuration={fallbackDuration} />;
   }
+  return <IdleTrackBar uri={uri} fallbackDuration={fallbackDuration} />;
+}
+
+// Idle (not-the-active-track) bar. The scrubber is still live: dragging the
+// dot starts playback from the dragged position (using the stored duration
+// for the math), so seeking works without a prior play tap.
+function IdleTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDuration: number | null }) {
+  const [trackW, setTrackW] = useState(0);
+  const [scrubFrac, setScrubFrac] = useState<number | null>(null);
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      // Don't let the surrounding ScrollView steal the drag mid-scrub.
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+      },
+      onPanResponderMove: (e) => {
+        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+      },
+      onPanResponderRelease: (e) => {
+        if (trackW > 0) {
+          const f = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW));
+          playTrack(uri, (fallbackDuration || 0) * f);
+        }
+        setScrubFrac(null);
+      },
+      onPanResponderTerminate: () => setScrubFrac(null),
+    })
+  ).current;
+
+  const frac = scrubFrac ?? 0;
+  const displayed = frac * (fallbackDuration || 0);
+
   return (
     <View style={styles.playerBar}>
       <Pressable style={styles.playBtn} onPress={() => playTrack(uri)}>
@@ -112,12 +148,17 @@ export function AudioPlayerBar({
       </Pressable>
       <EqBars playing={false} />
       <View style={styles.scrubCol}>
-        <View style={styles.track}>
+        <View
+          style={styles.track}
+          onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
+          {...pan.panHandlers}
+        >
           <View style={styles.trackBase} />
-          <View style={[styles.trackThumb, { left: 0 }]} />
+          <View style={[styles.trackFill, { width: `${frac * 100}%` }]} />
+          <View style={[styles.trackThumb, { left: Math.max(0, frac * trackW - 6) }]} />
         </View>
         <View style={styles.timeRow}>
-          <Text style={styles.timeText}>{fmtTime(0)}</Text>
+          <Text style={styles.timeText}>{fmtTime(displayed)}</Text>
           <Text style={styles.timeText}>{fmtTime(fallbackDuration || 0)}</Text>
         </View>
       </View>
@@ -150,6 +191,8 @@ function ActiveTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDurati
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // Don't let the surrounding ScrollView steal the drag mid-scrub.
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
         if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
       },
@@ -247,6 +290,8 @@ export function AudioPreviewBar({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // Don't let the surrounding ScrollView steal the drag mid-scrub.
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
         if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
       },
