@@ -27,6 +27,39 @@ type ThreadParams = {
   partnerUsername?: string | null;
 };
 
+// Server timestamps are naive UTC (no zone suffix) — tag them as UTC so
+// new Date() doesn't misread them as local time.
+function parseUtc(s: string): Date {
+  return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+}
+
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+// iMessage-style day marker: today / yesterday / "wed, jul 2" (this year) /
+// "jul 2, 2025" (older).
+function formatDayLabel(d: Date): string {
+  const now = new Date();
+  if (sameDay(d, now)) return 'today';
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(d, yesterday)) return 'yesterday';
+  const opts: Intl.DateTimeFormatOptions =
+    d.getFullYear() === now.getFullYear()
+      ? { weekday: 'short', month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: 'numeric' };
+  return d.toLocaleDateString([], opts).toLowerCase();
+}
+
 // One conversation, newest message at the bottom (inverted FlatList over
 // newest-first data — same order the API returns). While focused, the first
 // page is re-fetched on a short interval so replies appear without a manual
@@ -116,32 +149,52 @@ export default function ConversationThread() {
     }
   };
 
-  const renderMessage = ({ item: m }: { item: MessageOut }) => {
+  const renderMessage = ({ item: m, index }: { item: MessageOut; index: number }) => {
     const isOwn = m.sender_username === currentUser;
     const display = m.sender_firstname || m.sender_username;
     const unseen = !isOwn && (!prevReadAt || m.created_at > prevReadAt);
+    const when = parseUtc(m.created_at);
+
+    // Day separator above the first message of each day. Data is newest-first,
+    // so the chronologically-previous message sits at index + 1. When older
+    // pages are still unfetched, hold off — the marker lands once they load.
+    const older = messages[index + 1];
+    const showDay = older
+      ? !sameDay(when, parseUtc(older.created_at))
+      : nextCursor === null;
+
     return (
-      <View style={[styles.msgRow, isOwn ? styles.msgRowOwn : styles.msgRowOther]}>
-        {!isOwn && (
-          <Pressable
-            style={styles.msgLabel}
-            onPress={() => navigation.navigate('Main', {
-              screen: 'SearchTab',
-              params: { screen: 'UserProfile', params: { username: m.sender_username } },
-            })}
-          >
-            <Text style={styles.msgLabelName}>{display} {'>'}</Text>
-            {m.sender_firstname && <Text style={styles.msgLabelUsername}>@{m.sender_username}</Text>}
-          </Pressable>
-        )}
-        <View style={[styles.msgBubble, isOwn && styles.msgBubbleOwn, unseen && styles.msgBubbleUnseen]}>
-          <Text style={styles.msgText}>{m.body}</Text>
-        </View>
-        {isOwn && (
-          <View style={styles.msgLabel}>
-            <Text style={styles.msgLabelName}>{'<'}</Text>
+      <View>
+        {showDay && (
+          <View style={styles.daySeparator}>
+            <Text style={styles.daySeparatorText}>{formatDayLabel(when)}</Text>
           </View>
         )}
+        <View style={[styles.msgRow, isOwn ? styles.msgRowOwn : styles.msgRowOther]}>
+          {!isOwn && (
+            <Pressable
+              style={styles.msgLabel}
+              onPress={() => navigation.navigate('Main', {
+                screen: 'SearchTab',
+                params: { screen: 'UserProfile', params: { username: m.sender_username } },
+              })}
+            >
+              <Text style={styles.msgLabelName}>{display} {'>'}</Text>
+              {m.sender_firstname && <Text style={styles.msgLabelUsername}>@{m.sender_username}</Text>}
+            </Pressable>
+          )}
+          <View style={[styles.msgCol, isOwn ? styles.msgColOwn : styles.msgColOther]}>
+            <View style={[styles.msgBubble, isOwn && styles.msgBubbleOwn, unseen && styles.msgBubbleUnseen]}>
+              <Text style={styles.msgText}>{m.body}</Text>
+            </View>
+            <Text style={styles.msgTime}>{formatTime(when)}</Text>
+          </View>
+          {isOwn && (
+            <View style={styles.msgLabel}>
+              <Text style={styles.msgLabelName}>{'<'}</Text>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -281,13 +334,36 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.micro,
     color: Colors.textMuted,
   },
+  daySeparator: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  daySeparatorText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.micro,
+    color: Colors.textTertiary,
+  },
+  msgCol: {
+    maxWidth: '70%',
+  },
+  msgColOwn: {
+    alignItems: 'flex-end',
+  },
+  msgColOther: {
+    alignItems: 'flex-start',
+  },
+  msgTime: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.micro,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
   msgBubble: {
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: '#000',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    maxWidth: '70%',
   },
   msgBubbleOwn: {
     backgroundColor: Colors.secondary,
