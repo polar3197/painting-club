@@ -210,7 +210,6 @@ export function AudioPlayerBar({
 
 export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout }: AudioPieceProps) {
   const { token } = useAuth();
-  const [activated, setActivated] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   const uri = resolveImageUrl(piece.file_path);
@@ -242,22 +241,18 @@ export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout 
             {!!piece.artist && <Text style={styles.detailText}>{piece.artist}</Text>}
             {!!piece.date && <Text style={styles.detailText}>{piece.date}</Text>}
           </View>
-          {!!piece.duration_seconds && !activated && (
-            <Text style={styles.durationBadge}>{fmtTime(piece.duration_seconds)}</Text>
-          )}
         </View>
 
         {AUDIO_IS_STUB ? (
           <View style={[styles.bigPlay, styles.bigPlayDisabled]}>
             <Text style={styles.bigPlayLabel}>update the app to play audio</Text>
           </View>
-        ) : activated ? (
-          <AudioPlayerBar uri={uri} fallbackDuration={piece.duration_seconds} />
         ) : (
-          <Pressable style={styles.bigPlay} onPress={() => setActivated(true)}>
-            <Text style={styles.bigPlayIcon}>▶</Text>
-            <Text style={styles.bigPlayLabel}>play</Text>
-          </Pressable>
+          <AudioPlayerBar
+            uri={uri}
+            fallbackDuration={piece.duration_seconds}
+            autoPlay={false}
+          />
         )}
 
         {isOwner && (
