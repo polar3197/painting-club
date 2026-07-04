@@ -1,7 +1,7 @@
 # src/db/models.py
 from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean, Float, Integer
 from datetime import datetime
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import uuid
 
@@ -28,6 +28,10 @@ class Member(Base):
     # Timestamp of the last time the user opened their "comments on my art"
     # dialog. Comments with created_at > this value render as unseen.
     comments_last_viewed_at = Column(DateTime)
+    # Profile page colors from the edit-profile color tab: component-key ->
+    # color string ('#rrggbb'). NULL = never customized; clients fall back to
+    # the app-default palette.
+    profile_colors = Column(JSONB)
 
     # favorite piece you made
     # favorite medium

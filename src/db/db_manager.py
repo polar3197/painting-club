@@ -203,4 +203,9 @@ async def run_migrations():
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_comment_art_created ON comment (art_id, created_at DESC)"
         ))
+        # Per-member profile page colors (edit profile -> color scheme tab).
+        # NULL = never customized; clients fall back to the default palette.
+        await conn.execute(text(
+            "ALTER TABLE member ADD COLUMN IF NOT EXISTS profile_colors JSONB"
+        ))
     print("Migrations applied.")

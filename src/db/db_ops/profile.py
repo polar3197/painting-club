@@ -41,7 +41,10 @@ async def db_update_profile(db: AsyncSession, username: str, payload: ProfileUpd
     member = result.scalar_one_or_none()
     if not member:
         return None
-    for field, value in payload.model_dump().items():
+    # exclude_unset: only fields the client actually sent are written. Without
+    # it, optional fields a client omits (e.g. profile_colors from pre-colors
+    # app builds) would default to None and wipe the stored value.
+    for field, value in payload.model_dump(exclude_unset=True).items():
           setattr(member, field, value)
     await db.commit()
     return member

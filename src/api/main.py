@@ -335,6 +335,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         terms_accepted_at=member_row.terms_accepted_at if is_owner else None,
         viewer_blocked_by_owner=viewer_blocked_by_owner,
         blocked_usernames=blocked_usernames,
+        profile_colors=member_row.profile_colors,
     )
 
 @app.post("/members/accept-terms")

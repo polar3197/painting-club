@@ -1,7 +1,25 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import date as Date, datetime
 from typing import List
+import re
 import uuid
+
+# Recolorable profile page components — mirrors PROFILE_COLOR_ELEMENTS in
+# ios-v1/src/constants/profileColors.ts. Unknown keys are rejected so clients
+# can't stuff arbitrary data into the JSONB column.
+PROFILE_COLOR_KEYS = {
+    "bg",
+    "statementBox",
+    "mediaTab",
+    "mediaTabSelected",
+    "picFrame",
+    "artCardBg",
+    "actionBtn",
+}
+# '#rgb', '#rrggbb', or 'rgb(r, g, b)' — the formats clients send today.
+_COLOR_VALUE_RE = re.compile(
+    r"^(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\))$"
+)
 
 class MemberIn(BaseModel):
     username: str
@@ -36,6 +54,7 @@ class Profile(BaseModel):
     terms_accepted_at: datetime | None = None
     viewer_blocked_by_owner: bool = False
     blocked_usernames: list[str] | None = None
+    profile_colors: dict[str, str] | None = None
 
 class ProfileUpdate(BaseModel):
     firstname: str | None
@@ -43,6 +62,22 @@ class ProfileUpdate(BaseModel):
     bio: str | None
     city: str | None
     state: str | None
+    # Optional so pre-colors app builds (which never send it) stay valid;
+    # db_update_profile uses exclude_unset so an absent field is left alone.
+    profile_colors: dict[str, str] | None = None
+
+    @field_validator("profile_colors")
+    @classmethod
+    def _validate_profile_colors(cls, v: dict[str, str] | None):
+        if v is None:
+            return v
+        unknown = set(v) - PROFILE_COLOR_KEYS
+        if unknown:
+            raise ValueError(f"unknown profile color keys: {sorted(unknown)}")
+        for key, value in v.items():
+            if not isinstance(value, str) or not _COLOR_VALUE_RE.match(value):
+                raise ValueError(f"invalid color value for '{key}'")
+        return v
 
 class Token(BaseModel):
     access_token: str
