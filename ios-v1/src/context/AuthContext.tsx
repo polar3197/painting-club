@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { get_blocks } from '../api';
+import { get_blocks, refresh_token } from '../api';
 
 interface AuthContextType {
   currentUser: string | null;
@@ -68,6 +68,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(storedToken);
           setCurrentUser(storedUser);
           setCurrentRole(storedRole);
+          // Sliding session: swap the stored token for a fresh 30-day one on
+          // every launch, so active members never hit the JWT expiry. Failures
+          // are non-fatal — the stored token keeps working until it expires.
+          refresh_token(storedToken)
+            .then(async (res) => {
+              if (res?.access_token) {
+                await SecureStore.setItemAsync('token', res.access_token);
+                setToken(res.access_token);
+              }
+            })
+            .catch(() => {});
         }
       } catch {
         // ignore hydration errors

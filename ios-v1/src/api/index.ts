@@ -45,6 +45,13 @@ export function login_user(payload: LoginPayload): Promise<LoginResponse> {
   }) as Promise<LoginResponse>;
 }
 
+export function refresh_token(token: string): Promise<LoginResponse> {
+  return request('/members/refresh-token', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<LoginResponse>;
+}
+
 export function forgot_password(username: string): Promise<{ ok: boolean }> {
   return request('/members/forgot-password', {
     method: 'POST',
