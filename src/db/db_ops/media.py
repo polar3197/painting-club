@@ -99,17 +99,18 @@ async def db_get_visual_2d(db: AsyncSession, username: str, medium: str):
         return None
 
     result = await db.execute(
-        select(Visual2D)
+        select(Visual2D, Series.name)
+        .outerjoin(Series, Series.id == Visual2D.series_id)
         .filter(Visual2D.creator_id == member_id, Visual2D.media_id == media_id)
         .order_by(nulls_last(desc(Visual2D.date)))
     )
-    visual_2ds = result.scalars().all()
+    rows = result.all()
 
     art_with_keywords = []
-    for art in visual_2ds:                                                                                                                  
+    for art, series_name in rows:
         keywords = await db_get_art_keywords(db=db, art_id=art.id)
-        art_with_keywords.append((art, keywords))
-                                                                                                                                            
+        art_with_keywords.append((art, keywords, series_name))
+
     return art_with_keywords
 
 async def db_add_visual_2d(
@@ -129,6 +130,7 @@ async def db_add_visual_2d(
         comments_enabled: bool = False,
         aspect_ratio: float | None = None,
         collection_id=None,
+        series_name: str | None = None,
     ) -> str:
     username = username.lower()
     # find member_id, media_id
@@ -156,6 +158,13 @@ async def db_add_visual_2d(
     if not existing_link:
         db.add(Media_Members(media_id=media_id, member_id=member_id))
 
+    # Optional series ("series" for paintings — same table as writing
+    # collections and audio albums), get-or-created by name.
+    series_id = None
+    if series_name and series_name.strip():
+        series = await db_get_or_create_series(db, member_id, media_id, series_name)
+        series_id = series.id
+
     # use this to create the entry in Art
     new_art = Visual2D(
         id=art_id,
@@ -164,6 +173,7 @@ async def db_add_visual_2d(
         creator_id=member_id,
         media_id=media_id,
         collection_id=collection_id,
+        series_id=series_id,
         location=location,
         song=song,
         song_artist=song_artist,
@@ -209,6 +219,8 @@ async def db_update_visual_2d(
     file_path: str | None = None,
     aspect_ratio: float | None = None,
     update_file: bool = False,
+    series_name: str | None = None,
+    clear_series: bool = False,
 ):
     result = await db.execute(select(Visual2D).filter(Visual2D.id == art_id))
     piece = result.scalar_one_or_none()
@@ -255,6 +267,17 @@ async def db_update_visual_2d(
     if update_file and file_path is not None:
         piece.file_path = file_path
         piece.aspect_ratio = aspect_ratio
+
+    # Series membership (mirrors written form): explicit clear wins; a new
+    # series name moves the piece and resets its position in the new series.
+    if clear_series:
+        piece.series_id = None
+        piece.series_order_index = None
+    elif series_name is not None and series_name.strip():
+        series = await db_get_or_create_series(db, piece.creator_id, piece.media_id, series_name)
+        if piece.series_id != series.id:
+            piece.series_order_index = None
+        piece.series_id = series.id
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
 
@@ -488,16 +511,17 @@ async def db_get_audio(db: AsyncSession, username: str, medium: str):
         return None
 
     result = await db.execute(
-        select(Audio)
+        select(Audio, Series.name)
+        .outerjoin(Series, Series.id == Audio.series_id)
         .filter(Audio.creator_id == member_id, Audio.media_id == media_id)
         .order_by(nulls_last(desc(Audio.date)))
     )
-    audios = result.scalars().all()
+    rows = result.all()
 
     art_with_keywords = []
-    for art in audios:
+    for art, series_name in rows:
         keywords = await db_get_art_keywords(db=db, art_id=art.id)
-        art_with_keywords.append((art, keywords))
+        art_with_keywords.append((art, keywords, series_name))
 
     return art_with_keywords
 
@@ -514,6 +538,7 @@ async def db_add_audio(
         duration_seconds: float | None = None,
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
+        series_name: str | None = None,
     ) -> str:
     username = username.lower()
     member_result = await db.execute(select(Member.id).filter(Member.username == username))
@@ -539,12 +564,19 @@ async def db_add_audio(
     if not existing_link:
         db.add(Media_Members(media_id=media_id, member_id=member_id))
 
+    # Optional album membership (an "album" is a series of audio pieces).
+    series_id = None
+    if series_name and series_name.strip():
+        series = await db_get_or_create_series(db, member_id, media_id, series_name)
+        series_id = series.id
+
     new_art = Audio(
         id=art_id,
         title=title,
         date=date,
         creator_id=member_id,
         media_id=media_id,
+        series_id=series_id,
         file_path=file_path,
         comments_enabled=comments_enabled,
         artist=artist,
@@ -581,6 +613,8 @@ async def db_update_audio(
     comments_enabled: bool = False,
     medium: str | None = None,
     file_path: str | None = None,
+    series_name: str | None = None,
+    clear_series: bool = False,
 ):
     result = await db.execute(select(Audio).filter(Audio.id == art_id))
     piece = result.scalar_one_or_none()
@@ -626,6 +660,16 @@ async def db_update_audio(
         piece.duration_seconds = duration_seconds
     if file_path is not None:
         piece.file_path = file_path
+
+    # Album membership (mirrors written form / visual_2d series handling).
+    if clear_series:
+        piece.series_id = None
+        piece.series_order_index = None
+    elif series_name is not None and series_name.strip():
+        series = await db_get_or_create_series(db, piece.creator_id, piece.media_id, series_name)
+        if piece.series_id != series.id:
+            piece.series_order_index = None
+        piece.series_id = series.id
 
     await db.execute(delete(KeywordArt).filter(KeywordArt.art_id == art_id))
 

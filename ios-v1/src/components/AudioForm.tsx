@@ -16,6 +16,7 @@ export default function AudioForm({ onDataChange, initialData, rightSlot }: Audi
     title: initialData?.title ?? '',
     date: initialData ? initialData.date ?? '' : todayLocalISO(),
     keywords: initialData?.keywords?.join(', ') ?? '',
+    series: (initialData as any)?.series_name ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
   });
 
@@ -50,6 +51,14 @@ export default function AudioForm({ onDataChange, initialData, rightSlot }: Audi
         placeholderTextColor={Colors.textMuted}
         autoCapitalize="none"
         onChangeText={(v) => update({ date: v })}
+      />
+      <TextInput
+        style={styles.input}
+        value={form.series}
+        placeholder="album (optional)"
+        placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
+        onChangeText={(v) => update({ series: v })}
       />
 
       <View style={styles.toggleRow}>

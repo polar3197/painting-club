@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import Spinner from '../components/Spinner';
 import { search_art, resolveImageUrl, thumbUrl, ArtResult } from '../api';
+import { useDebouncedValue } from '../hooks';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { SearchStackParamList } from '../navigation/types';
 
@@ -47,10 +48,15 @@ export default function ArtGallery({ query, onResetFilters, onListScroll }: Prop
     setRefreshing(false);
   }, [onResetFilters]);
 
+  // Index construction is the expensive half of Fuse — build it once per
+  // dataset, not per keystroke. The query is debounced so the grid re-renders
+  // when typing pauses instead of on every character.
+  const fuse = useMemo(() => new Fuse(art, { keys: ART_KEYS, threshold: 0.4 }), [art]);
+  const debouncedQuery = useDebouncedValue(query);
   const filtered = useMemo(() => {
-    if (!query.trim()) return art;
-    return new Fuse(art, { keys: ART_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
-  }, [art, query]);
+    if (!debouncedQuery.trim()) return art;
+    return fuse.search(debouncedQuery).map((r) => r.item);
+  }, [art, fuse, debouncedQuery]);
 
   const numColumns = columnsFor(filtered.length);
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;

@@ -98,6 +98,7 @@ export default function AddArtDialog({
           width: piece.width ?? null,
           height: piece.height ?? null,
           keywords: piece.keywords?.join(', ') ?? '',
+          series: piece.series_name ?? '',
           comments_enabled: piece.comments_enabled ?? false,
         }
       : writtenPiece
@@ -114,6 +115,7 @@ export default function AddArtDialog({
           artist: audioPiece.artist ?? '',
           date: audioPiece.date ?? '',
           keywords: audioPiece.keywords?.join(', ') ?? '',
+          series: audioPiece.series_name ?? '',
           comments_enabled: audioPiece.comments_enabled ?? false,
         }
       : null
@@ -124,6 +126,10 @@ export default function AddArtDialog({
   // drag-down gesture dismiss the sheet reliably (the same pattern as the
   // top grab bar). Inside the ScrollView, iOS native scroll wins the gesture.
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+  // Extra images beyond the first when creating visual pieces — the picker
+  // allows multi-select for new art so a whole series uploads in one go.
+  // Edits (file replacement) stay single-file.
+  const [extraFiles, setExtraFiles] = useState<{ uri: string; name: string; type: string }[]>([]);
   // Measured length of a newly picked audio file (via the pre-listen player),
   // sent as duration_seconds with the create/replace payload.
   const [pickedDuration, setPickedDuration] = useState<number | null>(null);
@@ -148,16 +154,21 @@ export default function AddArtDialog({
   }, []);
 
   const pickImage = async () => {
+    const creating = !piece; // multi-select only for new pieces, not file swaps
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
+      allowsMultipleSelection: creating,
+      selectionLimit: creating ? 12 : 1,
     });
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const uri = asset.uri;
-      const name = uri.split('/').pop() || 'image.jpg';
-      const type = asset.mimeType || 'image/jpeg';
-      setPickedFile({ uri, name, type });
+      const toFile = (asset: (typeof result.assets)[0]) => ({
+        uri: asset.uri,
+        name: asset.uri.split('/').pop() || 'image.jpg',
+        type: asset.mimeType || 'image/jpeg',
+      });
+      setPickedFile(toFile(result.assets[0]));
+      setExtraFiles(result.assets.slice(1).map(toFile));
     }
   };
 
@@ -293,6 +304,9 @@ export default function AddArtDialog({
           : null,
         comments_enabled: formData.comments_enabled,
         medium: moving,
+        series_name: formData.series ? formData.series : null,
+        // Clear the series if the field was emptied while editing.
+        clear_series: !formData.series && !!piece.series_name,
         file: pickedFile,
       };
       onClose();
@@ -314,10 +328,9 @@ export default function AddArtDialog({
         Alert.alert('Missing', 'Please enter a title.');
         return;
       }
-      const createPayload: Visual2DIn = {
+      const basePayload = {
         username,
         medium: selectedMedium,
-        title,
         location: formData.location,
         song: formData.song,
         song_artist: formData.song_artist,
@@ -326,11 +339,19 @@ export default function AddArtDialog({
         height: formData.height,
         keywords: formData.keywords,
         comments_enabled: formData.comments_enabled,
-        file: pickedFile,
+        series_name: formData.series || undefined,
       };
       onClose();
-      // Parent owns the upload + placeholder tile.
-      onCreate?.(createPayload);
+      // Parent owns the upload + placeholder tile — one create per picked
+      // image. Multi-picks share all metadata; titles get numbered.
+      const files = [pickedFile, ...extraFiles];
+      files.forEach((file, i) => {
+        onCreate?.({
+          ...basePayload,
+          title: files.length > 1 ? `${title} ${i + 1}` : title,
+          file,
+        } as Visual2DIn);
+      });
     } else if (isWrittenForm && writtenPiece) {
       const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
       const trimmedText = pastedText.trim();
@@ -403,6 +424,8 @@ export default function AddArtDialog({
           : null,
         comments_enabled: formData.comments_enabled,
         medium: moving,
+        series_name: formData.series ? formData.series : null,
+        clear_series: !formData.series && !!audioPiece.series_name,
         // duration only travels with a replacement file — otherwise the stored
         // value still describes the existing audio.
         ...(pickedFile ? { file: pickedFile, duration_seconds: pickedDuration ?? undefined } : {}),
@@ -435,6 +458,7 @@ export default function AddArtDialog({
         keywords: formData.keywords,
         comments_enabled: formData.comments_enabled,
         duration_seconds: pickedDuration ?? undefined,
+        series_name: formData.series || undefined,
         file: pickedFile,
       };
       onClose();
@@ -472,7 +496,14 @@ export default function AddArtDialog({
               <View {...dropboxPanResponder.panHandlers}>
                 <Pressable style={styles.dropbox} onPress={pickImage}>
                   {pickedFile ? (
-                    <Image source={{ uri: pickedFile.uri }} style={styles.dropboxImage} contentFit="contain" />
+                    <>
+                      <Image source={{ uri: pickedFile.uri }} style={styles.dropboxImage} contentFit="contain" />
+                      {extraFiles.length > 0 && (
+                        <View style={styles.multiBadge}>
+                          <Text style={styles.multiBadgeText}>+{extraFiles.length} more</Text>
+                        </View>
+                      )}
+                    </>
                   ) : (
                     <Text style={styles.dropboxText}>{dropboxPlaceholder ?? 'tap to select art'}</Text>
                   )}
@@ -712,6 +743,21 @@ const styles = StyleSheet.create({
   dropboxImage: {
     width: '100%',
     height: '100%',
+  },
+  multiBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.accentGolden,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  multiBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.micro,
+    color: Colors.black,
   },
   dropboxText: {
     fontFamily: Fonts.serif,

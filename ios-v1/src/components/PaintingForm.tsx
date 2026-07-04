@@ -25,6 +25,7 @@ export default function PaintingForm({ onDataChange, initialData, rightSlot }: P
     width: initialData?.width ?? null as number | null,
     height: initialData?.height ?? null as number | null,
     keywords: initialData?.keywords?.join(', ') ?? '',
+    series: (initialData as any)?.series_name ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
   });
 
@@ -67,6 +68,14 @@ export default function PaintingForm({ onDataChange, initialData, rightSlot }: P
         placeholderTextColor={Colors.textMuted}
         autoCapitalize="none"
         onChangeText={(v) => update({ date: v })}
+      />
+      <TextInput
+        style={styles.input}
+        value={form.series}
+        placeholder="series (optional)"
+        placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
+        onChangeText={(v) => update({ series: v })}
       />
       <TextInput
         style={styles.input}

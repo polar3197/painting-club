@@ -213,4 +213,16 @@ async def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_message_conversation_created "
             "ON message (conversation_id, created_at DESC)"
         ))
+        # Series ordering generalized to every medium (albums, painting series):
+        # position moves to the art base table. written_form.order_index stays
+        # in sync (writes go to both) but art.series_order_index is the truth.
+        await conn.execute(text(
+            "ALTER TABLE art ADD COLUMN IF NOT EXISTS series_order_index INT"
+        ))
+        await conn.execute(text(
+            "UPDATE art SET series_order_index = wf.order_index "
+            "FROM written_form wf "
+            "WHERE art.id = wf.id AND art.series_order_index IS NULL "
+            "AND wf.order_index IS NOT NULL"
+        ))
     print("Migrations applied.")

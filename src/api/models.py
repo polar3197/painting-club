@@ -358,6 +358,9 @@ class Visual2DOut(BaseModel):
     file_path: str
     comments_enabled: bool = False
     aspect_ratio: float | None = None
+    series_id: uuid.UUID | None = None
+    series_name: str | None = None
+    order_index: int | None = None
 
 
 class WrittenFormOut(BaseModel):
@@ -393,6 +396,10 @@ class AudioOut(BaseModel):
     comments_enabled: bool = False
     artist: str | None = None
     duration_seconds: float | None = None
+    # Album membership (an album is a series of audio pieces).
+    series_id: uuid.UUID | None = None
+    series_name: str | None = None
+    order_index: int | None = None
 
 
 class AudioUpdate(BaseModel):

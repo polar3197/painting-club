@@ -72,6 +72,53 @@ function formatDayLabel(d: Date): string {
   return d.toLocaleDateString([], opts).toLowerCase();
 }
 
+// The composer owns its own text state so each keystroke re-renders only this
+// bar — when `input` lived on the screen next to the FlatList, every character
+// re-rendered all visible message rows.
+function MessageInputBar({
+  onSend,
+  bottomInset,
+}: {
+  // Sends to the server (and merges the sent message into the thread).
+  // Rejections put the text back in the box.
+  onSend: (body: string) => Promise<void>;
+  bottomInset: number;
+}) {
+  const [input, setInput] = useState('');
+
+  const submit = async () => {
+    const body = input.trim();
+    if (!body) return;
+    setInput('');
+    try {
+      await onSend(body);
+    } catch (err: any) {
+      // Same rule as comments: don't fabricate a local message the server
+      // never received — restore the text and surface the error.
+      setInput(body);
+      Alert.alert('Message failed', err?.message || 'Could not send your message');
+    }
+  };
+
+  return (
+    <View style={[styles.inputBar, { paddingBottom: 8 + bottomInset }]}>
+      <TextInput
+        style={styles.input}
+        value={input}
+        placeholder="message..."
+        placeholderTextColor={Colors.textMuted}
+        autoCapitalize="none"
+        onChangeText={setInput}
+        onSubmitEditing={submit}
+        returnKeyType="send"
+      />
+      <Pressable style={styles.submitBtn} onPress={submit}>
+        <Text style={styles.submitText}>{'↑'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // One conversation, newest message at the bottom (inverted FlatList over
 // newest-first data — same order the API returns). While focused, the first
 // page is re-fetched on a short interval so replies appear without a manual
@@ -90,7 +137,6 @@ export default function ConversationThread() {
   // move it or incoming bubbles would instantly lose their unseen colour.
   const [prevReadAt, setPrevReadAt] = useState<string | null>(null);
   const firstLoadDone = useRef(false);
-  const [input, setInput] = useState('');
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   // Invite-to-group sheet: directory members not already in the thread.
@@ -178,20 +224,15 @@ export default function ConversationThread() {
     } catch {}
   };
 
-  const submit = async () => {
-    const body = input.trim();
-    if (!body) return;
-    setInput('');
-    try {
+  // Stable identity so the memo-friendly composer never re-renders from
+  // thread updates.
+  const sendBody = useCallback(
+    async (body: string) => {
       const sent = await send_message(conversationId, body, token);
       mergeNewest([sent]);
-    } catch (err: any) {
-      // Same rule as comments: don't fabricate a local message the server
-      // never received — restore the text and surface the error.
-      setInput(body);
-      Alert.alert('Message failed', err?.message || 'Could not send your message');
-    }
-  };
+    },
+    [conversationId, token, mergeNewest]
+  );
 
   const doLeave = async () => {
     setConfirmLeave(false);
@@ -344,21 +385,7 @@ export default function ConversationThread() {
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
         />
-        <View style={[styles.inputBar, { paddingBottom: 8 + insets.bottom }]}>
-          <TextInput
-            style={styles.input}
-            value={input}
-            placeholder="message..."
-            placeholderTextColor={Colors.textMuted}
-            autoCapitalize="none"
-            onChangeText={setInput}
-            onSubmitEditing={submit}
-            returnKeyType="send"
-          />
-          <Pressable style={styles.submitBtn} onPress={submit}>
-            <Text style={styles.submitText}>{'↑'}</Text>
-          </Pressable>
-        </View>
+        <MessageInputBar onSend={sendBody} bottomInset={insets.bottom} />
       </KeyboardAvoidingView>
     </View>
   );

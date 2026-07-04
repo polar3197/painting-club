@@ -264,6 +264,7 @@ export function add_new_visual_2d(token: string | null, payload: Visual2DIn) {
   if (payload.keywords != null) fd.append('keywords', String(payload.keywords));
   if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
   if (payload.collection_id) fd.append('collection_id', payload.collection_id);
+  if (payload.series_name) fd.append('series_name', payload.series_name);
   fd.append('file', {
     uri: payload.file.uri,
     name: payload.file.name,
@@ -289,6 +290,8 @@ export function update_visual_2d(id: string, token: string | null, payload: Visu
   if (payload.keywords != null) fd.append('keywords', payload.keywords.join(', '));
   if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
   if (payload.medium) fd.append('medium', payload.medium);
+  if (payload.series_name != null) fd.append('series_name', payload.series_name);
+  if (payload.clear_series) fd.append('clear_series', String(payload.clear_series));
   if (payload.file) {
     fd.append('file', {
       uri: payload.file.uri,
@@ -388,6 +391,7 @@ export function add_new_audio(token: string | null, payload: AudioIn) {
   if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
   if (payload.artist) fd.append('artist', payload.artist);
   if (payload.duration_seconds != null) fd.append('duration_seconds', String(payload.duration_seconds));
+  if (payload.series_name) fd.append('series_name', payload.series_name);
   fd.append('file', {
     uri: payload.file.uri,
     name: payload.file.name,
@@ -414,6 +418,8 @@ export function update_audio(id: string, token: string | null, payload: AudioUpd
   if (payload.medium) fd.append('medium', payload.medium);
   if (payload.artist != null) fd.append('artist', payload.artist);
   if (payload.duration_seconds != null) fd.append('duration_seconds', String(payload.duration_seconds));
+  if (payload.series_name != null) fd.append('series_name', payload.series_name);
+  if (payload.clear_series) fd.append('clear_series', String(payload.clear_series));
   if (payload.file) {
     fd.append('file', {
       uri: payload.file.uri,

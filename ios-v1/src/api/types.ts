@@ -95,6 +95,8 @@ export interface Visual2DIn {
   keywords?: string;
   comments_enabled?: boolean;
   collection_id?: string | null;
+  // Series name ("series" of paintings — same grouping as albums/collections).
+  series_name?: string;
   file: { uri: string; name: string; type: string };
 }
 
@@ -136,6 +138,9 @@ export interface Visual2DOut {
   file_path: string;
   comments_enabled: boolean;
   aspect_ratio: number | null;
+  series_id: string | null;
+  series_name: string | null;
+  order_index: number | null;
 }
 
 export interface Visual2DUpdatePayload {
@@ -149,6 +154,8 @@ export interface Visual2DUpdatePayload {
   keywords?: string[] | null;
   comments_enabled?: boolean;
   medium?: string | null;
+  series_name?: string | null;
+  clear_series?: boolean;
   // When set, the on-disk file (and thumbnail) gets replaced.
   file?: { uri: string; name: string; type: string } | null;
 }
@@ -201,6 +208,8 @@ export interface AudioIn {
   artist?: string;
   // Client-measured length in seconds, captured once the picked file loads.
   duration_seconds?: number | null;
+  // Album name — the audio flavour of a series (created server-side on demand).
+  series_name?: string;
   file: { uri: string; name: string; type: string };
 }
 
@@ -213,6 +222,10 @@ export interface AudioOut {
   comments_enabled: boolean;
   artist: string | null;
   duration_seconds: number | null;
+  // Album membership (an album is a series of audio pieces).
+  series_id: string | null;
+  series_name: string | null;
+  order_index: number | null;
 }
 
 export interface AudioUpdatePayload {
@@ -223,6 +236,8 @@ export interface AudioUpdatePayload {
   medium?: string | null;
   artist?: string | null;
   duration_seconds?: number | null;
+  series_name?: string | null;
+  clear_series?: boolean;
   // When set, the on-disk audio file gets replaced.
   file?: { uri: string; name: string; type: string } | null;
 }

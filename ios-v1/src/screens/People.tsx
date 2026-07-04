@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import Spinner from '../components/Spinner';
-import { useMembers } from '../hooks';
+import { useMembers, useDebouncedValue } from '../hooks';
 import { resolveImageUrl, profilePicSrc, Profile } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { SearchStackParamList } from '../navigation/types';
@@ -44,10 +44,15 @@ export default function People({ query, onResetFilters, onListScroll }: Props) {
     setRefreshing(false);
   }, [onResetFilters, refetchMembers]);
 
+  // Index construction is the expensive half of Fuse — build it once per
+  // dataset, not per keystroke. The query is debounced so the grid re-renders
+  // when typing pauses instead of on every character.
+  const fuse = useMemo(() => new Fuse(members, { keys: PEOPLE_KEYS, threshold: 0.4 }), [members]);
+  const debouncedQuery = useDebouncedValue(query);
   const filtered = useMemo(() => {
-    if (!query.trim()) return members;
-    return new Fuse(members, { keys: PEOPLE_KEYS, threshold: 0.4 }).search(query).map((r) => r.item);
-  }, [members, query]);
+    if (!debouncedQuery.trim()) return members;
+    return fuse.search(debouncedQuery).map((r) => r.item);
+  }, [members, fuse, debouncedQuery]);
 
   const numColumns = columnsFor(filtered.length);
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;

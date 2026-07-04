@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Optional, List
 from pathlib import Path
 import io
+import os
 import uuid
 import magic
 from PIL import Image
@@ -481,9 +482,7 @@ async def get_visual_2d(
         raise HTTPException(status_code=404)
     
     visual_2ds = []
-    for result in results:
-        visual_2d_row = result[0]
-        keywords = result[1]
+    for visual_2d_row, keywords, series_name in results:
         visual_2d = Visual2DOut (
             id=visual_2d_row.id,
             title=visual_2d_row.title,
@@ -497,6 +496,9 @@ async def get_visual_2d(
             file_path=visual_2d_row.file_path,
             comments_enabled=visual_2d_row.comments_enabled,
             aspect_ratio=visual_2d_row.aspect_ratio,
+            series_id=visual_2d_row.series_id,
+            series_name=series_name,
+            order_index=visual_2d_row.series_order_index,
         )
         visual_2ds.append(visual_2d)
     print(visual_2ds)
@@ -629,7 +631,8 @@ AUDIO_MIME_TO_EXT = {
 }
 AUDIO_EXTS = {"m4a", "mp3", "wav", "aac"}
 
-STATIC_ROOT = Path("/app")
+# Container default; overridable so the API can run outside Docker (tests).
+STATIC_ROOT = Path(os.environ.get("STATIC_ROOT", "/app"))
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 
 def abs_path(rel: str) -> Path:
@@ -774,6 +777,7 @@ async def upload_visual_2d(
     keywords: str | None = Form(None),
     comments_enabled: bool = Form(False),
     collection_id: str | None = Form(None),
+    series_name: str | None = Form(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
@@ -841,6 +845,7 @@ async def upload_visual_2d(
             comments_enabled=comments_enabled,
             aspect_ratio=aspect_ratio,
             collection_id=collection_id,
+            series_name=series_name,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)
@@ -865,6 +870,8 @@ async def update_visual_2d(
     keywords: str | None = Form(None),
     comments_enabled: bool = Form(False),
     medium: str | None = Form(None),
+    series_name: str | None = Form(None),
+    clear_series: bool = Form(False),
     file: UploadFile | None = File(None),
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
@@ -956,6 +963,8 @@ async def update_visual_2d(
             file_path=new_file_path,
             aspect_ratio=new_aspect_ratio if file is not None else None,
             update_file=file is not None,
+            series_name=series_name,
+            clear_series=clear_series,
         )
     except ValueError as e:
         # Roll back any file we just wrote so the DB and disk don't diverge.
@@ -1420,6 +1429,7 @@ async def upload_audio(
     comments_enabled: bool = Form(False),
     artist: str | None = Form(None),
     duration_seconds: float | None = Form(None),
+    series_name: str | None = Form(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
@@ -1457,6 +1467,7 @@ async def upload_audio(
             keywords=keywords_list,
             file_path=file_path,
             comments_enabled=comments_enabled,
+            series_name=series_name,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)
@@ -1476,7 +1487,7 @@ async def get_audio(
         raise HTTPException(status_code=404)
 
     pieces = []
-    for row, kws in results:
+    for row, kws, series_name in results:
         pieces.append(AudioOut(
             id=row.id,
             title=row.title,
@@ -1486,6 +1497,9 @@ async def get_audio(
             comments_enabled=row.comments_enabled,
             artist=row.artist,
             duration_seconds=row.duration_seconds,
+            series_id=row.series_id,
+            series_name=series_name,
+            order_index=row.series_order_index,
         ))
     return pieces
 
@@ -1500,6 +1514,8 @@ async def update_audio(
     medium: str | None = Form(None),
     artist: str | None = Form(None),
     duration_seconds: float | None = Form(None),
+    series_name: str | None = Form(None),
+    clear_series: bool = Form(False),
     file: UploadFile | None = File(None),
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
@@ -1553,6 +1569,8 @@ async def update_audio(
             comments_enabled=comments_enabled,
             medium=medium,
             file_path=new_file_path,
+            series_name=series_name,
+            clear_series=clear_series,
         )
     except ValueError as e:
         if written_path is not None:

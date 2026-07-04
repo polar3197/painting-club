@@ -98,6 +98,10 @@ class Art(Base):
     creator_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
     series_id = Column(UUID(as_uuid=True), ForeignKey('series.id'), nullable=True)
+    # Position within the piece's series (album track order, painting sequence,
+    # writing order). Lives on the base so every medium shares one ordering.
+    # Supersedes written_form.order_index, which is kept in sync for old clients.
+    series_order_index = Column(Integer)
     collection_id = Column(UUID(as_uuid=True), ForeignKey('collection.id', ondelete='SET NULL'), nullable=True)
     title = Column(String(300), default="Untitled")
     date = Column(Date)
