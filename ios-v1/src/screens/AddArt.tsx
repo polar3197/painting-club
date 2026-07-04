@@ -138,7 +138,9 @@ export default function AddArt() {
 
   const pickAudio = async () => {
     const result = await DocumentPicker.getDocumentAsync({
-      type: ['public.audio', 'audio/*'],
+      // public.mpeg-4 makes .mp4 files selectable (iOS types them as movie,
+      // not audio) — the backend sniffs the container and stores them as .m4a.
+      type: ['public.audio', 'audio/*', 'public.mpeg-4'],
       multiple: false,
       copyToCacheDirectory: true,
     });
