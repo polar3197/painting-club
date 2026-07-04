@@ -64,6 +64,7 @@ from api.models import (
     SetupAccountIn,
     SetupCodeIn,
     ForgotPasswordIn,
+    PasswordResetOut,
     CommentOut,
     CommentReceivedOut,
     CommentsReceivedPage,
@@ -80,6 +81,7 @@ from db.db_ops.members import (
     db_login_user,
     db_redeem_setup_code,
     db_start_password_reset,
+    db_list_password_resets,
     db_get_members,
     db_complete_setup,
     db_export_member_data,
@@ -1716,6 +1718,27 @@ async def submit_application(payload: ApplicationIn, db: AsyncSession = Depends(
         reason=payload.reason,
     )
     return {"ok": True}
+
+@app.get("/admin/password-resets", response_model=list[PasswordResetOut])
+async def list_password_resets_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    """Live forgot-password codes, for manual delivery by the admin ("for now"
+    flow while SMTP is unconfigured; harmless alongside email delivery too)."""
+    members = await db_list_password_resets(db)
+    return [
+        PasswordResetOut(
+            username=m.username,
+            email=m.email,
+            firstname=m.firstname,
+            lastname=m.lastname,
+            code=m.temp_password_plaintext,
+            expires_at=m.temp_password_expires_at,
+        )
+        for m in members
+    ]
+
 
 @app.get("/admin/applications", response_model=list[ApplicationOut])
 async def get_applications(db: AsyncSession = Depends(get_db), _: Member = Depends(get_admin_member)):

@@ -106,6 +106,32 @@ async def db_start_password_reset(db: AsyncSession, email: str) -> tuple[Member,
     return member, code
 
 
+async def db_list_password_resets(db: AsyncSession):
+    """Members with a live self-requested reset code (forgot-password flow),
+    for the admin panel — the admin reads the code and sends it manually.
+    Invite-flow members are excluded: their pending state belongs to an
+    application row in 'pending_setup', which the applications list already
+    shows (with its own code)."""
+    from datetime import datetime as _dt
+    invite_pending = (
+        select(Application.id)
+        .where(Application.member_id == Member.id, Application.status == "pending_setup")
+        .exists()
+    )
+    result = await db.execute(
+        select(Member)
+        .filter(
+            Member.must_change_password == True,
+            Member.temp_password_plaintext.isnot(None),
+            ~invite_pending,
+        )
+    )
+    members = result.scalars().all()
+    now = _dt.utcnow()
+    # Only live codes — expired ones aren't actionable.
+    return [m for m in members if not (m.temp_password_expires_at and m.temp_password_expires_at < now)]
+
+
 async def db_create_member(db: AsyncSession, username: str, password: str) -> Member:
     username = username.lower()
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()

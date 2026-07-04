@@ -249,6 +249,14 @@ class ApplicationIn(BaseModel):
     known_member: str | None = None
     reason: str | None = None
 
+class PasswordResetOut(BaseModel):
+    username: str
+    email: str | None
+    firstname: str | None
+    lastname: str | None
+    code: str
+    expires_at: datetime | None
+
 class ApplicationOut(BaseModel):
     id: uuid.UUID
     firstname: str
