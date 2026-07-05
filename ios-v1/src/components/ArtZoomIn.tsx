@@ -30,6 +30,7 @@ import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
 import ContextPopup from './ContextPopup';
 import DeleteAccountDialog from './DeleteAccountDialog';
+import { useLandscapeUnlock } from '../hooks/useLandscapeUnlock';
 import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
@@ -60,6 +61,8 @@ export default function ArtZoomIn({
   backContent,
 }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
+  // Art deserves the full screen — allow rotation while zoomed in.
+  useLandscapeUnlock();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
   const { token, currentUser, blockedUsernames, noteBlocked, noteUnblocked, logout } = useAuth();
   const [showReport, setShowReport] = useState(false);
