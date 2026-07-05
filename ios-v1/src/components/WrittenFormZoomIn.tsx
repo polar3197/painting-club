@@ -285,7 +285,14 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
   };
 
   return (
-    <Modal visible animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      animationType="fade"
+      onRequestClose={onClose}
+      // iOS Modals default to portrait-only regardless of the app-level
+      // orientation unlock — without this the PDF reader never rotates.
+      supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
+    >
       <View
         style={[
           styles.sheet,
