@@ -12,7 +12,7 @@ import * as WebViewModule from 'react-native-webview';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resolveImageUrl } from '../api';
-import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
+import { extFromPath, isTextExt, useWrittenFormTextState } from '../hooks';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 // True when this OTA bundle runs against the build-#8 WebView stub — PDFs then
@@ -226,7 +226,11 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
   // WKWebView renders PDFs natively (paged, pinch-zoom) — view them in-app on
   // builds with the real WebView; stub builds keep the "open file" fallback.
   const pdfInApp = ext === 'pdf' && !WEBVIEW_IS_STUB;
-  const text = useWrittenFormText(filePath);
+  const { text, error: textError, retry: retryText } = useWrittenFormTextState(filePath);
+  // PDF load failures (e.g. a 502 while the server is unreachable) — without
+  // this the WebView renders the raw error page inside the reader.
+  const [pdfError, setPdfError] = useState(false);
+  const [pdfAttempt, setPdfAttempt] = useState(0);
 
   const [fontSize, setFontSize] = useState(DEFAULT_FONT);
   const [totalPages, setTotalPages] = useState(1);
@@ -295,21 +299,43 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
             <Text style={styles.xBtnText}>×</Text>
           </Pressable>
         </View>
-        {pdfInApp ? (
+        {pdfInApp && pdfError ? (
+          <View style={styles.fallback}>
+            <Text style={styles.loadingText}>couldn't load this piece — the server may be catching its breath</Text>
+            <Pressable
+              style={styles.openBtn}
+              onPress={() => { setPdfError(false); setPdfAttempt((a) => a + 1); }}
+            >
+              <Text style={styles.openBtnText}>try again</Text>
+            </Pressable>
+          </View>
+        ) : pdfInApp ? (
           <View style={styles.readerWrap}>
             <WebView
+              key={pdfAttempt}
               source={{ uri: resolveImageUrl(filePath) }}
               style={styles.webview}
               bounces={false}
               showsHorizontalScrollIndicator={false}
               automaticallyAdjustContentInsets={false}
               contentInsetAdjustmentBehavior="never"
+              onError={() => setPdfError(true)}
+              onHttpError={(e: any) => {
+                if ((e?.nativeEvent?.statusCode ?? 0) >= 400) setPdfError(true);
+              }}
             />
           </View>
         ) : !previewable ? (
           <View style={styles.fallback}>
             <Pressable style={styles.openBtn} onPress={openExternal}>
               <Text style={styles.openBtnText}>open file</Text>
+            </Pressable>
+          </View>
+        ) : textError ? (
+          <View style={styles.fallback}>
+            <Text style={styles.loadingText}>couldn't load this piece — the server may be catching its breath</Text>
+            <Pressable style={styles.openBtn} onPress={retryText}>
+              <Text style={styles.openBtnText}>try again</Text>
             </Pressable>
           </View>
         ) : text == null ? (
