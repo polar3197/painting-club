@@ -285,11 +285,14 @@ export default function ArtZoomIn({
 
   return (
     <Modal
-      transparent
       visible
       animationType="fade"
       onRequestClose={handleClose}
-      supportedOrientations={['portrait', 'landscape']}
+      // NOT transparent: iOS presents transparent modals over-full-screen,
+      // which never rotates regardless of supportedOrientations. The backdrop
+      // is near-opaque dark blur anyway, so fullscreen looks identical.
+      presentationStyle="fullScreen"
+      supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={handleClose}>
