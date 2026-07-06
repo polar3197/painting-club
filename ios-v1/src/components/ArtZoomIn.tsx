@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import {
   GestureHandlerRootView,
   Gesture,
@@ -30,7 +29,6 @@ import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
 import ContextPopup from './ContextPopup';
 import DeleteAccountDialog from './DeleteAccountDialog';
-import { useLandscapeUnlock } from '../hooks/useLandscapeUnlock';
 import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
@@ -61,8 +59,6 @@ export default function ArtZoomIn({
   backContent,
 }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
-  // Art deserves the full screen — allow rotation while zoomed in.
-  useLandscapeUnlock();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
   const { token, currentUser, blockedUsernames, noteBlocked, noteUnblocked, logout } = useAuth();
   const [showReport, setShowReport] = useState(false);
@@ -131,13 +127,6 @@ export default function ArtZoomIn({
   const cappedHeight = Math.min(contentHeight, screenH * 0.85);
   const cappedWidth = aspectRatio ? Math.min(contentWidth, cappedHeight * aspectRatio) : contentWidth;
 
-  useEffect(() => {
-    ScreenOrientation.unlockAsync();
-    return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    };
-  }, []);
-
   const handleFlip = () => {
     const next = !flippedRef.current;
     flippedRef.current = next;
@@ -150,7 +139,6 @@ export default function ArtZoomIn({
   };
 
   const handleClose = () => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     onClose();
   };
 
@@ -266,6 +254,14 @@ export default function ArtZoomIn({
   // Pinch and pan must coexist. Double-tap races both; it wins if it completes first.
   const composed = Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
 
+  // Tap anywhere outside the artwork to close. Gesture-handler tap (not a RN
+  // Pressable) so it can't be starved by the card's composed gestures.
+  const backdropTap = Gesture.Tap()
+    .maxDuration(400)
+    .onEnd((_e, success) => {
+      if (success) runOnJS(handleClose)();
+    });
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translationX.value },
@@ -285,20 +281,18 @@ export default function ArtZoomIn({
 
   return (
     <Modal
+      transparent
       visible
       animationType="fade"
       onRequestClose={handleClose}
-      // NOT transparent: iOS presents transparent modals over-full-screen,
-      // which never rotates regardless of supportedOrientations. The backdrop
-      // is near-opaque dark blur anyway, so fullscreen looks identical.
-      presentationStyle="fullScreen"
-      supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <Pressable style={styles.backdrop} onPress={handleClose}>
-          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
-          <View style={styles.darkenOverlay} />
-        </Pressable>
+        <GestureDetector gesture={backdropTap}>
+          <View style={styles.backdrop}>
+            <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <View style={styles.darkenOverlay} />
+          </View>
+        </GestureDetector>
 
         <View style={styles.imageWrapper} pointerEvents="box-none">
           <GestureDetector gesture={composed}>

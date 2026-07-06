@@ -13,7 +13,6 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resolveImageUrl } from '../api';
 import { extFromPath, isTextExt, useWrittenFormTextState } from '../hooks';
-import { useLandscapeUnlock } from '../hooks/useLandscapeUnlock';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 // True when this OTA bundle runs against the build-#8 WebView stub — PDFs then
@@ -227,8 +226,6 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
   // WKWebView renders PDFs natively (paged, pinch-zoom) — view them in-app on
   // builds with the real WebView; stub builds keep the "open file" fallback.
   const pdfInApp = ext === 'pdf' && !WEBVIEW_IS_STUB;
-  // PDFs read better wide — allow rotation while the reader is open.
-  useLandscapeUnlock(pdfInApp);
   const { text, error: textError, retry: retryText } = useWrittenFormTextState(filePath);
   // PDF load failures (e.g. a 502 while the server is unreachable) — without
   // this the WebView renders the raw error page inside the reader.
