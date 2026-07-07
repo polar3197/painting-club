@@ -225,4 +225,10 @@ async def run_migrations():
             "WHERE art.id = wf.id AND art.series_order_index IS NULL "
             "AND wf.order_index IS NOT NULL"
         ))
+        # Requester-chosen medium type on a media request. The requester now
+        # picks the type in the "propose a media form" dialog; the admin just
+        # approves. Nullable so rows created before this column stay valid.
+        await conn.execute(text(
+            "ALTER TABLE media_request ADD COLUMN IF NOT EXISTS requested_type VARCHAR(50)"
+        ))
     print("Migrations applied.")

@@ -120,7 +120,9 @@ function MediaRequestRow({
   req: MediaRequest;
   onResolve: (id: string, status: 'approved' | 'rejected', type: string | null, name: string | null) => void;
 }) {
-  const [pickingType, setPickingType] = useState(false);
+  // The requester now picks the type, so the admin just confirms. Entering
+  // `confirming` reveals an editable name (admin may rename before approving).
+  const [confirming, setConfirming] = useState(false);
   const [editName, setEditName] = useState(req.requested_name);
   const statusBg =
     req.status === 'approved'
@@ -134,10 +136,13 @@ function MediaRequestRow({
     return n && n !== req.requested_name ? n : null;
   };
 
+  // Requester's chosen type (pending), or the type it was approved with (resolved).
+  const typeLabel = req.resolved_type ?? req.requested_type;
+
   return (
     <View style={styles.row}>
       <View style={styles.rowInfo}>
-        {pickingType ? (
+        {confirming ? (
           <TextInput
             style={styles.rowEditInput}
             value={editName}
@@ -148,8 +153,8 @@ function MediaRequestRow({
           <Text style={styles.rowName}>{req.requested_name}</Text>
         )}
         <Text style={styles.rowEmail}>@{req.username}</Text>
-        {req.resolved_type && (
-          <Text style={styles.rowMeta}>type: {req.resolved_type}</Text>
+        {typeLabel && (
+          <Text style={styles.rowMeta}>type: {typeLabel}</Text>
         )}
         <Text style={styles.rowDate}>
           {new Date(req.created_at).toLocaleDateString()}
@@ -159,11 +164,11 @@ function MediaRequestRow({
         <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
           <Text style={styles.statusText}>{req.status}</Text>
         </View>
-        {req.status === 'pending' && !pickingType && (
+        {req.status === 'pending' && !confirming && (
           <View style={styles.actionBtns}>
             <Pressable
               style={[styles.actionBtn, { backgroundColor: Colors.greenBright }]}
-              onPress={() => setPickingType(true)}
+              onPress={() => setConfirming(true)}
             >
               <Text style={styles.actionBtnText}>approve</Text>
             </Pressable>
@@ -175,26 +180,35 @@ function MediaRequestRow({
             </Pressable>
           </View>
         )}
-        {req.status === 'pending' && pickingType && (
+        {req.status === 'pending' && confirming && req.requested_type && (
           <View style={styles.actionBtns}>
             <Pressable
-              style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-              onPress={() => onResolve(req.id, 'approved', 'visual_2d', finalName())}
+              style={[styles.actionBtn, { backgroundColor: Colors.greenBright }]}
+              onPress={() => onResolve(req.id, 'approved', null, finalName())}
             >
-              <Text style={styles.actionBtnText}>visual_2d</Text>
+              <Text style={styles.actionBtnText}>confirm {req.requested_type}</Text>
             </Pressable>
             <Pressable
-              style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-              onPress={() => onResolve(req.id, 'approved', 'written_word', finalName())}
+              style={[styles.actionBtn, { backgroundColor: Colors.white }]}
+              onPress={() => setConfirming(false)}
             >
-              <Text style={styles.actionBtnText}>written_word</Text>
+              <Text style={styles.actionBtnText}>cancel</Text>
             </Pressable>
-            <Pressable
-              style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-              onPress={() => onResolve(req.id, 'approved', 'audio', finalName())}
-            >
-              <Text style={styles.actionBtnText}>audio</Text>
-            </Pressable>
+          </View>
+        )}
+        {/* Legacy fallback: requests submitted before requesters picked their
+            own type carry no requested_type, so the admin classifies them. */}
+        {req.status === 'pending' && confirming && !req.requested_type && (
+          <View style={styles.actionBtns}>
+            {(['visual_2d', 'written_form', 'audio'] as const).map((t) => (
+              <Pressable
+                key={t}
+                style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
+                onPress={() => onResolve(req.id, 'approved', t, finalName())}
+              >
+                <Text style={styles.actionBtnText}>{t}</Text>
+              </Pressable>
+            ))}
           </View>
         )}
       </View>

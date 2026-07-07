@@ -8,8 +8,20 @@ from db.db_ops.media import db_create_media
 VALID_TYPES = {"visual_2d", "written_form", "audio"}
 
 
-async def db_create_media_request(db: AsyncSession, member_id: str, name: str) -> MediaRequest:
-    row = MediaRequest(member_id=member_id, requested_name=name, status="pending")
+async def db_create_media_request(
+    db: AsyncSession,
+    member_id: str,
+    name: str,
+    requested_type: str | None = None,
+) -> MediaRequest:
+    if requested_type is not None and requested_type not in VALID_TYPES:
+        raise ValueError(f"type must be one of {sorted(VALID_TYPES)}")
+    row = MediaRequest(
+        member_id=member_id,
+        requested_name=name,
+        requested_type=requested_type,
+        status="pending",
+    )
     db.add(row)
     await db.commit()
     await db.refresh(row)
@@ -42,6 +54,10 @@ async def db_resolve_media_request(
         raise ValueError("Media request not found")
 
     if status == "approved":
+        # The requester picks the type at submission; the admin approval just
+        # confirms it. Fall back to the requester's choice when the admin didn't
+        # send an explicit override (which the current admin UI never does).
+        type_ = type_ or row.requested_type
         if type_ not in VALID_TYPES:
             raise ValueError(f"type must be one of {sorted(VALID_TYPES)}")
         # Admin may rename the requested medium before approval. `requested_name` on

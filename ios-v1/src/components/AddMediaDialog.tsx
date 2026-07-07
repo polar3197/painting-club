@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { TextInput } from './AppTextInput';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
-import { get_media, submit_media_request, set_media_visibility, MediaType } from '../api';
+import { get_media, submit_media_request, set_media_visibility, MediaType, MediaTypeKind } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
@@ -30,6 +30,14 @@ interface AddMediaDialogProps {
 
 type Tab = 'hide-show' | 'new';
 
+// The requester classifies their proposed media form so the admin doesn't have
+// to. Labels are the human-facing names; values match the backend discriminator.
+const TYPE_OPTIONS: { value: MediaTypeKind; label: string }[] = [
+  { value: 'visual_2d', label: '2d-visual' },
+  { value: 'written_form', label: 'written-form' },
+  { value: 'audio', label: 'audio' },
+];
+
 export default function AddMediaDialog({
   shown,
   hidden,
@@ -43,6 +51,7 @@ export default function AddMediaDialog({
   const [media, setMedia] = useState<MediaType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestName, setRequestName] = useState('');
+  const [requestType, setRequestType] = useState<MediaTypeKind | null>(null);
   const [requestSent, setRequestSent] = useState(false);
 
   // Freeze order at mount so toggles don't reshuffle.
@@ -64,10 +73,11 @@ export default function AddMediaDialog({
 
   const handleRequest = async () => {
     const name = requestName.trim();
-    if (!name) return;
+    if (!name || !requestType) return;
     try {
-      await submit_media_request(name, token);
+      await submit_media_request(name, requestType, token);
       setRequestName('');
+      setRequestType(null);
       setRequestSent(true);
       setTimeout(() => setRequestSent(false), 2000);
     } catch (err: any) {
@@ -175,9 +185,29 @@ export default function AddMediaDialog({
                       autoCapitalize="none"
                       onChangeText={setRequestName}
                     />
-                    <Pressable style={styles.requestBtn} onPress={handleRequest}>
+                    <Pressable
+                      style={[styles.requestBtn, (!requestName.trim() || !requestType) && styles.requestBtnDisabled]}
+                      onPress={handleRequest}
+                      disabled={!requestName.trim() || !requestType}
+                    >
                       <Text style={styles.requestBtnText}>request</Text>
                     </Pressable>
+                  </View>
+                  <View style={styles.typeRow}>
+                    {TYPE_OPTIONS.map((opt) => {
+                      const selected = requestType === opt.value;
+                      return (
+                        <Pressable
+                          key={opt.value}
+                          style={[styles.typeChip, selected && styles.typeChipSelected]}
+                          onPress={() => setRequestType(opt.value)}
+                        >
+                          <Text style={styles.typeChipText}>
+                            {opt.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
                   </View>
                   {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
                 </View>
@@ -371,9 +401,34 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.secondary,
     justifyContent: 'center',
   },
+  requestBtnDisabled: {
+    opacity: 0.4,
+  },
   requestBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xxs,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  typeChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  typeChipSelected: {
+    // Selection is signalled by the fill colour alone — no weight/size shift.
+    backgroundColor: Colors.primaryGold,
+  },
+  typeChipText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
+    color: Colors.textSecondary,
   },
   requestSentMsg: {
     fontFamily: Fonts.serif,

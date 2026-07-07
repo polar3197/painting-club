@@ -116,6 +116,8 @@ class MediaIn(BaseModel):
 
 class MediaRequestIn(BaseModel):
     name: str
+    # Medium type chosen by the requester: "visual_2d" | "written_form" | "audio".
+    type: str | None = None
 
 class MediaRequestOut(BaseModel):
     id: uuid.UUID
@@ -123,6 +125,7 @@ class MediaRequestOut(BaseModel):
     username: str
     requested_name: str
     status: str
+    requested_type: str | None = None
     resolved_type: str | None = None
     created_at: datetime
 

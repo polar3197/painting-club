@@ -256,6 +256,9 @@ export interface ArtResult {
   id: string;
   title: string;
   medium: string;
+  // 'visual_2d' | 'written_form' (from the Art.type discriminator). Absent on
+  // older backends — treat missing as a visual piece.
+  art_type?: string | null;
   keywords: string[];
   song: string | null;
   file_path: string;
@@ -299,6 +302,10 @@ export interface MediaType {
   name: string;
   type?: string | null;
 }
+
+// The three medium categories a piece can belong to. Used when a requester
+// proposes a new media form so the admin no longer has to classify it.
+export type MediaTypeKind = 'visual_2d' | 'written_form' | 'audio';
 
 export interface FeatureRequestOut {
   id: string;
@@ -365,6 +372,9 @@ export interface MediaRequest {
   username: string;
   requested_name: string;
   status: string;
+  // What the requester picked at submission ("visual_2d" | "written_form" |
+  // "audio"). Null on rows created before requesters chose their own type.
+  requested_type: string | null;
   resolved_type: string | null;
   created_at: string;
 }

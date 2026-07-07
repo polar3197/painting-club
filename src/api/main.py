@@ -1832,13 +1832,19 @@ async def submit_media_request(
     name = (payload.name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="name required")
-    row = await db_create_media_request(db, current_member.id, name)
+    try:
+        row = await db_create_media_request(
+            db, current_member.id, name, requested_type=payload.type,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return MediaRequestOut(
         id=row.id,
         member_id=row.member_id,
         username=current_member.username,
         requested_name=row.requested_name,
         status=row.status,
+        requested_type=row.requested_type,
         resolved_type=row.resolved_type,
         created_at=row.created_at,
     )
@@ -1857,6 +1863,7 @@ async def get_media_requests(
             username=username,
             requested_name=req.requested_name,
             status=req.status,
+            requested_type=req.requested_type,
             resolved_type=req.resolved_type,
             created_at=req.created_at,
         )
@@ -1871,8 +1878,10 @@ async def resolve_media_request(
     db: AsyncSession = Depends(get_db),
     _: Member = Depends(get_admin_member),
 ):
-    if payload.status == "approved" and not payload.type:
-        raise HTTPException(status_code=400, detail="type required for approval")
+    # The type is chosen by the requester at submission and stored on the row,
+    # so the admin no longer supplies it here. db_resolve_media_request falls
+    # back to the request's requested_type; a missing type surfaces as a 400
+    # ("type must be one of ...") from that helper.
     try:
         row = await db_resolve_media_request(
             db, request_id, payload.status, payload.type, name_override=payload.name,
@@ -1896,6 +1905,7 @@ async def resolve_media_request(
         username=member.username if member else "",
         requested_name=row.requested_name,
         status=row.status,
+        requested_type=row.requested_type,
         resolved_type=row.resolved_type,
         created_at=row.created_at,
     )

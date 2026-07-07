@@ -278,6 +278,10 @@ class MediaRequest(Base):
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
     requested_name = Column(String(300), nullable=False)
     status = Column(String(20), nullable=False, default="pending")
+    # The medium type the requester picked at submission ("visual_2d" |
+    # "written_form" | "audio"). Nullable for rows predating this field; the
+    # admin can still override it at approval time.
+    requested_type = Column(String(50), nullable=True)
     resolved_type = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

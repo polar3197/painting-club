@@ -25,6 +25,7 @@ import type {
   CommentOut,
   CommentsReceivedPage,
   MediaType,
+  MediaTypeKind,
   MediaRequest,
   FeatureRequestOut,
   FeatureRequestVoteOut,
@@ -203,11 +204,15 @@ export function set_media_visibility(medium: string, hidden: boolean, token: str
   });
 }
 
-export function submit_media_request(name: string, token: string | null): Promise<MediaRequest> {
+export function submit_media_request(
+  name: string,
+  type: MediaTypeKind,
+  token: string | null,
+): Promise<MediaRequest> {
   return request('/media-requests', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, type }),
   }) as Promise<MediaRequest>;
 }
 
@@ -439,6 +444,33 @@ export function remove_audio(id: string, token: string | null) {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+// A series/album/collection is one editable entity: renaming updates every
+// member's displayed name in place (pieces only hold series_id).
+export function rename_series(
+  id: string,
+  name: string,
+  token: string | null,
+): Promise<{ id: string; name: string }> {
+  return request(`/series/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name }),
+  }) as Promise<{ id: string; name: string }>;
+}
+
+// Persist a new member order — pass every piece id in the desired order.
+export function set_series_order(
+  id: string,
+  art_ids: string[],
+  token: string | null,
+): Promise<{ ok: true }> {
+  return request(`/series/${id}/order`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ art_ids }),
+  }) as Promise<{ ok: true }>;
 }
 
 export function get_comments(art_id: string, token: string | null): Promise<CommentOut[]> {
