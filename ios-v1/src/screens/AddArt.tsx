@@ -8,7 +8,6 @@ import {
   Alert,
   Dimensions,
   Animated,
-  KeyboardAvoidingView,
   Keyboard,
   Platform,
 } from 'react-native';
@@ -286,6 +285,7 @@ export default function AddArt() {
           height: formData.height,
           keywords: formData.keywords,
           comments_enabled: formData.comments_enabled,
+          series_name: formData.series || undefined,
           file: pickedFile,
         };
         startUpload(payload);
@@ -316,6 +316,9 @@ export default function AddArt() {
           keywords: formData.keywords,
           comments_enabled: formData.comments_enabled,
           duration_seconds: pickedDuration ?? undefined,
+          // The album/series typed in the form — was silently dropped before,
+          // which is why albums only "took" via edit-after-upload.
+          series_name: formData.series || undefined,
           file: pickedFile,
         };
         startAudioUpload(payload);
@@ -339,10 +342,7 @@ export default function AddArt() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* --- Step content: a horizontal row that slides between stages --- */}
       <View style={styles.pagerViewport}>
         <Animated.View style={[styles.pagerRow, { transform: [{ translateX: slideX }] }]}>
@@ -361,8 +361,18 @@ export default function AddArt() {
             </ScrollView>
           </View>
 
-          {/* Stage 2 — details */}
-          <ScrollView style={styles.page} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
+          {/* Stage 2 — details. automaticallyAdjustKeyboardInsets lets iOS
+              scroll the focused field (incl. the low width/height/series/album
+              rows) above the keyboard; "interactive" dismiss means scrolling to
+              reach a field no longer nukes the keyboard (was "on-drag"). */}
+          <ScrollView
+            style={styles.page}
+            contentContainerStyle={styles.body}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            showsVerticalScrollIndicator={false}
+          >
             {isVisual && (
               <Pressable style={styles.dropbox} onPress={pickImage}>
                 {pickedFile ? (
@@ -542,7 +552,7 @@ export default function AddArt() {
           onClose={() => setShowAddMedia(false)}
         />
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

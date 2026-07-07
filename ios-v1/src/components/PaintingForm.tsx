@@ -8,12 +8,14 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 interface PaintingFormProps {
   onDataChange: (data: Record<string, any>) => void;
   initialData?: Visual2DOut;
+  // Seed the series field on create (e.g. "+" inside a series' gallery).
+  initialSeries?: string;
   // Optional node rendered on the right side of the comments-toggle row.
   // AddArtDialog uses this to inline the submit button next to the toggle.
   rightSlot?: React.ReactNode;
 }
 
-export default function PaintingForm({ onDataChange, initialData, rightSlot }: PaintingFormProps) {
+export default function PaintingForm({ onDataChange, initialData, initialSeries, rightSlot }: PaintingFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
     location: initialData?.location ?? '',
@@ -25,9 +27,16 @@ export default function PaintingForm({ onDataChange, initialData, rightSlot }: P
     width: initialData?.width ?? null as number | null,
     height: initialData?.height ?? null as number | null,
     keywords: initialData?.keywords?.join(', ') ?? '',
-    series: (initialData as any)?.series_name ?? '',
+    series: (initialData as any)?.series_name ?? initialSeries ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
   });
+
+  // Seeded fields only reach the parent through onDataChange — push the
+  // initial state up once so an untouched-but-seeded form still submits whole.
+  React.useEffect(() => {
+    onDataChange(form);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const thumbPos = useRef(new Animated.Value(form.comments_enabled ? 18 : 0)).current;
 

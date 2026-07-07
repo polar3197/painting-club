@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { TextInput } from './AppTextInput';
 import { Paths, File } from 'expo-file-system';
@@ -85,6 +87,13 @@ export default function DeleteAccountDialog({ visible, username, onClose, onDele
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={handleClose}>
+      {/* Lift the centered dialog above the keyboard — the confirm field and
+          the "delete forever" button sit in its lower half and would otherwise
+          be covered on smaller screens. */}
+      <KeyboardAvoidingView
+        style={styles.kav}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <Pressable style={styles.backdrop} onPress={handleClose}>
         <View style={styles.dialog} onStartShouldSetResponder={() => true}>
           <Text style={styles.title}>delete account</Text>
@@ -140,11 +149,15 @@ export default function DeleteAccountDialog({ visible, username, onClose, onDele
           </View>
         </View>
       </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  kav: {
+    flex: 1,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: Colors.overlay,

@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   PanResponder,
   GestureResponderEvent,
@@ -28,6 +27,8 @@ import {
   rgbToHex,
   rgbToHsv,
   hsvToRgb,
+  decodeStoredColors,
+  encodeColorsForStorage,
 } from '../constants/profileColors';
 
 type Tab = 'details' | 'colors';
@@ -53,8 +54,13 @@ function MiniProfile({
     <View style={[mini.page, { backgroundColor: colors.bg }, hl('bg')]}>
       <View style={mini.topRow}>
         <View style={mini.identity}>
-          <Text style={mini.name}>67 1738</Text>
-          <Text style={mini.location}>420, 69</Text>
+          {/* nameText colors the name + location. Like the frame, it can't be
+              painted blue when selected, so a ring wraps the text group and the
+              chosen color stays visible inside. */}
+          <View style={[mini.nameGroup, highlight === 'nameText' && mini.nameGroupHighlight]}>
+            <Text style={[mini.name, { color: colors.nameText }]}>67 1738</Text>
+            <Text style={[mini.location, { color: colors.nameText }]}>420, 69</Text>
+          </View>
           <View style={mini.actionRow}>
             {[0, 1, 2, 3].map((i) => (
               <View
@@ -238,7 +244,8 @@ export default function EditProfile() {
     setBio(profile.bio || '');
     // Saved colors are partial — merge over defaults so components the member
     // never touched (or added after they saved) still get the app palette.
-    setPageColors({ ...DEFAULT_PROFILE_COLORS, ...(profile.profile_colors ?? {}) });
+    // decodeStoredColors splits a packed picFrame back into picFrame + nameText.
+    setPageColors({ ...DEFAULT_PROFILE_COLORS, ...decodeStoredColors(profile.profile_colors) });
   }, [profile?.id]);
 
   const save = async () => {
@@ -247,11 +254,10 @@ export default function EditProfile() {
     try {
       const updated = { ...profile, firstname, lastname, city, state: stateVal, bio };
       if (colorsDirty) {
-        // Normalize everything to '#rrggbb' (untouched defaults are rgb()
-        // strings) so the stored object has one format.
-        updated.profile_colors = Object.fromEntries(
-          Object.entries(pageColors).map(([k, v]) => [k, rgbToHex(parseColorToRgb(v))])
-        );
+        // Fold the 8 in-app colors into the 7 keys the backend accepts: every
+        // color normalizes to '#rrggbb', except nameText, which packs into
+        // picFrame (only when the member set a custom name color).
+        updated.profile_colors = encodeColorsForStorage(pageColors);
       }
       await update_profile(currentUser, updated, token);
       setProfile(updated);
@@ -266,10 +272,7 @@ export default function EditProfile() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <View style={[styles.inner, { paddingTop: insets.top + 12 }]}>
         {/* details <-> color scheme toggle, styled like the profile's media
             tabs. No page title above it — vertical room goes to the content
@@ -291,8 +294,13 @@ export default function EditProfile() {
 
         {tab === 'details' ? (
           <ScrollView
-            keyboardDismissMode="on-drag"
+            style={styles.detailsScroll}
+            keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
+            // iOS insets the scroll content by the keyboard height, so every
+            // field (and the save button) can scroll into view above it —
+            // replaces the old KeyboardAvoidingView, which fought the scroll.
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
             contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
             showsVerticalScrollIndicator={false}
           >
@@ -474,7 +482,7 @@ export default function EditProfile() {
           </ScrollView>
         )}
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -486,6 +494,11 @@ const styles = StyleSheet.create({
   inner: {
     flex: 1,
     paddingHorizontal: 30,
+  },
+  // Fill the remaining height so the scroll frame reaches the screen bottom —
+  // gives automaticallyAdjustKeyboardInsets a full frame to inset against.
+  detailsScroll: {
+    flex: 1,
   },
   tabRow: {
     flexDirection: 'row',
@@ -603,6 +616,9 @@ const styles = StyleSheet.create({
   elementRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    // 8 swatches now; wrap to a second line on narrow phones rather than clip.
+    flexWrap: 'wrap',
+    rowGap: 10,
     marginTop: 16,
   },
   elementBtnWrap: {
@@ -610,8 +626,8 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   elementBtn: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderWidth: 1,
     borderColor: '#000',
   },
@@ -643,6 +659,18 @@ const mini = StyleSheet.create({
   identity: {
     flex: 1,
     gap: 2,
+  },
+  nameGroup: {
+    alignSelf: 'flex-start',
+    // Transparent border always reserved so the highlight doesn't shift layout.
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 4,
+    marginHorizontal: -3,
+    paddingHorizontal: 3,
+  },
+  nameGroupHighlight: {
+    borderColor: Colors.blue,
   },
   name: {
     fontFamily: Fonts.serif,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -349,6 +349,11 @@ export default function Admin() {
     <ScrollView
       style={[styles.container, { paddingTop: insets.top }]}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      // Reveal the inline media-request rename field above the keyboard even
+      // when the list is short (nothing below to scroll into otherwise).
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
     >
       <View style={styles.titleRow}>
         <Pressable onPress={() => setTab('applications')}>

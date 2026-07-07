@@ -84,36 +84,36 @@ function EqBars({ playing }: { playing: boolean }) {
 }
 
 /**
- * Profile-tile player bar, bound to the app-wide playback singleton — audio
- * keeps playing when the user navigates anywhere else; only starting another
- * track (or pausing) stops it. While this tile's track isn't the active one,
- * an idle bar renders (play button + stored duration) and tapping play claims
- * the global player.
+ * Shared scrubber track. Fixes two bugs the old per-bar PanResponders had:
+ * (1) the responder closure captured trackW from the first render (always 0),
+ * so every handler bailed and drags did nothing; (2) touches landing on the
+ * thumb/fill children reported locationX relative to the child, not the track.
+ * Geometry now lives in refs (always current inside the stable responder) and
+ * moves use pageX against the track's left edge, so the drag keeps tracking
+ * even when the finger wanders off the bar.
  */
-export function AudioPlayerBar({
-  uri,
-  fallbackDuration,
+function ScrubTrack({
+  frac,
+  onPreview,
+  onCommit,
 }: {
-  uri: string;
-  fallbackDuration: number | null;
+  frac: number;
+  // Live fraction while dragging (null = drag ended/cancelled).
+  onPreview: (f: number | null) => void;
+  // Final fraction on release.
+  onCommit: (f: number) => void;
 }) {
-  // Re-render when the active track changes so tiles swap active/idle modes.
-  const [, setTick] = useState(0);
-  useEffect(() => subscribeActiveTrack(() => setTick((t) => t + 1)), []);
-
-  const active = getActiveUri() === uri && !!getActivePlayer();
-  if (active) {
-    return <ActiveTrackBar uri={uri} fallbackDuration={fallbackDuration} />;
-  }
-  return <IdleTrackBar uri={uri} fallbackDuration={fallbackDuration} />;
-}
-
-// Idle (not-the-active-track) bar. The scrubber is still live: dragging the
-// dot starts playback from the dragged position (using the stored duration
-// for the math), so seeking works without a prior play tap.
-function IdleTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDuration: number | null }) {
   const [trackW, setTrackW] = useState(0);
-  const [scrubFrac, setScrubFrac] = useState<number | null>(null);
+  const trackWRef = useRef(0);
+  const trackLeftRef = useRef(0);
+  const cbRef = useRef({ onPreview, onCommit });
+  cbRef.current = { onPreview, onCommit };
+
+  const fracFromPageX = (pageX: number) => {
+    const w = trackWRef.current;
+    if (w <= 0) return 0;
+    return Math.max(0, Math.min(1, (pageX - trackLeftRef.current) / w));
+  };
 
   const pan = useRef(
     PanResponder.create({
@@ -122,41 +122,87 @@ function IdleTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDuration
       // Don't let the surrounding ScrollView steal the drag mid-scrub.
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
-        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+        // Children are pointerEvents:none, so locationX is track-relative —
+        // anchoring the track's page-left here survives any prior scrolling.
+        trackLeftRef.current = e.nativeEvent.pageX - e.nativeEvent.locationX;
+        cbRef.current.onPreview(fracFromPageX(e.nativeEvent.pageX));
       },
       onPanResponderMove: (e) => {
-        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
+        cbRef.current.onPreview(fracFromPageX(e.nativeEvent.pageX));
       },
       onPanResponderRelease: (e) => {
-        if (trackW > 0) {
-          const f = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW));
-          playTrack(uri, (fallbackDuration || 0) * f);
-        }
-        setScrubFrac(null);
+        cbRef.current.onCommit(fracFromPageX(e.nativeEvent.pageX));
+        cbRef.current.onPreview(null);
       },
-      onPanResponderTerminate: () => setScrubFrac(null),
+      onPanResponderTerminate: () => cbRef.current.onPreview(null),
     })
   ).current;
+
+  return (
+    <View
+      style={styles.track}
+      onLayout={(e: LayoutChangeEvent) => {
+        trackWRef.current = e.nativeEvent.layout.width;
+        setTrackW(e.nativeEvent.layout.width);
+      }}
+      {...pan.panHandlers}
+    >
+      <View pointerEvents="none" style={styles.trackBase} />
+      <View pointerEvents="none" style={[styles.trackFill, { width: `${frac * 100}%` }]} />
+      <View pointerEvents="none" style={[styles.trackThumb, { left: Math.max(0, frac * trackW - 6) }]} />
+    </View>
+  );
+}
+
+/**
+ * Profile-tile player bar, bound to the app-wide playback singleton — audio
+ * keeps playing when the user navigates anywhere else; only starting another
+ * track (or pausing) stops it. While this tile's track isn't the active one,
+ * an idle bar renders (play button + stored duration) and tapping play claims
+ * the global player. `queue` is the surrounding album's ordered uris — every
+ * play started from this bar carries it so finished tracks auto-advance.
+ */
+export function AudioPlayerBar({
+  uri,
+  fallbackDuration,
+  queue,
+}: {
+  uri: string;
+  fallbackDuration: number | null;
+  queue?: string[];
+}) {
+  // Re-render when the active track changes so tiles swap active/idle modes.
+  const [, setTick] = useState(0);
+  useEffect(() => subscribeActiveTrack(() => setTick((t) => t + 1)), []);
+
+  const active = getActiveUri() === uri && !!getActivePlayer();
+  if (active) {
+    return <ActiveTrackBar uri={uri} fallbackDuration={fallbackDuration} queue={queue} />;
+  }
+  return <IdleTrackBar uri={uri} fallbackDuration={fallbackDuration} queue={queue} />;
+}
+
+// Idle (not-the-active-track) bar. The scrubber is still live: dragging the
+// dot starts playback from the dragged position (using the stored duration
+// for the math), so seeking works without a prior play tap.
+function IdleTrackBar({ uri, fallbackDuration, queue }: { uri: string; fallbackDuration: number | null; queue?: string[] }) {
+  const [scrubFrac, setScrubFrac] = useState<number | null>(null);
 
   const frac = scrubFrac ?? 0;
   const displayed = frac * (fallbackDuration || 0);
 
   return (
     <View style={styles.playerBar}>
-      <Pressable style={styles.playBtn} onPress={() => playTrack(uri)}>
+      <Pressable style={styles.playBtn} onPress={() => playTrack(uri, undefined, queue)}>
         <Text style={styles.playBtnText}>▶</Text>
       </Pressable>
       <EqBars playing={false} />
       <View style={styles.scrubCol}>
-        <View
-          style={styles.track}
-          onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
-          {...pan.panHandlers}
-        >
-          <View style={styles.trackBase} />
-          <View style={[styles.trackFill, { width: `${frac * 100}%` }]} />
-          <View style={[styles.trackThumb, { left: Math.max(0, frac * trackW - 6) }]} />
-        </View>
+        <ScrubTrack
+          frac={frac}
+          onPreview={setScrubFrac}
+          onCommit={(f) => playTrack(uri, (fallbackDuration || 0) * f, queue)}
+        />
         <View style={styles.timeRow}>
           <Text style={styles.timeText}>{fmtTime(displayed)}</Text>
           <Text style={styles.timeText}>{fmtTime(fallbackDuration || 0)}</Text>
@@ -167,10 +213,9 @@ function IdleTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDuration
 }
 
 // The bound (active-track) bar: full controls against the global player.
-function ActiveTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDuration: number | null }) {
+function ActiveTrackBar({ uri, fallbackDuration, queue }: { uri: string; fallbackDuration: number | null; queue?: string[] }) {
   const player = getActivePlayer()!;
   const status = useAudioPlayerStatus(player);
-  const [trackW, setTrackW] = useState(0);
   // Local scrub position while dragging so the thumb tracks the finger 1:1
   // instead of waiting for the (slightly lagged) status.currentTime to catch up.
   const [scrubFrac, setScrubFrac] = useState<number | null>(null);
@@ -187,36 +232,13 @@ function ActiveTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDurati
     if (duration > 0) player.seekTo(clamped * duration);
   };
 
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      // Don't let the surrounding ScrollView steal the drag mid-scrub.
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (e) => {
-        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
-      },
-      onPanResponderMove: (e) => {
-        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
-      },
-      onPanResponderRelease: (e) => {
-        if (trackW > 0) {
-          const f = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW));
-          seekToFrac(f);
-        }
-        setScrubFrac(null);
-      },
-      onPanResponderTerminate: () => setScrubFrac(null),
-    })
-  ).current;
-
   const displayedTime = scrubFrac != null ? scrubFrac * duration : status.currentTime;
 
   return (
     <View style={styles.playerBar}>
       <Pressable
         style={styles.playBtn}
-        onPress={() => (status.playing ? player.pause() : playTrack(uri))}
+        onPress={() => (status.playing ? player.pause() : playTrack(uri, undefined, queue))}
       >
         <Text style={styles.playBtnText}>
           {!status.isLoaded ? '…' : status.playing ? '❚❚' : '▶'}
@@ -224,15 +246,7 @@ function ActiveTrackBar({ uri, fallbackDuration }: { uri: string; fallbackDurati
       </Pressable>
       <EqBars playing={status.playing} />
       <View style={styles.scrubCol}>
-        <View
-          style={styles.track}
-          onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
-          {...pan.panHandlers}
-        >
-          <View style={styles.trackBase} />
-          <View style={[styles.trackFill, { width: `${frac * 100}%` }]} />
-          <View style={[styles.trackThumb, { left: Math.max(0, frac * trackW - 6) }]} />
-        </View>
+        <ScrubTrack frac={frac} onPreview={setScrubFrac} onCommit={seekToFrac} />
         <View style={styles.timeRow}>
           <Text style={styles.timeText}>{fmtTime(displayedTime)}</Text>
           <Text style={styles.timeText}>{fmtTime(duration)}</Text>
@@ -257,7 +271,6 @@ export function AudioPreviewBar({
 }) {
   const player = useAudioPlayer({ uri });
   const status = useAudioPlayerStatus(player);
-  const [trackW, setTrackW] = useState(0);
   const [scrubFrac, setScrubFrac] = useState<number | null>(null);
 
   // Stable pause closure for the one-at-a-time registry.
@@ -286,28 +299,6 @@ export function AudioPreviewBar({
   const duration = status.duration || 0;
   const frac = scrubFrac != null ? scrubFrac : duration > 0 ? Math.min(1, status.currentTime / duration) : 0;
 
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      // Don't let the surrounding ScrollView steal the drag mid-scrub.
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (e) => {
-        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
-      },
-      onPanResponderMove: (e) => {
-        if (trackW > 0) setScrubFrac(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)));
-      },
-      onPanResponderRelease: (e) => {
-        if (trackW > 0 && duration > 0) {
-          player.seekTo(Math.max(0, Math.min(1, e.nativeEvent.locationX / trackW)) * duration);
-        }
-        setScrubFrac(null);
-      },
-      onPanResponderTerminate: () => setScrubFrac(null),
-    })
-  ).current;
-
   const displayedTime = scrubFrac != null ? scrubFrac * duration : status.currentTime;
 
   return (
@@ -322,15 +313,11 @@ export function AudioPreviewBar({
       </Pressable>
       <EqBars playing={status.playing} />
       <View style={styles.scrubCol}>
-        <View
-          style={styles.track}
-          onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
-          {...pan.panHandlers}
-        >
-          <View style={styles.trackBase} />
-          <View style={[styles.trackFill, { width: `${frac * 100}%` }]} />
-          <View style={[styles.trackThumb, { left: Math.max(0, frac * trackW - 6) }]} />
-        </View>
+        <ScrubTrack
+          frac={frac}
+          onPreview={setScrubFrac}
+          onCommit={(f) => { if (duration > 0) player.seekTo(f * duration); }}
+        />
         <View style={styles.timeRow}>
           <Text style={styles.timeText}>{fmtTime(displayedTime)}</Text>
           <Text style={styles.timeText}>{fmtTime(duration)}</Text>
@@ -343,8 +330,22 @@ export function AudioPreviewBar({
 export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout }: AudioPieceProps) {
   const { token } = useAuth();
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  // Collapsed by default: the tile shows only its title + a play button, so a
+  // long list of songs reads as a compact tracklist. Tapping the title or the
+  // play button opens the scrubber and the owner's edit/remove controls.
+  const [expanded, setExpanded] = useState(false);
 
   const uri = resolveImageUrl(piece.file_path);
+
+  // Follow global playback: if this track becomes the active one (its play was
+  // tapped, or it auto-advanced into focus), open so the live scrubber shows.
+  useEffect(
+    () =>
+      subscribeActiveTrack(() => {
+        if (getActiveUri() === uri) setExpanded(true);
+      }),
+    [uri],
+  );
 
   const removeArt = async () => {
     await remove_audio(piece.id, token);
@@ -368,29 +369,42 @@ export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout 
       />
       <View style={styles.element} onLayout={onLayout}>
         <View style={styles.headerRow}>
-          <View style={styles.titleCol}>
+          <Pressable style={styles.titleCol} onPress={() => setExpanded((v) => !v)}>
             <Text style={styles.artTitle} numberOfLines={2}>{piece.title}</Text>
             {!!piece.artist && <Text style={styles.detailText}>{piece.artist}</Text>}
-            {!!piece.date && <Text style={styles.detailText}>{piece.date}</Text>}
-          </View>
+          </Pressable>
+          {!AUDIO_IS_STUB && !expanded && (
+            <Pressable
+              style={({ pressed }) => [styles.rowPlayBtn, pressed && { opacity: 0.7 }]}
+              onPress={() => { playTrack(uri); setExpanded(true); }}
+              hitSlop={6}
+            >
+              <Text style={styles.rowPlayText}>▶</Text>
+            </Pressable>
+          )}
         </View>
 
-        {AUDIO_IS_STUB ? (
-          <View style={[styles.bigPlay, styles.bigPlayDisabled]}>
-            <Text style={styles.bigPlayLabel}>update the app to play audio</Text>
-          </View>
-        ) : (
-          <AudioPlayerBar uri={uri} fallbackDuration={piece.duration_seconds} />
-        )}
+        {expanded && (
+          <View style={styles.expandedBody}>
+            {!!piece.date && <Text style={styles.detailText}>{piece.date}</Text>}
+            {AUDIO_IS_STUB ? (
+              <View style={[styles.bigPlay, styles.bigPlayDisabled]}>
+                <Text style={styles.bigPlayLabel}>update the app to play audio</Text>
+              </View>
+            ) : (
+              <AudioPlayerBar uri={uri} fallbackDuration={piece.duration_seconds} />
+            )}
 
-        {isOwner && (
-          <View style={styles.buttons}>
-            <Pressable style={[styles.btn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
-              <Text style={styles.btnText}>remove</Text>
-            </Pressable>
-            <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
-              <Text style={styles.btnText}>edit</Text>
-            </Pressable>
+            {isOwner && (
+              <View style={styles.buttons}>
+                <Pressable style={[styles.btn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+                  <Text style={styles.btnText}>remove</Text>
+                </Pressable>
+                <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
+                  <Text style={styles.btnText}>edit</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -408,13 +422,29 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 10,
+    alignItems: 'center',
+    gap: 10,
   },
   titleCol: {
     flex: 1,
     gap: 2,
+  },
+  // Compact play button in the collapsed header (mirrors the album tracklist).
+  rowPlayBtn: {
+    width: 34,
+    height: 34,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.primaryGold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowPlayText: {
+    fontSize: 13,
+    color: Colors.black,
+  },
+  expandedBody: {
+    marginTop: 10,
   },
   artTitle: {
     fontFamily: Fonts.serif,

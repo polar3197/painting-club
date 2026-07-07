@@ -10,6 +10,8 @@ import {
   Alert,
   Animated,
   LayoutChangeEvent,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { TextInput } from './AppTextInput';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
@@ -97,6 +99,13 @@ export default function AddMediaDialog({
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Lift the whole dialog above the keyboard — the "propose a media form"
+          input is a fixed footer at the bottom of the 520px dialog and would
+          otherwise sit behind the keyboard on every screen size. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <View style={styles.dialog} onStartShouldSetResponder={() => true}>
           <View style={styles.titleRow}>
@@ -222,6 +231,7 @@ export default function AddMediaDialog({
           </View>
         </View>
       </Pressable>
+      </KeyboardAvoidingView>
       </GestureHandlerRootView>
     </Modal>
   );

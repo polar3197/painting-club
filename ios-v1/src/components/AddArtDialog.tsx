@@ -54,6 +54,9 @@ interface AddArtDialogProps {
   // Custom placeholder text shown inside the image dropbox when nothing is
   // picked yet (defaults to "tap to select art").
   dropboxPlaceholder?: string;
+  // Pre-fill the series/album field on CREATE — used by the full-page
+  // collection views' "+" so a new piece lands in that collection.
+  initialSeries?: string;
 }
 
 export default function AddArtDialog({
@@ -70,6 +73,7 @@ export default function AddArtDialog({
   onCreateAudio,
   minimal = false,
   dropboxPlaceholder,
+  initialSeries,
 }: AddArtDialogProps) {
   const { token } = useAuth();
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
@@ -87,6 +91,12 @@ export default function AddArtDialog({
   const compatibleMedia = editingPiece && currentType
     ? allMedia.filter((m) => m.type === currentType && m.name !== selectedMedium).map((m) => m.name)
     : [];
+  // The "move to" dropdown is the last row and its option list is absolutely
+  // positioned, so it adds no height to the scroll content and gets clipped
+  // when opened. Reserve scroll space beneath it (capped at the list's 200px
+  // maxHeight) so the expanded options can be scrolled into view.
+  const moveToVisible = !minimal && editingPiece && compatibleMedia.length > 0;
+  const moveToReserve = moveToVisible ? Math.min(200, compatibleMedia.length * 28) + 12 : 0;
   const [formData, setFormData] = useState<Record<string, any> | null>(
     piece
       ? {
@@ -328,6 +338,15 @@ export default function AddArtDialog({
         Alert.alert('Missing', 'Please enter a title.');
         return;
       }
+      // Multiple images land as ONE series post on the profile, so the
+      // series field is what groups them — require it for multi-picks.
+      if (extraFiles.length > 0 && !(formData.series || '').trim()) {
+        Alert.alert(
+          'Name the series',
+          'You picked multiple images — give the series a name so they land as one post.',
+        );
+        return;
+      }
       const basePayload = {
         username,
         medium: selectedMedium,
@@ -339,7 +358,7 @@ export default function AddArtDialog({
         height: formData.height,
         keywords: formData.keywords,
         comments_enabled: formData.comments_enabled,
-        series_name: formData.series || undefined,
+        series_name: (formData.series || '').trim() || undefined,
       };
       onClose();
       // Parent owns the upload + placeholder tile — one create per picked
@@ -588,7 +607,10 @@ export default function AddArtDialog({
                 taps on Pressables register without first dismissing the keyboard. */}
             <ScrollView
               style={styles.scrollArea}
-              contentContainerStyle={styles.formContent}
+              contentContainerStyle={[
+                styles.formContent,
+                moveToReserve ? { paddingBottom: 20 + moveToReserve } : null,
+              ]}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
@@ -623,6 +645,7 @@ export default function AddArtDialog({
                 <PaintingForm
                   onDataChange={setFormData}
                   initialData={piece}
+                  initialSeries={initialSeries}
                   rightSlot={
                     <Pressable style={styles.submitBtn} onPress={submit}>
                       <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
@@ -645,6 +668,7 @@ export default function AddArtDialog({
                 <AudioForm
                   onDataChange={setFormData}
                   initialData={audioPiece}
+                  initialSeries={initialSeries}
                   rightSlot={
                     <Pressable style={styles.submitBtn} onPress={submit}>
                       <Text style={styles.submitBtnText}>{audioPiece ? 'update' : 'submit'}</Text>
@@ -652,7 +676,7 @@ export default function AddArtDialog({
                   }
                 />
               )}
-              {!minimal && editingPiece && compatibleMedia.length > 0 && (
+              {moveToVisible && (
                 <View style={styles.moveToRow}>
                   <Text style={styles.moveToLabel}>move to:</Text>
                   <View style={styles.moveToDropdown}>

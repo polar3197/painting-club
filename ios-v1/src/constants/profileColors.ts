@@ -12,6 +12,10 @@ export interface ProfilePageColors {
   picFrame: string;         // border around the profile picture
   artCardBg: string;        // art element card fill
   actionBtn: string;        // owner options buttons (gear/pencil/mail/share)
+  // Name + location text color. The backend's profile_colors validator only
+  // accepts the 7 keys above, so this one has no storage slot of its own — it
+  // rides along inside picFrame (see packFrameAndName / decodeStoredColors).
+  nameText: string;
 }
 
 // What the profile page renders today — the fallback for members who never
@@ -24,10 +28,12 @@ export const DEFAULT_PROFILE_COLORS: ProfilePageColors = {
   picFrame: Colors.primaryGold,
   artCardBg: Colors.white,
   actionBtn: Colors.white,
+  nameText: Colors.textPrimary,
 };
 
-// The 7 component buttons, in display order. Labels are squeezed under
-// 38px-wide buttons, hence the shorthand.
+// The 8 component buttons, in display order. Labels are squeezed under the
+// narrow buttons, hence the shorthand. 'name' has no backend key of its own —
+// it's packed into picFrame at save time (see below).
 export const PROFILE_COLOR_ELEMENTS: { key: keyof ProfilePageColors; label: string }[] = [
   { key: 'bg', label: 'bg' },
   { key: 'statementBox', label: 'bio' },
@@ -36,6 +42,7 @@ export const PROFILE_COLOR_ELEMENTS: { key: keyof ProfilePageColors; label: stri
   { key: 'picFrame', label: 'frame' },
   { key: 'artCardBg', label: 'art' },
   { key: 'actionBtn', label: 'btns' },
+  { key: 'nameText', label: 'name' },
 ];
 
 // --- Color math for the HSV picker on the color tab ---
@@ -104,4 +111,91 @@ export function hsvToRgb({ h, s, v }: Hsv): Rgb {
   else if (h < 300) [rn, gn, bn] = [x, 0, c];
   else [rn, gn, bn] = [c, 0, x];
   return { r: (rn + m) * 255, g: (gn + m) * 255, b: (bn + m) * 255 };
+}
+
+// --- Packing two colors into one storage slot ---
+// The backend's profile_colors validator only allows 7 fixed keys, each a
+// single color string ('#rgb' | '#rrggbb' | 'rgb(r, g, b)'). To give members a
+// name-text color without a schema change, we smuggle it inside picFrame: two
+// 12-bit (rgb444) colors pack into the 24 bits of an 'rgb(b0, b1, b2)' triple.
+// 12-bit loses a little precision (each channel snaps to a multiple of 17), but
+// both colors survive a round trip. We only pay that cost when the member
+// actually sets a name color — otherwise picFrame stays a plain, full-precision
+// hex string, exactly as before.
+
+// Quantize an 8-bit channel to 4 bits; expand back by nibble-doubling
+// (0xa -> 0xaa) so 0x0..0xf map across the full 0..255 range.
+function rgbTo12(rgb: Rgb): number {
+  const q = (n: number) => Math.max(0, Math.min(15, Math.round((n / 255) * 15)));
+  return (q(rgb.r) << 8) | (q(rgb.g) << 4) | q(rgb.b);
+}
+function rgb12ToRgb(v: number): Rgb {
+  const e = (n: number) => (n << 4) | n;
+  return { r: e((v >> 8) & 0xf), g: e((v >> 4) & 0xf), b: e(v & 0xf) };
+}
+
+// frame + name -> 'rgb(b0, b1, b2)'. Only this format is written by the packer,
+// so on read an 'rgb(...)' picFrame unambiguously means "packed" (the app
+// normalizes every other saved color to '#rrggbb').
+export function packFrameAndName(frame: string, name: string): string {
+  const combined = (rgbTo12(parseColorToRgb(frame)) << 12) | rgbTo12(parseColorToRgb(name));
+  const b0 = (combined >> 16) & 0xff;
+  const b1 = (combined >> 8) & 0xff;
+  const b2 = combined & 0xff;
+  return `rgb(${b0}, ${b1}, ${b2})`;
+}
+
+const PACKED_RE = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/;
+
+// Returns the two unpacked colors, or null if `stored` isn't a packed triple
+// (i.e. it's a legacy plain hex frame color).
+export function unpackFrameAndName(stored: string): { picFrame: string; nameText: string } | null {
+  const m = stored.match(PACKED_RE);
+  if (!m) return null;
+  const combined = ((+m[1] & 0xff) << 16) | ((+m[2] & 0xff) << 8) | (+m[3] & 0xff);
+  return {
+    picFrame: rgbToHex(rgb12ToRgb((combined >> 12) & 0xfff)),
+    nameText: rgbToHex(rgb12ToRgb(combined & 0xfff)),
+  };
+}
+
+// Storage boundary: turn the raw stored 7-key object into the in-app 8-key
+// partial (spread over DEFAULT_PROFILE_COLORS by callers). Splits a packed
+// picFrame back into picFrame + nameText.
+export function decodeStoredColors(
+  stored: Record<string, string> | null | undefined,
+): Partial<ProfilePageColors> {
+  if (!stored) return {};
+  const out: Partial<ProfilePageColors> = { ...(stored as Partial<ProfilePageColors>) };
+  if (typeof stored.picFrame === 'string') {
+    const unpacked = unpackFrameAndName(stored.picFrame);
+    if (unpacked) {
+      out.picFrame = unpacked.picFrame;
+      out.nameText = unpacked.nameText;
+    }
+    // else: legacy plain frame color — leave picFrame, nameText stays default.
+  }
+  return out;
+}
+
+// Storage boundary: turn the in-app 8-key colors into the 7-key object the
+// backend accepts. nameText is folded into picFrame; every other color is
+// normalized to '#rrggbb'. picFrame is only packed (and quantized) when the
+// member set a non-default name color, so unaffected members keep exact colors.
+export function encodeColorsForStorage(colors: ProfilePageColors): Record<string, string> {
+  const nameHex = rgbToHex(parseColorToRgb(colors.nameText));
+  const defaultNameHex = rgbToHex(parseColorToRgb(DEFAULT_PROFILE_COLORS.nameText));
+  const nameCustomized = nameHex !== defaultNameHex;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(colors)) {
+    if (k === 'nameText') continue; // packed into picFrame, never its own key
+    if (k === 'picFrame') {
+      out.picFrame = nameCustomized
+        ? packFrameAndName(colors.picFrame, colors.nameText)
+        : rgbToHex(parseColorToRgb(colors.picFrame));
+    } else {
+      out[k] = rgbToHex(parseColorToRgb(v));
+    }
+  }
+  return out;
 }

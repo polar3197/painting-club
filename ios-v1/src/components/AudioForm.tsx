@@ -8,17 +8,26 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 interface AudioFormProps {
   onDataChange: (data: Record<string, any>) => void;
   initialData?: AudioOut;
+  // Seed the album field on create (e.g. "+" inside an album's page).
+  initialSeries?: string;
   rightSlot?: React.ReactNode;
 }
 
-export default function AudioForm({ onDataChange, initialData, rightSlot }: AudioFormProps) {
+export default function AudioForm({ onDataChange, initialData, initialSeries, rightSlot }: AudioFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
     date: initialData ? initialData.date ?? '' : todayLocalISO(),
     keywords: initialData?.keywords?.join(', ') ?? '',
-    series: (initialData as any)?.series_name ?? '',
+    series: (initialData as any)?.series_name ?? initialSeries ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
   });
+
+  // Seeded fields only reach the parent through onDataChange — push the
+  // initial state up once so an untouched-but-seeded form still submits whole.
+  React.useEffect(() => {
+    onDataChange(form);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const thumbPos = useRef(new Animated.Value(form.comments_enabled ? 18 : 0)).current;
 

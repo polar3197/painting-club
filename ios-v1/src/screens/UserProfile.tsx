@@ -9,6 +9,7 @@ import {
   Dimensions,
   LayoutChangeEvent,
   RefreshControl,
+  Image as RNImage,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +46,8 @@ import ArtComments from '../components/ArtComments';
 import AddArtDialog from '../components/AddArtDialog';
 import WrittenFormPiece from '../components/WrittenFormPiece';
 import AudioPiece from '../components/AudioPiece';
+import AlbumTile from '../components/AlbumTile';
+import PaintingSeriesRow from '../components/PaintingSeriesRow';
 import SeriesRow from '../components/SeriesRow';
 import AddMediaDialog from '../components/AddMediaDialog';
 import ShareMediaDialog from '../components/ShareMediaDialog';
@@ -57,6 +60,7 @@ import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import {
   DEFAULT_PROFILE_COLORS,
   ProfilePageColors,
+  decodeStoredColors,
 } from '../constants/profileColors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -133,7 +137,31 @@ function Visual2DPiece({
   // with the image's real dimensions once it loads. A wrong/stale stored ratio
   // would otherwise letterbox the image (white bars) under contentFit:contain.
   const [measuredRatio, setMeasuredRatio] = useState<number | null>(null);
-  const aspectRatio = measuredRatio ?? piece.aspect_ratio ?? 1;
+  // The ratio we're confident about — stored, or measured from the thumbnail.
+  // Null only for the brief moment before either is known; we hold the image
+  // hidden until then so it never flashes at the wrong (square) shape.
+  const knownRatio = measuredRatio ?? piece.aspect_ratio ?? null;
+  const aspectRatio = knownRatio ?? 1;
+
+  // Older pieces have no stored aspect_ratio, so the card would open as a square
+  // and snap to the real shape when the full-res image lands. Measure the
+  // thumbnail up front (512px, CDN-cached, aspect-preserving — it resolves well
+  // before the full image) so the box takes its true shape first and the full
+  // image swaps in with no reflow. Falls back to the full image's onLoad.
+  useEffect(() => {
+    if (piece.aspect_ratio) return;
+    let cancelled = false;
+    RNImage.getSize(
+      thumbUrl(piece.id),
+      (w, h) => {
+        if (!cancelled && w > 0 && h > 0) setMeasuredRatio(w / h);
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [piece.id, piece.aspect_ratio]);
 
   const removeArt = async () => {
     await remove_visual_2d(piece.id, token);
@@ -168,7 +196,7 @@ function Visual2DPiece({
               source={{ uri: resolveImageUrl(piece.file_path) }}
               placeholder={{ uri: thumbUrl(piece.id) }}
               transition={200}
-              style={styles.artImage}
+              style={[styles.artImage, { opacity: knownRatio ? 1 : 0 }]}
               contentFit="contain"
               onLoad={(e) => {
                 const { width, height } = e.source;
@@ -280,7 +308,7 @@ export default function UserProfile() {
   // The owner's saved page colors (partial), merged over the app defaults.
   // Viewers get the owner's scheme too — it rides the profile payload.
   const pageColors: ProfilePageColors = useMemo(
-    () => ({ ...DEFAULT_PROFILE_COLORS, ...(profile?.profile_colors ?? {}) }),
+    () => ({ ...DEFAULT_PROFILE_COLORS, ...decodeStoredColors(profile?.profile_colors) }),
     [profile?.profile_colors]
   );
   const [selectedMedium, setSelectedMedium] = useState<string | null>(mediumParam ?? null);
@@ -570,6 +598,64 @@ export default function UserProfile() {
     return rows;
   }, [filteredWrittenArt]);
 
+  // Same series collapsing for paintings — a series shows as one cover tile.
+  const visualRows = useMemo(() => {
+    type Row =
+      | { kind: 'piece'; piece: Visual2DOut }
+      | { kind: 'series'; id: string; name: string; pieces: Visual2DOut[] };
+    const rows: Row[] = [];
+    const seriesIndex = new Map<string, Extract<Row, { kind: 'series' }>>();
+    for (const p of filteredArt) {
+      if (p.series_id) {
+        const existing = seriesIndex.get(p.series_id);
+        if (existing) {
+          existing.pieces.push(p);
+        } else {
+          const row: Extract<Row, { kind: 'series' }> = {
+            kind: 'series',
+            id: p.series_id,
+            name: p.series_name ?? 'series',
+            pieces: [p],
+          };
+          seriesIndex.set(p.series_id, row);
+          rows.push(row);
+        }
+      } else {
+        rows.push({ kind: 'piece', piece: p });
+      }
+    }
+    return rows;
+  }, [filteredArt]);
+
+  // ...and for audio — an album shows as one tracklist tile.
+  const audioRows = useMemo(() => {
+    type Row =
+      | { kind: 'piece'; piece: AudioOut }
+      | { kind: 'series'; id: string; name: string; pieces: AudioOut[] };
+    const rows: Row[] = [];
+    const seriesIndex = new Map<string, Extract<Row, { kind: 'series' }>>();
+    for (const p of filteredAudioArt) {
+      if (p.series_id) {
+        const existing = seriesIndex.get(p.series_id);
+        if (existing) {
+          existing.pieces.push(p);
+        } else {
+          const row: Extract<Row, { kind: 'series' }> = {
+            kind: 'series',
+            id: p.series_id,
+            name: p.series_name ?? 'album',
+            pieces: [p],
+          };
+          seriesIndex.set(p.series_id, row);
+          rows.push(row);
+        }
+      } else {
+        rows.push({ kind: 'piece', piece: p });
+      }
+    }
+    return rows;
+  }, [filteredAudioArt]);
+
   const handleArtLayout = useCallback((pieceId: string, e: LayoutChangeEvent) => {
     const y = e.nativeEvent.layout.y + artSectionY.current;
     artPositions.current[pieceId] = y;
@@ -727,11 +813,11 @@ export default function UserProfile() {
         <View style={styles.userFields}>
               <View style={styles.userTopRow}>
                 <View style={styles.userIdentity}>
-                  <Text style={styles.userName}>
+                  <Text style={[styles.userName, { color: pageColors.nameText }]}>
                     {profile.firstname} {profile.lastname}
                   </Text>
                   {(profile.city || profile.state) && (
-                    <Text style={styles.userLocation}>
+                    <Text style={[styles.userLocation, { color: pageColors.nameText }]}>
                       {[profile.city, profile.state].filter(Boolean).join(', ')}
                     </Text>
                   )}
@@ -945,19 +1031,41 @@ export default function UserProfile() {
                   cardBg={pageColors.artCardBg}
                 />
               ))}
-            {filteredArt.map((piece, idx) => (
-              <Visual2DPiece
-                key={piece.id}
-                isOwner={profile.is_owner}
-                piece={piece}
-                viewerBlockedByOwner={!!profile.viewer_blocked_by_owner}
-                cardBg={pageColors.artCardBg}
-                onRemove={() => setRefresh((r) => r + 1)}
-                onEdit={() => setEditingPiece(piece)}
-                onZoom={() => setZoomIndex(idx)}
-                onLayout={(e) => handleArtLayout(piece.id, e)}
-              />
-            ))}
+            {visualRows.map((row) =>
+              row.kind === 'piece' ? (
+                <Visual2DPiece
+                  key={row.piece.id}
+                  isOwner={profile.is_owner}
+                  piece={row.piece}
+                  viewerBlockedByOwner={!!profile.viewer_blocked_by_owner}
+                  cardBg={pageColors.artCardBg}
+                  onRemove={() => setRefresh((r) => r + 1)}
+                  onEdit={() => setEditingPiece(row.piece)}
+                  // The profile-wide carousel still swipes across every piece
+                  // in the medium, so zoom by position in filteredArt.
+                  onZoom={() => setZoomIndex(filteredArt.indexOf(row.piece))}
+                  onLayout={(e) => handleArtLayout(row.piece.id, e)}
+                />
+              ) : (
+                <PaintingSeriesRow
+                  key={row.id}
+                  isOwner={profile.is_owner}
+                  seriesName={row.name}
+                  pieces={row.pieces}
+                  cardBg={pageColors.artCardBg}
+                  selectedMedium={selectedMedium!}
+                  username={username}
+                  creatorUsername={profile.username}
+                  onRefresh={() => setRefresh((r) => r + 1)}
+                  onMediumMove={(newMedium) => {
+                    setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
+                    setSelectedMedium(newMedium);
+                    setSelectedKeywords([]);
+                  }}
+                  onLayout={(e) => handleArtLayout(row.id, e)}
+                />
+              )
+            )}
           </>
         ) : selectedMedium && isWritten ? (
           <>
@@ -1009,16 +1117,34 @@ export default function UserProfile() {
                   <Text style={styles.artDetailText}>uploading…</Text>
                 </View>
               ))}
-            {filteredAudioArt.map((piece) => (
-              <AudioPiece
-                key={piece.id}
-                isOwner={profile.is_owner}
-                piece={piece}
-                onRemove={() => setRefresh((r) => r + 1)}
-                onEdit={() => setEditingAudio(piece)}
-                onLayout={(e) => handleArtLayout(piece.id, e)}
-              />
-            ))}
+            {audioRows.map((row) =>
+              row.kind === 'piece' ? (
+                <AudioPiece
+                  key={row.piece.id}
+                  isOwner={profile.is_owner}
+                  piece={row.piece}
+                  onRemove={() => setRefresh((r) => r + 1)}
+                  onEdit={() => setEditingAudio(row.piece)}
+                  onLayout={(e) => handleArtLayout(row.piece.id, e)}
+                />
+              ) : (
+                <AlbumTile
+                  key={row.id}
+                  isOwner={profile.is_owner}
+                  albumName={row.name}
+                  pieces={row.pieces}
+                  selectedMedium={selectedMedium!}
+                  username={username}
+                  onMediumMove={(newMedium) => {
+                    setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
+                    setSelectedMedium(newMedium);
+                    setSelectedKeywords([]);
+                  }}
+                  onRefresh={() => setRefresh((r) => r + 1)}
+                  onLayout={(e) => handleArtLayout(row.id, e)}
+                />
+              )
+            )}
           </>
         ) : (
           <Text style={styles.emptyText}>{selectedMedium} is empty atm</Text>
