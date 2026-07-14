@@ -27,6 +27,8 @@ from api.models import (
     ProfileUpdate,
     Token,
     MemberFilters,
+    MemberRoleUpdate,
+    MemberRoleOut,
     AddMedia,
     MediaOut,
     MediaIn,
@@ -118,6 +120,7 @@ from db.db_ops.members import (
     db_export_member_data,
     db_delete_member,
     db_get_member_directory,
+    db_set_member_role,
 )
 
 from db.db_ops.profile import (
@@ -2812,3 +2815,26 @@ async def reorder_my_media(
         raise HTTPException(status_code=400, detail="mediums cannot be empty")
     await db_reorder_member_media(db, current_member.id, payload.mediums)
     return {"ok": True}
+
+
+@app.patch("/admin/members/{username}/role", response_model=MemberRoleOut)
+async def set_member_role(
+    username: str,
+    payload: MemberRoleUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    """Promote a member to admin or demote them back to member. Admin-only.
+    Refuses to demote the last remaining admin so the app can't be locked out."""
+    try:
+        member = await db_set_member_role(db, username, payload.role)
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg.lower():
+            status_code = 404
+        elif "last admin" in msg.lower():
+            status_code = 409
+        else:
+            status_code = 400
+        raise HTTPException(status_code=status_code, detail=msg)
+    return MemberRoleOut(username=member.username, role=member.role)

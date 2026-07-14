@@ -1,6 +1,6 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, and_, or_
+from sqlalchemy import select, delete, and_, or_, func
 import bcrypt
 
 from db.models import (
@@ -9,9 +9,42 @@ from db.models import (
     KeywordArt,
 )
 
+VALID_ROLES = {"member", "admin"}
+
 async def db_get_members(db: AsyncSession):
     result = await db.execute(select(Member))
     return result.scalars().all()
+
+
+async def db_set_member_role(db: AsyncSession, username: str, role: str) -> Member:
+    """Promote/demote a member to/from admin. Guards against demoting the last
+    admin, so the app can never end up with zero admins (a lock-out). No-op if
+    the member already has the requested role."""
+    role = (role or "").strip().lower()
+    if role not in VALID_ROLES:
+        raise ValueError(f"role must be one of {sorted(VALID_ROLES)}")
+    uname = (username or "").strip().lower()
+    member = (
+        await db.execute(select(Member).filter(Member.username == uname))
+    ).scalar_one_or_none()
+    if member is None:
+        raise ValueError("Member not found")
+    if member.role == role:
+        return member  # already there
+    if member.role == "admin" and role == "member":
+        other_admins = (
+            await db.execute(
+                select(func.count())
+                .select_from(Member)
+                .filter(Member.role == "admin", Member.id != member.id)
+            )
+        ).scalar_one()
+        if other_admins == 0:
+            raise ValueError("cannot demote the last admin")
+    member.role = role
+    await db.commit()
+    await db.refresh(member)
+    return member
 
 
 async def db_get_member_directory(db: AsyncSession, viewer_id):

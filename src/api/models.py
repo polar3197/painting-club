@@ -555,3 +555,11 @@ class EventOut(BaseModel):
 class MediaOrderIn(BaseModel):
     # The member's media names in the desired tab order (front to back).
     mediums: list[str]
+
+
+class MemberRoleUpdate(BaseModel):
+    role: str  # 'admin' | 'member'
+
+class MemberRoleOut(BaseModel):
+    username: str
+    role: str
