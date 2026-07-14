@@ -2407,6 +2407,7 @@ async def _event_out(db: AsyncSession, event, viewer: Member) -> EventOut:
         event_date=event.event_date,
         event_time=event.event_time,
         image_path=event.image_path,
+        color=event.color,
         is_public=event.is_public,
         creator_username=creator_username,
         hosts=hosts,
@@ -2447,6 +2448,7 @@ async def create_event(
             event_date=payload.event_date,
             event_time=payload.event_time,
             is_public=payload.is_public,
+            color=payload.color,
             host_usernames=payload.hosts,
         )
     except ValueError as e:

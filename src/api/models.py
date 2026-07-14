@@ -483,6 +483,8 @@ class EventIn(BaseModel):
     event_date: Date
     event_time: TimeOfDay | None = None
     is_public: bool = False
+    # Optional host-configurable accent color (e.g. "#rrggbb").
+    color: str | None = None
     # Additional host usernames — the creator is always added as a host.
     hosts: list[str] = []
 
@@ -493,6 +495,7 @@ class EventUpdate(BaseModel):
     event_date: Date | None = None
     event_time: TimeOfDay | None = None
     is_public: bool | None = None
+    color: str | None = None
 
 class EventMembersIn(BaseModel):
     usernames: list[str]
@@ -504,6 +507,7 @@ class EventOut(BaseModel):
     event_date: Date
     event_time: TimeOfDay | None = None
     image_path: str | None = None
+    color: str | None = None
     is_public: bool
     creator_username: str
     hosts: list[str] = []

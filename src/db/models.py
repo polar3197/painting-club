@@ -356,6 +356,9 @@ class Event(Base):
     event_date = Column(Date, nullable=False)
     event_time = Column(Time)
     image_path = Column(String(500))
+    # Host-configurable accent color for the event's card/detail (e.g. '#rrggbb').
+    # NULL = client uses its default palette.
+    color = Column(String(20))
     # Public events are visible to every member; private ones only to the
     # creator, hosts, and invitees (see db_ops/events.py visibility rule).
     is_public = Column(Boolean, nullable=False, default=False)
