@@ -55,6 +55,10 @@ class Media_Members(Base):
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), primary_key=True)
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), primary_key=True)
     hidden = Column(Boolean, nullable=False, default=False)
+    # User-chosen position of this medium's tab on their profile (hold-and-drag
+    # reorder). NULL = never customized — sorts after positioned tabs,
+    # alphabetically, so untouched profiles keep the historical order.
+    position = Column(Integer)
 
 class Series(Base):
     """Per-creator grouping of pieces under a shared name within one (creator, medium).

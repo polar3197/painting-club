@@ -155,6 +155,11 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE media_members ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false"
         ))
+        # User-chosen ordering of a profile's media tabs (hold-and-drag).
+        # NULL = never customized; queries order position NULLS LAST, then name.
+        await conn.execute(text(
+            "ALTER TABLE media_members ADD COLUMN IF NOT EXISTS position INT"
+        ))
         # Canonical source aspect ratio (w/h), captured at upload. Avoids relying on
         # thumbnail pixel dimensions, which drift from source by PIL integer rounding.
         await conn.execute(text(

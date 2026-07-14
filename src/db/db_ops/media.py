@@ -33,6 +33,30 @@ async def db_set_media_visibility(
     return True
 
 
+async def db_reorder_member_media(
+    db: AsyncSession, member_id, ordered_names: list[str]
+) -> None:
+    """Persist the member's tab order: position = index in ordered_names.
+    Names the member doesn't have are ignored (tolerates races with a
+    just-removed medium); the member's media absent from the list keep their
+    old position untouched. Empty list = no-op."""
+    if not ordered_names:
+        return
+    rows = (
+        await db.execute(
+            select(Media_Members, Media.name)
+            .join(Media, Media.id == Media_Members.media_id)
+            .filter(Media_Members.member_id == member_id)
+        )
+    ).all()
+    by_name = {name: link for link, name in rows}
+    for index, name in enumerate(ordered_names):
+        link = by_name.get(name)
+        if link is not None:
+            link.position = index
+    await db.commit()
+
+
 async def db_create_media(db: AsyncSession, name: str, type_: str | None = None) -> Media:
     existing = await db.execute(select(Media).filter(Media.name == name))
     row = existing.scalars().first()

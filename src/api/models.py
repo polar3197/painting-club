@@ -513,3 +513,7 @@ class EventOut(BaseModel):
     # Convenience for clients: can the viewer edit/host-manage this event?
     can_edit: bool = False
     created_at: datetime
+
+class MediaOrderIn(BaseModel):
+    # The member's media names in the desired tab order (front to back).
+    mediums: list[str]
