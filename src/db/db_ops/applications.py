@@ -75,21 +75,10 @@ async def db_delete_application(db: AsyncSession, application_id: str) -> None:
     await db.commit()
 
 
-async def db_approve_application(db: AsyncSession, application_id: str) -> tuple[Application, Member, str]:
-    """Approve an application: create a Member with a temp password, link it to the app,
-    move the app to 'pending_setup'. Returns (application, member, plaintext_temp_password)."""
-    result = await db.execute(select(Application).filter(Application.id == application_id))
-    app = result.scalar_one_or_none()
-    if not app:
-        raise ValueError("Application not found")
-    if app.status not in ("pending", "approved"):
-        raise ValueError(f"Application is already {app.status}")
-
-    member_id = uuid.uuid4()
-    placeholder_username = f"user_{str(member_id)[:8]}"
-    # Generate a temp password unique among active (non-null) plaintext values, since the
-    # setup-code login looks members up by this column. Collisions are astronomically rare,
-    # but cheap to guard against.
+async def _unique_temp_password(db: AsyncSession) -> tuple[str, str]:
+    """Generate a temp password unique among active (non-null) plaintext values, since
+    the setup-code login looks members up by this column. Collisions are astronomically
+    rare, but cheap to guard against. Returns (plaintext, bcrypt_hash)."""
     for _ in range(5):
         temp_password = _gen_temp_password()
         clash = (await db.execute(
@@ -100,6 +89,55 @@ async def db_approve_application(db: AsyncSession, application_id: str) -> tuple
     else:
         raise RuntimeError("Could not generate a unique temp password after 5 attempts")
     password_hash = bcrypt.hashpw(temp_password.encode(), bcrypt.gensalt(rounds=12)).decode()
+    return temp_password, password_hash
+
+
+async def db_approve_application(db: AsyncSession, application_id: str) -> tuple[Application, Member, str]:
+    """Approve an application: create a Member with a temp password, link it to the app,
+    move the app to 'pending_setup'. Returns (application, member, plaintext_temp_password).
+
+    member.email is UNIQUE, so a re-application with an email that already has a member
+    can't just insert a second row (that used to escape as a 500 IntegrityError). Two
+    cases instead: an un-finished pending_setup orphan (applied before, approved, never
+    completed setup) is REUSED with a fresh temp password; a completed account raises a
+    clear 'already exists' error the route maps to 409."""
+    result = await db.execute(select(Application).filter(Application.id == application_id))
+    app = result.scalar_one_or_none()
+    if not app:
+        raise ValueError("Application not found")
+    if app.status not in ("pending", "approved"):
+        raise ValueError(f"Application is already {app.status}")
+
+    existing = (await db.execute(
+        select(Member).filter(Member.email == app.email)
+    )).scalar_one_or_none()
+    if existing is not None:
+        if not existing.must_change_password:
+            # A real, completed account owns this email.
+            raise ValueError(
+                "a member with this email already exists — delete the earlier request "
+                "or have them log in / reset their password"
+            )
+        # Orphan invite (approved earlier, setup never finished): reuse it with a
+        # fresh temp password + expiry, and point this application at it. Any older
+        # pending_setup application stays linked to the same member and simply
+        # becomes another path to the same account.
+        temp_password, password_hash = await _unique_temp_password(db)
+        existing.password_hash = password_hash
+        existing.temp_password_plaintext = temp_password
+        existing.temp_password_expires_at = datetime.utcnow() + timedelta(days=TEMP_PASSWORD_TTL_DAYS)
+
+        app.status = "pending_setup"
+        app.member_id = existing.id
+
+        await db.commit()
+        await db.refresh(existing)
+        await db.refresh(app)
+        return app, existing, temp_password
+
+    member_id = uuid.uuid4()
+    placeholder_username = f"user_{str(member_id)[:8]}"
+    temp_password, password_hash = await _unique_temp_password(db)
 
     member = Member(
         id=member_id,

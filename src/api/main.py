@@ -56,6 +56,11 @@ from api.models import (
     PromptDetailOut,
     PromptCreate,
     PromptSummary,
+    PromptSuggestionIn,
+    PromptSuggestionOut,
+    AdminPromptQueueOut,
+    PromptSuggestionReview,
+    PromptSuggestionReorder,
     SearchOptions,
     ArtResult,
     ApplicationIn,
@@ -186,6 +191,13 @@ from db.db_ops.prompts import (
     db_validate_submission_medium,
 )
 
+from db.db_ops.weekly_prompt_suggestions import (
+    db_create_suggestion,
+    db_list_suggestions_admin,
+    db_review_suggestion,
+    db_reorder_suggestions,
+)
+
 from db.db_ops.comments import (
     db_get_comments,
     db_add_comment,
@@ -194,7 +206,7 @@ from db.db_ops.comments import (
     db_touch_comments_viewed,
 )
     
-from db.session import get_db
+from db.session import get_db, AsyncSessionLocal
 from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
 from db.models import Member, Media, Media_Members, Art, Comment, Visual2D, WrittenForm, WeeklyPrompt
 
@@ -210,6 +222,12 @@ async def lifespan(app: FastAPI):
     await pre_init_migrations()
     await init_db()
     await run_migrations()
+    # One-time data repair: pieces uploaded before the aspect_ratio column
+    # existed have NULL ratios (the column was added without a backfill), which
+    # is why old art flashes square before snapping to shape. Idempotent — only
+    # touches NULL rows — so it's safe to leave here and run on every boot.
+    async with AsyncSessionLocal() as db:
+        await backfill_visual_2d_aspect_ratios(db)
     yield
     # await empty_db()
 
@@ -692,6 +710,27 @@ def _compute_aspect_ratio(path: Path) -> float | None:
     return None
 
 
+async def backfill_visual_2d_aspect_ratios(db: AsyncSession) -> None:
+    """One-time data repair, run at startup: compute aspect_ratio for visual_2d
+    rows created before the column existed (aspect_ratio IS NULL). Idempotent —
+    only NULL rows are touched, PDFs and unreadable files are skipped (and stay
+    NULL, so they're re-attempted next boot at negligible cost)."""
+    rows = (await db.execute(
+        select(Visual2D).filter(Visual2D.aspect_ratio.is_(None))
+    )).scalars().all()
+    changed = 0
+    for v in rows:
+        if not v.file_path or v.file_path.lower().endswith(".pdf"):
+            continue
+        ratio = _compute_aspect_ratio(abs_path(v.file_path))
+        if ratio:
+            v.aspect_ratio = ratio
+            changed += 1
+    if changed:
+        await db.commit()
+    print(f"[backfill] aspect_ratio set on {changed} of {len(rows)} NULL rows")
+
+
 def heic_to_jpeg_bytes(contents: bytes) -> bytes:
     img = Image.open(io.BytesIO(contents))
     if img.mode != "RGB":
@@ -699,6 +738,24 @@ def heic_to_jpeg_bytes(contents: bytes) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=90)
     return buf.getvalue()
+
+
+COVER_MIME_TO_EXT = {"image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg"}
+
+
+async def read_cover_image(cover: UploadFile) -> tuple[bytes, str]:
+    """Validate a written-piece cover upload. Images only (no PDFs); HEIC is
+    converted to JPEG like profile pics. Returns (bytes, extension)."""
+    contents = await cover.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Cover image exceeds 20 MB limit")
+    mime = magic.from_buffer(contents, mime=True)
+    if mime in {"image/heic", "image/heif"}:
+        contents = heic_to_jpeg_bytes(contents)
+        mime = "image/jpeg"
+    if mime not in COVER_MIME_TO_EXT:
+        raise HTTPException(status_code=400, detail=f"Cover must be a png/jpeg/heic image (got {mime})")
+    return contents, COVER_MIME_TO_EXT[mime]
 
 
 PROFILE_THUMB_DIM = 256  # tiny placeholder for instant first paint; original stays full-res
@@ -1015,6 +1072,8 @@ async def upload_written_form(
     # bring text in from Notes / Google Docs / anywhere via copy-paste — no
     # share-extension or file-provider round-trip required.
     text: str | None = Form(None),
+    # Optional image used as the piece's card cover in art displays.
+    cover: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
 ):
@@ -1051,6 +1110,12 @@ async def upload_written_form(
         else:
             raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
 
+    # Validate the cover BEFORE any disk writes so a bad cover can't orphan the
+    # main file.
+    cover_payload: tuple[bytes, str] | None = None
+    if cover is not None:
+        cover_payload = await read_cover_image(cover)
+
     art_id = uuid.uuid4()
     safe_medium = sanitize_path_segment(medium)
     file_path = f"/static/written-form/{current_member.id}/{safe_medium}/{art_id}.{file_ext}"
@@ -1060,6 +1125,15 @@ async def upload_written_form(
     path.write_bytes(contents)
     if not path.exists() or path.stat().st_size == 0:
         raise HTTPException(status_code=500, detail="Upload write failed")
+
+    cover_image_path: str | None = None
+    cover_abs: Path | None = None
+    if cover_payload is not None:
+        cover_bytes, cover_ext = cover_payload
+        cover_image_path = f"/static/written-form/{current_member.id}/{safe_medium}/{art_id}_cover.{cover_ext}"
+        cover_abs = abs_path(cover_image_path)
+        cover_abs.parent.mkdir(parents=True, exist_ok=True)
+        cover_abs.write_bytes(cover_bytes)
 
     keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
 
@@ -1075,12 +1149,15 @@ async def upload_written_form(
             file_path=file_path,
             comments_enabled=comments_enabled,
             series_name=series_name,
+            cover_image_path=cover_image_path,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)
+        if cover_abs is not None:
+            cover_abs.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail=str(e))
 
-    return {"file_path": file_path}
+    return {"file_path": file_path, "cover_image_path": cover_image_path}
 
 
 @app.get("/members/{username}/art/written-form/{medium}", response_model=list[WrittenFormOut])
@@ -1106,6 +1183,7 @@ async def get_written_form(
             series_id=row.series_id,
             series_name=series_name,
             order_index=row.order_index,
+            cover_image_path=row.cover_image_path,
         ))
     return pieces
 
@@ -1122,6 +1200,9 @@ async def update_written_form(
     clear_series: bool = Form(False),
     file: UploadFile | None = File(None),
     text: str | None = Form(None),
+    # Cover image: send `cover` to set/replace, or clear_cover=true to remove.
+    cover: UploadFile | None = File(None),
+    clear_cover: bool = Form(False),
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1129,6 +1210,25 @@ async def update_written_form(
         raise HTTPException(status_code=400, detail="Send a file OR pasted text, not both")
 
     keywords_list = [k.strip() for k in keywords.split(',')] if keywords else None
+
+    # Any file work (main file/text replacement, cover set/clear) needs the
+    # existing row for ownership checks, old paths, and the medium folder name.
+    existing: WrittenForm | None = None
+    safe_medium: str | None = None
+    if file is not None or text or cover is not None or clear_cover:
+        existing = (
+            await db.execute(select(WrittenForm).filter(WrittenForm.id == art_id))
+        ).scalar_one_or_none()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Art not found")
+        if str(existing.creator_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not your piece")
+        # Path uses the current medium's name (move-to is a DB column update only;
+        # we re-key files on the existing medium's folder to keep things simple).
+        current_media = (
+            await db.execute(select(Media).filter(Media.id == existing.media_id))
+        ).scalar_one_or_none()
+        safe_medium = sanitize_path_segment(current_media.name if current_media else "written")
 
     # File/text replacement path. Mirrors the Visual2D update flow: load existing,
     # write the new bytes to a fresh path, swap file_path in the DB, then delete
@@ -1138,14 +1238,6 @@ async def update_written_form(
     old_abs_to_delete: Path | None = None
 
     if file is not None or text:
-        existing = (
-            await db.execute(select(WrittenForm).filter(WrittenForm.id == art_id))
-        ).scalar_one_or_none()
-        if existing is None:
-            raise HTTPException(status_code=404, detail="Art not found")
-        if str(existing.creator_id) != str(current_user.id):
-            raise HTTPException(status_code=403, detail="Not your piece")
-
         if text is not None:
             contents = text.encode("utf-8")
             if len(contents) > MAX_UPLOAD_BYTES:
@@ -1169,18 +1261,28 @@ async def update_written_form(
         if existing.file_path:
             old_abs_to_delete = abs_path(existing.file_path)
 
-        # Path uses the current medium's name (move-to is a DB column update only;
-        # we re-key the file on the existing medium's folder to keep things simple).
-        current_media = (
-            await db.execute(select(Media).filter(Media.id == existing.media_id))
-        ).scalar_one_or_none()
-        safe_medium = sanitize_path_segment(current_media.name if current_media else "written")
         new_file_path = f"/static/written-form/{current_user.id}/{safe_medium}/{art_id}.{file_ext}"
         written_path = abs_path(new_file_path)
         written_path.parent.mkdir(parents=True, exist_ok=True)
         written_path.write_bytes(contents)
         if not written_path.exists() or written_path.stat().st_size == 0:
             raise HTTPException(status_code=500, detail="Upload write failed")
+
+    # Cover set/replace/clear. New bytes land on a fresh write; the old cover
+    # file is only unlinked after the DB commit succeeds.
+    new_cover_path: str | None = None
+    cover_abs: Path | None = None
+    old_cover_abs: Path | None = None
+    if clear_cover and existing is not None and existing.cover_image_path:
+        old_cover_abs = abs_path(existing.cover_image_path)
+    if cover is not None:
+        cover_bytes, cover_ext = await read_cover_image(cover)
+        if existing is not None and existing.cover_image_path:
+            old_cover_abs = abs_path(existing.cover_image_path)
+        new_cover_path = f"/static/written-form/{current_user.id}/{safe_medium}/{art_id}_cover.{cover_ext}"
+        cover_abs = abs_path(new_cover_path)
+        cover_abs.parent.mkdir(parents=True, exist_ok=True)
+        cover_abs.write_bytes(cover_bytes)
 
     try:
         await db_update_written_form(
@@ -1195,18 +1297,26 @@ async def update_written_form(
             series_name=series_name,
             clear_series=clear_series,
             file_path=new_file_path,
+            cover_image_path=new_cover_path,
+            clear_cover=clear_cover,
         )
     except ValueError as e:
         if written_path is not None:
             written_path.unlink(missing_ok=True)
+        if cover_abs is not None:
+            cover_abs.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         if written_path is not None:
             written_path.unlink(missing_ok=True)
+        if cover_abs is not None:
+            cover_abs.unlink(missing_ok=True)
         raise HTTPException(status_code=403, detail=str(e))
 
     if new_file_path is not None and old_abs_to_delete is not None and old_abs_to_delete != written_path:
         old_abs_to_delete.unlink(missing_ok=True)
+    if old_cover_abs is not None and old_cover_abs != cover_abs:
+        old_cover_abs.unlink(missing_ok=True)
     return {"ok": True}
 
 
@@ -1351,6 +1461,82 @@ async def admin_archive_prompt(
     )
 
 
+# ============================================================
+# Weekly-prompt suggestions: members propose prompts; admins
+# review them into an ordered "up next" queue (drag-reorder
+# mirrors the series/album ordering pattern).
+# ============================================================
+
+def _suggestion_out(suggestion, media_name: str | None, username: str | None) -> PromptSuggestionOut:
+    return PromptSuggestionOut(
+        id=suggestion.id,
+        username=username,
+        media_id=suggestion.media_id,
+        media_name=media_name,
+        prompt_text=suggestion.prompt_text,
+        status=suggestion.status,
+        order_index=suggestion.order_index,
+        created_at=suggestion.created_at,
+    )
+
+
+@app.post("/weekly-prompts/suggestions", response_model=PromptSuggestionOut, status_code=status.HTTP_201_CREATED)
+async def create_prompt_suggestion(
+    payload: PromptSuggestionIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        suggestion, media_name = await db_create_suggestion(
+            db, current_member.id, payload.prompt_text, payload.media_id
+        )
+    except ValueError as e:
+        detail = str(e)
+        raise HTTPException(status_code=404 if "not found" in detail.lower() else 400, detail=detail)
+    return _suggestion_out(suggestion, media_name, current_member.username)
+
+
+@app.get("/admin/weekly-prompts", response_model=AdminPromptQueueOut)
+async def list_prompt_suggestions(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    proposed, up_next = await db_list_suggestions_admin(db)
+    return AdminPromptQueueOut(
+        proposed=[_suggestion_out(s, m, u) for s, m, u in proposed],
+        up_next=[_suggestion_out(s, m, u) for s, m, u in up_next],
+    )
+
+
+# Declared BEFORE /{suggestion_id} so "reorder" isn't captured as a path param.
+@app.patch("/admin/weekly-prompts/reorder")
+async def reorder_prompt_suggestions(
+    payload: PromptSuggestionReorder,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    try:
+        await db_reorder_suggestions(db, [str(s) for s in payload.suggestion_ids])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.patch("/admin/weekly-prompts/{suggestion_id}", response_model=PromptSuggestionOut)
+async def review_prompt_suggestion(
+    suggestion_id: str,
+    payload: PromptSuggestionReview,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    try:
+        suggestion, media_name, username = await db_review_suggestion(db, suggestion_id, payload.status)
+    except ValueError as e:
+        detail = str(e)
+        raise HTTPException(status_code=404 if "not found" in detail.lower() else 400, detail=detail)
+    return _suggestion_out(suggestion, media_name, username)
+
+
 @app.patch("/series/{series_id}/order")
 async def set_series_order(
     series_id: str,
@@ -1386,13 +1572,15 @@ async def rename_series(
 @app.delete("/art/written-form/{art_id}")
 async def remove_written_form(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
     try:
-        file_path = await db_remove_written_form(art_id=art_id, current_member_id=current_user.id, db=db)
+        file_path, cover_image_path = await db_remove_written_form(art_id=art_id, current_member_id=current_user.id, db=db)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     if file_path:
         abs_path(file_path).unlink(missing_ok=True)
+    if cover_image_path:
+        abs_path(cover_image_path).unlink(missing_ok=True)
     return
 
 
@@ -1795,7 +1983,13 @@ async def update_application_status(
         try:
             app, member, temp_password = await db_approve_application(db, application_id)
         except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            # "already exists" = a completed member owns this email → 409 so the
+            # admin sees a clear conflict instead of a generic failure.
+            detail = str(e)
+            raise HTTPException(
+                status_code=409 if "already exists" in detail else 404,
+                detail=detail,
+            )
         return ApplicationApproveOut(
             application_id=app.id,
             status=app.status,

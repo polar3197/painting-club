@@ -376,6 +376,8 @@ class WrittenFormOut(BaseModel):
     series_id: uuid.UUID | None = None
     series_name: str | None = None
     order_index: int | None = None
+    # Optional image used as the piece's card cover. None = text-snippet card.
+    cover_image_path: str | None = None
 
 
 class WrittenFormUpdate(BaseModel):
@@ -453,4 +455,37 @@ class PromptCreate(BaseModel):
     short_summary: str | None = None
     medium: str  # medium name; resolved to media_id server-side
     activate: bool = False
+
+
+class PromptSuggestionIn(BaseModel):
+    prompt_text: str
+    # NULL/absent = "medium agnostic".
+    media_id: uuid.UUID | None = None
+
+
+class PromptSuggestionOut(BaseModel):
+    id: uuid.UUID
+    # Suggester — populated in the admin queue view.
+    username: str | None = None
+    media_id: uuid.UUID | None = None
+    media_name: str | None = None  # None = medium agnostic
+    prompt_text: str
+    status: str
+    order_index: int | None = None
+    created_at: datetime
+
+
+class AdminPromptQueueOut(BaseModel):
+    proposed: list[PromptSuggestionOut] = []
+    # Approved queue, in order_index order.
+    up_next: list[PromptSuggestionOut] = []
+
+
+class PromptSuggestionReview(BaseModel):
+    status: str  # approved | rejected
+
+
+class PromptSuggestionReorder(BaseModel):
+    # The full approved queue in the desired order (mirrors SeriesOrderUpdate).
+    suggestion_ids: list[uuid.UUID]
 

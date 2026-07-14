@@ -355,6 +355,7 @@ async def db_add_written_form(
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
         series_name: str | None = None,
+        cover_image_path: str | None = None,
     ) -> str:
     username = username.lower()
     member_result = await db.execute(select(Member.id).filter(Member.username==username))
@@ -381,6 +382,7 @@ async def db_add_written_form(
         series_id=series_id,
         file_path=file_path,
         comments_enabled=comments_enabled,
+        cover_image_path=cover_image_path,
     )
     db.add(new_art)
     await db.flush()
@@ -413,6 +415,8 @@ async def db_update_written_form(
     series_name: str | None = None,
     clear_series: bool = False,
     file_path: str | None = None,
+    cover_image_path: str | None = None,
+    clear_cover: bool = False,
 ):
     result = await db.execute(select(WrittenForm).filter(WrittenForm.id == art_id))
     piece = result.scalar_one_or_none()
@@ -453,6 +457,10 @@ async def db_update_written_form(
     piece.comments_enabled = comments_enabled
     if file_path is not None:
         piece.file_path = file_path
+    if clear_cover:
+        piece.cover_image_path = None
+    elif cover_image_path is not None:
+        piece.cover_image_path = cover_image_path
 
     if clear_series:
         piece.series_id = None
@@ -476,14 +484,24 @@ async def db_update_written_form(
     await db.commit()
 
 
-async def db_remove_written_form(db: AsyncSession, art_id: str, current_member_id: str) -> str | None:
-    result = await db.execute(select(Art.creator_id, Art.file_path).filter(Art.id == art_id))
+async def db_remove_written_form(
+    db: AsyncSession, art_id: str, current_member_id: str
+) -> tuple[str | None, str | None]:
+    """Delete a written piece. Returns (file_path, cover_image_path) so the
+    caller can unlink both files from disk after the commit."""
+    # Select off the subclass: it carries the base columns via joined
+    # inheritance. (Selecting from Art AND joining WrittenForm would put `art`
+    # in the FROM twice and return duplicate rows.)
+    result = await db.execute(
+        select(WrittenForm.creator_id, WrittenForm.file_path, WrittenForm.cover_image_path)
+        .filter(WrittenForm.id == art_id)
+    )
     row = result.one_or_none()
 
     if row is None:
         raise ValueError("Art not found")
 
-    creator_id, file_path = row
+    creator_id, file_path, cover_image_path = row
     if str(creator_id) != str(current_member_id):
         raise PermissionError("Not your piece")
 
@@ -491,7 +509,7 @@ async def db_remove_written_form(db: AsyncSession, art_id: str, current_member_i
     await db.execute(delete(WrittenForm).filter(WrittenForm.id == art_id))
     await db.execute(delete(Art).filter(Art.id == art_id))
     await db.commit()
-    return file_path
+    return file_path, cover_image_path
 
 
 # ============================================================

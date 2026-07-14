@@ -231,4 +231,24 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE media_request ADD COLUMN IF NOT EXISTS requested_type VARCHAR(50)"
         ))
+        # --- Stream B (016-017) ---
+        # 016: optional cover image on written pieces, shown as the card image
+        # in art-element displays. NULL = no cover (text-snippet card).
+        await conn.execute(text(
+            "ALTER TABLE written_form ADD COLUMN IF NOT EXISTS cover_image_path VARCHAR(500)"
+        ))
+        # 017: member-suggested weekly prompts + the admin's ordered up-next
+        # queue. create_all also builds this on fresh DBs; this guard covers
+        # existing prod DBs. media_id NULL = medium-agnostic suggestion.
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS weekly_prompt_suggestion ("
+            "  id UUID PRIMARY KEY,"
+            "  member_id UUID NOT NULL REFERENCES member(id) ON DELETE CASCADE,"
+            "  media_id UUID REFERENCES media(id),"
+            "  prompt_text TEXT NOT NULL,"
+            "  status VARCHAR(20) NOT NULL DEFAULT 'proposed',"
+            "  order_index INT,"
+            "  created_at TIMESTAMP DEFAULT now()"
+            ")"
+        ))
     print("Migrations applied.")

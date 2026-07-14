@@ -172,10 +172,13 @@ async def db_complete_setup(
     member.temp_password_plaintext = None
     member.temp_password_expires_at = None
 
-    app_row = (await db.execute(
+    # Resolve every application linked to this member — orphan-reuse on
+    # duplicate-email approvals can legitimately link more than one (the
+    # original + the re-application), and all of them are now satisfied.
+    app_rows = (await db.execute(
         select(Application).filter(Application.member_id == member.id)
-    )).scalar_one_or_none()
-    if app_row is not None:
+    )).scalars().all()
+    for app_row in app_rows:
         app_row.status = "resolved"
 
     await db.commit()

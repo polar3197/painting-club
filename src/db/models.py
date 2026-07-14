@@ -92,6 +92,23 @@ class WeeklyPrompt(Collection):
     __mapper_args__ = {"polymorphic_identity": "weekly_prompt"}
 
 
+class WeeklyPromptSuggestion(Base):
+    """Member-proposed weekly prompts. Admin reviews each: proposed → approved
+    (joins the ordered "up next" queue) or rejected. media_id NULL means the
+    suggestion is medium-agnostic. order_index mirrors the series/album ordering
+    pattern — set on approval, rewritten by the admin's drag-reorder."""
+    __tablename__ = "weekly_prompt_suggestion"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
+    media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=True)
+    prompt_text = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="proposed")  # proposed | approved | rejected
+    # Position in the up-next queue; only meaningful while status='approved'.
+    order_index = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Art(Base):
     __tablename__ = "art"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -132,6 +149,9 @@ class WrittenForm(Art):
     id = Column(UUID(as_uuid=True), ForeignKey('art.id'), primary_key=True)
     # User-defined position within a series. NULL ⇒ unset (sorted to the bottom).
     order_index = Column(Integer)
+    # Optional image shown as the piece's cover in art-element displays, so a
+    # text piece can render a picture card. NULL = no cover (text-snippet card).
+    cover_image_path = Column(String(500))
 
     __mapper_args__ = {"polymorphic_identity": "written_form"}
 
