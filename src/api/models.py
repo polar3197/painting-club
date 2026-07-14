@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from datetime import date as Date, datetime
+from datetime import date as Date, datetime, time as TimeOfDay
 from typing import List
 import re
 import uuid
@@ -454,3 +454,62 @@ class PromptCreate(BaseModel):
     medium: str  # medium name; resolved to media_id server-side
     activate: bool = False
 
+
+
+# --- Bookmarks ----------------------------------------------------------------
+
+class BookmarkedArtOut(BaseModel):
+    """A bookmarked piece, shaped like a gallery card: enough to render the
+    art element (any medium) plus who made it and when it was saved."""
+    art_id: uuid.UUID
+    title: str
+    # Art.type discriminator: "visual_2d" | "written_form" | "audio".
+    art_type: str
+    medium: str
+    file_path: str | None = None
+    date: Date | None = None
+    creator_username: str
+    # Populated for visual pieces (NULL for written/audio — clients already
+    # handle a missing ratio by measuring).
+    aspect_ratio: float | None = None
+    bookmarked_at: datetime
+
+
+# --- Events --------------------------------------------------------------------
+
+class EventIn(BaseModel):
+    title: str
+    description: str | None = None
+    event_date: Date
+    event_time: TimeOfDay | None = None
+    is_public: bool = False
+    # Additional host usernames — the creator is always added as a host.
+    hosts: list[str] = []
+
+class EventUpdate(BaseModel):
+    # All optional: only fields the client sends are applied (exclude_unset).
+    title: str | None = None
+    description: str | None = None
+    event_date: Date | None = None
+    event_time: TimeOfDay | None = None
+    is_public: bool | None = None
+
+class EventMembersIn(BaseModel):
+    usernames: list[str]
+
+class EventOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    description: str | None = None
+    event_date: Date
+    event_time: TimeOfDay | None = None
+    image_path: str | None = None
+    is_public: bool
+    creator_username: str
+    hosts: list[str] = []
+    # Only present when the viewer is a host/creator — invitees aren't shown
+    # the rest of the guest list.
+    invited: list[str] | None = None
+    # Convenience for clients: can the viewer edit/host-manage this event?
+    can_edit: bool = False
+    created_at: datetime

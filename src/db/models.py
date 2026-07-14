@@ -1,5 +1,5 @@
 # src/db/models.py
-from sqlalchemy import Column, String, Text, ForeignKey, Date, Numeric, DateTime, Boolean, Float, Integer, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, String, Text, ForeignKey, Date, Time, Numeric, DateTime, Boolean, Float, Integer, UniqueConstraint, CheckConstraint
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -326,3 +326,47 @@ class BlockedMember(Base):
     blocker_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
     blockee_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Bookmark(Base):
+    __tablename__ = "bookmark"
+
+    # Composite PK = one bookmark per member per piece. Pure M:N between member
+    # and the polymorphic art base, so any medium (visual/written/audio) can be
+    # bookmarked uniformly. DB-level CASCADE keeps rows honest when a piece or
+    # account is deleted outside the ORM.
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
+    art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Event(Base):
+    __tablename__ = "event"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    creator_id = Column(UUID(as_uuid=True), ForeignKey('member.id'), nullable=False)
+    title = Column(String(300), nullable=False)
+    description = Column(Text)
+    # Separate date + time (time optional) rather than one timestamp — an event
+    # can have a day without a set hour.
+    event_date = Column(Date, nullable=False)
+    event_time = Column(Time)
+    image_path = Column(String(500))
+    # Public events are visible to every member; private ones only to the
+    # creator, hosts, and invitees (see db_ops/events.py visibility rule).
+    is_public = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class EventHost(Base):
+    __tablename__ = "event_host"
+
+    event_id = Column(UUID(as_uuid=True), ForeignKey('event.id', ondelete='CASCADE'), primary_key=True)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
+
+
+class EventInvite(Base):
+    __tablename__ = "event_invite"
+
+    event_id = Column(UUID(as_uuid=True), ForeignKey('event.id', ondelete='CASCADE'), primary_key=True)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)

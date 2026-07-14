@@ -17,6 +17,11 @@ async def db_get_profile(db: AsyncSession, username: str):
         select(Media.name, Media_Members.hidden)
         .join(Media_Members, Media.id == Media_Members.media_id)
         .filter(Media_Members.member_id == member.id)
+        # Stable order across fetches — without it Postgres may return a
+        # different order on the mount vs. focus refetch and the profile's
+        # media tabs visibly reshuffle. Alphabetical matches the iOS client's
+        # own sort, so adding this causes no one-time reshuffle.
+        .order_by(Media.name)
     )
     shown: list[str] = []
     hidden: list[str] = []

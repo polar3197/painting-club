@@ -74,6 +74,30 @@ from api.models import (
     ReportOut,
     ReportStatusUpdate,
     BlockIn,
+    BookmarkedArtOut,
+    EventIn,
+    EventUpdate,
+    EventMembersIn,
+    EventOut,
+)
+
+from db.db_ops.bookmarks import (
+    db_add_bookmark,
+    db_remove_bookmark,
+    db_list_bookmarks,
+)
+
+from db.db_ops.events import (
+    db_get_event,
+    db_is_event_host,
+    db_can_view_event,
+    db_create_event,
+    db_update_event,
+    db_delete_event,
+    db_add_event_members,
+    db_remove_event_member,
+    db_list_visible_events,
+    db_event_participants,
 )
 
 from db.db_ops.members import (
@@ -2305,3 +2329,274 @@ async def resolve_report_endpoint(
         status=row.status,
         created_at=row.created_at,
     )
+
+
+# =============================================================================
+# Bookmarks — a member's saved collection of other people's pieces
+# =============================================================================
+
+def _parse_uuid(value: str, what: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid {what} id")
+
+
+@app.post("/art/{art_id}/bookmark", status_code=201)
+async def add_bookmark(
+    art_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    aid = _parse_uuid(art_id, "art")
+    try:
+        await db_add_bookmark(db, current_member.id, aid)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True}
+
+
+@app.delete("/art/{art_id}/bookmark")
+async def remove_bookmark(
+    art_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    await db_remove_bookmark(db, current_member.id, _parse_uuid(art_id, "art"))
+    return {"ok": True}
+
+
+@app.get("/members/me/bookmarks", response_model=list[BookmarkedArtOut])
+async def list_my_bookmarks(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    rows = await db_list_bookmarks(db, current_member.id)
+    return [
+        BookmarkedArtOut(
+            art_id=r.id,
+            title=r.title,
+            art_type=r.type,
+            medium=r.medium,
+            file_path=r.file_path,
+            date=r.date,
+            creator_username=r.creator_username,
+            aspect_ratio=r.aspect_ratio,
+            bookmarked_at=r.bookmarked_at,
+        )
+        for r in rows
+    ]
+
+
+# =============================================================================
+# Events — hosted gatherings; public or invite-only
+# =============================================================================
+
+async def _event_out(db: AsyncSession, event, viewer: Member) -> EventOut:
+    hosts, invited = await db_event_participants(db, event.id)
+    creator_username = (
+        await db.execute(select(Member.username).filter(Member.id == event.creator_id))
+    ).scalar_one_or_none() or ""
+    is_host = event.creator_id == viewer.id or viewer.username in hosts
+    return EventOut(
+        id=event.id,
+        title=event.title,
+        description=event.description,
+        event_date=event.event_date,
+        event_time=event.event_time,
+        image_path=event.image_path,
+        is_public=event.is_public,
+        creator_username=creator_username,
+        hosts=hosts,
+        # Guest list stays private to the people running the event.
+        invited=invited if is_host else None,
+        can_edit=is_host,
+        created_at=event.created_at,
+    )
+
+
+async def _get_event_or_404(db: AsyncSession, event_id: str):
+    try:
+        return await db_get_event(db, _parse_uuid(event_id, "event"))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+async def _require_host(db: AsyncSession, event, member: Member):
+    if not await db_is_event_host(db, event, member.id):
+        raise HTTPException(status_code=403, detail="Only a host can do that")
+
+
+@app.post("/events", response_model=EventOut, status_code=201)
+async def create_event(
+    payload: EventIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    title = (payload.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title required")
+    try:
+        event = await db_create_event(
+            db,
+            creator_id=current_member.id,
+            title=title,
+            description=payload.description,
+            event_date=payload.event_date,
+            event_time=payload.event_time,
+            is_public=payload.is_public,
+            host_usernames=payload.hosts,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await _event_out(db, event, current_member)
+
+
+@app.get("/events", response_model=list[EventOut])
+async def list_events(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    events = await db_list_visible_events(db, current_member.id)
+    return [await _event_out(db, e, current_member) for e in events]
+
+
+@app.get("/events/{event_id}", response_model=EventOut)
+async def get_event(
+    event_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    if not await db_can_view_event(db, event, current_member.id):
+        # 404 (not 403) so private events don't leak their existence.
+        raise HTTPException(status_code=404, detail="Event not found")
+    return await _event_out(db, event, current_member)
+
+
+@app.patch("/events/{event_id}", response_model=EventOut)
+async def update_event(
+    event_id: str,
+    payload: EventUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    await _require_host(db, event, current_member)
+    fields = payload.model_dump(exclude_unset=True)
+    if "title" in fields:
+        fields["title"] = (fields["title"] or "").strip()
+        if not fields["title"]:
+            raise HTTPException(status_code=400, detail="title cannot be empty")
+    event = await db_update_event(db, event, fields)
+    return await _event_out(db, event, current_member)
+
+
+@app.delete("/events/{event_id}")
+async def delete_event(
+    event_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    await _require_host(db, event, current_member)
+    await db_delete_event(db, event)
+    return {"ok": True}
+
+
+@app.post("/events/{event_id}/hosts")
+async def add_event_hosts(
+    event_id: str,
+    payload: EventMembersIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    await _require_host(db, event, current_member)
+    try:
+        await db_add_event_members(db, event.id, payload.usernames, as_hosts=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.delete("/events/{event_id}/hosts/{username}")
+async def remove_event_host(
+    event_id: str,
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    await _require_host(db, event, current_member)
+    try:
+        await db_remove_event_member(db, event.id, username, as_host=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.post("/events/{event_id}/invites")
+async def add_event_invites(
+    event_id: str,
+    payload: EventMembersIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    await _require_host(db, event, current_member)
+    try:
+        await db_add_event_members(db, event.id, payload.usernames, as_hosts=False)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.delete("/events/{event_id}/invites/{username}")
+async def remove_event_invite(
+    event_id: str,
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    await _require_host(db, event, current_member)
+    try:
+        await db_remove_event_member(db, event.id, username, as_host=False)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.post("/events/{event_id}/image")
+async def upload_event_image(
+    event_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    event = await _get_event_or_404(db, event_id)
+    await _require_host(db, event, current_member)
+
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+    mime = magic.from_buffer(contents, mime=True)
+    if mime not in {"image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif"}:
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+    if mime in HEIC_MIMES:
+        contents = heic_to_jpeg_bytes(contents)
+        mime = "image/jpeg"
+
+    ext = "png" if mime == "image/png" else "jpg"
+    file_path = f"/static/events/{event.id}.{ext}"
+    path = abs_path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
+    # Same format-switch hygiene as profile pics: drop the other-ext sibling.
+    other_ext = "jpg" if ext == "png" else "png"
+    abs_path(f"/static/events/{event.id}.{other_ext}").unlink(missing_ok=True)
+
+    event.image_path = file_path
+    await db.commit()
+    return {"image_path": file_path}
