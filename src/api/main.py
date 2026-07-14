@@ -79,6 +79,7 @@ from api.models import (
     ReportOut,
     ReportStatusUpdate,
     BlockIn,
+    MediaOrderIn,
     BookmarkedArtOut,
     EventIn,
     EventUpdate,
@@ -184,6 +185,7 @@ from db.db_ops.media import (
     db_list_media,
     db_create_media,
     db_set_media_visibility,
+    db_reorder_member_media,
     db_add_visual_2d,
     db_get_visual_2d,
     db_update_visual_2d,
@@ -2599,6 +2601,7 @@ async def _event_out(db: AsyncSession, event, viewer: Member) -> EventOut:
         event_date=event.event_date,
         event_time=event.event_time,
         image_path=event.image_path,
+        color=event.color,
         is_public=event.is_public,
         creator_username=creator_username,
         hosts=hosts,
@@ -2639,6 +2642,7 @@ async def create_event(
             event_date=payload.event_date,
             event_time=payload.event_time,
             is_public=payload.is_public,
+            color=payload.color,
             host_usernames=payload.hosts,
         )
     except ValueError as e:
@@ -2794,3 +2798,17 @@ async def upload_event_image(
     event.image_path = file_path
     await db.commit()
     return {"image_path": file_path}
+
+
+@app.patch("/members/media-order")
+async def reorder_my_media(
+    payload: MediaOrderIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """Persist the caller's profile-tab order (hold-and-drag). Sends the full
+    ordered list of medium names; names not on the profile are ignored."""
+    if not payload.mediums:
+        raise HTTPException(status_code=400, detail="mediums cannot be empty")
+    await db_reorder_member_media(db, current_member.id, payload.mediums)
+    return {"ok": True}

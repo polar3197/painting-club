@@ -71,6 +71,7 @@ async def db_create_event(
     event_date,
     event_time,
     is_public: bool,
+    color: str | None = None,
     host_usernames: list[str] | None = None,
 ) -> Event:
     event = Event(
@@ -80,6 +81,7 @@ async def db_create_event(
         event_date=event_date,
         event_time=event_time,
         is_public=is_public,
+        color=color,
     )
     db.add(event)
     await db.flush()  # event.id needed for the host rows

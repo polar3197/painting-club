@@ -1,7 +1,7 @@
 
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, nulls_last
 
 from db.models import Member, Media, Media_Members, BlockedMember
 from api.models import ProfileUpdate
@@ -17,11 +17,12 @@ async def db_get_profile(db: AsyncSession, username: str):
         select(Media.name, Media_Members.hidden)
         .join(Media_Members, Media.id == Media_Members.media_id)
         .filter(Media_Members.member_id == member.id)
-        # Stable order across fetches — without it Postgres may return a
-        # different order on the mount vs. focus refetch and the profile's
-        # media tabs visibly reshuffle. Alphabetical matches the iOS client's
-        # own sort, so adding this causes no one-time reshuffle.
-        .order_by(Media.name)
+        # User-chosen tab order first (hold-and-drag reorder, NULL = never
+        # customized → sorts last), then alphabetical. Also makes the order
+        # stable across fetches — without an ORDER BY Postgres may return a
+        # different order on mount vs. focus refetch and the profile's media
+        # tabs visibly reshuffle.
+        .order_by(nulls_last(Media_Members.position), Media.name)
     )
     shown: list[str] = []
     hidden: list[str] = []
