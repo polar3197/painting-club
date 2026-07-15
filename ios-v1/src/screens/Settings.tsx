@@ -76,6 +76,12 @@ export default function Settings() {
           >
             <Text style={styles.actionBtnText}>infra stats</Text>
           </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
+            onPress={() => navigation.navigate('UserRoles')}
+          >
+            <Text style={styles.actionBtnText}>user roles</Text>
+          </Pressable>
         </>
       )}
 

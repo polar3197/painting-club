@@ -3054,10 +3054,10 @@ async def list_members_endpoint(
     db: AsyncSession = Depends(get_db),
     _: Member = Depends(get_admin_member),
 ):
-    """Every member with their role, for the admin's role-management panel.
-    Sorted contributors/admins first so the trusted tiers surface at the top."""
+    """Every member with their role, for the role-management panel.
+    Sorted by tier (contributor > admin > member) so trusted tiers surface first."""
     members = await db_get_members(db)
-    rank = {"admin": 0, "contributor": 1, "member": 2}
+    rank = {"contributor": 0, "admin": 1, "member": 2}
     ordered = sorted(
         members,
         key=lambda m: (rank.get(m.role or "member", 2), (m.username or "").lower()),
@@ -3077,10 +3077,11 @@ async def set_member_role(
     username: str,
     payload: MemberRoleUpdate,
     db: AsyncSession = Depends(get_db),
-    _: Member = Depends(get_admin_member),
+    _: Member = Depends(get_contributor_member),
 ):
-    """Promote a member to admin or demote them back to member. Admin-only.
-    Refuses to demote the last remaining admin so the app can't be locked out."""
+    """Change a member's role. Contributor-only — role management is a
+    contributor-exclusive ability (contributor is the top tier). Refuses to
+    demote the last remaining admin so the app can't be locked out."""
     try:
         member = await db_set_member_role(db, username, payload.role)
     except ValueError as e:
