@@ -24,6 +24,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   get_messages,
   send_message,
+  edit_message,
+  delete_message,
   leave_group,
   get_participants,
   add_group_members,
@@ -164,6 +166,11 @@ export default function ConversationThread() {
   const [invited, setInvited] = useState<Set<string>>(new Set());
   const [inviting, setInviting] = useState(false);
 
+  // Long-press an own message → edit / delete (author-only). `editing` holds the
+  // message being edited; the edit modal is open while it's non-null.
+  const [editing, setEditing] = useState<MessageOut | null>(null);
+  const [editText, setEditText] = useState('');
+
   const openInvite = async () => {
     setInvited(new Set());
     setShowInvite(true);
@@ -263,6 +270,51 @@ export default function ConversationThread() {
     }
   };
 
+  // Long-press menu for an own message: native action sheet (the destructive
+  // "delete" IS the confirmation — no second dialog).
+  const openMessageMenu = (m: MessageOut) => {
+    Alert.alert(
+      'message',
+      m.body.length > 80 ? m.body.slice(0, 80) + '…' : m.body,
+      [
+        { text: 'edit', onPress: () => { setEditText(m.body); setEditing(m); } },
+        { text: 'delete', style: 'destructive', onPress: () => doDeleteMessage(m) },
+        { text: 'cancel', style: 'cancel' },
+      ],
+    );
+  };
+
+  const doDeleteMessage = async (m: MessageOut) => {
+    // Optimistic remove; restore (in newest-first order) if the server rejects —
+    // same rule as sending: never lie about what the server actually did.
+    setMessages((prev) => prev.filter((x) => x.id !== m.id));
+    try {
+      await delete_message(conversationId, m.id, token);
+    } catch (err: any) {
+      setMessages((prev) =>
+        [m, ...prev].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+      );
+      Alert.alert('Could not delete', err?.message || 'try again');
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    const body = editText.trim();
+    if (!body || body === editing.body) { setEditing(null); return; }
+    try {
+      const updated = await edit_message(conversationId, editing.id, body, token);
+      setMessages((prev) =>
+        prev.map((x) =>
+          x.id === updated.id ? { ...x, body: updated.body, edited_at: updated.edited_at } : x,
+        ),
+      );
+      setEditing(null);
+    } catch (err: any) {
+      Alert.alert('Could not edit', err?.message || 'try again');
+    }
+  };
+
   const renderMessage = ({ item: m, index }: { item: MessageOut; index: number }) => {
     const isOwn = m.sender_username === currentUser;
     const display = m.sender_firstname || m.sender_username;
@@ -299,10 +351,18 @@ export default function ConversationThread() {
             </Pressable>
           )}
           <View style={[styles.msgCol, isOwn ? styles.msgColOwn : styles.msgColOther]}>
-            <View style={[styles.msgBubble, isOwn && styles.msgBubbleOwn, unseen && styles.msgBubbleUnseen]}>
+            <Pressable
+              // Author-only: long-press own bubble to edit/delete. Non-own
+              // bubbles have no long-press action.
+              onLongPress={isOwn ? () => openMessageMenu(m) : undefined}
+              delayLongPress={300}
+              style={[styles.msgBubble, isOwn && styles.msgBubbleOwn, unseen && styles.msgBubbleUnseen]}
+            >
               <Text style={styles.msgText}>{m.body}</Text>
-            </View>
-            <Text style={styles.msgTime}>{formatTime(when)}</Text>
+            </Pressable>
+            <Text style={styles.msgTime}>
+              {formatTime(when)}{m.edited_at ? ' · edited' : ''}
+            </Text>
           </View>
           {isOwn && type === 'group' && (
             <View style={styles.msgLabel}>
@@ -384,6 +444,38 @@ export default function ConversationThread() {
                 <Text style={styles.inviteEmpty}>everyone's already here</Text>
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ---- Edit own message ---- */}
+      <Modal visible={editing !== null} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
+        <View style={styles.editRoot}>
+          <Pressable style={styles.editBackdrop} onPress={() => setEditing(null)} />
+          <View style={styles.editSheet}>
+            <Text style={styles.editTitle}>edit message</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editText}
+              onChangeText={setEditText}
+              autoCapitalize="sentences"
+              autoCorrect
+              spellCheck
+              multiline
+              autoFocus
+            />
+            <View style={styles.editActions}>
+              <Pressable style={styles.editCancel} onPress={() => setEditing(null)}>
+                <Text style={styles.editCancelText}>cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.editSave, !editText.trim() && styles.editSaveDisabled]}
+                onPress={saveEdit}
+                disabled={!editText.trim()}
+              >
+                <Text style={styles.editSaveText}>save</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -632,5 +724,69 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  // --- edit-message modal ---
+  editRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  editBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.overlay,
+  },
+  editSheet: {
+    backgroundColor: Colors.mainBg,
+    borderWidth: 1,
+    borderColor: '#000',
+    padding: 16,
+    gap: 12,
+  },
+  editTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
+  },
+  editInput: {
+    fontFamily: Fonts.system,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 44,
+    maxHeight: 160,
+    textAlignVertical: 'top',
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  editCancel: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  editCancelText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+  editSave: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.greenBright,
+    paddingHorizontal: 18,
+    paddingVertical: 6,
+  },
+  editSaveDisabled: { opacity: 0.4 },
+  editSaveText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
   },
 });

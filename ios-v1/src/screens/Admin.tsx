@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert } from 'react-native';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import {
   get_applications,
@@ -346,14 +347,19 @@ function ReportRow({
 export default function Admin() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const [tab, setTab] = useState<'applications' | 'media-requests' | 'reports' | 'prompts' | 'members'>('applications');
+  // Each admin section is reached from the admin's Settings menu, which passes
+  // the section as `initialTab`. The old members tab is gone (role management
+  // now lives in the contributor "user roles" page).
+  const route = useRoute<any>();
+  type AdminSection = 'applications' | 'media-requests' | 'reports' | 'prompts';
+  const initialTab: AdminSection = route.params?.initialTab || 'applications';
+  const [tab] = useState<AdminSection>(initialTab);
   const [applications, setApplications] = useState<ApplicationOut[]>([]);
   const [resets, setResets] = useState<PasswordResetOut[]>([]);
   const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
   const [reports, setReports] = useState<ReportOut[]>([]);
   const [proposed, setProposed] = useState<PromptSuggestionOut[]>([]);
   const [upNext, setUpNext] = useState<PromptSuggestionOut[]>([]);
-  const [members, setMembers] = useState<AdminMemberOut[]>([]);
 
   const fetchApps = () => {
     get_applications(token).then(setApplications).catch(() => {});
@@ -377,29 +383,13 @@ export default function Admin() {
       .catch(() => {});
   };
 
-  const fetchMembers = () => {
-    get_admin_members(token).then(setMembers).catch(() => {});
-  };
-
   useEffect(() => {
     fetchApps();
     fetchRequests();
     fetchReports();
     fetchPrompts();
-    fetchMembers();
   }, [token]);
 
-  const handleSetRole = async (username: string, role: MemberRole) => {
-    // Optimistic: reflect the new tier immediately, roll back on failure.
-    const prev = members;
-    setMembers((ms) => ms.map((m) => (m.username === username ? { ...m, role } : m)));
-    try {
-      await set_member_role(username, role, token);
-    } catch (err: any) {
-      setMembers(prev);
-      Alert.alert("Couldn't change role", err?.message || 'try again.');
-    }
-  };
 
   const handleReviewPrompt = async (id: string, status: 'approved' | 'rejected') => {
     try {
@@ -474,31 +464,9 @@ export default function Admin() {
       automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
     >
       <View style={styles.titleRow}>
-        <Pressable onPress={() => setTab('applications')}>
-          <Text style={[styles.title, tab !== 'applications' && styles.titleInactive]}>
-            applications
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => setTab('media-requests')}>
-          <Text style={[styles.title, tab !== 'media-requests' && styles.titleInactive]}>
-            media requests
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => setTab('reports')}>
-          <Text style={[styles.title, tab !== 'reports' && styles.titleInactive]}>
-            reports
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => setTab('prompts')}>
-          <Text style={[styles.title, tab !== 'prompts' && styles.titleInactive]}>
-            prompts
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => setTab('members')}>
-          <Text style={[styles.title, tab !== 'members' && styles.titleInactive]}>
-            members
-          </Text>
-        </Pressable>
+        <Text style={styles.title}>
+          {tab === 'media-requests' ? 'media requests' : tab}
+        </Text>
       </View>
 
       {tab === 'prompts' ? (
@@ -517,16 +485,6 @@ export default function Admin() {
             <Text style={styles.emptyText}>nothing approved yet</Text>
           ) : (
             upNext.map((s) => <PromptSuggestionRow key={s.id} s={s} />)
-          )}
-        </>
-      ) : tab === 'members' ? (
-        <>
-          {members.length === 0 ? (
-            <Text style={styles.emptyText}>no members</Text>
-          ) : (
-            members.map((m) => (
-              <MemberRoleRow key={m.username} m={m} onSetRole={handleSetRole} />
-            ))
           )}
         </>
       ) : tab === 'reports' ? (

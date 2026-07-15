@@ -2,7 +2,7 @@
 
 Owned by Stream B. Do not share this file with Stream A.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, func, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import UsageEvent, Member
 
 VALID_KINDS = {"login", "screen"}
+
+
+def naive_utc(dt):
+    """Client `at` timestamps arrive offset-AWARE (ISO 'Z' from
+    Date.toISOString()); the DateTime columns are naive, and asyncpg rejects the
+    mismatch ("can't subtract offset-naive and offset-aware"). Normalize to
+    naive UTC — or now() if the client didn't send one."""
+    if dt is None:
+        return datetime.utcnow()
+    if getattr(dt, "tzinfo", None) is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 async def db_record_usage(db: AsyncSession, member_id, events) -> int:
@@ -29,7 +41,7 @@ async def db_record_usage(db: AsyncSession, member_id, events) -> int:
                 member_id=member_id,
                 kind=kind,
                 screen=screen if kind == "screen" else None,
-                occurred_at=e.at or datetime.utcnow(),
+                occurred_at=naive_utc(e.at),
             )
         )
         written += 1

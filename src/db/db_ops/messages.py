@@ -189,7 +189,10 @@ async def db_list_conversations(db: AsyncSession, me_id):
                 "created_at": convo.created_at,
             }
         )
-    out.sort(key=lambda r: r["last_message_at"] or r["created_at"], reverse=True)
+    # Only surface threads that have at least one message — hides ghost DMs and
+    # empty groups created by opening a thread that was never actually used.
+    out = [r for r in out if r["last_message_at"] is not None]
+    out.sort(key=lambda r: r["last_message_at"], reverse=True)
     return out
 
 
@@ -333,4 +336,38 @@ async def db_leave_group(db: AsyncSession, conversation_id, me_id):
     if remaining == 0:
         # Last one out deletes the whole thread (messages cascade).
         await db.delete(convo)
+    await db.commit()
+
+
+async def db_edit_message(db: AsyncSession, conversation_id, message_id, me_id, new_body: str) -> Message:
+    """Author-only edit of a message's body. Raises ValueError (empty body),
+    LookupError (not found / wrong conversation) or PermissionError (not author)."""
+    new_body = (new_body or "").strip()
+    if not new_body:
+        raise ValueError("message cannot be empty")
+    msg = (
+        await db.execute(select(Message).filter(Message.id == message_id))
+    ).scalar_one_or_none()
+    if msg is None or str(msg.conversation_id) != str(conversation_id):
+        raise LookupError("Message not found")
+    if msg.sender_id != me_id:
+        raise PermissionError("You can only edit your own messages")
+    msg.body = new_body
+    msg.edited_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(msg)
+    return msg
+
+
+async def db_delete_message(db: AsyncSession, conversation_id, message_id, me_id) -> None:
+    """Author-only hard delete of a message. Raises LookupError (not found /
+    wrong conversation) or PermissionError (not author)."""
+    msg = (
+        await db.execute(select(Message).filter(Message.id == message_id))
+    ).scalar_one_or_none()
+    if msg is None or str(msg.conversation_id) != str(conversation_id):
+        raise LookupError("Message not found")
+    if msg.sender_id != me_id:
+        raise PermissionError("You can only delete your own messages")
+    await db.delete(msg)
     await db.commit()

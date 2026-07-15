@@ -28,9 +28,6 @@ import {
 } from '../api';
 import { todayLocalISO } from '../utils/date';
 
-// Accent swatches a host can tag an event with. First = the Home event ball blue.
-const SWATCHES = ['#1E73BE', '#E30022', '#0c8c6e', '#d2a046', '#7c5cc4', '#111111'];
-
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
@@ -53,7 +50,6 @@ export default function EventEdit() {
   const [date, setDate] = useState(todayLocalISO());
   const [time, setTime] = useState('');
   const [isPublic, setIsPublic] = useState(false);
-  const [color, setColor] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
 
@@ -69,7 +65,6 @@ export default function EventEdit() {
         setDate(e.event_date);
         setTime(e.event_time ? e.event_time.slice(0, 5) : '');
         setIsPublic(e.is_public);
-        setColor(e.color);
         setExistingImage(e.image_path);
       } catch (err: any) {
         Alert.alert('could not load event', err?.message || 'try again');
@@ -116,7 +111,6 @@ export default function EventEdit() {
         event_date: date,
         event_time: time.trim() || null,
         is_public: isPublic,
-        color,
       };
       let id = eventId;
       if (isEdit) {
@@ -226,23 +220,6 @@ export default function EventEdit() {
           />
         </View>
 
-        <Text style={styles.label}>accent</Text>
-        <View style={styles.swatchRow}>
-          <Pressable
-            style={[styles.swatch, styles.swatchNone, !color && styles.swatchOn]}
-            onPress={() => setColor(null)}
-          >
-            <Text style={styles.swatchNoneText}>—</Text>
-          </Pressable>
-          {SWATCHES.map((c) => (
-            <Pressable
-              key={c}
-              style={[styles.swatch, { backgroundColor: c }, color === c && styles.swatchOn]}
-              onPress={() => setColor(c)}
-            />
-          ))}
-        </View>
-
         <Text style={styles.label}>cover image</Text>
         <Pressable style={styles.cover} onPress={pickImage}>
           {previewUri ? (
@@ -323,30 +300,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     gap: 12,
-  },
-  swatchRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 2,
-  },
-  swatch: {
-    width: 34,
-    height: 34,
-    borderWidth: 1,
-    borderColor: '#000',
-  },
-  swatchNone: {
-    backgroundColor: Colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  swatchNoneText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    color: Colors.textSecondary,
-  },
-  swatchOn: {
-    borderWidth: 3,
   },
   cover: {
     height: 160,

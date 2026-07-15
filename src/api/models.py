@@ -196,6 +196,7 @@ class MessageOut(BaseModel):
     sender_firstname: str | None = None
     body: str
     created_at: datetime
+    edited_at: datetime | None = None
 
 class MessageIn(BaseModel):
     body: str

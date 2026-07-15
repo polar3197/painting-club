@@ -35,128 +35,52 @@ export default function Announcements() {
   // Invisible until there's something to announce.
   if (items.length === 0) return null;
 
-  const preview = items.slice(0, PREVIEW_COUNT);
-  const extra = items.length - preview.length;
+  // Minimal: just the latest announcement's title as a thin one-line banner
+  // (no "announcements" header). Tap → its discussion. "+N" hints at more.
+  const latest = items[0];
+  const more = items.length - 1;
 
   return (
-    <View style={styles.wrapper}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>announcements</Text>
-      </View>
-
-      <View style={styles.body}>
-        {preview.map((a) => (
-          <Pressable
-            key={a.id}
-            style={styles.item}
-            onPress={() => navigation.navigate('AnnouncementDetail', { id: a.id })}
-          >
-            <Text style={styles.itemTitle} numberOfLines={1}>{a.title}</Text>
-            <Text style={styles.itemBody} numberOfLines={2}>{a.body}</Text>
-            {a.comment_count > 0 && (
-              <Text style={styles.itemMeta}>
-                {a.comment_count} {a.comment_count === 1 ? 'reply' : 'replies'}
-              </Text>
-            )}
-          </Pressable>
-        ))}
-
-        {extra > 0 && (
-          <Pressable
-            style={styles.seeAll}
-            onPress={() => navigation.navigate('AnnouncementsFeed')}
-          >
-            <Text style={styles.seeAllText}>see all {items.length} →</Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
+    <Pressable
+      style={styles.banner}
+      onPress={() => navigation.navigate('AnnouncementDetail', { id: latest.id })}
+    >
+      <Text style={styles.marker}>◆</Text>
+      <Text style={styles.title} numberOfLines={1}>{latest.title}</Text>
+      {more > 0 && (
+        <Pressable hitSlop={8} onPress={() => navigation.navigate('AnnouncementsFeed')}>
+          <Text style={styles.more}>+{more}</Text>
+        </Pressable>
+      )}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    borderWidth: 3,
-    borderColor: '#000',
-    ...Shadows.card,
-    marginTop: 20,
-    backgroundColor: Colors.mainBg,
-  },
-  header: {
-    backgroundColor: Colors.mainBg,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
+  banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-  },
-  postBtn: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    color: Colors.textPrimary,
+    gap: 8,
     borderWidth: 1,
     borderColor: '#000',
-    backgroundColor: Colors.greenBright,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  body: {
-    backgroundColor: Colors.greenMuted,
-  },
-  item: {
-    borderWidth: 1,
-    borderColor: '#000',
-    padding: 10,
     backgroundColor: Colors.mainBg,
-    marginHorizontal: 8,
-    marginTop: 8,
-  },
-  itemTitle: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    fontWeight: '700',
-  },
-  itemBody: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  itemMeta: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.micro,
-    color: Colors.textTertiary,
-    marginTop: 4,
-  },
-  emptyItem: {
-    padding: 12,
-    margin: 8,
-    borderWidth: 1,
-    borderColor: '#000',
-    borderStyle: 'dashed',
-    backgroundColor: Colors.mainBg,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
-  },
-  seeAll: {
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    alignItems: 'flex-end',
+    ...Shadows.card,
   },
-  seeAllText: {
-    fontFamily: Fonts.mono,
+  marker: {
+    fontSize: 10,
+    color: Colors.redBright,
+  },
+  title: {
+    flex: 1,
+    fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
-    color: Colors.textPrimary,
+    color: Colors.black,
+  },
+  more: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
+    color: Colors.textSecondary,
   },
 });

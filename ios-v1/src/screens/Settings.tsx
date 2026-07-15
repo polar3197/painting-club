@@ -72,6 +72,12 @@ export default function Settings() {
           </Pressable>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
+            onPress={() => navigation.navigate('WeeklyPromptSwitch')}
+          >
+            <Text style={styles.actionBtnText}>weekly prompt</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
             onPress={() => navigation.navigate('UserRoles')}
           >
             <Text style={styles.actionBtnText}>user roles</Text>
@@ -92,12 +98,32 @@ export default function Settings() {
       )}
 
       {(currentRole === 'admin' || currentRole === 'contributor') && (
-        <Pressable
-          style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-          onPress={() => navigation.navigate('Admin')}
-        >
-          <Text style={styles.actionBtnText}>admin</Text>
-        </Pressable>
+        <>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
+            onPress={() => navigation.navigate('Admin', { initialTab: 'applications' })}
+          >
+            <Text style={styles.actionBtnText}>applications</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
+            onPress={() => navigation.navigate('Admin', { initialTab: 'media-requests' })}
+          >
+            <Text style={styles.actionBtnText}>media requests</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
+            onPress={() => navigation.navigate('Admin', { initialTab: 'reports' })}
+          >
+            <Text style={styles.actionBtnText}>reports</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
+            onPress={() => navigation.navigate('Admin', { initialTab: 'prompts' })}
+          >
+            <Text style={styles.actionBtnText}>prompts</Text>
+          </Pressable>
+        </>
       )}
 
       <Pressable

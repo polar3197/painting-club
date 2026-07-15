@@ -9,6 +9,7 @@ from sqlalchemy import select, func, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import DeviceEvent
+from db.db_ops.usage import naive_utc
 
 VALID_KINDS = {"crash", "memory_warning", "perf"}
 
@@ -37,7 +38,7 @@ async def db_record_device_events(db: AsyncSession, member_id, events) -> int:
                 os_version=_clip(e.os_version, 40),
                 device_model=_clip(e.device_model, 80),
                 detail=(e.detail or None),
-                occurred_at=e.at or datetime.utcnow(),
+                occurred_at=naive_utc(e.at),
             )
         )
         written += 1

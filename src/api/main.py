@@ -193,6 +193,8 @@ from db.db_ops.messages import (
     db_get_unread_count,
     db_get_messages,
     db_send_message,
+    db_edit_message,
+    db_delete_message,
     db_leave_group,
 )
 
@@ -2666,6 +2668,51 @@ async def send_message_endpoint(
         body=msg.body,
         created_at=msg.created_at,
     )
+
+
+# Edit/delete are author-only. Declared AFTER the collection route above so the
+# literal /messages POST/GET aren't shadowed; the {message_id} suffix keeps these
+# unambiguous. Edit is the author, so sender_* come from current_member.
+@app.patch("/conversations/{conversation_id}/messages/{message_id}", response_model=MessageOut)
+async def edit_message_endpoint(
+    conversation_id: str,
+    message_id: str,
+    payload: MessageIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        msg = await db_edit_message(db, conversation_id, message_id, current_member.id, payload.body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return MessageOut(
+        id=msg.id,
+        sender_username=current_member.username,
+        sender_firstname=current_member.firstname,
+        body=msg.body,
+        created_at=msg.created_at,
+        edited_at=msg.edited_at,
+    )
+
+
+@app.delete("/conversations/{conversation_id}/messages/{message_id}")
+async def delete_message_endpoint(
+    conversation_id: str,
+    message_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        await db_delete_message(db, conversation_id, message_id, current_member.id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return {"ok": True}
 
 
 @app.post("/conversations/{conversation_id}/leave")

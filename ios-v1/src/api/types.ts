@@ -384,6 +384,7 @@ export interface MessageOut {
   sender_firstname: string | null;
   body: string;
   created_at: string;
+  edited_at?: string | null;
 }
 
 export interface MessagesPage {

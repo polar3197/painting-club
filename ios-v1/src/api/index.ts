@@ -659,6 +659,30 @@ export function send_message(
   }) as Promise<MessageOut>;
 }
 
+export function edit_message(
+  conversation_id: string,
+  message_id: string,
+  body: string,
+  token: string | null,
+): Promise<MessageOut> {
+  return request(`/conversations/${conversation_id}/messages/${message_id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ body }),
+  }) as Promise<MessageOut>;
+}
+
+export function delete_message(
+  conversation_id: string,
+  message_id: string,
+  token: string | null,
+): Promise<{ ok: true }> {
+  return request(`/conversations/${conversation_id}/messages/${message_id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: true }>;
+}
+
 export function get_participants(
   conversation_id: string,
   token: string | null,
@@ -703,6 +727,15 @@ export function list_prompts(token: string | null): Promise<PromptSummary[]> {
   return request("/prompts", {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   }) as Promise<PromptSummary[]>;
+}
+
+// Make one prompt the active weekly prompt (deactivates the rest). The endpoint
+// is admin-gated, and contributors pass that gate (contributor is the top tier).
+export function activate_prompt(prompt_id: string, token: string | null): Promise<PromptOut> {
+  return request(`/admin/prompts/${prompt_id}/activate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<PromptOut>;
 }
 
 // --- Weekly-prompt suggestions (member proposes; admin reviews) ---

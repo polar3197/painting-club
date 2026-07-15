@@ -293,6 +293,8 @@ class Message(Base):
     sender_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
     body = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Set to server time when the author edits the message; NULL = never edited.
+    edited_at = Column(DateTime)
 # =============================================
 
 

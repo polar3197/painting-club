@@ -299,6 +299,12 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE written_form ADD COLUMN IF NOT EXISTS cover_image_path VARCHAR(500)"
         ))
+        # 024: message edit timestamp. NULL = never edited; set to server time on
+        # each edit so the client can show "(edited)". New column on an existing
+        # table, so create_all won't add it — this guard does.
+        await conn.execute(text(
+            "ALTER TABLE message ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP"
+        ))
         # 017: member-suggested weekly prompts + the admin's ordered up-next
         # queue. create_all also builds this on fresh DBs; this guard covers
         # existing prod DBs. media_id NULL = medium-agnostic suggestion.

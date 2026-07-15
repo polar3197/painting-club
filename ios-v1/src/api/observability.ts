@@ -4,7 +4,7 @@
 //   - device (#6): crashes / memory warnings / perf → POST /telemetry
 // Everything here is fire-and-forget: a failed flush drops its batch rather
 // than retrying, so telemetry can never block the UI or grow unbounded.
-import { Platform, DeviceEventEmitter } from 'react-native';
+import { Platform, DeviceEventEmitter, AppState } from 'react-native';
 import Constants from 'expo-constants';
 import { request } from './client';
 
@@ -162,5 +162,21 @@ export function initDeviceTelemetry() {
       }
       if (typeof prev === 'function') prev(error, isFatal);
     });
+  }
+
+  // Session heartbeat: emit a lightweight 'perf' sample on launch and whenever
+  // the app returns to the foreground. This gives infra stats real signal
+  // (app-version spread, platform/OS mix, active sessions) without a native
+  // module. True device memory/CPU needs react-native-device-info (a native
+  // build, not OTA-able) — add that later if deeper metrics are wanted.
+  try {
+    recordDeviceEvent({ kind: 'perf', detail: 'session', ...deviceMeta() });
+    AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        recordDeviceEvent({ kind: 'perf', detail: 'foreground', ...deviceMeta() });
+      }
+    });
+  } catch {
+    // non-fatal
   }
 }
