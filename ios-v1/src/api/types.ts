@@ -454,12 +454,22 @@ export interface DayCount {
   count: number;
 }
 
+export interface ActiveMember {
+  username: string;
+  firstname: string | null;
+}
+
 export interface UsageSummary {
   days: number;
-  total_logins: number;
+  // "Visits" = app-use sessions (a member's activity split on >30min gaps), a
+  // truer engagement signal than logins now that sessions slide and rarely
+  // re-auth.
+  total_visits: number;
   total_events: number;
-  logins_per_day: DayCount[];
+  visits_per_day: DayCount[];
   active_per_day: DayCount[];
+  // Who was active today (distinct members with any event today).
+  active_today: ActiveMember[];
   top_screens: { screen: string; count: number }[];
 }
 

@@ -54,9 +54,10 @@ export default function UserStats() {
     );
   }
 
-  const maxLogins = Math.max(1, ...(data?.logins_per_day.map((d) => d.count) || [1]));
+  const maxVisits = Math.max(1, ...(data?.visits_per_day.map((d) => d.count) || [1]));
   const maxActive = Math.max(1, ...(data?.active_per_day.map((d) => d.count) || [1]));
   const maxScreen = Math.max(1, ...(data?.top_screens.map((s) => s.count) || [1]));
+  const activeToday = data?.active_today ?? [];
 
   return (
     <ScrollView
@@ -76,16 +77,29 @@ export default function UserStats() {
       ) : (
         <>
           <View style={styles.tiles}>
-            <Tile label="logins" value={data?.total_logins ?? 0} />
-            <Tile label="events" value={data?.total_events ?? 0} />
+            <Tile label="visits" value={data?.total_visits ?? 0} />
+            <Tile label="active today" value={activeToday.length} />
           </View>
 
-          <Section title="logins per day">
-            {(data?.logins_per_day.length ?? 0) === 0 ? (
-              <Text style={styles.empty}>no logins yet</Text>
+          <Section title="active today">
+            {activeToday.length === 0 ? (
+              <Text style={styles.empty}>nobody yet today</Text>
             ) : (
-              data!.logins_per_day.map((d) => (
-                <BarRow key={d.date} label={shortDate(d.date)} count={d.count} max={maxLogins} />
+              activeToday.map((m) => (
+                <View key={m.username} style={styles.memberRow}>
+                  <Text style={styles.memberName} numberOfLines={1}>{m.firstname || m.username}</Text>
+                  <Text style={styles.memberHandle} numberOfLines={1}>@{m.username}</Text>
+                </View>
+              ))
+            )}
+          </Section>
+
+          <Section title="visits per day">
+            {(data?.visits_per_day.length ?? 0) === 0 ? (
+              <Text style={styles.empty}>no visits yet</Text>
+            ) : (
+              data!.visits_per_day.map((d) => (
+                <BarRow key={d.date} label={shortDate(d.date)} count={d.count} max={maxVisits} />
               ))
             )}
           </Section>
@@ -253,5 +267,25 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.textMuted,
     marginTop: 8,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  memberName: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
+    flexShrink: 1,
+  },
+  memberHandle: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
+    color: Colors.textSecondary,
+    marginLeft: 12,
   },
 });

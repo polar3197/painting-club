@@ -50,23 +50,24 @@ async def db_record_usage(db: AsyncSession, member_id, events) -> int:
     return written
 
 
+# Two events from the same member more than this far apart start a new "visit"
+# (app-use session). 30 min is the usual web-analytics session window.
+SESSION_GAP = timedelta(minutes=30)
+
+
 async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
-    """Contributor "user stats": per-day logins + active users, plus the most-
-    trafficked screens over the window. Rolls up on server receive time
-    (created_at) so device clock skew can't smear the buckets."""
+    """Contributor "user stats": per-day VISITS (app-use sessions) + active
+    members, who's active today, and the most-trafficked screens. Rolls up on
+    server receive time (created_at) so device clock skew can't smear buckets.
+
+    Logins were dropped as a metric — with sliding sessions members rarely
+    re-auth, so logins undercount real use. A "visit" instead = a burst of any
+    activity: we walk each member's events in time order and start a new session
+    whenever the gap exceeds SESSION_GAP. This is derived from data already
+    collected (no client change) and dedupes a sitting's many events into one."""
     days = max(1, min(days, 90))
     since = datetime.utcnow() - timedelta(days=days)
     day = cast(UsageEvent.created_at, Date)
-
-    # Logins per day.
-    logins_rows = (
-        await db.execute(
-            select(day.label("d"), func.count().label("n"))
-            .filter(UsageEvent.created_at >= since, UsageEvent.kind == "login")
-            .group_by(day)
-            .order_by(day)
-        )
-    ).all()
 
     # Distinct active members per day (any event kind).
     active_rows = (
@@ -93,16 +94,49 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
         )
     ).all()
 
-    total_logins = sum(int(n) for _, n in logins_rows)
+    # Visits per day, by sessionizing each member's event stream on gaps.
+    ev_rows = (
+        await db.execute(
+            select(UsageEvent.member_id, UsageEvent.created_at)
+            .filter(UsageEvent.created_at >= since)
+            .order_by(UsageEvent.member_id, UsageEvent.created_at)
+        )
+    ).all()
+    visits_by_day: dict = {}
+    total_visits = 0
+    prev_member = None
+    prev_time = None
+    for member_id, created_at in ev_rows:
+        if member_id != prev_member or prev_time is None or (created_at - prev_time) > SESSION_GAP:
+            d = created_at.date()
+            visits_by_day[d] = visits_by_day.get(d, 0) + 1
+            total_visits += 1
+        prev_member = member_id
+        prev_time = created_at
+    visits_per_day = [{"date": d.isoformat(), "count": c} for d, c in sorted(visits_by_day.items())]
+
+    # Who was active today (distinct members with any event today).
+    today = datetime.utcnow().date()
+    active_today_rows = (
+        await db.execute(
+            select(Member.username, Member.firstname)
+            .join(UsageEvent, UsageEvent.member_id == Member.id)
+            .filter(cast(UsageEvent.created_at, Date) == today)
+            .distinct()
+            .order_by(Member.username)
+        )
+    ).all()
+
     total_events = (
         await db.execute(select(func.count()).select_from(UsageEvent).filter(UsageEvent.created_at >= since))
     ).scalar_one()
 
     return {
         "days": days,
-        "total_logins": total_logins,
+        "total_visits": total_visits,
         "total_events": int(total_events or 0),
-        "logins_per_day": [{"date": d.isoformat(), "count": int(n)} for d, n in logins_rows],
+        "visits_per_day": visits_per_day,
         "active_per_day": [{"date": d.isoformat(), "count": int(n)} for d, n in active_rows],
+        "active_today": [{"username": u, "firstname": f} for u, f in active_today_rows],
         "top_screens": [{"screen": s, "count": int(n)} for s, n in screen_rows],
     }
