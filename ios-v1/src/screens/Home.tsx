@@ -762,9 +762,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   announcementsSlot: {
-    // Drop to the bottom of the content column; clear the corner buttons.
+    // Sit low in the content column, a bit further down (closer to the corner
+    // buttons) per design.
     marginTop: 'auto',
-    marginBottom: 44,
+    marginBottom: 18,
   },
   diamondCell: {
     width: DIAMOND_CELL,

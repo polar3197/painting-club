@@ -109,6 +109,33 @@ async def pre_init_migrations():
             """
         ))
 
+        # Events feature: on some prod DBs a legacy/unrelated `event` table
+        # (id, type, color) pre-existed, so create_all SKIPPED building the real
+        # Events table — every `POST /events` then 500s with "column creator_id
+        # does not exist". The real event/event_host/event_invite tables are
+        # empty in that state (no event could ever be created), so drop the
+        # mismatched set and let create_all rebuild them with the correct schema.
+        # Guarded on the missing creator_id column → runs at most once, and never
+        # touches a correctly-shaped (or data-bearing) event table.
+        await conn.execute(text(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'event'
+                ) AND NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'event' AND column_name = 'creator_id'
+                ) THEN
+                    DROP TABLE IF EXISTS event_invite CASCADE;
+                    DROP TABLE IF EXISTS event_host CASCADE;
+                    DROP TABLE IF EXISTS event CASCADE;
+                END IF;
+            END $$;
+            """
+        ))
+
         # Rename legacy per-creator collection table → series. We detect the legacy
         # variant by the presence of the creator_id column (the new abstract
         # collection table has no such column).
