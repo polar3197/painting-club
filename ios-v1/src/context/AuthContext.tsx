@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { get_blocks, refresh_token } from '../api';
+import { setObservabilityToken, recordLogin } from '../api/observability';
 
 interface AuthContextType {
   currentUser: string | null;
@@ -95,6 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else setBlockedUsernames([]);
   }, [token, refreshBlocks]);
 
+  // Keep the telemetry transport's token in sync with auth state so usage +
+  // device events can flush (and get cleared on logout).
+  useEffect(() => {
+    setObservabilityToken(token);
+  }, [token]);
+
   const login = useCallback(async (user: string, tok: string, role: string) => {
     await SecureStore.setItemAsync('token', tok);
     await SecureStore.setItemAsync('username', user);
@@ -102,6 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(tok);
     setCurrentUser(user);
     setCurrentRole(role);
+    // Record the login for the behavioral trail (#5). The effect above sets the
+    // transport token synchronously enough that the flush picks it up; if not,
+    // it stays queued and flushes with the next screen event.
+    setObservabilityToken(tok);
+    recordLogin();
   }, []);
 
   const logout = useCallback(async () => {

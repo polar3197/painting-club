@@ -14,8 +14,12 @@ import {
   Platform,
 } from 'react-native';
 import { TextInput } from './AppTextInput';
-import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerStateChangeEvent, State } from 'react-native-gesture-handler';
-import { get_media, submit_media_request, set_media_visibility, MediaType, MediaTypeKind } from '../api';
+import {
+  GestureHandlerRootView,
+  Gesture,
+  GestureDetector,
+} from 'react-native-gesture-handler';
+import { get_media, submit_media_request, set_media_visibility, reorder_media, MediaType, MediaTypeKind } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
@@ -25,6 +29,9 @@ interface AddMediaDialogProps {
   onAdd: (name: string) => void;
   onVisibilityChange: (name: string, hidden: boolean) => void;
   onClose: () => void;
+  // Fired after a hold-and-drag reorder persists, with every medium name in
+  // its new order (shown and hidden interleaved as displayed).
+  onReorder?: (names: string[]) => void;
   // When set, only the "new" pane is shown (no hide/show tab) — used by the
   // Add flow's medium picker.
   onlyNew?: boolean;
@@ -46,6 +53,7 @@ export default function AddMediaDialog({
   onAdd,
   onVisibilityChange,
   onClose,
+  onReorder,
   onlyNew = false,
 }: AddMediaDialogProps) {
   const { token } = useAuth();
@@ -56,9 +64,93 @@ export default function AddMediaDialog({
   const [requestType, setRequestType] = useState<MediaTypeKind | null>(null);
   const [requestSent, setRequestSent] = useState(false);
 
-  // Freeze order at mount so toggles don't reshuffle.
-  const initialOrder = useMemo(() => [...shown, ...hidden], []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Row order, seeded from the server's (position, name) ordering at mount.
+  // Toggling hide/show doesn't reshuffle it; hold-and-drag rewrites it.
+  const [order, setOrder] = useState<string[]>(() => [...shown, ...hidden]);
   const hiddenSet = new Set(hidden);
+
+  // ---- hold-and-drag reorder (mirrors the album tracklist mechanic) ---------
+  // One pan over the whole list, armed by a long press. The touched row lifts,
+  // rows reflow as the finger crosses neighbours (step accumulator against
+  // measured row heights), and the new order persists on release.
+  const [draggingName, setDraggingName] = useState<string | null>(null);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const heightsRef = useRef<Map<string, number>>(new Map());
+  const orderRef = useRef<string[]>(order);
+  orderRef.current = order;
+  const dragRef = useRef<{ name: string; lastTy: number; moved: boolean } | null>(null);
+
+  const commitOrder = async (names: string[]) => {
+    try {
+      await reorder_media(names, token);
+      onReorder?.(names);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'reorder failed');
+    }
+  };
+
+  const dragPan = Gesture.Pan()
+    .runOnJS(true)
+    .activateAfterLongPress(300)
+    .onStart((e) => {
+      const names = orderRef.current;
+      let acc = 0;
+      let idx = -1;
+      for (let i = 0; i < names.length; i++) {
+        const h = heightsRef.current.get(names[i]) ?? 46;
+        if (e.y < acc + h) { idx = i; break; }
+        acc += h;
+      }
+      if (idx < 0) return;
+      dragRef.current = { name: names[idx], lastTy: 0, moved: false };
+      setDraggingName(names[idx]);
+      setScrollEnabled(false);
+    })
+    .onUpdate((e) => {
+      const st = dragRef.current;
+      if (!st) return;
+      const names = [...orderRef.current];
+      let i = names.indexOf(st.name);
+      if (i < 0) return;
+      let changed = false;
+      for (;;) {
+        const delta = e.translationY - st.lastTy;
+        if (delta > 0 && i < names.length - 1) {
+          const nextH = heightsRef.current.get(names[i + 1]) ?? 46;
+          if (delta > nextH * 0.6) {
+            names.splice(i + 1, 0, names.splice(i, 1)[0]);
+            st.lastTy += nextH;
+            i++;
+            changed = true;
+            continue;
+          }
+        } else if (delta < 0 && i > 0) {
+          const prevH = heightsRef.current.get(names[i - 1]) ?? 46;
+          if (-delta > prevH * 0.6) {
+            names.splice(i - 1, 0, names.splice(i, 1)[0]);
+            st.lastTy -= prevH;
+            i--;
+            changed = true;
+            continue;
+          }
+        }
+        break;
+      }
+      if (changed) {
+        st.moved = true;
+        orderRef.current = names;
+        setOrder(names);
+      }
+    })
+    .onEnd(() => {
+      const st = dragRef.current;
+      if (st?.moved) commitOrder(orderRef.current);
+    })
+    .onFinalize(() => {
+      dragRef.current = null;
+      setDraggingName(null);
+      setScrollEnabled(true);
+    });
 
   useEffect(() => {
     get_media()
@@ -135,7 +227,7 @@ export default function AddMediaDialog({
 
           <View style={styles.panelArea}>
             {tab === 'hide-show' ? (
-              initialOrder.length === 0 ? (
+              order.length === 0 ? (
                 <Text style={styles.empty}>you've got to add an art form before you can hide them. click new. top right.</Text>
               ) : (
                 <>
@@ -143,15 +235,33 @@ export default function AddMediaDialog({
                     <Text style={styles.shownHeader}>shown</Text>
                     <Text style={styles.hiddenHeader}>hidden</Text>
                   </View>
-                  <ScrollView style={styles.panelScroll}>
-                    {initialOrder.map((name) => (
-                      <ToggleRow
-                        key={name}
-                        name={name}
-                        hidden={hiddenSet.has(name)}
-                        onToggle={() => toggle(name, !hiddenSet.has(name))}
-                      />
-                    ))}
+                  <ScrollView style={styles.panelScroll} scrollEnabled={scrollEnabled}>
+                    {/* One long-press-armed pan over the whole list drives the
+                        hold-and-drag reorder; quick taps and horizontal swipes
+                        still hit each row's own toggle handlers. */}
+                    <GestureDetector gesture={dragPan}>
+                      <View>
+                        {order.map((name) => {
+                          const isHidden = hiddenSet.has(name);
+                          // 1-based position among the shown (green) tabs only —
+                          // matches the tab order on the profile.
+                          const shownRank = isHidden
+                            ? null
+                            : order.filter((n) => !hiddenSet.has(n)).indexOf(name) + 1;
+                          return (
+                            <ToggleRow
+                              key={name}
+                              name={name}
+                              hidden={isHidden}
+                              positionNumber={shownRank}
+                              dragging={draggingName === name}
+                              onHeight={(h) => heightsRef.current.set(name, h)}
+                              onToggle={() => toggle(name, !hiddenSet.has(name))}
+                            />
+                          );
+                        })}
+                      </View>
+                    </GestureDetector>
                   </ScrollView>
                 </>
               )
@@ -246,10 +356,17 @@ const CHIP_GUTTER = 4;
 function ToggleRow({
   name,
   hidden,
+  positionNumber,
+  dragging,
+  onHeight,
   onToggle,
 }: {
   name: string;
   hidden: boolean;
+  // 1-based tab position among the shown (green) rows, or null when hidden.
+  positionNumber: number | null;
+  dragging: boolean;
+  onHeight: (h: number) => void;
   onToggle: () => void;
 }) {
   const [rowWidth, setRowWidth] = useState(0);
@@ -272,39 +389,44 @@ function ToggleRow({
     outputRange: [0, travel],
   });
 
-  const onGesture = (e: PanGestureHandlerStateChangeEvent) => {
-    if (e.nativeEvent.state === State.END) {
-      if (Math.abs(e.nativeEvent.translationX) > 30) onToggle();
-    }
-  };
-
   const onLayout = (e: LayoutChangeEvent) => {
     setRowWidth(e.nativeEvent.layout.width);
+    onHeight(e.nativeEvent.layout.height + 6); // +6 for marginBottom
   };
 
+  // Tap toggles hide/show; a long-press arms the parent's hold-and-drag
+  // reorder. No per-row pan gesture — it would intercept the long-press, and
+  // tap already covers toggling.
   return (
-    <PanGestureHandler onHandlerStateChange={onGesture}>
-      <Pressable
-        onPress={onToggle}
-        onLayout={onLayout}
-        style={[styles.toggleRow, hidden ? styles.toggleRowHidden : styles.toggleRowShown]}
-      >
-        {rowWidth > 0 && (
-          <Animated.View
-            style={[
-              styles.toggleChip,
-              {
-                width: chipWidth,
-                left: CHIP_GUTTER,
-                transform: [{ translateX }],
-              },
-            ]}
-          >
-            <Text style={styles.toggleChipText} numberOfLines={1}>{name}</Text>
-          </Animated.View>
-        )}
-      </Pressable>
-    </PanGestureHandler>
+    <Pressable
+      onPress={onToggle}
+      onLayout={onLayout}
+      style={[
+        styles.toggleRow,
+        hidden ? styles.toggleRowHidden : styles.toggleRowShown,
+        dragging && styles.toggleRowDragging,
+      ]}
+    >
+      {/* Tab-order number on shown rows only — matches the profile ordering,
+          renumbering live as rows are dragged or toggled. */}
+      {positionNumber != null && (
+        <Text style={styles.positionBadge}>{positionNumber}</Text>
+      )}
+      {rowWidth > 0 && (
+        <Animated.View
+          style={[
+            styles.toggleChip,
+            {
+              width: chipWidth,
+              left: CHIP_GUTTER,
+              transform: [{ translateX }],
+            },
+          ]}
+        >
+          <Text style={styles.toggleChipText} numberOfLines={1}>{name}</Text>
+        </Animated.View>
+      )}
+    </Pressable>
   );
 }
 
@@ -477,6 +599,24 @@ const styles = StyleSheet.create({
   },
   toggleRowHidden: {
     backgroundColor: Colors.redLight,
+  },
+  toggleRowDragging: {
+    opacity: 0.9,
+    borderWidth: 2,
+    ...Shadows.card,
+  },
+  positionBadge: {
+    // Sits in the green area to the right of the name chip (shown rows only).
+    position: 'absolute',
+    right: 14,
+    top: 0,
+    bottom: 0,
+    lineHeight: 40,
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    fontWeight: '700',
+    color: '#000',
+    zIndex: 1,
   },
   toggleChip: {
     position: 'absolute',

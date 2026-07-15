@@ -22,9 +22,12 @@ import SearchStack from './SearchStack';
 import HomeStack from './HomeStack';
 import AddArt from '../screens/AddArt';
 import Settings from '../screens/Settings';
+import UserStats from '../screens/UserStats';
+import InfraStats from '../screens/InfraStats';
 import EditProfile from '../screens/EditProfile';
 import Messages from '../screens/Messages';
 import ConversationThread from '../screens/ConversationThread';
+import { BackendGate } from '../components/BackendDownNotice';
 
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { MainTabParamList } from './types';
@@ -76,6 +79,30 @@ function MeScreen() {
   return <UserProfile />;
 }
 
+// Each tab shows the "Pi is down" notice instead of a blank/broken screen when
+// the backend is unreachable. Defined at module scope (not inline in the
+// navigator) so the wrapped components keep a stable identity across renders.
+const HomeStackGated = () => (
+  <BackendGate>
+    <HomeStack />
+  </BackendGate>
+);
+const SearchStackGated = () => (
+  <BackendGate>
+    <SearchStack />
+  </BackendGate>
+);
+const AddArtGated = () => (
+  <BackendGate>
+    <AddArt />
+  </BackendGate>
+);
+const MeScreenGated = () => (
+  <BackendGate>
+    <MeScreen />
+  </BackendGate>
+);
+
 
 function MainTabs() {
 
@@ -114,7 +141,7 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeStack}
+        component={HomeStackGated}
         options={{
           // Render an empty (space) label so this tab reserves the same label
           // height as the others — that keeps the PC icon on the same line as
@@ -122,15 +149,15 @@ function MainTabs() {
           tabBarLabel: ' ',
         }}
       />
-      <Tab.Screen name="SearchTab" component={SearchStack} options={{ tabBarLabel: 'stuff' }} />
+      <Tab.Screen name="SearchTab" component={SearchStackGated} options={{ tabBarLabel: 'stuff' }} />
       <Tab.Screen
         name="AddTab"
-        component={AddArt}
+        component={AddArtGated}
         options={{ tabBarLabel: 'share' }}
       />
       <Tab.Screen
         name="Me"
-        component={MeScreen}
+        component={MeScreenGated}
         options={{ tabBarLabel: 'me' }}
       />
     </Tab.Navigator>
@@ -166,6 +193,8 @@ export default function RootNavigator() {
       />
       <RootStack.Screen name="Ethos" component={Ethos} />
       <RootStack.Screen name="Settings" component={Settings} />
+      <RootStack.Screen name="UserStats" component={UserStats} />
+      <RootStack.Screen name="InfraStats" component={InfraStats} />
       <RootStack.Screen name="EditProfile" component={EditProfile} />
       <RootStack.Screen name="Messages" component={Messages} />
       <RootStack.Screen name="ConversationThread" component={ConversationThread} />

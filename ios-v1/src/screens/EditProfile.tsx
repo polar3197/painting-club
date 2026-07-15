@@ -349,6 +349,9 @@ export default function EditProfile() {
               placeholderTextColor={Colors.textMuted}
               autoCapitalize="none"
               multiline
+              // Grow to fit the whole statement instead of scrolling inside the
+              // field — so a drag scrolls the outer form (and reaches save).
+              scrollEnabled={false}
             />
             <Pressable
               style={[styles.saveBtn, saving && { opacity: 0.5 }]}

@@ -29,6 +29,7 @@ from api.models import (
     MemberFilters,
     MemberRoleUpdate,
     MemberRoleOut,
+    AdminMemberOut,
     AddMedia,
     MediaOut,
     MediaIn,
@@ -63,6 +64,13 @@ from api.models import (
     AdminPromptQueueOut,
     PromptSuggestionReview,
     PromptSuggestionReorder,
+    AnnouncementIn,
+    AnnouncementOut,
+    AnnouncementDetailOut,
+    DocIn,
+    DocOut,
+    AnnouncementCommentIn,
+    AnnouncementCommentOut,
     SearchOptions,
     ArtResult,
     ApplicationIn,
@@ -87,6 +95,8 @@ from api.models import (
     EventUpdate,
     EventMembersIn,
     EventOut,
+    UsageBatchIn,
+    DeviceBatchIn,
 )
 
 from db.db_ops.bookmarks import (
@@ -106,6 +116,16 @@ from db.db_ops.events import (
     db_remove_event_member,
     db_list_visible_events,
     db_event_participants,
+)
+
+from db.db_ops.usage import (
+    db_record_usage,
+    db_usage_summary,
+)
+
+from db.db_ops.telemetry import (
+    db_record_device_events,
+    db_telemetry_summary,
 )
 
 from db.db_ops.members import (
@@ -227,6 +247,23 @@ from db.db_ops.weekly_prompt_suggestions import (
     db_reorder_suggestions,
 )
 
+from db.db_ops.announcements import (
+    db_create_announcement,
+    db_list_announcements,
+    db_get_announcement,
+    db_delete_announcement,
+    db_list_comments as db_list_announcement_comments,
+    db_add_comment as db_add_announcement_comment,
+    db_get_comment as db_get_announcement_comment,
+    db_delete_comment as db_delete_announcement_comment,
+)
+
+from db.db_ops.docs import (
+    db_list_docs,
+    db_get_doc,
+    db_update_doc,
+)
+
 from db.db_ops.comments import (
     db_get_comments,
     db_add_comment,
@@ -296,6 +333,12 @@ async def get_optional_member(credentials: Optional[HTTPAuthorizationCredentials
 async def get_admin_member(current_member: Member = Depends(get_current_member)):
     if current_member.role != "admin":
         raise HTTPException(status_code=403, detail="Admins only")
+    return current_member
+
+async def get_contributor_member(current_member: Member = Depends(get_current_member)):
+    # Admin implies contributor. Gates announcement/docs authoring + moderation.
+    if current_member.role not in ("contributor", "admin"):
+        raise HTTPException(status_code=403, detail="Contributors only")
     return current_member
 
 @app.post("/members/newfull", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
@@ -1566,6 +1609,190 @@ async def review_prompt_suggestion(
     return _suggestion_out(suggestion, media_name, username)
 
 
+# ---------------------------------------------------------------------------
+# Announcements + discussion
+# ---------------------------------------------------------------------------
+
+def _is_contributor(member: Member) -> bool:
+    return (member.role or "member") in ("contributor", "admin")
+
+
+def _announcement_out(row, username, firstname, comment_count) -> AnnouncementOut:
+    return AnnouncementOut(
+        id=row.id,
+        title=row.title,
+        body=row.body,
+        author_username=username,
+        author_firstname=firstname,
+        comment_count=comment_count,
+        created_at=row.created_at,
+    )
+
+
+def _announcement_comment_out(comment, username, firstname) -> AnnouncementCommentOut:
+    return AnnouncementCommentOut(
+        id=comment.id,
+        username=username,
+        firstname=firstname,
+        text=comment.text,
+        created_at=comment.created_at,
+    )
+
+
+@app.post("/announcements", response_model=AnnouncementOut, status_code=status.HTTP_201_CREATED)
+async def create_announcement(
+    payload: AnnouncementIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_contributor_member),
+):
+    title = (payload.title or "").strip()
+    body = (payload.body or "").strip()
+    if not title or not body:
+        raise HTTPException(status_code=400, detail="Title and body are required")
+    row = await db_create_announcement(db, current_member.id, title, body)
+    return _announcement_out(row, current_member.username, current_member.firstname, 0)
+
+
+@app.get("/announcements", response_model=list[AnnouncementOut])
+async def list_announcements(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    rows = await db_list_announcements(db)
+    return [_announcement_out(a, u, f, c) for a, u, f, c in rows]
+
+
+@app.get("/announcements/{announcement_id}", response_model=AnnouncementDetailOut)
+async def get_announcement(
+    announcement_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    found = await db_get_announcement(db, announcement_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    row, username, firstname = found
+    comments = await db_list_announcement_comments(db, announcement_id)
+    return AnnouncementDetailOut(
+        id=row.id,
+        title=row.title,
+        body=row.body,
+        author_username=username,
+        author_firstname=firstname,
+        comment_count=len(comments),
+        created_at=row.created_at,
+        comments=[_announcement_comment_out(c, u, f) for c, u, f in comments],
+    )
+
+
+@app.delete("/announcements/{announcement_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_announcement(
+    announcement_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    found = await db_get_announcement(db, announcement_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    row, _u, _f = found
+    # Author or any contributor (moderation) may delete.
+    if row.author_id != current_member.id and not _is_contributor(current_member):
+        raise HTTPException(status_code=403, detail="Not allowed")
+    await db_delete_announcement(db, announcement_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.post(
+    "/announcements/{announcement_id}/comments",
+    response_model=AnnouncementCommentOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_announcement_comment(
+    announcement_id: str,
+    payload: AnnouncementCommentIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Comment cannot be empty")
+    if await db_get_announcement(db, announcement_id) is None:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    comment = await db_add_announcement_comment(db, announcement_id, current_member.id, text)
+    return _announcement_comment_out(comment, current_member.username, current_member.firstname)
+
+
+@app.delete(
+    "/announcements/{announcement_id}/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_announcement_comment(
+    announcement_id: str,
+    comment_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    comment = await db_get_announcement_comment(db, comment_id)
+    if comment is None or str(comment.announcement_id) != announcement_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    # Comment author or any contributor (moderation) may delete.
+    if comment.member_id != current_member.id and not _is_contributor(current_member):
+        raise HTTPException(status_code=403, detail="Not allowed")
+    await db_delete_announcement_comment(db, comment_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Docs (editable "about the app" sections) ---------------------------------
+# Any member reads; contributors edit. Docs are seeded (ethos/art/aims), so
+# there's no create route — only list/get/update. Literal /docs is declared
+# before /docs/{slug} so FastAPI doesn't capture "docs" as a slug.
+
+def _doc_out(doc) -> DocOut:
+    return DocOut(
+        slug=doc.slug,
+        title=doc.title,
+        body=doc.body,
+        order_index=doc.order_index,
+        updated_at=doc.updated_at,
+    )
+
+
+@app.get("/docs", response_model=list[DocOut])
+async def list_docs(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    return [_doc_out(d) for d in await db_list_docs(db)]
+
+
+@app.get("/docs/{slug}", response_model=DocOut)
+async def get_doc(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    doc = await db_get_doc(db, slug)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Doc not found")
+    return _doc_out(doc)
+
+
+@app.put("/docs/{slug}", response_model=DocOut)
+async def update_doc(
+    slug: str,
+    payload: DocIn,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_contributor_member),
+):
+    title = (payload.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    doc = await db_update_doc(db, slug, title, payload.body or "")
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Doc not found")
+    return _doc_out(doc)
+
+
 @app.patch("/series/{series_id}/order")
 async def set_series_order(
     series_id: str,
@@ -2817,6 +3044,29 @@ async def reorder_my_media(
     return {"ok": True}
 
 
+@app.get("/admin/members", response_model=list[AdminMemberOut])
+async def list_members_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+):
+    """Every member with their role, for the admin's role-management panel.
+    Sorted contributors/admins first so the trusted tiers surface at the top."""
+    members = await db_get_members(db)
+    rank = {"admin": 0, "contributor": 1, "member": 2}
+    ordered = sorted(
+        members,
+        key=lambda m: (rank.get(m.role or "member", 2), (m.username or "").lower()),
+    )
+    return [
+        AdminMemberOut(
+            username=m.username,
+            firstname=m.firstname,
+            lastname=m.lastname,
+            role=m.role or "member",
+        )
+        for m in ordered
+    ]
+
 @app.patch("/admin/members/{username}/role", response_model=MemberRoleOut)
 async def set_member_role(
     username: str,
@@ -2838,3 +3088,48 @@ async def set_member_role(
             status_code = 400
         raise HTTPException(status_code=status_code, detail=msg)
     return MemberRoleOut(username=member.username, role=member.role)
+
+
+# =============================================================================
+# Observability — usage trail (#5) + device telemetry (#6) + contributor panel (#7)
+# Ingest is open to every logged-in client; the summaries are contributor-gated.
+# Static paths (/usage/summary, /telemetry/summary) are defined so nothing can be
+# shadowed by a later /{id} route.
+# =============================================================================
+
+@app.post("/usage", status_code=202)
+async def ingest_usage(
+    payload: UsageBatchIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    written = await db_record_usage(db, current_member.id, payload.events)
+    return {"ok": True, "recorded": written}
+
+
+@app.get("/usage/summary")
+async def usage_summary(
+    days: int = 14,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_contributor_member),
+):
+    return await db_usage_summary(db, days)
+
+
+@app.post("/telemetry", status_code=202)
+async def ingest_telemetry(
+    payload: DeviceBatchIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    written = await db_record_device_events(db, current_member.id, payload.events)
+    return {"ok": True, "recorded": written}
+
+
+@app.get("/telemetry/summary")
+async def telemetry_summary(
+    days: int = 14,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_contributor_member),
+):
+    return await db_telemetry_summary(db, days)

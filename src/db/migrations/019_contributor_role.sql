@@ -1,0 +1,11 @@
+-- 019: add the "contributor" role tier (paper trail — no schema change needed;
+-- member.role is already a free VARCHAR(20). This documents the new allowed
+-- value. Role hierarchy: member < contributor < admin. "contributor" grants
+-- announcement/docs authoring + discussion moderation; admin implies contributor.
+--
+-- Enforcement lives in the app: db_ops/members.VALID_ROLES accepts the value and
+-- guards against demoting the last admin; api.main.get_contributor_member gates
+-- contributor-only routes (admin passes too).
+--
+-- No-op DDL kept for the paper trail; existing rows default to 'member'.
+-- (member.role VARCHAR(20) NOT NULL DEFAULT 'member' already exists.)

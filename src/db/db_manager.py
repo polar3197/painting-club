@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import text
 
 from db.database import Base, engine
@@ -23,6 +25,57 @@ _WRITTEN_FORM_SEED = ("poetry", "writing")
 # Both share the polymorphic 'audio' Art type but are distinct media names so a
 # member can add either to their profile independently.
 _AUDIO_SEED = ("music",)
+
+# Starter content for the editable "about the app" docs (migration 021). One row
+# per About section; seeded once, then contributor-editable. `ethos` carries the
+# existing hardcoded aboutContent (flattened to plain text — paragraphs split by
+# blank lines); `art`/`aims` start empty. Seeding is ON CONFLICT-guarded on slug,
+# so this never overwrites a doc that a contributor has since edited.
+_ETHOS_BODY = (
+    '"Underlying [the Web\'s] whole infrastructure was the intention to allow for '
+    "collaboration, foster compassion and generate creativity — what I term the 3 "
+    "C's. It was to be a tool to empower humanity. [...] Yet in the past decade, "
+    "instead of embodying these values, the web has instead played a part in "
+    'eroding them."\n'
+    "— Tim Berners-Lee (creator of the World Wide Web)\n"
+    "\n"
+    "This is a general introduction to the spirit of Painting Club. Actually this "
+    "is all gibberish, an official and succinct doc will be written and placed here "
+    "to communicate what is achieved here and why it is fun and philosophically "
+    "important.\n"
+    "\n"
+    "Painting Club is a big bet on my hope that community is more powerful than "
+    "dopamine kicks.\n"
+    "\n"
+    "Online participation has become co-opted and turned into continual and "
+    "pervasive exploitation and mental-priming of vulnerable, isolated people, by "
+    "powerful idiots. — why do we enter this contract? For a fun way to connect "
+    "with our friends over the internet.\n"
+    "\n"
+    "You have to be one sick mofo to prey upon people's desire to have connection "
+    "and community. Connection is the purest and most fragile human desire —and "
+    "Zuck twists and corrupts it before it can even stand up on its own.\n"
+    "\n"
+    "Social connection should not be monetized. Annnnd, that brings us to the four "
+    "tenants of Painting Club\n"
+    "\n"
+    "1. no dopamine hooks\n"
+    "2. sincerity as the metric\n"
+    "3. no advertising\n"
+    "4. no ai (not in a reactionary way, in a humanane way)\n"
+    "\n"
+    'Some people might say "no dopamine hooks? how will you get people to use the '
+    'app?" or "why would people choose painting club over instagram/tiktok?". '
+    "These questions miss the point. The goal is not to get users; the goal is not "
+    "to harvest attention; the goal is not to coerce members into participating. "
+    "The goal is to provide an alternative."
+)
+# (slug, title, order_index, body)
+_DOC_SEED = (
+    ("ethos", "Painting Club Ethos", 0, _ETHOS_BODY),
+    ("art", "art", 1, ""),
+    ("aims", "aims", 2, ""),
+)
 
 
 async def pre_init_migrations():
@@ -260,4 +313,54 @@ async def run_migrations():
             "  created_at TIMESTAMP DEFAULT now()"
             ")"
         ))
+        # 020: contributor-authored announcements + their attached discussion.
+        # create_all builds these on fresh DBs; guards cover existing prod DBs.
+        # author_id SET NULL keeps an announcement if the author is removed.
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS announcement ("
+            "  id UUID PRIMARY KEY,"
+            "  author_id UUID REFERENCES member(id) ON DELETE SET NULL,"
+            "  title VARCHAR(300) NOT NULL,"
+            "  body TEXT NOT NULL,"
+            "  created_at TIMESTAMP DEFAULT now()"
+            ")"
+        ))
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS announcement_comment ("
+            "  id UUID PRIMARY KEY,"
+            "  announcement_id UUID NOT NULL REFERENCES announcement(id) ON DELETE CASCADE,"
+            "  member_id UUID NOT NULL REFERENCES member(id) ON DELETE CASCADE,"
+            "  text TEXT NOT NULL,"
+            "  created_at TIMESTAMP DEFAULT now()"
+            ")"
+        ))
+        # 021: editable "about the app" docs (one row per About section).
+        # create_all builds this on fresh DBs; the guard covers existing prod
+        # DBs. The seed is ON CONFLICT-guarded on slug, so starter content lands
+        # exactly once and later contributor edits are never clobbered on reboot.
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS doc ("
+            "  id UUID PRIMARY KEY,"
+            "  slug VARCHAR(50) UNIQUE NOT NULL,"
+            "  title VARCHAR(300) NOT NULL,"
+            "  body TEXT NOT NULL DEFAULT '',"
+            "  order_index INTEGER NOT NULL DEFAULT 0,"
+            "  updated_at TIMESTAMP DEFAULT now()"
+            ")"
+        ))
+        for slug, title, order_index, body in _DOC_SEED:
+            await conn.execute(
+                text(
+                    "INSERT INTO doc (id, slug, title, body, order_index, updated_at) "
+                    "VALUES (:id, :slug, :title, :body, :order_index, now()) "
+                    "ON CONFLICT (slug) DO NOTHING"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "slug": slug,
+                    "title": title,
+                    "body": body,
+                    "order_index": order_index,
+                },
+            )
     print("Migrations applied.")

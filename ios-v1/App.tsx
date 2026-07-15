@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { UploadProvider } from './src/context/UploadContext';
 import { Colors } from './src/constants/theme';
 import { setAuthExpiredHandler } from './src/api/client';
+import { recordScreen, initDeviceTelemetry } from './src/api/observability';
 import RootNavigator from './src/navigation';
 import UpdateBanner from './src/components/UpdateBanner';
 
@@ -52,12 +53,28 @@ export default function App() {
     });
   }, []);
 
+  // Wire device/perf telemetry sources (#6) once at startup. Emitted events only
+  // flush once a login token is set, so this is safe before auth.
+  useEffect(() => {
+    initDeviceTelemetry();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
           <UploadProvider>
-            <NavigationContainer theme={navTheme} ref={navigationRef}>
+            <NavigationContainer
+              theme={navTheme}
+              ref={navigationRef}
+              // Behavioral trail (#5): record the focused route on every nav
+              // change. recordScreen dedupes consecutive repeats and batches,
+              // so this is cheap. No-op until a token is set (post-login).
+              onStateChange={() => {
+                const name = (navigationRef as any).getCurrentRoute()?.name;
+                if (name) recordScreen(name);
+              }}
+            >
               <AuthExpiryBridge />
               <RootNavigator />
               <UpdateBanner />

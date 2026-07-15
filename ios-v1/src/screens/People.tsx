@@ -28,9 +28,12 @@ interface Props {
   query: string;
   onResetFilters: () => void;
   onListScroll: () => void;
+  // Reports the grid's vertical scroll offset so SearchTabs can minimize the
+  // toggle bar as you scroll down.
+  onVerticalScroll: (offsetY: number) => void;
 }
 
-export default function People({ query, onResetFilters, onListScroll }: Props) {
+export default function People({ query, onResetFilters, onListScroll, onVerticalScroll }: Props) {
   const navigation = useNavigation<Nav>();
   const [members, , , refetchMembers] = useMembers('', '');
   const [refreshing, setRefreshing] = useState(false);
@@ -87,6 +90,8 @@ export default function People({ query, onResetFilters, onListScroll }: Props) {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={onListScroll}
+        onScroll={(e) => onVerticalScroll(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -119,7 +124,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   list: {
-    padding: 20,
+    // Top gap lives on the pager (SearchTabs) so it persists while scrolling.
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
   row: {

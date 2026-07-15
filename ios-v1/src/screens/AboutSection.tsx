@@ -1,49 +1,180 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  // Raw RN input (not AppTextInput) so the editor keeps autocorrect + spellcheck.
+  TextInput,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useRoute, RouteProp } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
+import { get_doc, update_doc, DocOut } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
-import { ABOUT_POSTS, ABOUT_SECTIONS } from '../constants/aboutContent';
+import { ABOUT_SECTIONS } from '../constants/aboutContent';
 import type { HomeStackParamList } from '../navigation/types';
 
-type Nav = NativeStackNavigationProp<HomeStackParamList, 'AboutSection'>;
 type SectionRoute = RouteProp<HomeStackParamList, 'AboutSection'>;
 
-// One section (e.g. "ethos"): the section title, then a box per post showing
-// only the post title. Tapping a box opens the post's blog page.
+// One About section, now backed by the editable `doc` API (slug == section key).
+// Any member reads the doc as a clean blog page; contributors get an inline
+// editor (title + body) that PUTs back to /docs/{slug}.
 export default function AboutSection() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<Nav>();
   const { section } = useRoute<SectionRoute>().params;
+  const { token, currentRole } = useAuth();
 
-  const label = ABOUT_SECTIONS.find((s) => s.key === section)?.label ?? section;
-  const posts = ABOUT_POSTS[section] ?? [];
-  const emptyText =
-    section === 'art' ? 'currently artless'
-    : section === 'aims' ? 'currently aimless'
-    : 'nothing here yet';
+  const fallbackLabel = ABOUT_SECTIONS.find((s) => s.key === section)?.label ?? section;
+  const isContributor = currentRole === 'contributor' || currentRole === 'admin';
+
+  const [doc, setDoc] = useState<DocOut | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await get_doc(section, token);
+      setDoc(d);
+    } catch {
+      // leave doc null → empty state below
+    } finally {
+      setLoading(false);
+    }
+  }, [section, token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const startEdit = () => {
+    if (!doc) return;
+    setDraftTitle(doc.title);
+    setDraftBody(doc.body);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    const title = draftTitle.trim();
+    if (!title || saving) return;
+    setSaving(true);
+    try {
+      const updated = await update_doc(section, title, draftBody, token);
+      setDoc(updated);
+      setEditing(false);
+    } catch (err: any) {
+      Alert.alert('could not save', err?.message || 'try again');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Body renders as a blog page: blank-line-separated paragraphs, in order.
+  const paragraphs = (doc?.body ?? '')
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (loading) {
+    return (
+      <View style={[styles.page, styles.center]}>
+        <ActivityIndicator color={Colors.darkerGold} />
+      </View>
+    );
+  }
+
+  if (editing) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.page}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={[
+            styles.editContent,
+            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
+          <Text style={styles.editLabel}>title</Text>
+          <TextInput
+            style={styles.titleInput}
+            value={draftTitle}
+            onChangeText={setDraftTitle}
+            placeholder="section title"
+            placeholderTextColor={Colors.textMuted}
+            autoCapitalize="sentences"
+            autoCorrect
+            spellCheck
+          />
+
+          <Text style={styles.editLabel}>body</Text>
+          <TextInput
+            style={styles.bodyInput}
+            value={draftBody}
+            onChangeText={setDraftBody}
+            placeholder="write this section…"
+            placeholderTextColor={Colors.textMuted}
+            autoCapitalize="sentences"
+            autoCorrect
+            spellCheck
+            multiline
+          />
+
+          <View style={styles.editActions}>
+            <Pressable
+              style={styles.cancelBtn}
+              onPress={() => setEditing(false)}
+              disabled={saving}
+            >
+              <Text style={styles.cancelText}>cancel</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.saveBtn, (!draftTitle.trim() || saving) && styles.saveDisabled]}
+              onPress={save}
+              disabled={!draftTitle.trim() || saving}
+            >
+              <Text style={styles.saveText}>{saving ? 'saving…' : 'save'}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <ScrollView
-      style={[styles.container, { paddingTop: insets.top + 12 }]}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      style={styles.page}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 60 },
+      ]}
     >
-      <Text style={styles.pageTitle}>{label}</Text>
-
-      {posts.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>{emptyText}</Text>
-        </View>
-      ) : (
-        posts.map((post, i) => (
-          <Pressable
-            key={`${post.title}-${i}`}
-            style={[styles.postBtn, i === 0 && styles.postBtnFirst]}
-            onPress={() => navigation.navigate('AboutPost', { section, postIndex: i })}
-          >
-            <Text style={styles.postBtnText}>{post.title}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>{doc?.title || fallbackLabel}</Text>
+        {isContributor && (
+          <Pressable hitSlop={8} onPress={startEdit}>
+            <Text style={styles.editLink}>edit</Text>
           </Pressable>
+        )}
+      </View>
+
+      {paragraphs.length === 0 ? (
+        <Text style={styles.empty}>
+          {section === 'art' ? 'currently artless' : section === 'aims' ? 'currently aimless' : 'nothing here yet'}
+        </Text>
+      ) : (
+        paragraphs.map((p, i) => (
+          <Text key={i} style={styles.body}>{p}</Text>
         ))
       )}
     </ScrollView>
@@ -51,39 +182,104 @@ export default function AboutSection() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  page: {
     flex: 1,
-    backgroundColor: Colors.mainBg,
+    backgroundColor: Colors.white,
   },
-  content: {},
-  pageTitle: {
-    fontFamily: Fonts.serif,
+  center: { alignItems: 'center', justifyContent: 'center' },
+  content: {
+    paddingHorizontal: 24,
+    gap: 18,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  title: {
+    fontFamily: Fonts.mono,
     fontSize: FontSizes.lg,
     color: Colors.black,
-    paddingHorizontal: 16,
-    marginBottom: 10,
+    flex: 1,
+  },
+  editLink: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.darkerGold,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 12,
+  },
+  body: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    lineHeight: 20,
+    color: Colors.textPrimary,
   },
   empty: {
-    paddingVertical: 60,
-    alignItems: 'center',
-  },
-  emptyText: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
     color: Colors.textTertiary,
   },
-  postBtn: {
-    borderBottomWidth: 1,
+  // --- editor ---
+  editContent: {
+    paddingHorizontal: 20,
+  },
+  editLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
+  titleInput: {
+    borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.white,
-    justifyContent: 'center',
-    height: 84,
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.base,
+    padding: 10,
+    marginBottom: 18,
+  },
+  bodyInput: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.base,
+    lineHeight: 22,
+    minHeight: 320,
+    padding: 10,
+    textAlignVertical: 'top',
+    marginBottom: 18,
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  cancelBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
     paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  postBtnFirst: {
-    borderTopWidth: 1,
+  cancelText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
   },
-  postBtnText: {
+  saveBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.greenBright,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  saveDisabled: { opacity: 0.5 },
+  saveText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.black,

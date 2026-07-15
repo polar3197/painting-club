@@ -31,4 +31,9 @@ export type HomeStackParamList = {
   AboutPost: { section: AboutSectionKey; postIndex: number };
   ComingSoon: { title?: string };
   RequestFeature: undefined;
+  AnnouncementsFeed: undefined;
+  AnnouncementDetail: { id: string };
+  Events: undefined;
+  EventDetail: { eventId: string };
+  EventEdit: { eventId?: string };
 };

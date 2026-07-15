@@ -129,6 +129,17 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
       }
     });
 
+  // Tap anywhere on the image/letterbox to dismiss. Wraps only the pager
+  // ScrollView, so the kebab + captions (rendered on top as siblings) keep
+  // their own touches. Disabled while zoomed so a tap doesn't fight the zoom;
+  // a horizontal drag pages and a pinch zooms (a discrete tap yields to both).
+  const dismissTap = Gesture.Tap()
+    .enabled(!zoomed)
+    .maxDuration(250)
+    .onEnd((_e, success) => {
+      if (success) runOnJS(dismiss)();
+    });
+
   const contentStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: dragY.value }],
   }));
@@ -170,39 +181,41 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
 
         <GestureDetector gesture={dismissPan}>
           <Animated.View style={[styles.root, contentStyle]}>
-            <ScrollView
-              ref={outerRef}
-              horizontal
-              pagingEnabled
-              scrollEnabled={!zoomed}
-              showsHorizontalScrollIndicator={false}
-              contentOffset={{ x: initialIndex * screenW, y: 0 }}
-              onMomentumScrollEnd={onMomentumEnd}
-              // Belt-and-suspenders: jump to the tapped piece once the strip has
-              // laid out, in case the initial contentOffset didn't take.
-              onLayout={() => {
-                if (!didInit.current) {
-                  didInit.current = true;
-                  if (initialIndex > 0) {
-                    outerRef.current?.scrollTo({ x: initialIndex * screenW, animated: false });
+            <GestureDetector gesture={dismissTap}>
+              <ScrollView
+                ref={outerRef}
+                horizontal
+                pagingEnabled
+                scrollEnabled={!zoomed}
+                showsHorizontalScrollIndicator={false}
+                contentOffset={{ x: initialIndex * screenW, y: 0 }}
+                onMomentumScrollEnd={onMomentumEnd}
+                // Belt-and-suspenders: jump to the tapped piece once the strip has
+                // laid out, in case the initial contentOffset didn't take.
+                onLayout={() => {
+                  if (!didInit.current) {
+                    didInit.current = true;
+                    if (initialIndex > 0) {
+                      outerRef.current?.scrollTo({ x: initialIndex * screenW, animated: false });
+                    }
                   }
-                }
-              }}
-              style={StyleSheet.absoluteFillObject}
-            >
-              {pieces.map((p, i) => (
-                <ZoomablePage
-                  key={p.id}
-                  uri={resolveImageUrl(p.file_path)}
-                  width={screenW}
-                  height={screenH}
-                  topInset={imgTopInset}
-                  bottomInset={imgBottomInset}
-                  active={i === index}
-                  onZoomChange={setZoomed}
-                />
-              ))}
-            </ScrollView>
+                }}
+                style={StyleSheet.absoluteFillObject}
+              >
+                {pieces.map((p, i) => (
+                  <ZoomablePage
+                    key={p.id}
+                    uri={resolveImageUrl(p.file_path)}
+                    width={screenW}
+                    height={screenH}
+                    topInset={imgTopInset}
+                    bottomInset={imgBottomInset}
+                    active={i === index}
+                    onZoomChange={setZoomed}
+                  />
+                ))}
+              </ScrollView>
+            </GestureDetector>
 
             {showKebab && (
               <Pressable

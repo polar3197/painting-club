@@ -4,7 +4,6 @@ import {
   Text,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
@@ -76,14 +75,9 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Text style={styles.closeBtnText}>x</Text>
           </Pressable>
-          {/* Submit lives inside the scroll area so it rides above the keyboard
-              with the rest of the form — outside, the keyboard would cover it. */}
-          <ScrollView
-            style={styles.form}
-            contentContainerStyle={styles.formContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+          {/* No scroll — the form is short enough to fit, and KeyboardAvoidingView
+              lifts the whole dialog above the keyboard so submit stays visible. */}
+          <View style={styles.form}>
             <TextInput
               style={styles.input}
               value={firstname}
@@ -140,13 +134,13 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               placeholder="why do you want to join?"
               placeholderTextColor={Colors.textMuted}
               multiline
-              numberOfLines={4}
+              numberOfLines={2}
               autoCapitalize="none"
             />
             <Pressable style={styles.submitBtn} onPress={handleSubmit}>
               <Text style={styles.submitBtnText}>submit</Text>
             </Pressable>
-          </ScrollView>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -186,9 +180,6 @@ const styles = StyleSheet.create({
   form: {
     marginTop: 20,
   },
-  formContent: {
-    paddingBottom: 8,
-  },
   input: {
     borderBottomWidth: 1,
     borderBottomColor: '#000',
@@ -198,7 +189,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   multiline: {
-    minHeight: 80,
+    minHeight: 44,
     textAlignVertical: 'top',
   },
   submitBtn: {

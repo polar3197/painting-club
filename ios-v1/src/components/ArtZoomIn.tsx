@@ -111,6 +111,10 @@ export default function ArtZoomIn({
   const savedTranslationX = useSharedValue(0);
   const savedTranslationY = useSharedValue(0);
 
+  // 1 while a single-finger downward drag (at 1x) is dragging the card away to
+  // dismiss — distinguishes swipe-to-close from panning a zoomed-in image.
+  const dismissActive = useSharedValue(0);
+
   // Image-local coords of the focal point at the moment pinch began.
   // Used to keep that exact pixel under the fingers' midpoint as scale changes.
   const focalImageX = useSharedValue(0);
@@ -214,12 +218,38 @@ export default function ArtZoomIn({
     .minPointers(1)
     .maxPointers(2)
     .averageTouches(true)
+    .onStart((e) => {
+      // At 1x, a single-finger drag is a swipe-to-dismiss; two fingers is a
+      // pinch, and a zoomed image just pans. Decide up front.
+      dismissActive.value = savedScale.value <= 1.01 && e.numberOfPointers === 1 ? 1 : 0;
+    })
     .onUpdate((e) => {
+      if (dismissActive.value === 1) {
+        // A second finger landing mid-drag means the user is pinching — hand off.
+        if (e.numberOfPointers > 1) {
+          dismissActive.value = 0;
+          return;
+        }
+        // Follow the finger down only (ignore an upward pull) so the card lifts
+        // away before it closes.
+        translationY.value = Math.max(0, e.translationY);
+        return;
+      }
       if (savedScale.value <= 1.01) return; // no pan at 1x
       translationX.value = savedTranslationX.value + e.translationX;
       translationY.value = savedTranslationY.value + e.translationY;
     })
-    .onEnd(() => {
+    .onEnd((e) => {
+      if (dismissActive.value === 1) {
+        dismissActive.value = 0;
+        // A decisive downward drag or flick closes; anything less springs back.
+        if (e.translationY > 120 || e.velocityY > 800) {
+          runOnJS(handleClose)();
+        } else {
+          translationY.value = withSpring(0);
+        }
+        return;
+      }
       if (savedScale.value <= 1.01) return;
       // Clamp with spring rubber-band.
       const maxX = Math.max(0, (wrapperW.value * savedScale.value - wrapperW.value) / 2);

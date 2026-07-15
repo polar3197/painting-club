@@ -28,6 +28,7 @@ import {
   Visual2DOut,
 } from '../api';
 import AddArtDialog from '../components/AddArtDialog';
+import ProposePromptDialog from '../components/ProposePromptDialog';
 import ArtCarousel from '../components/ArtCarousel';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { HomeStackParamList } from '../navigation/types';
@@ -58,6 +59,7 @@ export default function WeeklyPromptDetail() {
   const [prompt, setPrompt] = useState<PromptDetailOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [showPropose, setShowPropose] = useState(false);
   const [showPromptList, setShowPromptList] = useState(false);
   const [allPrompts, setAllPrompts] = useState<PromptSummary[]>([]);
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
@@ -181,11 +183,13 @@ export default function WeeklyPromptDetail() {
 
         <Pressable
           style={({ pressed }) => [styles.proposeBtn, pressed && styles.dropFramePressed]}
-          onPress={() => navigation.navigate('ComingSoon', { title: "propose next week's prompt" })}
+          onPress={() => setShowPropose(true)}
         >
           <Text style={styles.proposeBtnText}>propose next week's prompt</Text>
         </Pressable>
       </View>
+
+      {showPropose && <ProposePromptDialog onClose={() => setShowPropose(false)} />}
 
       {showDialog && currentUser && (
         <AddArtDialog

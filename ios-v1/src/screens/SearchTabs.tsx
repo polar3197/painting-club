@@ -34,6 +34,14 @@ const ICON_SCALE_MIN = 0.42;
 // How much the selection box narrows when the keyboard is up.
 const BOX_SCALE_X_MIN = 0.6;
 
+// Persistent gap between the toggle bar and the top of the scrolling grid, so
+// content never scrolls flush against the bottom of the icons.
+const TAB_PAGER_GAP = 20;
+// Scroll offsets (with hysteresis) at which the toggle bar collapses/expands as
+// the grid scrolls — the same minimize the keyboard triggers.
+const SCROLL_COLLAPSE_ON = 40;
+const SCROLL_COLLAPSE_OFF = 8;
+
 // The two halves of the search tab. `iconScale` mirrors the per-asset scaling
 // the standalone banners used so the profiles mark reads at the same visual
 // weight as the art mark.
@@ -76,6 +84,14 @@ export default function SearchTabs() {
   // transform stays in the animation system (no re-render, no first-frame jump).
   const lift = useRef(new Animated.Value(0)).current;
 
+  // Scroll-driven collapse mirrors the keyboard one: `sc` (native driver)
+  // drives the icon transforms, `scH` (JS driver) the toggle bar's layout
+  // height. Combined with the keyboard values below so either input minimizes
+  // the bar. `scrollCollapsed` tracks the current state to debounce retriggers.
+  const sc = useRef(new Animated.Value(0)).current;
+  const scH = useRef(new Animated.Value(0)).current;
+  const scrollCollapsed = useRef(false);
+
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
       const overlap = Math.max(0, e.endCoordinates.height - NAV_TAB_HEIGHT);
@@ -99,19 +115,26 @@ export default function SearchTabs() {
     };
   }, [kb, kbH, lift]);
 
-  // Lift the bar by the keyboard overlap; shrink/recenter the icons.
+  // Lift the bar by the keyboard overlap (keyboard only — scrolling doesn't move
+  // the search bar).
   const barTranslateY = Animated.multiply(kb, lift);
-  const iconScale = kb.interpolate({ inputRange: [0, 1], outputRange: [1, ICON_SCALE_MIN] });
-  const iconTranslateY = kb.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
-  // Fade the little icon labels out as the bar minimizes (keyboard up) so they
-  // never get clipped by the shrinking bar.
-  const labelOpacity = kb.interpolate({ inputRange: [0, 0.5], outputRange: [1, 0], extrapolate: 'clamp' });
-  // Narrow the selection box (in addition to the bar's height shrink) when the
-  // keyboard is up.
-  const boxScaleX = kb.interpolate({ inputRange: [0, 1], outputRange: [1, BOX_SCALE_X_MIN] });
-  const tabBarHeight = kbH.interpolate({
+  // Either the keyboard or a scrolled grid minimizes the bar. Summing the two
+  // 0→1 drivers and clamping per-use means both at once still reads as fully
+  // collapsed rather than doubling up.
+  const collapse = Animated.add(kb, sc);
+  const collapseH = Animated.add(kbH, scH);
+  const iconScale = collapse.interpolate({ inputRange: [0, 1], outputRange: [1, ICON_SCALE_MIN], extrapolate: 'clamp' });
+  const iconTranslateY = collapse.interpolate({ inputRange: [0, 1], outputRange: [8, 0], extrapolate: 'clamp' });
+  // Fade the little icon labels out as the bar minimizes so they never get
+  // clipped by the shrinking bar.
+  const labelOpacity = collapse.interpolate({ inputRange: [0, 0.5], outputRange: [1, 0], extrapolate: 'clamp' });
+  // Narrow the selection box (in addition to the bar's height shrink) as it
+  // minimizes.
+  const boxScaleX = collapse.interpolate({ inputRange: [0, 1], outputRange: [1, BOX_SCALE_X_MIN], extrapolate: 'clamp' });
+  const tabBarHeight = collapseH.interpolate({
     inputRange: [0, 1],
     outputRange: [TAB_BAR_HEIGHT, TAB_BAR_HEIGHT_MIN],
+    extrapolate: 'clamp',
   });
 
   const goTo = useCallback((index: number) => {
@@ -130,6 +153,25 @@ export default function SearchTabs() {
   const dismissKeyboard = useCallback(() => {
     Keyboard.dismiss();
   }, []);
+
+  // Collapse the toggle bar once the grid scrolls past a small threshold, and
+  // restore it near the top — the same minimize the keyboard triggers, but
+  // driven by the vertical list scroll. Hysteresis keeps it from flickering
+  // when the offset hovers around the threshold.
+  const onListVerticalScroll = useCallback(
+    (offsetY: number) => {
+      const next = scrollCollapsed.current
+        ? offsetY > SCROLL_COLLAPSE_OFF
+        : offsetY > SCROLL_COLLAPSE_ON;
+      if (next === scrollCollapsed.current) return;
+      scrollCollapsed.current = next;
+      Animated.parallel([
+        Animated.timing(sc, { toValue: next ? 1 : 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(scH, { toValue: next ? 1 : 0, duration: 200, useNativeDriver: false }),
+      ]).start();
+    },
+    [sc, scH],
+  );
 
   // Filled gold box slides between the two halves as the pager scrolls.
   const boxTranslate = scrollX.interpolate({
@@ -201,6 +243,7 @@ export default function SearchTabs() {
               query={query}
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
+              onVerticalScroll={onListVerticalScroll}
             />
           </View>
           <View style={[styles.page, { height: pageHeight }]}>
@@ -208,6 +251,7 @@ export default function SearchTabs() {
               query={query}
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
+              onVerticalScroll={onListVerticalScroll}
             />
           </View>
         </Animated.ScrollView>
@@ -285,6 +329,9 @@ const styles = StyleSheet.create({
   },
   pager: {
     flex: 1,
+    // Keep a fixed gap below the icons; the grid's own top padding moves here so
+    // the space persists instead of scrolling away under the bar.
+    marginTop: TAB_PAGER_GAP,
   },
   page: {
     width: SCREEN_WIDTH,

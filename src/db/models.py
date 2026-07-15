@@ -113,6 +113,46 @@ class WeeklyPromptSuggestion(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Announcement(Base):
+    """A contributor/admin-authored announcement. Every announcement carries an
+    attached discussion (announcement_comment rows). Authoring is gated on the
+    contributor role; any member can read and comment."""
+    __tablename__ = "announcement"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    author_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='SET NULL'), nullable=True)
+    title = Column(String(300), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AnnouncementComment(Base):
+    """A comment in an announcement's discussion thread. Deletable by its author
+    or any contributor (moderation)."""
+    __tablename__ = "announcement_comment"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    announcement_id = Column(UUID(as_uuid=True), ForeignKey('announcement.id', ondelete='CASCADE'), nullable=False)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Doc(Base):
+    """An editable "about the app" document, one per About section (slug =
+    ethos/art/aims). Backs the previously-static aboutContent: any member reads,
+    contributors edit. `body` is plain text (paragraphs separated by blank
+    lines); `order_index` fixes the section order in the About hub."""
+    __tablename__ = "doc"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    slug = Column(String(50), unique=True, nullable=False)
+    title = Column(String(300), nullable=False)
+    body = Column(Text, nullable=False, default="")
+    order_index = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Art(Base):
     __tablename__ = "art"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -397,3 +437,47 @@ class EventInvite(Base):
 
     event_id = Column(UUID(as_uuid=True), ForeignKey('event.id', ondelete='CASCADE'), primary_key=True)
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
+
+
+# --- Observability -------------------------------------------------------------
+
+class UsageEvent(Base):
+    """Behavioral trail: logins + in-app navigation (screen focus). Every
+    logged-in client emits these; contributors read the rollups (#7).
+
+    Brand-new table — create_all builds it; no migration needed (paper trail
+    lives in migrations/022_usage_events.sql)."""
+    __tablename__ = "usage_event"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False, index=True)
+    # 'login' | 'screen'
+    kind = Column(String(20), nullable=False)
+    # Route name for screen-focus events; NULL for logins.
+    screen = Column(String(120))
+    # Client-reported occurrence time (falls back to server time on ingest).
+    occurred_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    # Server receive time — authoritative for skew-proof rollups.
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class DeviceEvent(Base):
+    """Device/perf telemetry: crashes, memory-pressure warnings, perf samples
+    (#6). Separate table from UsageEvent — different shape, different reader.
+
+    Brand-new table — create_all builds it (paper trail:
+    migrations/023_device_events.sql)."""
+    __tablename__ = "device_event"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False, index=True)
+    # 'crash' | 'memory_warning' | 'perf'
+    kind = Column(String(30), nullable=False, index=True)
+    platform = Column(String(20))        # 'ios' | 'android'
+    app_version = Column(String(40))     # e.g. '1.0.4'
+    os_version = Column(String(40))      # e.g. '18.2'
+    device_model = Column(String(80))    # e.g. 'iPhone15,2'
+    # Free-form context: crash message, memory MB, perf metric, etc.
+    detail = Column(Text)
+    occurred_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

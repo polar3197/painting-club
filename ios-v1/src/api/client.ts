@@ -1,6 +1,12 @@
+import { markBackendUp, markBackendDown } from './backendHealth';
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:80/api';
 
 const SERVER_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+
+// Gateway statuses Cloudflare returns when the Pi origin is unreachable. A plain
+// 500 means the Pi is up but the request errored, so it does NOT count as down.
+const GATEWAY_DOWN_STATUSES = new Set([502, 503, 504]);
 
 interface RequestOptions {
   method?: string;
@@ -17,13 +23,25 @@ export function setAuthExpiredHandler(fn: (() => void) | null) {
 
 export async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      ...(!isFormData && { 'Content-Type': 'application/json' }),
-      ...(options.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        ...(!isFormData && { 'Content-Type': 'application/json' }),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (err) {
+    // Couldn't even reach the origin (Pi off / no network) — flag it so every
+    // surface can show the "power source is weak" notice, then rethrow.
+    markBackendDown();
+    throw err;
+  }
+
+  // A gateway error means the Pi is down; any other real response means it's up.
+  if (GATEWAY_DOWN_STATUSES.has(response.status)) markBackendDown();
+  else markBackendUp();
 
   const isJson = response.headers.get('content-type')?.includes('application/json');
   const data = isJson ? await response.json() : null;

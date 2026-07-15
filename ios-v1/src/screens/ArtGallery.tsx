@@ -5,8 +5,19 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import Spinner from '../components/Spinner';
-import { search_art, resolveImageUrl, thumbUrl, ArtResult } from '../api';
-import { useDebouncedValue } from '../hooks';
+import {
+  search_art,
+  get_media,
+  get_members,
+  get_members_written_form,
+  resolveImageUrl,
+  thumbUrl,
+  ArtResult,
+  MediaType,
+  Profile,
+} from '../api';
+import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
+import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { SearchStackParamList } from '../navigation/types';
 
@@ -14,6 +25,115 @@ type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COLUMN_GAP = 10;
 const LIST_PAD = 20; // horizontal padding on each side of the list
+const SNIPPET_LINES = 8;
+
+function snippetOf(text: string | null): string {
+  if (!text) return '';
+  return text.split(/\r?\n/).slice(0, SNIPPET_LINES).join('\n');
+}
+
+// The /art/search endpoint is visual-2d only, and there's no global
+// written-form endpoint — so the gallery assembles written pieces itself,
+// client-side, from the per-member written endpoint. One fetch per
+// (member, shown written-medium); iterating each member's SHOWN `media`
+// list naturally skips hidden media. WrittenFormOut carries no creator or
+// medium, so we stitch those in from the fetch context.
+async function fetchWrittenArt(token: string | null): Promise<ArtResult[]> {
+  const [media, members] = await Promise.all([
+    get_media().catch(() => [] as MediaType[]),
+    get_members('', '', token).catch(() => [] as Profile[]),
+  ]);
+  const writtenMedia = new Set(
+    media.filter((m) => m.type === 'written_form').map((m) => m.name),
+  );
+  if (writtenMedia.size === 0) return [];
+
+  const jobs: Promise<ArtResult[]>[] = [];
+  for (const member of members) {
+    for (const medium of member.media ?? []) {
+      if (!writtenMedia.has(medium)) continue;
+      jobs.push(
+        get_members_written_form(member.username, medium)
+          .then((pieces) =>
+            pieces.map((p): ArtResult => ({
+              id: p.id,
+              title: p.title,
+              medium,
+              art_type: 'written_form',
+              keywords: p.keywords ?? [],
+              song: null,
+              file_path: p.file_path,
+              date: p.date,
+              location: null,
+              creator_username: member.username,
+              creator_city: member.city ?? null,
+              aspect_ratio: null,
+            })),
+          )
+          .catch(() => [] as ArtResult[]),
+      );
+    }
+  }
+  return (await Promise.all(jobs)).flat();
+}
+
+// Merge visual + written newest-first (ISO date strings; nulls sink to the
+// bottom), deduped by id so a future backend that returns written pieces in
+// search can't double them up with the client fan-out.
+function mergeArt(visual: ArtResult[], written: ArtResult[]): ArtResult[] {
+  const byId = new Map<string, ArtResult>();
+  for (const a of visual) byId.set(a.id, a);
+  for (const a of written) if (!byId.has(a.id)) byId.set(a.id, a);
+  return Array.from(byId.values()).sort((a, b) =>
+    (b.date ?? '').localeCompare(a.date ?? ''),
+  );
+}
+
+// Image card — visual-2d pieces (and anything an old backend returns untyped).
+function VisualCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: number; onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      <Image
+        source={{ uri: resolveImageUrl(item.file_path) }}
+        placeholder={{ uri: thumbUrl(item.id) }}
+        transition={200}
+        style={[styles.cardImage, { height: cardWidth }]}
+        contentFit="cover"
+      />
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.cardMedium} numberOfLines={1}>{item.medium}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// Paper card — written-form pieces. Shows a text snippet for .txt/.md, else a
+// blank page (matching the profile's WrittenFormPiece thumbnail treatment).
+function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: number; onPress: () => void }) {
+  const isText = isTextExt(extFromPath(item.file_path));
+  const text = useWrittenFormText(item.file_path);
+  const snippet = snippetOf(text);
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      <View style={[styles.cardPage, { height: cardWidth }]}>
+        {isText && !!snippet && (
+          <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
+        )}
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.cardMedium} numberOfLines={1}>{item.medium}</Text>
+      </View>
+    </Pressable>
+  );
+}
 
 // Cards per row grow ~square with the result count, capped at 4 — a big gallery
 // stays 4-up, and a narrowed search slims down to fewer, larger cards.
@@ -28,25 +148,34 @@ interface Props {
   query: string;
   onResetFilters: () => void;
   onListScroll: () => void;
+  // Reports the grid's vertical scroll offset so SearchTabs can minimize the
+  // toggle bar as you scroll down.
+  onVerticalScroll: (offsetY: number) => void;
 }
 
-export default function ArtGallery({ query, onResetFilters, onListScroll }: Props) {
+export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll }: Props) {
   const navigation = useNavigation<Nav>();
-  const [art, setArt] = useState<ArtResult[]>([]);
+  const { token } = useAuth();
+  // Visual paints immediately; written fans out and merges in when ready.
+  const [visualArt, setVisualArt] = useState<ArtResult[]>([]);
+  const [writtenArt, setWrittenArt] = useState<ArtResult[]>([]);
+  const art = useMemo(() => mergeArt(visualArt, writtenArt), [visualArt, writtenArt]);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    search_art('').then(setArt).catch(() => {});
-  }, []);
+    search_art('').then(setVisualArt).catch(() => {});
+    fetchWrittenArt(token).then(setWrittenArt).catch(() => {});
+  }, [token]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     onResetFilters();
-    try {
-      setArt(await search_art(''));
-    } catch {}
+    await Promise.all([
+      search_art('').then(setVisualArt).catch(() => {}),
+      fetchWrittenArt(token).then(setWrittenArt).catch(() => {}),
+    ]);
     setRefreshing(false);
-  }, [onResetFilters]);
+  }, [onResetFilters, token]);
 
   // Index construction is the expensive half of Fuse — build it once per
   // dataset, not per keystroke. The query is debounced so the grid re-renders
@@ -61,32 +190,19 @@ export default function ArtGallery({ query, onResetFilters, onListScroll }: Prop
   const numColumns = columnsFor(filtered.length);
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
 
-  const renderCard = ({ item }: { item: ArtResult }) => (
-    <Pressable
-      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
-      onPress={() =>
-        navigation.navigate('UserProfile', {
-          username: item.creator_username,
-          artId: item.id,
-          medium: item.medium,
-        })
-      }
-    >
-      <Image
-        source={{ uri: resolveImageUrl(item.file_path) }}
-        placeholder={{ uri: thumbUrl(item.id) }}
-        transition={200}
-        style={[styles.cardImage, { height: cardWidth }]}
-        contentFit="cover"
-      />
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.cardMedium} numberOfLines={1}>{item.medium}</Text>
-      </View>
-    </Pressable>
-  );
+  const renderCard = ({ item }: { item: ArtResult }) => {
+    const onPress = () =>
+      navigation.navigate('UserProfile', {
+        username: item.creator_username,
+        artId: item.id,
+        medium: item.medium,
+      });
+    return item.art_type === 'written_form' ? (
+      <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} />
+    ) : (
+      <VisualCard item={item} cardWidth={cardWidth} onPress={onPress} />
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -101,6 +217,8 @@ export default function ArtGallery({ query, onResetFilters, onListScroll }: Prop
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={onListScroll}
+        onScroll={(e) => onVerticalScroll(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -133,7 +251,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   list: {
-    padding: 20,
+    // Top gap lives on the pager (SearchTabs) so it persists while scrolling.
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
   row: {
@@ -151,6 +270,20 @@ const styles = StyleSheet.create({
   },
   cardImage: {
     width: '100%',
+  },
+  // Written-form "page": cream panel with a clipped serif snippet, sized to
+  // match the square image cards so mixed rows line up.
+  cardPage: {
+    width: '100%',
+    backgroundColor: Colors.secondary,
+    padding: 8,
+    overflow: 'hidden',
+  },
+  cardPageSnippet: {
+    fontFamily: Fonts.serif,
+    fontSize: 8,
+    lineHeight: 10,
+    color: Colors.black,
   },
   cardBody: {
     padding: 8,

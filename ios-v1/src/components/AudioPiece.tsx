@@ -269,7 +269,9 @@ export function AudioPreviewBar({
   uri: string;
   onDuration?: (seconds: number) => void;
 }) {
-  const player = useAudioPlayer({ uri });
+  // Tighter update interval than the 500ms default: the play/pause icon and the
+  // play-vs-pause decision were lagging reality and desyncing on rapid taps.
+  const player = useAudioPlayer({ uri }, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
   const [scrubFrac, setScrubFrac] = useState<number | null>(null);
 
@@ -280,9 +282,24 @@ export function AudioPreviewBar({
 
   useEffect(() => () => releasePlayback(pauseSelf), []);
 
-  const startPlay = () => {
-    claimPlayback(pauseSelf);
-    player.play();
+  // A freshly recorded take can leave the iOS session in record mode; re-assert
+  // playback so the just-recorded file is audible on the first tap.
+  useEffect(() => {
+    ExpoAudio.setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+  }, []);
+
+  // Branch off the player's SYNCHRONOUS state, not the (lagged) status snapshot,
+  // and never call play() before the item is loaded — that no-op was the
+  // "recorded memo won't play," and the stale-status branch was the play/pause
+  // spam getting stuck.
+  const toggle = () => {
+    if (!player.isLoaded) return;
+    if (player.playing) {
+      player.pause();
+    } else {
+      claimPlayback(pauseSelf);
+      player.play();
+    }
   };
 
   useEffect(() => {
@@ -303,10 +320,7 @@ export function AudioPreviewBar({
 
   return (
     <View style={styles.playerBar}>
-      <Pressable
-        style={styles.playBtn}
-        onPress={() => (status.playing ? player.pause() : startPlay())}
-      >
+      <Pressable style={styles.playBtn} onPress={toggle}>
         <Text style={styles.playBtnText}>
           {!status.isLoaded ? '…' : status.playing ? '❚❚' : '▶'}
         </Text>

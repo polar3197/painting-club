@@ -1,20 +1,22 @@
 import React, { useEffect } from 'react';
 import { Pressable, Text, View, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 /**
- * Floating "update ready — tap to restart" pill. expo-updates downloads new OTA
+ * "update ready — tap to restart" button. expo-updates downloads new OTA
  * bundles in the background (checkAutomatically: ON_LOAD); normally they only
  * apply on the *next* cold start. This surfaces the pending update and lets the
  * user apply it immediately via reloadAsync() — no two-restart dance.
  *
- * Also proactively checks + fetches on mount so the pill can appear within a
+ * Rendered once at the app root (above the navigator), so it floats dead-center
+ * over whatever page is showing. `box-none` lets taps pass through to the
+ * content behind it; only the button itself is interactive.
+ *
+ * Also proactively checks + fetches on mount so the button can appear within a
  * single session rather than waiting for the implicit launch check.
  */
 export default function UpdateBanner() {
-  const insets = useSafeAreaInsets();
   const { isUpdatePending } = Updates.useUpdates();
 
   useEffect(() => {
@@ -33,14 +35,15 @@ export default function UpdateBanner() {
   if (!isUpdatePending) return null;
 
   return (
-    <View style={[styles.wrap, { top: insets.top + 8 }]} pointerEvents="box-none">
+    <View style={styles.wrap} pointerEvents="box-none">
       <Pressable
-        style={styles.pill}
+        style={styles.button}
         onPress={() => {
           Updates.reloadAsync().catch(() => {});
         }}
       >
-        <Text style={styles.text}>update ready — tap to restart</Text>
+        <Text style={styles.title}>update ready</Text>
+        <Text style={styles.subtitle}>tap to restart</Text>
       </Pressable>
     </View>
   );
@@ -48,24 +51,31 @@ export default function UpdateBanner() {
 
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1000,
   },
-  pill: {
+  button: {
     backgroundColor: Colors.accentGolden,
     borderWidth: 1,
     borderColor: '#000',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 20,
+    alignItems: 'center',
     ...Shadows.card,
   },
-  text: {
+  title: {
+    fontFamily: Fonts.serif,
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.black,
+  },
+  subtitle: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.black,
+    marginTop: 2,
   },
 });

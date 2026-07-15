@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert } from 'react-native';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -16,9 +16,83 @@ import {
   get_reports,
   update_report_status,
   ReportOut,
+  get_admin_prompt_queue,
+  review_prompt_suggestion,
+  PromptSuggestionOut,
+  get_admin_members,
+  set_member_role,
+  AdminMemberOut,
+  MemberRole,
 } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from '../components/ConfirmDialog';
+
+function PromptSuggestionRow({
+  s,
+  onReview,
+}: {
+  s: PromptSuggestionOut;
+  onReview?: (id: string, status: 'approved' | 'rejected') => void;
+}) {
+  return (
+    <View style={styles.promptRow}>
+      <Text style={styles.promptText}>{s.prompt_text}</Text>
+      <Text style={styles.promptMeta}>
+        {s.media_name ?? 'any medium'}
+        {s.username ? `  ·  @${s.username}` : ''}
+      </Text>
+      {onReview && (
+        <View style={styles.promptBtns}>
+          <Pressable
+            style={[styles.promptBtn, { backgroundColor: 'lightgreen' }]}
+            onPress={() => onReview(s.id, 'approved')}
+          >
+            <Text style={styles.promptBtnText}>approve</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.promptBtn, { backgroundColor: Colors.redCoral }]}
+            onPress={() => onReview(s.id, 'rejected')}
+          >
+            <Text style={styles.promptBtnText}>reject</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const ROLE_TIERS: MemberRole[] = ['member', 'contributor', 'admin'];
+
+function MemberRoleRow({
+  m,
+  onSetRole,
+}: {
+  m: AdminMemberOut;
+  onSetRole: (username: string, role: MemberRole) => void;
+}) {
+  const name = [m.firstname, m.lastname].filter(Boolean).join(' ');
+  return (
+    <View style={styles.memberRow}>
+      <Text style={styles.memberName}>
+        @{m.username}
+        {name ? `  ·  ${name}` : ''}
+      </Text>
+      <View style={styles.roleChips}>
+        {ROLE_TIERS.map((r) => (
+          <Pressable
+            key={r}
+            style={[styles.roleChip, m.role === r && styles.roleChipOn]}
+            onPress={() => m.role !== r && onSetRole(m.username, r)}
+          >
+            <Text style={[styles.roleChipText, m.role === r && styles.roleChipTextOn]}>
+              {r}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 function ApplicationRow({
   app,
@@ -272,11 +346,14 @@ function ReportRow({
 export default function Admin() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const [tab, setTab] = useState<'applications' | 'media-requests' | 'reports'>('applications');
+  const [tab, setTab] = useState<'applications' | 'media-requests' | 'reports' | 'prompts' | 'members'>('applications');
   const [applications, setApplications] = useState<ApplicationOut[]>([]);
   const [resets, setResets] = useState<PasswordResetOut[]>([]);
   const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
   const [reports, setReports] = useState<ReportOut[]>([]);
+  const [proposed, setProposed] = useState<PromptSuggestionOut[]>([]);
+  const [upNext, setUpNext] = useState<PromptSuggestionOut[]>([]);
+  const [members, setMembers] = useState<AdminMemberOut[]>([]);
 
   const fetchApps = () => {
     get_applications(token).then(setApplications).catch(() => {});
@@ -291,11 +368,47 @@ export default function Admin() {
     get_reports(token).then(setReports).catch(() => {});
   };
 
+  const fetchPrompts = () => {
+    get_admin_prompt_queue(token)
+      .then((q) => {
+        setProposed(q.proposed);
+        setUpNext(q.up_next);
+      })
+      .catch(() => {});
+  };
+
+  const fetchMembers = () => {
+    get_admin_members(token).then(setMembers).catch(() => {});
+  };
+
   useEffect(() => {
     fetchApps();
     fetchRequests();
     fetchReports();
+    fetchPrompts();
+    fetchMembers();
   }, [token]);
+
+  const handleSetRole = async (username: string, role: MemberRole) => {
+    // Optimistic: reflect the new tier immediately, roll back on failure.
+    const prev = members;
+    setMembers((ms) => ms.map((m) => (m.username === username ? { ...m, role } : m)));
+    try {
+      await set_member_role(username, role, token);
+    } catch (err: any) {
+      setMembers(prev);
+      Alert.alert("Couldn't change role", err?.message || 'try again.');
+    }
+  };
+
+  const handleReviewPrompt = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      await review_prompt_suggestion(id, status, token);
+      fetchPrompts();
+    } catch (err: any) {
+      Alert.alert("Couldn't update", err?.message || 'try again.');
+    }
+  };
 
   const handleResolveReport = async (id: string, status: 'resolved' | 'dismissed') => {
     try {
@@ -310,8 +423,13 @@ export default function Admin() {
     try {
       await update_application_status(id, status, token);
       fetchApps();
-    } catch {
-      // ignore
+    } catch (err: any) {
+      // Surface the failure instead of swallowing it — e.g. approving a
+      // re-submitted application whose email already belongs to a member.
+      Alert.alert(
+        status === 'approved' ? "Couldn't approve" : "Couldn't update",
+        err?.message || 'Something went wrong — try again.',
+      );
     }
   };
 
@@ -371,9 +489,47 @@ export default function Admin() {
             reports
           </Text>
         </Pressable>
+        <Pressable onPress={() => setTab('prompts')}>
+          <Text style={[styles.title, tab !== 'prompts' && styles.titleInactive]}>
+            prompts
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => setTab('members')}>
+          <Text style={[styles.title, tab !== 'members' && styles.titleInactive]}>
+            members
+          </Text>
+        </Pressable>
       </View>
 
-      {tab === 'reports' ? (
+      {tab === 'prompts' ? (
+        <>
+          <Text style={styles.sectionHeader}>proposed</Text>
+          {proposed.length === 0 ? (
+            <Text style={styles.emptyText}>no proposed prompts</Text>
+          ) : (
+            proposed.map((s) => (
+              <PromptSuggestionRow key={s.id} s={s} onReview={handleReviewPrompt} />
+            ))
+          )}
+
+          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>up next</Text>
+          {upNext.length === 0 ? (
+            <Text style={styles.emptyText}>nothing approved yet</Text>
+          ) : (
+            upNext.map((s) => <PromptSuggestionRow key={s.id} s={s} />)
+          )}
+        </>
+      ) : tab === 'members' ? (
+        <>
+          {members.length === 0 ? (
+            <Text style={styles.emptyText}>no members</Text>
+          ) : (
+            members.map((m) => (
+              <MemberRoleRow key={m.username} m={m} onSetRole={handleSetRole} />
+            ))
+          )}
+        </>
+      ) : tab === 'reports' ? (
         <>
           <Text style={styles.sectionHeader}>pending</Text>
           {pendingReports.length === 0 ? (
@@ -515,6 +671,72 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.textTertiary,
     marginBottom: 10,
+  },
+  promptRow: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    padding: 12,
+    marginBottom: 8,
+    gap: 6,
+  },
+  promptText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+  },
+  promptMeta: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textSecondary,
+  },
+  promptBtns: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 2,
+  },
+  promptBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  promptBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+  },
+  memberRow: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    padding: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  memberName: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+  },
+  roleChips: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  roleChip: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  roleChipOn: {
+    backgroundColor: Colors.primaryGold,
+  },
+  roleChipText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textSecondary,
+  },
+  roleChipTextOn: {
+    color: '#000',
   },
   row: {
     flexDirection: 'row',

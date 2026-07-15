@@ -33,10 +33,23 @@ import type {
   MessageOut,
   MessagesPage,
   MemberDirectoryEntry,
+  AdminMemberOut,
+  MemberRole,
+  AnnouncementOut,
+  AnnouncementDetailOut,
+  AnnouncementCommentOut,
+  DocOut,
   ParticipantOut,
   PromptOut,
   PromptDetailOut,
   PromptSummary,
+  PromptSuggestionOut,
+  AdminPromptQueueOut,
+  EventOut,
+  EventIn,
+  EventUpdate,
+  UsageSummary,
+  TelemetrySummary,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -202,6 +215,14 @@ export function set_media_visibility(medium: string, hidden: boolean, token: str
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ hidden }),
   });
+}
+
+export function reorder_media(mediums: string[], token: string | null): Promise<{ ok: boolean }> {
+  return request('/members/media-order', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ mediums }),
+  }) as Promise<{ ok: boolean }>;
 }
 
 export function submit_media_request(
@@ -684,3 +705,235 @@ export function list_prompts(token: string | null): Promise<PromptSummary[]> {
   }) as Promise<PromptSummary[]>;
 }
 
+// --- Weekly-prompt suggestions (member proposes; admin reviews) ---
+
+export function create_prompt_suggestion(
+  prompt_text: string,
+  media_id: string | null,
+  token: string | null,
+): Promise<PromptSuggestionOut> {
+  return request('/weekly-prompts/suggestions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ prompt_text, media_id }),
+  }) as Promise<PromptSuggestionOut>;
+}
+
+export function get_admin_members(token: string | null): Promise<AdminMemberOut[]> {
+  return request('/admin/members', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AdminMemberOut[]>;
+}
+
+export function set_member_role(
+  username: string,
+  role: MemberRole,
+  token: string | null,
+): Promise<{ username: string; role: MemberRole }> {
+  return request(`/admin/members/${username}/role`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ role }),
+  }) as Promise<{ username: string; role: MemberRole }>;
+}
+
+export function get_admin_prompt_queue(token: string | null): Promise<AdminPromptQueueOut> {
+  return request('/admin/weekly-prompts', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AdminPromptQueueOut>;
+}
+
+export function review_prompt_suggestion(
+  id: string,
+  status: 'approved' | 'rejected',
+  token: string | null,
+): Promise<PromptSuggestionOut> {
+  return request(`/admin/weekly-prompts/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  }) as Promise<PromptSuggestionOut>;
+}
+
+// --- Events -------------------------------------------------------------------
+
+export function list_events(token: string | null): Promise<EventOut[]> {
+  return request('/events', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<EventOut[]>;
+}
+
+export function get_event(id: string, token: string | null): Promise<EventOut> {
+  return request(`/events/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<EventOut>;
+}
+
+export function create_event(payload: EventIn, token: string | null): Promise<EventOut> {
+  return request('/events', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }) as Promise<EventOut>;
+}
+
+export function update_event(id: string, payload: EventUpdate, token: string | null): Promise<EventOut> {
+  return request(`/events/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }) as Promise<EventOut>;
+}
+
+export function delete_event(id: string, token: string | null): Promise<{ ok: boolean }> {
+  return request(`/events/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean }>;
+}
+
+export function add_event_hosts(id: string, usernames: string[], token: string | null) {
+  return request(`/events/${id}/hosts`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ usernames }),
+  });
+}
+
+export function remove_event_host(id: string, username: string, token: string | null) {
+  return request(`/events/${id}/hosts/${username}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function add_event_invites(id: string, usernames: string[], token: string | null) {
+  return request(`/events/${id}/invites`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ usernames }),
+  });
+}
+
+export function remove_event_invite(id: string, username: string, token: string | null) {
+  return request(`/events/${id}/invites/${username}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function upload_event_image(
+  id: string,
+  file: { uri: string; name: string; type: string },
+  token: string | null,
+): Promise<{ image_path: string }> {
+  const fd = new FormData();
+  fd.append('file', {
+    uri: file.uri,
+    name: file.name,
+    type: file.type,
+  } as any);
+  return request(`/events/${id}/image`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  }) as Promise<{ image_path: string }>;
+}
+
+// --- Observability summaries (contributor panel, #7) --------------------------
+
+export function get_usage_summary(days: number, token: string | null): Promise<UsageSummary> {
+  return request(`/usage/summary?days=${days}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<UsageSummary>;
+}
+
+export function get_telemetry_summary(days: number, token: string | null): Promise<TelemetrySummary> {
+  return request(`/telemetry/summary?days=${days}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<TelemetrySummary>;
+}
+
+
+// --- Announcements (contributor-authored feed + discussion) -------------------
+
+export function get_announcements(token: string | null): Promise<AnnouncementOut[]> {
+  return request('/announcements', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AnnouncementOut[]>;
+}
+
+export function get_announcement(id: string, token: string | null): Promise<AnnouncementDetailOut> {
+  return request(`/announcements/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AnnouncementDetailOut>;
+}
+
+export function create_announcement(
+  title: string,
+  body: string,
+  token: string | null,
+): Promise<AnnouncementOut> {
+  return request('/announcements', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title, body }),
+  }) as Promise<AnnouncementOut>;
+}
+
+export function delete_announcement(id: string, token: string | null): Promise<void> {
+  return request(`/announcements/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<void>;
+}
+
+export function add_announcement_comment(
+  id: string,
+  text: string,
+  token: string | null,
+): Promise<AnnouncementCommentOut> {
+  return request(`/announcements/${id}/comments`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ text }),
+  }) as Promise<AnnouncementCommentOut>;
+}
+
+export function delete_announcement_comment(
+  id: string,
+  comment_id: string,
+  token: string | null,
+): Promise<void> {
+  return request(`/announcements/${id}/comments/${comment_id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<void>;
+}
+
+// --- Docs (editable "about the app" sections) ---------------------------------
+
+export function get_docs(token: string | null): Promise<DocOut[]> {
+  return request('/docs', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<DocOut[]>;
+}
+
+export function get_doc(slug: string, token: string | null): Promise<DocOut> {
+  return request(`/docs/${slug}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<DocOut>;
+}
+
+export function update_doc(
+  slug: string,
+  title: string,
+  body: string,
+  token: string | null,
+): Promise<DocOut> {
+  return request(`/docs/${slug}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title, body }),
+  }) as Promise<DocOut>;
+}

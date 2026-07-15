@@ -123,6 +123,24 @@ export interface PromptSummary {
   created_at: string;
 }
 
+// A member-proposed weekly prompt. `media_name` null = "medium agnostic".
+// `username` is populated in the admin queue view.
+export interface PromptSuggestionOut {
+  id: string;
+  username: string | null;
+  media_id: string | null;
+  media_name: string | null;
+  prompt_text: string;
+  status: string; // proposed | approved | rejected
+  order_index: number | null;
+  created_at: string;
+}
+
+export interface AdminPromptQueueOut {
+  proposed: PromptSuggestionOut[];
+  up_next: PromptSuggestionOut[];
+}
+
 export interface Visual2DOut {
   id: string;
   username: string;
@@ -331,6 +349,16 @@ export interface MemberDirectoryEntry {
   lastname: string | null;
 }
 
+// Admin role-management panel: every member with their role tier.
+export type MemberRole = 'member' | 'contributor' | 'admin';
+
+export interface AdminMemberOut {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+  role: MemberRole;
+}
+
 export interface ParticipantOut {
   username: string;
   firstname: string | null;
@@ -377,4 +405,108 @@ export interface MediaRequest {
   requested_type: string | null;
   resolved_type: string | null;
   created_at: string;
+}
+
+// --- Events -------------------------------------------------------------------
+
+export interface EventOut {
+  id: string;
+  title: string;
+  description: string | null;
+  event_date: string; // YYYY-MM-DD
+  event_time: string | null; // HH:MM:SS
+  image_path: string | null;
+  color: string | null;
+  is_public: boolean;
+  creator_username: string;
+  hosts: string[];
+  // Only present when the viewer is a host/creator; invitees don't see the list.
+  invited: string[] | null;
+  can_edit: boolean;
+  created_at: string;
+}
+
+export interface EventIn {
+  title: string;
+  description?: string | null;
+  event_date: string; // YYYY-MM-DD (required)
+  event_time?: string | null; // HH:MM (backend accepts HH:MM[:SS])
+  is_public?: boolean;
+  color?: string | null;
+  hosts?: string[];
+}
+
+export interface EventUpdate {
+  title?: string;
+  description?: string | null;
+  event_date?: string;
+  event_time?: string | null;
+  is_public?: boolean;
+  color?: string | null;
+}
+
+// --- Observability summaries (contributor panel, #7) --------------------------
+
+export interface DayCount {
+  date: string; // YYYY-MM-DD
+  count: number;
+}
+
+export interface UsageSummary {
+  days: number;
+  total_logins: number;
+  total_events: number;
+  logins_per_day: DayCount[];
+  active_per_day: DayCount[];
+  top_screens: { screen: string; count: number }[];
+}
+
+export interface DeviceEventRecent {
+  kind: string;
+  platform: string | null;
+  app_version: string | null;
+  os_version: string | null;
+  device_model: string | null;
+  detail: string | null;
+  occurred_at: string | null;
+}
+
+export interface TelemetrySummary {
+  days: number;
+  counts_by_kind: { kind: string; count: number }[];
+  app_versions: { version: string; count: number }[];
+  crashes_per_day: DayCount[];
+  recent: DeviceEventRecent[];
+}
+
+// --- Announcements (contributor-authored feed + discussion) -------------------
+export interface AnnouncementOut {
+  id: string;
+  title: string;
+  body: string;
+  author_username: string | null;
+  author_firstname: string | null;
+  comment_count: number;
+  created_at: string;
+}
+
+export interface AnnouncementCommentOut {
+  id: string;
+  username: string;
+  firstname: string | null;
+  text: string;
+  created_at: string;
+}
+
+export interface AnnouncementDetailOut extends AnnouncementOut {
+  comments: AnnouncementCommentOut[];
+}
+
+// --- Docs (editable "about the app" sections) ---------------------------------
+export interface DocOut {
+  slug: string;
+  title: string;
+  body: string;
+  order_index: number;
+  updated_at: string | null;
 }

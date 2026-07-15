@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { useProfile } from '../hooks';
+import { useProfile, useAdminPending } from '../hooks';
 import * as ImagePicker from 'expo-image-picker';
 import {
   get_members_visual_2d,
@@ -321,6 +321,8 @@ export default function UserProfile() {
   // Unread-messages dot on the owner's mail button. Polled while the profile
   // is focused; server counts messages newer than each thread's read cursor.
   const [unreadMessages, setUnreadMessages] = useState(0);
+  // Admin-only: pending account + media requests → red dot on the settings gear.
+  const adminPending = useAdminPending();
 
   useEffect(() => {
     if (!isFocused || !profile?.is_owner) return;
@@ -451,11 +453,20 @@ export default function UserProfile() {
     }, 50);
   }, []);
 
+  // The backend now returns media in a stable order — the owner's chosen tab
+  // order (hold-and-drag) first, then alphabetical — identical across the
+  // mount + focus refetch, so we render it as-is instead of re-sorting
+  // alphabetically (which would override the custom order).
+  const mediaTabs = useMemo(
+    () => profile?.media ?? [],
+    [profile?.media],
+  );
+
   useEffect(() => {
-    if (!mediumParam && profile?.media?.[0]) {
-      setSelectedMedium(profile.media[0]);
+    if (!mediumParam && mediaTabs[0]) {
+      setSelectedMedium(mediaTabs[0]);
     }
-  }, [profile]);
+  }, [mediaTabs, mediumParam]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('tabPress', () => {
@@ -796,6 +807,7 @@ export default function UserProfile() {
           hidden={profile.hidden_media ?? []}
           onAdd={handleAddMedia}
           onVisibilityChange={handleMediaVisibilityChange}
+          onReorder={() => refetchProfile()}
           onClose={() => setShowAddMedia(false)}
         />
       )}
@@ -850,6 +862,7 @@ export default function UserProfile() {
                         onPress={() => navigation.navigate('Settings')}
                       >
                         <Ionicons name="settings-outline" size={22} color={Colors.black} />
+                        {adminPending.total > 0 && <View style={styles.unreadDot} />}
                       </Pressable>
                       <Pressable
                         style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
@@ -946,7 +959,7 @@ export default function UserProfile() {
         onLayout={(e) => { mediaBarY.current = e.nativeEvent.layout.y; }}
       >
         <View style={styles.mediaTabs}>
-          {profile.media?.map((m) => (
+          {mediaTabs.map((m) => (
             <Pressable
               key={m}
               style={[
@@ -1481,12 +1494,17 @@ const styles = StyleSheet.create({
     // ~2/3 of the original xxl (36 → 24) — still reads as a title but
     // less dominant than the artwork.
     fontSize: FontSizes.lg,
+    // Take only the space left of the date badge and WRAP long titles —
+    // unconstrained, a long title grew to content width and pushed the
+    // badge off the row's right edge.
+    flex: 1,
   },
   titleRow: {
     // Title left, date badge pinned to the right edge via marginLeft:'auto'
-    // on the badge itself.
+    // on the badge itself. Top-aligned so a wrapped multi-line title keeps
+    // the badge beside its first line.
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     marginBottom: 6,
   },
@@ -1496,6 +1514,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1,
     marginLeft: 'auto',
+    // Optically align with the title's first text line under flex-start.
+    marginTop: 4,
   },
   dateBadgeText: {
     fontFamily: Fonts.mono,

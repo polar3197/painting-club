@@ -59,6 +59,25 @@ export default function Settings() {
       {/* Spacer pushes the everyday actions down to the thumb zone. */}
       <View style={{ flex: 1 }} />
 
+      {/* Contributor panel (#7): usage + telemetry rollups. Admin implies
+          contributor, so both roles see these. */}
+      {(currentRole === 'contributor' || currentRole === 'admin') && (
+        <>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
+            onPress={() => navigation.navigate('UserStats')}
+          >
+            <Text style={styles.actionBtnText}>user stats</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
+            onPress={() => navigation.navigate('InfraStats')}
+          >
+            <Text style={styles.actionBtnText}>infra stats</Text>
+          </Pressable>
+        </>
+      )}
+
       {currentRole === 'admin' && (
         <Pressable
           style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}

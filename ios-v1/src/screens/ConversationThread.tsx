@@ -6,13 +6,17 @@ import {
   FlatList,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   Alert,
   Modal,
   Dimensions,
+  // Raw RN input here (not the app-wide AppTextInput wrapper) so the message
+  // field can keep autocorrect on. The iOS suggestion bar rides with it unless
+  // Predictive is off in the device keyboard settings.
+  TextInput,
 } from 'react-native';
-import { TextInput } from '../components/AppTextInput';
 import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,10 +111,13 @@ function MessageInputBar({
         value={input}
         placeholder="message..."
         placeholderTextColor={Colors.textMuted}
-        autoCapitalize="none"
+        autoCapitalize="sentences"
+        autoCorrect
+        spellCheck
         onChangeText={setInput}
-        onSubmitEditing={submit}
-        returnKeyType="send"
+        // Grows in height with the text (up to maxHeight, then scrolls) instead
+        // of scrolling sideways. Return inserts a newline; send with the button.
+        multiline
       />
       <Pressable style={styles.submitBtn} onPress={submit}>
         <Text style={styles.submitText}>{'↑'}</Text>
@@ -130,6 +137,18 @@ export default function ConversationThread() {
   const { currentUser, token } = useAuth();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+
+  // When the keyboard is up it already covers the home-indicator area, so the
+  // input bar shouldn't also pad by the bottom safe-area inset — that double
+  // count is the dead space between the text box and the keyboard.
+  const [kbUp, setKbUp] = useState(false);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s = Keyboard.addListener(showEvt, () => setKbUp(true));
+    const h = Keyboard.addListener(hideEvt, () => setKbUp(false));
+    return () => { s.remove(); h.remove(); };
+  }, []);
 
   const [messages, setMessages] = useState<MessageOut[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -385,7 +404,7 @@ export default function ConversationThread() {
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
         />
-        <MessageInputBar onSend={sendBody} bottomInset={insets.bottom} />
+        <MessageInputBar onSend={sendBody} bottomInset={kbUp ? 0 : insets.bottom} />
       </KeyboardAvoidingView>
     </View>
   );
@@ -498,8 +517,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentGolden,
   },
   msgText: {
-    fontFamily: Fonts.serif,
-    fontSize: 15,
+    fontFamily: Fonts.system,
+    fontSize: 16,
   },
   // --- invite sheet ---
   inviteRoot: {
@@ -582,19 +601,23 @@ const styles = StyleSheet.create({
   },
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // Bottom-align so the send button stays at the bottom as the field grows.
+    alignItems: 'flex-end',
+    gap: 8,
     borderTopWidth: 1,
     borderTopColor: '#000',
     padding: 8,
   },
   input: {
     flex: 1,
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
+    fontFamily: Fonts.system,
+    fontSize: 16,
     borderWidth: 1,
     borderColor: '#000',
     paddingHorizontal: 8,
     paddingVertical: 6,
+    minHeight: 36,
+    maxHeight: 120,
   },
   submitBtn: {
     width: 24,

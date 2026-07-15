@@ -7,6 +7,11 @@ import AboutSection from '../screens/AboutSection';
 import AboutPost from '../screens/AboutPost';
 import ComingSoon from '../screens/ComingSoon';
 import RequestFeature from '../screens/RequestFeature';
+import AnnouncementsFeed from '../screens/AnnouncementsFeed';
+import AnnouncementDetail from '../screens/AnnouncementDetail';
+import Events from '../screens/Events';
+import EventDetail from '../screens/EventDetail';
+import EventEdit from '../screens/EventEdit';
 import type { HomeStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -27,6 +32,11 @@ export default function HomeStack() {
       <Stack.Screen name="AboutPost" component={AboutPost} />
       <Stack.Screen name="ComingSoon" component={ComingSoon} />
       <Stack.Screen name="RequestFeature" component={RequestFeature} />
+      <Stack.Screen name="AnnouncementsFeed" component={AnnouncementsFeed} />
+      <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetail} />
+      <Stack.Screen name="Events" component={Events} />
+      <Stack.Screen name="EventDetail" component={EventDetail} />
+      <Stack.Screen name="EventEdit" component={EventEdit} />
       <Stack.Screen
         name="WeeklyPromptDetail"
         component={WeeklyPromptDetail}

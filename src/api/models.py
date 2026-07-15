@@ -490,6 +490,52 @@ class PromptSuggestionReorder(BaseModel):
     suggestion_ids: list[uuid.UUID]
 
 
+class AnnouncementIn(BaseModel):
+    title: str
+    body: str
+
+
+class AnnouncementCommentIn(BaseModel):
+    text: str
+
+
+class AnnouncementCommentOut(BaseModel):
+    id: uuid.UUID
+    username: str
+    firstname: str | None = None
+    text: str
+    created_at: datetime
+
+
+class AnnouncementOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    body: str
+    author_username: str | None = None
+    author_firstname: str | None = None
+    comment_count: int = 0
+    created_at: datetime
+
+
+class AnnouncementDetailOut(AnnouncementOut):
+    comments: list[AnnouncementCommentOut] = []
+
+
+# --- Docs (editable "about the app" sections) ---------------------------------
+
+class DocIn(BaseModel):
+    title: str
+    body: str
+
+
+class DocOut(BaseModel):
+    slug: str
+    title: str
+    body: str
+    order_index: int = 0
+    updated_at: datetime | None = None
+
+
 # --- Bookmarks ----------------------------------------------------------------
 
 class BookmarkedArtOut(BaseModel):
@@ -557,9 +603,42 @@ class MediaOrderIn(BaseModel):
     mediums: list[str]
 
 
+class AdminMemberOut(BaseModel):
+    username: str
+    firstname: str | None = None
+    lastname: str | None = None
+    role: str
+
 class MemberRoleUpdate(BaseModel):
-    role: str  # 'admin' | 'member'
+    role: str  # 'member' | 'contributor' | 'admin'
 
 class MemberRoleOut(BaseModel):
     username: str
     role: str
+
+
+# --- Observability -------------------------------------------------------------
+
+class UsageEventIn(BaseModel):
+    # 'login' | 'screen' (unknown kinds dropped server-side)
+    kind: str
+    # Route name for screen events; ignored for logins.
+    screen: str | None = None
+    # Client-reported occurrence time; server falls back to receive time.
+    at: datetime | None = None
+
+class UsageBatchIn(BaseModel):
+    events: List[UsageEventIn]
+
+class DeviceEventIn(BaseModel):
+    # 'crash' | 'memory_warning' | 'perf'
+    kind: str
+    platform: str | None = None
+    app_version: str | None = None
+    os_version: str | None = None
+    device_model: str | None = None
+    detail: str | None = None
+    at: datetime | None = None
+
+class DeviceBatchIn(BaseModel):
+    events: List[DeviceEventIn]

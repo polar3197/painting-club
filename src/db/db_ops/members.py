@@ -9,7 +9,9 @@ from db.models import (
     KeywordArt,
 )
 
-VALID_ROLES = {"member", "admin"}
+# Role hierarchy: member < contributor < admin. "contributor" grants
+# announcement/docs authoring + discussion moderation; admin implies contributor.
+VALID_ROLES = {"member", "contributor", "admin"}
 
 async def db_get_members(db: AsyncSession):
     result = await db.execute(select(Member))
@@ -31,7 +33,7 @@ async def db_set_member_role(db: AsyncSession, username: str, role: str) -> Memb
         raise ValueError("Member not found")
     if member.role == role:
         return member  # already there
-    if member.role == "admin" and role == "member":
+    if member.role == "admin" and role != "admin":
         other_admins = (
             await db.execute(
                 select(func.count())

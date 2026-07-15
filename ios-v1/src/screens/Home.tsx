@@ -1,16 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, Image, Pressable, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
+import { View, Text, ScrollView, Image, Pressable, StyleSheet, Dimensions, Animated, Easing, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
+  useFrameCallback,
   withDecay,
   runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
+import { useAdminPending } from '../hooks';
+import Announcements from '../components/Announcements';
 import { get_active_prompt, PromptOut } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { HomeStackParamList } from '../navigation/types';
@@ -22,6 +26,11 @@ type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeFeed'>;
 // prompt in particular is preserved so it can be re-added later.
 const SHOW_INTRO = false; // title bar + welcome blurb
 const SHOW_WEEKLY_PROMPT = true; // the week's-prompt circle
+
+// Fidget spinner (the spinning diamond + its ∗/○ toggle) is hidden for now —
+// the Home toy is the two bouncing balls. Flip back to true to restore the
+// toggle and the spinning-diamond mode.
+const SHOW_FIDGET = false;
 
 // Temporary type-sampler. These are the sharp-edged / monoline fonts that iOS
 // ships with (so they render without embedding). The Google picks (Jost,
@@ -134,6 +143,205 @@ function Sparkle({ angle, r, delay, size }: { angle: number; r: number; delay: n
   );
 }
 
+// --- Bounce mode physics (independent of the fidget diamond) ---
+const BALL_SIZE = 150;
+const WALL_RESTITUTION = 0.94;  // energy kept per wall bounce (high elasticity)
+const LAUNCH_GAIN = 78;         // launch px/s per px of pull (opposite the pull) — ~3x strong
+const MAX_PULL = 185;           // ~1.2 inches of stretch (≈155 pt/inch on these screens)
+const MAX_SPEED = 6000;         // ceiling: fast but still reads as motion, not a vibrating blur
+const REST_DAMPING = 0.7;       // per-second exponential velocity decay (light)
+const MIN_SPEED = 24;           // px/s below which the ball is treated as at rest
+
+// A single slingshot "ball" living inside a shared play area. The arena owns
+// the measured width/height (passed in as shared values); the ball owns its own
+// position/velocity. Grab it (freezes it), drag to stretch from its rest
+// anchor, release and it launches OPPOSITE the pull, bouncing off the arena
+// walls with high elasticity and light friction until it settles. Each ball
+// also gets an initial velocity so they're already bouncing on load. A clean
+// tap fires onOpen. Physics runs on the UI thread via useFrameCallback, paused
+// whenever the screen isn't focused. Fully separate from SpinningPromptDiamond.
+function Ball({ label, sublabel, accent, onOpen, W, H, initFracX, initFracY, initVX, initVY }: {
+  label: string;
+  sublabel?: string | null;
+  accent: string;
+  onOpen?: () => void;
+  W: Reanimated.SharedValue<number>;
+  H: Reanimated.SharedValue<number>;
+  initFracX: number;
+  initFracY: number;
+  initVX: number;
+  initVY: number;
+}) {
+  const posX = useSharedValue(0);
+  const posY = useSharedValue(0);
+  const velX = useSharedValue(0);
+  const velY = useSharedValue(0);
+  const dragging = useSharedValue(false);
+  const inited = useSharedValue(false);
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  const anchorX = useSharedValue(0);
+  const anchorY = useSharedValue(0);
+  const isFocused = useIsFocused();
+
+  const frame = useFrameCallback((info) => {
+    'worklet';
+    if (W.value === 0 || H.value === 0) return;
+    // Lazy init once the arena is measured: drop the ball at its start fraction
+    // and give it an initial velocity so it's bouncing the moment it appears.
+    if (!inited.value) {
+      posX.value = (W.value - BALL_SIZE) * initFracX;
+      posY.value = (H.value - BALL_SIZE) * initFracY;
+      velX.value = initVX;
+      velY.value = initVY;
+      inited.value = true;
+    }
+    if (dragging.value) return;
+    const dt = Math.min((info.timeSincePreviousFrame ?? 16) / 1000, 0.05);
+    if (dt <= 0) return;
+    let x = posX.value + velX.value * dt;
+    let y = posY.value + velY.value * dt;
+    const maxX = W.value - BALL_SIZE;
+    const maxY = H.value - BALL_SIZE;
+    if (x < 0) { x = 0; velX.value = -velX.value * WALL_RESTITUTION; }
+    else if (x > maxX) { x = maxX; velX.value = -velX.value * WALL_RESTITUTION; }
+    if (y < 0) { y = 0; velY.value = -velY.value * WALL_RESTITUTION; }
+    else if (y > maxY) { y = maxY; velY.value = -velY.value * WALL_RESTITUTION; }
+    const damp = Math.exp(-REST_DAMPING * dt);
+    velX.value *= damp;
+    velY.value *= damp;
+    if (Math.hypot(velX.value, velY.value) < MIN_SPEED) { velX.value = 0; velY.value = 0; }
+    posX.value = x;
+    posY.value = y;
+  }, false);
+
+  // Only integrate while this screen is focused — no physics off-screen.
+  useEffect(() => {
+    frame.setActive(isFocused);
+    return () => frame.setActive(false);
+  }, [isFocused, frame]);
+
+  const pan = Gesture.Pan()
+    .onBegin(() => {
+      'worklet';
+      // Catch the ball: freeze it and anchor the sling at its current spot.
+      dragging.value = true;
+      velX.value = 0;
+      velY.value = 0;
+      startX.value = posX.value;
+      startY.value = posY.value;
+      anchorX.value = posX.value;
+      anchorY.value = posY.value;
+    })
+    .onUpdate((e) => {
+      'worklet';
+      let nx = startX.value + e.translationX;
+      let ny = startY.value + e.translationY;
+      // Cap the stretch distance from the anchor.
+      const dx = nx - anchorX.value;
+      const dy = ny - anchorY.value;
+      const dist = Math.hypot(dx, dy);
+      if (dist > MAX_PULL) {
+        const s = MAX_PULL / dist;
+        nx = anchorX.value + dx * s;
+        ny = anchorY.value + dy * s;
+      }
+      // Keep the ball fully within the play area while dragging.
+      nx = Math.max(0, Math.min(nx, W.value - BALL_SIZE));
+      ny = Math.max(0, Math.min(ny, H.value - BALL_SIZE));
+      posX.value = nx;
+      posY.value = ny;
+    })
+    .onEnd(() => {
+      'worklet';
+      // Slingshot: fling opposite the pull, magnitude ∝ pull distance, but
+      // capped so a big pull can't send it vibrating faster than the eye tracks.
+      let vx = (anchorX.value - posX.value) * LAUNCH_GAIN;
+      let vy = (anchorY.value - posY.value) * LAUNCH_GAIN;
+      const spd = Math.hypot(vx, vy);
+      if (spd > MAX_SPEED) {
+        const s = MAX_SPEED / spd;
+        vx *= s;
+        vy *= s;
+      }
+      velX.value = vx;
+      velY.value = vy;
+    })
+    .onFinalize(() => {
+      'worklet';
+      // Always clear the drag flag, even on a tap where onEnd never fires.
+      dragging.value = false;
+    });
+
+  const tap = Gesture.Tap()
+    .maxDistance(10)
+    .onEnd((_e, success) => {
+      if (success && onOpen) runOnJS(onOpen)();
+    });
+
+  const composed = Gesture.Race(tap, pan);
+
+  const ballStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: posX.value }, { translateY: posY.value }],
+  }));
+
+  return (
+    <GestureDetector gesture={composed}>
+      <Reanimated.View style={[styles.ball, { borderColor: accent }, ballStyle]}>
+        <Text style={styles.diamondHeading}>{label}</Text>
+        {sublabel ? <Text style={styles.diamondSub} numberOfLines={2}>{sublabel}</Text> : null}
+      </Reanimated.View>
+    </GestureDetector>
+  );
+}
+
+// The Home "toy": two slingshot balls — the week's prompt and an event ball —
+// bouncing around a shared full-bleed play area behind the title and buttons.
+// The arena measures the play area once and hands its width/height to each ball
+// so they share one set of walls. box-none lets touches on empty space fall
+// through; each ball grabs only its own circle. Bounded to the Home area (above
+// the tab bar), so a ball can never reach the nav bar.
+function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
+  prompt: PromptOut | null;
+  onOpenPrompt: () => void;
+  onOpenEvent?: () => void;
+  topInset: number;
+}) {
+  const W = useSharedValue(0);
+  const H = useSharedValue(0);
+  const onLayout = (e: LayoutChangeEvent) => {
+    W.value = e.nativeEvent.layout.width;
+    H.value = e.nativeEvent.layout.height;
+  };
+  return (
+    <View style={[styles.bounceLayer, { top: topInset }]} onLayout={onLayout} pointerEvents="box-none">
+      <Ball
+        label={"week's\nprompt"}
+        sublabel={prompt?.title ?? null}
+        accent="#E30022"
+        onOpen={prompt ? onOpenPrompt : undefined}
+        W={W}
+        H={H}
+        initFracX={0.26}
+        initFracY={0.2}
+        initVX={1600}
+        initVY={1300}
+      />
+      <Ball
+        label="event"
+        accent="#1E73BE"
+        onOpen={onOpenEvent}
+        W={W}
+        H={H}
+        initFracX={0.72}
+        initFracY={0.66}
+        initVX={-1500}
+        initVY={-1400}
+      />
+    </View>
+  );
+}
+
 // The weekly-prompt diamond, spinnable like a fidget spinner. Drag anywhere on
 // it to whirl it around the center; on release it keeps spinning and slows under
 // friction (withDecay). A plain tap still opens the prompt. The gesture lives on
@@ -223,6 +431,34 @@ export default function Home() {
   // nothing). Starts true so the banner shell paints on the first frame.
   const [promptLoading, setPromptLoading] = useState(true);
 
+  // Home toy mode: 'fidget' (spinning diamond, the default) or 'bounce'
+  // (slingshot ball). Persisted so it reopens in the last-used mode.
+  const [mode, setMode] = useState<'fidget' | 'bounce'>('fidget');
+  useEffect(() => {
+    SecureStore.getItemAsync('home_toy_mode')
+      .then((v) => { if (v === 'bounce' || v === 'fidget') setMode(v); })
+      .catch(() => {});
+  }, []);
+  const changeMode = (m: 'fidget' | 'bounce') => {
+    setMode(m);
+    SecureStore.setItemAsync('home_toy_mode', m).catch(() => {});
+  };
+
+  // Fidget spinner is hidden for now (SHOW_FIDGET). When it's off, the Home toy
+  // is always the bouncing balls and the ∗/○ toggle disappears.
+  const showBounce = !SHOW_FIDGET || mode === 'bounce';
+  const showFidget = SHOW_FIDGET && mode === 'fidget';
+
+  // Admin-only: pending account/media requests. total > 0 only for admins, so
+  // the alert below is implicitly admin-gated.
+  const adminPending = useAdminPending();
+  const adminAlertLabel = (() => {
+    const parts: string[] = [];
+    if (adminPending.applications > 0) parts.push(`${adminPending.applications} account`);
+    if (adminPending.media > 0) parts.push(`${adminPending.media} media`);
+    return `${parts.join(' + ')} request${adminPending.total === 1 ? '' : 's'} to review`;
+  })();
+
   useEffect(() => {
     let cancelled = false;
     setPromptLoading(true);
@@ -235,10 +471,36 @@ export default function Home() {
 
   return (
     <View style={[styles.gradient, styles.homeBg]}>
+    {/* The bouncing balls ride a full-bleed layer BEHIND everything below, so
+        they pass behind the title and the corner buttons. Bounded to the Home
+        area (which sits above the tab bar), so they never reach the nav bar. */}
+    {showBounce && (
+      <BounceArena
+        prompt={prompt}
+        topInset={insets.top}
+        onOpenPrompt={() => prompt && navigation.navigate('WeeklyPromptDetail', { promptId: prompt.id })}
+        onOpenEvent={() => navigation.navigate('Events')}
+      />
+    )}
     {/* Fixed (non-scrollable) so vertical flicks spin the diamond instead of
-        being captured by a scroll view. */}
-    <View style={[styles.container, styles.content, { paddingTop: insets.top + 20 }]}>
-      <Text style={styles.homeTitle}>painting club</Text>
+        being captured by a scroll view. box-none in bounce mode lets touches on
+        empty areas fall through to the balls behind. */}
+    <View
+      style={[styles.container, styles.content, { paddingTop: insets.top + 20 }]}
+      pointerEvents={showBounce ? 'box-none' : 'auto'}
+    >
+      <Text style={styles.homeTitle}>paint club</Text>
+
+      {adminPending.total > 0 && (
+        <Pressable style={styles.adminAlert} onPress={() => (navigation as any).navigate('Admin')}>
+          <View style={styles.adminAlertDot} />
+          <Text style={styles.adminAlertText}>{adminAlertLabel}</Text>
+        </Pressable>
+      )}
+
+      {/* Live announcements feed card. Renders nothing when empty for
+          non-contributors, so Home stays minimal until there's something to say. */}
+      <Announcements />
 
       {SHOW_INTRO && (
         <>
@@ -261,12 +523,19 @@ export default function Home() {
         </>
       )}
 
-      {/* Spinnable weekly-prompt diamond, centered in the available height. */}
-      <View style={styles.diamondsWrap}>
-        <SpinningPromptDiamond
-          prompt={prompt}
-          onOpen={() => prompt && navigation.navigate('WeeklyPromptDetail', { promptId: prompt.id })}
-        />
+      {/* Fidget spinner lives centered in the available height. In bounce mode
+          the ball is the full-screen layer above, so this stays empty and
+          passes touches through to it. */}
+      <View
+        style={styles.diamondsWrap}
+        pointerEvents={showBounce ? 'none' : 'auto'}
+      >
+        {showFidget && (
+          <SpinningPromptDiamond
+            prompt={prompt}
+            onOpen={() => prompt && navigation.navigate('WeeklyPromptDetail', { promptId: prompt.id })}
+          />
+        )}
       </View>
 
       {SHOW_FONT_SAMPLES && (
@@ -281,6 +550,26 @@ export default function Home() {
       )}
 
     </View>
+
+    {/* fidget (∗) / bounce (○) toggle — hidden while SHOW_FIDGET is off. */}
+    {SHOW_FIDGET && (
+      <View style={styles.modeToggle}>
+        <Pressable
+          style={[styles.modeChip, mode === 'fidget' && styles.modeChipOn]}
+          onPress={() => changeMode('fidget')}
+          hitSlop={6}
+        >
+          <Text style={styles.modeChipIcon}>∗</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.modeChip, styles.modeChipBottom, mode === 'bounce' && styles.modeChipOn]}
+          onPress={() => changeMode('bounce')}
+          hitSlop={6}
+        >
+          <Text style={styles.modeChipIcon}>○</Text>
+        </Pressable>
+      </View>
+    )}
 
     {/* Pinned to the bottom-left corner of the screen. */}
     <Pressable style={styles.aboutBtn} onPress={() => navigation.navigate('About')}>
@@ -341,6 +630,80 @@ const styles = StyleSheet.create({
     color: Colors.black,
   },
 
+  adminAlert: {
+    alignSelf: 'center',
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  adminAlertDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#E30022',
+  },
+  adminAlertText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textPrimary,
+  },
+  modeToggle: {
+    position: 'absolute',
+    left: 20,
+    bottom: 54,
+    flexDirection: 'column',
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  modeChip: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.secondary,
+  },
+  // Hairline between the stacked chips.
+  modeChipBottom: {
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+  },
+  modeChipOn: {
+    backgroundColor: Colors.primaryGold,
+  },
+  modeChipIcon: {
+    fontSize: 18,
+    lineHeight: 20,
+    color: Colors.textPrimary,
+  },
+  bounceLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // top set inline to the safe-area inset so the ball clears the notch.
+    overflow: 'hidden',
+  },
+  ball: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: BALL_SIZE,
+    height: BALL_SIZE,
+    borderRadius: BALL_SIZE / 2,
+    backgroundColor: Colors.secondary,
+    borderWidth: 6,
+    borderColor: '#E30022',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    ...Shadows.card,
+  },
   diamondsWrap: {
     // Fill the space below the title and center the chain vertically so the
     // zigzag sits evenly in the available height rather than bunching at top.
