@@ -5,10 +5,10 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { submit_application } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
@@ -29,7 +29,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
 
   const handleSubmit = async () => {
     if (!firstname.trim() || !lastname.trim() || !email.trim()) {
-      Alert.alert('Required', 'Please fill in first name, last name, and email.');
+      appAlert('Required', 'Please fill in first name, last name, and email.');
       return;
     }
     try {
@@ -44,7 +44,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
       });
       setSubmitted(true);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong');
+      appAlert('Error', err.message || 'Something went wrong');
     }
   };
 

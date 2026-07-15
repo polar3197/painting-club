@@ -9,9 +9,9 @@ import {
   TextInput,
   LayoutChangeEvent,
   useWindowDimensions,
-  Alert,
   Animated,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -188,7 +188,7 @@ function PaintingSeriesZoomIn({
       onRefresh();
       loadStandalone();
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'upload failed');
+      appAlert('Error', err?.message || 'upload failed');
     }
   };
 
@@ -240,7 +240,7 @@ function PaintingSeriesZoomIn({
       onRefresh();
     } catch (err: any) {
       setLocalIds(null);
-      Alert.alert('Error', err?.message || 'reorder failed');
+      appAlert('Error', err?.message || 'reorder failed');
     }
   };
 
@@ -356,7 +356,7 @@ function PaintingSeriesZoomIn({
       onRefresh();
     } catch (err: any) {
       setNameDraft(seriesName);
-      Alert.alert('Error', err?.message || 'rename failed');
+      appAlert('Error', err?.message || 'rename failed');
     }
   };
 
@@ -370,7 +370,7 @@ function PaintingSeriesZoomIn({
       onRefresh();
       loadStandalone();
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'could not add');
+      appAlert('Error', err?.message || 'could not add');
     } finally {
       setAddBusy(null);
     }

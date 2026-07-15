@@ -6,8 +6,8 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -45,7 +45,7 @@ export default function UserRoleDetail() {
         setProfile(p);
         setRole((p.role as MemberRole) || 'member');
       } catch (err: any) {
-        Alert.alert('could not load member', err?.message || 'try again');
+        appAlert('could not load member', err?.message || 'try again');
         navigation.goBack();
       } finally {
         if (alive) setLoading(false);
@@ -67,7 +67,7 @@ export default function UserRoleDetail() {
       await set_member_role(username, role, token);
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('could not set role', err?.message || 'try again');
+      appAlert('could not set role', err?.message || 'try again');
     } finally {
       setSaving(false);
     }

@@ -9,7 +9,6 @@ import {
   Keyboard,
   Platform,
   StyleSheet,
-  Alert,
   Modal,
   Dimensions,
   // Raw RN input here (not the app-wide AppTextInput wrapper) so the message
@@ -17,6 +16,7 @@ import {
   // Predictive is off in the device keyboard settings.
   TextInput,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,7 +102,7 @@ function MessageInputBar({
       // Same rule as comments: don't fabricate a local message the server
       // never received — restore the text and surface the error.
       setInput(body);
-      Alert.alert('Message failed', err?.message || 'Could not send your message');
+      appAlert('Message failed', err?.message || 'Could not send your message');
     }
   };
 
@@ -201,7 +201,7 @@ export default function ConversationThread() {
       await add_group_members(conversationId, Array.from(invited), token);
       setShowInvite(false);
     } catch (err: any) {
-      Alert.alert('Could not add members', err?.message || 'try again');
+      appAlert('Could not add members', err?.message || 'try again');
     } finally {
       setInviting(false);
     }
@@ -266,14 +266,14 @@ export default function ConversationThread() {
       await leave_group(conversationId, token);
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('Could not leave', err?.message || 'try again');
+      appAlert('Could not leave', err?.message || 'try again');
     }
   };
 
   // Long-press menu for an own message: native action sheet (the destructive
   // "delete" IS the confirmation — no second dialog).
   const openMessageMenu = (m: MessageOut) => {
-    Alert.alert(
+    appAlert(
       'message',
       m.body.length > 80 ? m.body.slice(0, 80) + '…' : m.body,
       [
@@ -294,7 +294,7 @@ export default function ConversationThread() {
       setMessages((prev) =>
         [m, ...prev].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
       );
-      Alert.alert('Could not delete', err?.message || 'try again');
+      appAlert('Could not delete', err?.message || 'try again');
     }
   };
 
@@ -311,7 +311,7 @@ export default function ConversationThread() {
       );
       setEditing(null);
     } catch (err: any) {
-      Alert.alert('Could not edit', err?.message || 'try again');
+      appAlert('Could not edit', err?.message || 'try again');
     }
   };
 

@@ -8,10 +8,10 @@ import {
   StyleSheet,
   TextInput,
   LayoutChangeEvent,
-  Alert,
   Animated,
   useWindowDimensions,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import * as ExpoAudio from 'expo-audio';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -282,7 +282,7 @@ function AlbumZoomIn({
       onRefresh();
     } catch (err: any) {
       setUploading(false);
-      Alert.alert('Error', err?.message || 'upload failed');
+      appAlert('Error', err?.message || 'upload failed');
     }
   };
 
@@ -304,7 +304,7 @@ function AlbumZoomIn({
       onRefresh();
     } catch (err: any) {
       setLocalIds(null);
-      Alert.alert('Error', err?.message || 'reorder failed');
+      appAlert('Error', err?.message || 'reorder failed');
     }
   };
 
@@ -411,7 +411,7 @@ function AlbumZoomIn({
       onRefresh();
     } catch (err: any) {
       setNameDraft(albumName);
-      Alert.alert('Error', err?.message || 'rename failed');
+      appAlert('Error', err?.message || 'rename failed');
     }
   };
 

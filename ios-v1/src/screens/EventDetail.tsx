@@ -6,10 +6,10 @@ import {
   Pressable,
   StyleSheet,
   Image,
-  Alert,
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -53,7 +53,7 @@ export default function EventDetail() {
     try {
       setEvent(await get_event(eventId, token));
     } catch (err: any) {
-      Alert.alert('could not load event', err?.message || 'try again');
+      appAlert('could not load event', err?.message || 'try again');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -89,7 +89,7 @@ export default function EventDetail() {
       }
       await load();
     } catch (err: any) {
-      Alert.alert('could not add', err?.message || 'try again');
+      appAlert('could not add', err?.message || 'try again');
     } finally {
       setBusy(false);
     }
@@ -102,7 +102,7 @@ export default function EventDetail() {
       await remove_event_host(eventId, username, token);
       await load();
     } catch (err: any) {
-      Alert.alert('could not remove', err?.message || 'try again');
+      appAlert('could not remove', err?.message || 'try again');
     } finally {
       setBusy(false);
     }
@@ -115,7 +115,7 @@ export default function EventDetail() {
       await remove_event_invite(eventId, username, token);
       await load();
     } catch (err: any) {
-      Alert.alert('could not remove', err?.message || 'try again');
+      appAlert('could not remove', err?.message || 'try again');
     } finally {
       setBusy(false);
     }
@@ -127,7 +127,7 @@ export default function EventDetail() {
       await delete_event(eventId, token);
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('could not delete', err?.message || 'try again');
+      appAlert('could not delete', err?.message || 'try again');
     }
   };
 

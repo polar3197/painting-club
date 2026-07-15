@@ -11,10 +11,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  Alert,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -143,7 +143,7 @@ export default function Messages() {
       closeCompose();
       openThread(convo);
     } catch (err: any) {
-      Alert.alert('Could not open messages', err?.message || 'try again');
+      appAlert('Could not open messages', err?.message || 'try again');
     } finally {
       setCreating(false);
     }
@@ -168,7 +168,7 @@ export default function Messages() {
       load();
       openThread(convo);
     } catch (err: any) {
-      Alert.alert('Could not create group', err?.message || 'try again');
+      appAlert('Could not create group', err?.message || 'try again');
     } finally {
       setCreating(false);
     }

@@ -5,12 +5,12 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Alert,
   Dimensions,
   LayoutChangeEvent,
   RefreshControl,
   Image as RNImage,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -386,7 +386,7 @@ export default function UserProfile() {
       setSelectedMedium(name);
       setSelectedKeywords([]);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      appAlert('Error', err.message);
     }
   }, [profile, username, token]);
 
@@ -847,7 +847,7 @@ export default function UserProfile() {
                               partnerUsername: convo.partner_username,
                             });
                           } catch (err: any) {
-                            Alert.alert('Could not open messages', err?.message || 'try again');
+                            appAlert('Could not open messages', err?.message || 'try again');
                           }
                         }}
                       >

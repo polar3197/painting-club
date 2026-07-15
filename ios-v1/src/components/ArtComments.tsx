@@ -12,8 +12,8 @@ import {
   Dimensions,
   Animated,
   PanResponder,
-  Alert,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
@@ -120,7 +120,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
       // Don't fabricate a local comment — that creates the illusion of success
       // while the server never received it. Restore the text and surface the error.
       setInput(text);
-      Alert.alert('Comment failed', err?.message || 'Could not post your comment');
+      appAlert('Comment failed', err?.message || 'Could not post your comment');
     }
   };
 
@@ -137,7 +137,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
       await delete_comment(piece.id, id, token);
       setComments((prev) => prev.filter((c) => c.id !== id));
     } catch (err: any) {
-      Alert.alert('Delete failed', err?.message || 'Could not delete comment');
+      appAlert('Delete failed', err?.message || 'Could not delete comment');
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
@@ -405,7 +406,7 @@ export default function Admin() {
       await activate_suggestion(id, token);
       fetchPrompts();
     } catch (err: any) {
-      Alert.alert("Couldn't activate", err?.message || 'try again.');
+      appAlert("Couldn't activate", err?.message || 'try again.');
     }
   };
 
@@ -422,7 +423,7 @@ export default function Admin() {
       await review_prompt_suggestion(id, status, token);
       fetchPrompts();
     } catch (err: any) {
-      Alert.alert("Couldn't update", err?.message || 'try again.');
+      appAlert("Couldn't update", err?.message || 'try again.');
     }
   };
 
@@ -442,7 +443,7 @@ export default function Admin() {
     } catch (err: any) {
       // Surface the failure instead of swallowing it — e.g. approving a
       // re-submitted application whose email already belongs to a member.
-      Alert.alert(
+      appAlert(
         status === 'approved' ? "Couldn't approve" : "Couldn't update",
         err?.message || 'Something went wrong — try again.',
       );

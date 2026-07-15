@@ -5,12 +5,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Alert,
   Dimensions,
   Animated,
   Keyboard,
   Platform,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -219,7 +219,7 @@ export default function AddArt() {
       });
       chooseMedium(name);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'failed to add media');
+      appAlert('Error', err?.message || 'failed to add media');
     }
   }, [profile, currentUser, token, setProfile, chooseMedium]);
 
@@ -249,7 +249,7 @@ export default function AddArt() {
     if (!selectedMedium || !currentUser || !formData) return;
     const title = (formData.title || '').trim();
     if (!title) {
-      Alert.alert('Missing', 'Please enter a title.');
+      appAlert('Missing', 'Please enter a title.');
       return;
     }
     setPosting(true);
@@ -272,7 +272,7 @@ export default function AddArt() {
       );
 
       if (isVisual) {
-        if (!pickedFile) { Alert.alert('Missing', 'Please select an image.'); setPosting(false); return; }
+        if (!pickedFile) { appAlert('Missing', 'Please select an image.'); setPosting(false); return; }
         const payload: Visual2DIn = {
           username: currentUser,
           medium: selectedMedium,
@@ -291,7 +291,7 @@ export default function AddArt() {
         startUpload(payload);
       } else if (isWritten) {
         const useFile = writeMode === 'file' && !PICKER_IS_STUB;
-        if (useFile && !pickedFile) { Alert.alert('Missing', 'Please select a file.'); setPosting(false); return; }
+        if (useFile && !pickedFile) { appAlert('Missing', 'Please select a file.'); setPosting(false); return; }
         const trimmedText = pastedText.trim();
         const payload: WrittenFormIn = {
           username: currentUser,
@@ -306,7 +306,7 @@ export default function AddArt() {
         };
         startWrittenUpload(payload);
       } else if (isAudio) {
-        if (!pickedFile) { Alert.alert('Missing', 'Please select an audio file.'); setPosting(false); return; }
+        if (!pickedFile) { appAlert('Missing', 'Please select an audio file.'); setPosting(false); return; }
         const payload: AudioIn = {
           username: currentUser,
           medium: selectedMedium,
@@ -325,7 +325,7 @@ export default function AddArt() {
       }
       goToDestination(selectedMedium);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Something went wrong');
+      appAlert('Error', err?.message || 'Something went wrong');
       setPosting(false);
     }
   }, [selectedMedium, currentUser, formData, myMedia, token, isVisual, isWritten, isAudio, pickedFile, pastedText, writeMode, startUpload, startWrittenUpload, startAudioUpload, goToDestination, profile, setProfile]);

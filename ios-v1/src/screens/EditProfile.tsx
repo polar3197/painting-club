@@ -5,11 +5,11 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Alert,
   Platform,
   PanResponder,
   GestureResponderEvent,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { Image } from 'expo-image';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -265,7 +265,7 @@ export default function EditProfile() {
       // values show up immediately.
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      appAlert('Error', err.message);
     } finally {
       setSaving(false);
     }

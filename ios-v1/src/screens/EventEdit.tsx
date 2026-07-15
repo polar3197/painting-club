@@ -7,11 +7,11 @@ import {
   StyleSheet,
   Switch,
   Image,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -67,7 +67,7 @@ export default function EventEdit() {
         setIsPublic(e.is_public);
         setExistingImage(e.image_path);
       } catch (err: any) {
-        Alert.alert('could not load event', err?.message || 'try again');
+        appAlert('could not load event', err?.message || 'try again');
         navigation.goBack();
       } finally {
         if (alive) setLoading(false);
@@ -92,15 +92,15 @@ export default function EventEdit() {
   const save = async () => {
     const t = title.trim();
     if (!t) {
-      Alert.alert('title required', 'give the event a name.');
+      appAlert('title required', 'give the event a name.');
       return;
     }
     if (!DATE_RE.test(date)) {
-      Alert.alert('check the date', 'use YYYY-MM-DD, e.g. ' + todayLocalISO() + '.');
+      appAlert('check the date', 'use YYYY-MM-DD, e.g. ' + todayLocalISO() + '.');
       return;
     }
     if (time.trim() && !TIME_RE.test(time.trim())) {
-      Alert.alert('check the time', 'use 24-hour HH:MM, e.g. 19:00 — or leave it blank.');
+      appAlert('check the time', 'use 24-hour HH:MM, e.g. 19:00 — or leave it blank.');
       return;
     }
     setSaving(true);
@@ -129,7 +129,7 @@ export default function EventEdit() {
         navigation.replace('EventDetail', { eventId: id });
       }
     } catch (err: any) {
-      Alert.alert('could not save', err?.message || 'try again');
+      appAlert('could not save', err?.message || 'try again');
     } finally {
       setSaving(false);
     }

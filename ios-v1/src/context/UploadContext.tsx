@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { Alert } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import {
   add_new_visual_2d,
   add_new_written_form,
@@ -73,7 +73,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     ]);
     add_new_visual_2d(token, payload)
       .then(() => setVersion((v) => v + 1))
-      .catch((err: any) => Alert.alert('Error', err?.message || 'Upload failed'))
+      .catch((err: any) => appAlert('Error', err?.message || 'Upload failed'))
       .finally(() => setPendingPieces((p) => p.filter((x) => x.tempId !== id)));
   }, [token]);
 
@@ -85,7 +85,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     ]);
     add_new_written_form(token, payload)
       .then(() => setVersion((v) => v + 1))
-      .catch((err: any) => Alert.alert('Error', err?.message || 'Upload failed'))
+      .catch((err: any) => appAlert('Error', err?.message || 'Upload failed'))
       .finally(() => setPendingWritten((p) => p.filter((x) => x.tempId !== id)));
   }, [token]);
 
@@ -97,7 +97,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     ]);
     add_new_audio(token, payload)
       .then(() => setVersion((v) => v + 1))
-      .catch((err: any) => Alert.alert('Error', err?.message || 'Upload failed'))
+      .catch((err: any) => appAlert('Error', err?.message || 'Upload failed'))
       .finally(() => setPendingAudio((p) => p.filter((x) => x.tempId !== id)));
   }, [token]);
 

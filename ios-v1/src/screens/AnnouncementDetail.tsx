@@ -7,11 +7,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   // Raw RN input (not AppTextInput) so the comment field keeps autocorrect on.
   TextInput,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { useNavigation, useRoute, useIsFocused, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,7 +99,7 @@ export default function AnnouncementDetail() {
       );
     } catch (err: any) {
       setInput(text);
-      Alert.alert('comment failed', err?.message || 'could not post your comment');
+      appAlert('comment failed', err?.message || 'could not post your comment');
     } finally {
       setSending(false);
     }
@@ -111,7 +111,7 @@ export default function AnnouncementDetail() {
       await delete_announcement(id, token);
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('could not delete', err?.message || 'try again');
+      appAlert('could not delete', err?.message || 'try again');
     }
   };
 
@@ -129,7 +129,7 @@ export default function AnnouncementDetail() {
           : prev,
       );
     } catch (err: any) {
-      Alert.alert('could not delete', err?.message || 'try again');
+      appAlert('could not delete', err?.message || 'try again');
     }
   };
 

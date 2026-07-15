@@ -7,8 +7,8 @@ import {
   StyleSheet,
   Animated as RNAnimated,
   useWindowDimensions,
-  Alert,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import {
@@ -82,7 +82,7 @@ export default function ArtZoomIn({
       await block_user(u, token);
       noteBlocked(u);
     } catch (err: any) {
-      Alert.alert('Could not block', err?.message || 'try again');
+      appAlert('Could not block', err?.message || 'try again');
     }
   };
 
@@ -94,7 +94,7 @@ export default function ArtZoomIn({
       await unblock_user(u, token);
       noteUnblocked(u);
     } catch (err: any) {
-      Alert.alert('Could not unblock', err?.message || 'try again');
+      appAlert('Could not unblock', err?.message || 'try again');
     }
   };
 

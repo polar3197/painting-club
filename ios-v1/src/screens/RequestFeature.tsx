@@ -11,9 +11,9 @@ import {
   Keyboard,
   Animated,
   Dimensions,
-  Alert,
   RefreshControl,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -117,7 +117,7 @@ export default function RequestFeature() {
       setRequests((prev) => [created, ...prev]);
       closeAdd();
     } catch (e) {
-      Alert.alert('could not post', e instanceof Error ? e.message : 'try again');
+      appAlert('could not post', e instanceof Error ? e.message : 'try again');
     } finally {
       setPosting(false);
     }

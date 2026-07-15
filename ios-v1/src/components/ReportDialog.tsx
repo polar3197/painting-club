@@ -7,8 +7,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { useAuth } from '../context/AuthContext';
 import { submit_report } from '../api';
@@ -34,7 +34,7 @@ export default function ReportDialog({ visible, targetType, targetId, onClose }:
       setReason('');
       onClose();
     } catch (err: any) {
-      Alert.alert('Could not send', err?.message || 'try again');
+      appAlert('Could not send', err?.message || 'try again');
     } finally {
       setSubmitting(false);
     }

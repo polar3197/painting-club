@@ -5,11 +5,11 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -66,7 +66,7 @@ export default function DeleteAccountDialog({ visible, username, onClose, onDele
       }
       setDownloaded(true);
     } catch (err: any) {
-      Alert.alert('Download failed', err?.message || 'could not export your data');
+      appAlert('Download failed', err?.message || 'could not export your data');
     } finally {
       setDownloading(false);
     }
@@ -80,7 +80,7 @@ export default function DeleteAccountDialog({ visible, username, onClose, onDele
       reset();
       onDeleted();
     } catch (err: any) {
-      Alert.alert('Could not delete account', err?.message || 'try again');
+      appAlert('Could not delete account', err?.message || 'try again');
       setDeleting(false);
     }
   };

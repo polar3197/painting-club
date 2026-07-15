@@ -5,12 +5,12 @@ import {
   Pressable,
   ImageBackground,
   StyleSheet,
-  Alert,
   Dimensions,
   KeyboardAvoidingView,
   Platform,
   Modal,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -83,7 +83,7 @@ export default function LandingPage() {
       await auth.login(profile.username, res.access_token, profile.role);
       (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
-      Alert.alert('Login failed', err.message || 'Invalid credentials');
+      appAlert('Login failed', err.message || 'Invalid credentials');
     }
   };
 
@@ -95,7 +95,7 @@ export default function LandingPage() {
       setShowSecretCode(false);
       (navigation as any).navigate('SetupAccount', { token: res.access_token });
     } catch (err: any) {
-      Alert.alert('Setup failed', err.message || 'Invalid or expired setup code');
+      appAlert('Setup failed', err.message || 'Invalid or expired setup code');
     }
   };
 
@@ -108,7 +108,7 @@ export default function LandingPage() {
       setPendingTerms(null);
       (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
-      Alert.alert('Could not save', err.message || 'try again');
+      appAlert('Could not save', err.message || 'try again');
     } finally {
       setAcceptingTerms(false);
     }

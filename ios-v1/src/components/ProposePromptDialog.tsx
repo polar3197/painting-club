@@ -6,13 +6,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Alert,
   Animated,
   PanResponder,
   Dimensions,
   Keyboard,
   Platform,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { useAuth } from '../context/AuthContext';
 import { create_prompt_suggestion, get_media, MediaType } from '../api';
@@ -66,10 +66,10 @@ export default function ProposePromptDialog({ onClose }: { onClose: () => void }
     try {
       await create_prompt_suggestion(body, mediaId, token);
       close();
-      Alert.alert('sent!', 'your prompt idea is in the queue for review.');
+      appAlert('sent!', 'your prompt idea is in the queue for review.');
     } catch (err: any) {
       setSubmitting(false);
-      Alert.alert('could not send', err?.message || 'something went wrong — try again.');
+      appAlert('could not send', err?.message || 'something went wrong — try again.');
     }
   };
 

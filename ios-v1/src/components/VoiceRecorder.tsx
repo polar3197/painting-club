@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { appAlert } from './AppAlert';
 import {
   useAudioRecorder,
   useAudioRecorderState,
@@ -62,7 +63,7 @@ export default function VoiceRecorder({ onRecorded }: VoiceRecorderProps) {
     try {
       const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) {
-        Alert.alert(
+        appAlert(
           'microphone',
           'painting club needs microphone access to record — enable it in Settings.',
         );
@@ -76,7 +77,7 @@ export default function VoiceRecorder({ onRecorded }: VoiceRecorderProps) {
       await recorder.prepareToRecordAsync();
       recorder.record();
     } catch (e: any) {
-      Alert.alert('recording failed', e?.message || 'could not start recording');
+      appAlert('recording failed', e?.message || 'could not start recording');
     } finally {
       setBusy(false);
     }
@@ -97,13 +98,13 @@ export default function VoiceRecorder({ onRecorded }: VoiceRecorderProps) {
       }).catch(() => {});
       const uri = recorder.uri;
       if (!uri) {
-        Alert.alert('recording failed', 'no audio was captured');
+        appAlert('recording failed', 'no audio was captured');
         return;
       }
       const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       onRecorded({ uri, name: `memo ${stamp}.m4a`, type: 'audio/m4a' }, seconds);
     } catch (e: any) {
-      Alert.alert('recording failed', e?.message || 'could not stop recording');
+      appAlert('recording failed', e?.message || 'could not stop recording');
     } finally {
       setBusy(false);
     }

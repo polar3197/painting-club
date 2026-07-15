@@ -7,12 +7,12 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Animated,
   LayoutChangeEvent,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import {
   GestureHandlerRootView,
@@ -85,7 +85,7 @@ export default function AddMediaDialog({
       await reorder_media(names, token);
       onReorder?.(names);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'reorder failed');
+      appAlert('Error', err?.message || 'reorder failed');
     }
   };
 
@@ -175,7 +175,7 @@ export default function AddMediaDialog({
       setRequestSent(true);
       setTimeout(() => setRequestSent(false), 2000);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'request failed');
+      appAlert('Error', err.message || 'request failed');
     }
   };
 
@@ -184,7 +184,7 @@ export default function AddMediaDialog({
       await set_media_visibility(name, makeHidden, token);
       onVisibilityChange(name, makeHidden);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'failed');
+      appAlert('Error', err.message || 'failed');
     }
   };
 

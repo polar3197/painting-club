@@ -5,9 +5,9 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { upload_profile_picture } from '../api';
@@ -44,7 +44,7 @@ export default function ProfilePicPromptModal() {
       // its next fetch (e.g. when the Me tab focuses).
       dismissProfilePicPrompt();
     } catch (err: any) {
-      Alert.alert('Upload failed', err?.message || 'Try again');
+      appAlert('Upload failed', err?.message || 'Try again');
     } finally {
       setUploading(false);
     }

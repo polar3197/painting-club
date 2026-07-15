@@ -4,12 +4,12 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
   ScrollView,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -33,19 +33,19 @@ export default function SetupAccount() {
   const handleSubmit = async () => {
     const trimmed = username.trim().toLowerCase();
     if (trimmed.length < 1) {
-      Alert.alert('Setup', 'username cannot be empty');
+      appAlert('Setup', 'username cannot be empty');
       return;
     }
     if (password.length < 8) {
-      Alert.alert('Setup', 'password must be at least 8 characters');
+      appAlert('Setup', 'password must be at least 8 characters');
       return;
     }
     if (password !== confirm) {
-      Alert.alert('Setup', "passwords don't match");
+      appAlert('Setup', "passwords don't match");
       return;
     }
     if (!token) {
-      Alert.alert('Setup', 'missing auth token — please log in again');
+      appAlert('Setup', 'missing auth token — please log in again');
       navigation.reset({ index: 0, routes: [{ name: 'LandingPage' }] });
       return;
     }
@@ -75,7 +75,7 @@ export default function SetupAccount() {
         ],
       });
     } catch (err: any) {
-      Alert.alert('Setup failed', err.message || 'could not complete setup');
+      appAlert('Setup failed', err.message || 'could not complete setup');
     } finally {
       setSubmitting(false);
     }

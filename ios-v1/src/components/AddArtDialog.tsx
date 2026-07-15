@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Alert, Animated, PanResponder, Dimensions, Keyboard, Platform } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, Keyboard, Platform } from 'react-native';
+import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -326,22 +327,22 @@ export default function AddArtDialog({
           onSuccess();
         })
         .catch((err: any) => {
-          Alert.alert('Error', err?.message || 'Something went wrong');
+          appAlert('Error', err?.message || 'Something went wrong');
         });
     } else if (isVisual2D) {
       if (!pickedFile) {
-        Alert.alert('Missing', 'Please select an image.');
+        appAlert('Missing', 'Please select an image.');
         return;
       }
       const title = (formData.title || '').trim();
       if (!title) {
-        Alert.alert('Missing', 'Please enter a title.');
+        appAlert('Missing', 'Please enter a title.');
         return;
       }
       // Multiple images land as ONE series post on the profile, so the
       // series field is what groups them — require it for multi-picks.
       if (extraFiles.length > 0 && !(formData.series || '').trim()) {
-        Alert.alert(
+        appAlert(
           'Name the series',
           'You picked multiple images — give the series a name so they land as one post.',
         );
@@ -400,21 +401,21 @@ export default function AddArtDialog({
           onSuccess();
         })
         .catch((err: any) => {
-          Alert.alert('Error', err?.message || 'Something went wrong');
+          appAlert('Error', err?.message || 'Something went wrong');
         });
     } else if (isWrittenForm) {
       const trimmedText = pastedText.trim();
       if (writeMode === 'file' && !pickedFile) {
-        Alert.alert('Missing', 'Please select a file.');
+        appAlert('Missing', 'Please select a file.');
         return;
       }
       if (writeMode === 'text' && !trimmedText) {
-        Alert.alert('Missing', 'Please paste some text.');
+        appAlert('Missing', 'Please paste some text.');
         return;
       }
       const title = (formData.title || '').trim();
       if (!title) {
-        Alert.alert('Missing', 'Please enter a title.');
+        appAlert('Missing', 'Please enter a title.');
         return;
       }
       const createPayload: WrittenFormIn = {
@@ -456,16 +457,16 @@ export default function AddArtDialog({
           onSuccess();
         })
         .catch((err: any) => {
-          Alert.alert('Error', err?.message || 'Something went wrong');
+          appAlert('Error', err?.message || 'Something went wrong');
         });
     } else if (isAudio) {
       if (!pickedFile) {
-        Alert.alert('Missing', 'Please select an audio file.');
+        appAlert('Missing', 'Please select an audio file.');
         return;
       }
       const title = (formData.title || '').trim();
       if (!title) {
-        Alert.alert('Missing', 'Please enter a title.');
+        appAlert('Missing', 'Please enter a title.');
         return;
       }
       const createPayload: AudioIn = {

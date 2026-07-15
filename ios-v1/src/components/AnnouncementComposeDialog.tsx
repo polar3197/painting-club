@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Alert,
   Animated,
   PanResponder,
   Dimensions,
@@ -16,6 +15,7 @@ import {
   // autocorrect + spellcheck on — matches ConversationThread's message field.
   TextInput,
 } from 'react-native';
+import { appAlert } from './AppAlert';
 import { useAuth } from '../context/AuthContext';
 import { create_announcement } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -71,7 +71,7 @@ export default function AnnouncementComposeDialog({
       close();
     } catch (err: any) {
       setSubmitting(false);
-      Alert.alert('could not post', err?.message || 'something went wrong — try again.');
+      appAlert('could not post', err?.message || 'something went wrong — try again.');
     }
   };
 

@@ -6,12 +6,12 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   // Raw RN input (not AppTextInput) so the doc editor keeps autocorrect + spellcheck.
   TextInput,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
@@ -51,7 +51,7 @@ export default function AboutDoc() {
         setDraftTitle(d.title);
         setDraftBody(d.body);
       } catch {
-        if (alive) Alert.alert('could not load', 'try again');
+        if (alive) appAlert('could not load', 'try again');
       } finally {
         if (alive) setLoading(false);
       }
@@ -64,7 +64,7 @@ export default function AboutDoc() {
   const save = async () => {
     const title = draftTitle.trim();
     if (!title) {
-      Alert.alert('title required', 'give the doc a title.');
+      appAlert('title required', 'give the doc a title.');
       return;
     }
     setSaving(true);
@@ -76,7 +76,7 @@ export default function AboutDoc() {
       }
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('could not save', err?.message || 'try again');
+      appAlert('could not save', err?.message || 'try again');
     } finally {
       setSaving(false);
     }
@@ -89,7 +89,7 @@ export default function AboutDoc() {
       await delete_doc(slug, token);
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('could not delete', err?.message || 'try again');
+      appAlert('could not delete', err?.message || 'try again');
     }
   };
 

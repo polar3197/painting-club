@@ -5,11 +5,11 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Modal,
   FlatList,
   Dimensions,
 } from 'react-native';
+import { appAlert } from '../components/AppAlert';
 import { Image } from 'expo-image';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -70,7 +70,7 @@ export default function WeeklyPromptDetail() {
   const refresh = useCallback(() => {
     get_prompt(promptId, token)
       .then((p) => setPrompt(p))
-      .catch((err: any) => Alert.alert('Error', err?.message || 'Could not load prompt'))
+      .catch((err: any) => appAlert('Error', err?.message || 'Could not load prompt'))
       .finally(() => setLoading(false));
   }, [promptId, token]);
 
@@ -103,7 +103,7 @@ export default function WeeklyPromptDetail() {
     if (!prompt) return;
     add_new_visual_2d(token, { ...payload, collection_id: prompt.id })
       .then(() => { setShowDialog(false); refresh(); })
-      .catch((err: any) => Alert.alert('Error', err?.message || 'Could not submit'));
+      .catch((err: any) => appAlert('Error', err?.message || 'Could not submit'));
   };
 
   if (loading) {

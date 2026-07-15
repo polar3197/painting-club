@@ -12,6 +12,7 @@ import { setAuthExpiredHandler } from './src/api/client';
 import { recordScreen, initDeviceTelemetry } from './src/api/observability';
 import RootNavigator from './src/navigation';
 import UpdateBanner from './src/components/UpdateBanner';
+import { AppAlertHost } from './src/components/AppAlert';
 
 const navTheme = {
   ...DefaultTheme,
@@ -78,6 +79,7 @@ export default function App() {
               <AuthExpiryBridge />
               <RootNavigator />
               <UpdateBanner />
+              <AppAlertHost />
               <StatusBar style="dark" />
             </NavigationContainer>
           </UploadProvider>
