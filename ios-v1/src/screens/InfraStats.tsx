@@ -94,14 +94,26 @@ export default function InfraStats() {
             <Row label="available" value={fmtBytes(data.memory.available)} />
           </Section>
 
-          <Section title="disk (sd card)">
+          <Section title="system disk (sd card)">
             <Meter label="used" percent={data.disk.percent} value={`${fmtBytes(data.disk.used)} / ${fmtBytes(data.disk.total)}`} />
             <Row label="free" value={fmtBytes(data.disk.free)} />
           </Section>
 
+          <Section title="media drive (usb)">
+            <Text style={styles.note}>
+              the external drive uploads live on — the one that actually fills up.
+            </Text>
+            <Meter
+              label="used"
+              percent={data.content_disk.percent}
+              value={`${fmtBytes(data.content_disk.used)} / ${fmtBytes(data.content_disk.total)}`}
+            />
+            <Row label="free" value={fmtBytes(data.content_disk.free)} />
+          </Section>
+
           <Section title="people's content">
             <Text style={styles.note}>
-              uploaded art + profile images (the static-files volume) — this rides on the disk above.
+              uploaded art + profile images (the static-files volume) — this rides on the media drive above.
             </Text>
             <Row label="size" value={fmtBytes(data.content.bytes)} />
             <Row

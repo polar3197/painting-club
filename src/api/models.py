@@ -667,7 +667,11 @@ class InfraHealthOut(BaseModel):
     temperature_c: float | None = None
     cpu: CpuHealth = CpuHealth()
     memory: MemoryHealth = MemoryHealth()
+    # `disk` = the system/SD-card filesystem (code + OS). `content_disk` = the
+    # drive that actually holds uploads (a USB SSD bind-mounted at the static
+    # volume) — the one that fills up as people post art.
     disk: DiskHealth = DiskHealth()
+    content_disk: DiskHealth = DiskHealth()
     content: ContentHealth = ContentHealth()
 
 

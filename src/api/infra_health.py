@@ -185,5 +185,8 @@ async def read_host_health(disk_path: str = "/src", content_path: str = "/app/st
         "cpu": await _cpu(),
         "memory": _memory(),
         "disk": _disk(disk_path),
+        # The drive the static-files volume actually lives on (the USB SSD) —
+        # its own filesystem, so uploads are measured against the right disk.
+        "content_disk": _disk(content_path),
         "content": _dir_size(content_path),
     }

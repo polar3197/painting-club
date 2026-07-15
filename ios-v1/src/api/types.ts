@@ -531,7 +531,10 @@ export interface InfraHealthOut {
     load_15: number | null;
   };
   memory: { total: number | null; used: number | null; available: number | null; percent: number | null };
+  // System/SD-card filesystem (code + OS).
   disk: { path: string | null; total: number | null; used: number | null; free: number | null; percent: number | null };
-  // Size of the Docker static-files volume (uploaded art + profile images).
+  // The drive uploads actually live on (USB SSD) — the one that fills up.
+  content_disk: { path: string | null; total: number | null; used: number | null; free: number | null; percent: number | null };
+  // Size of the static-files volume (uploaded art + profile images).
   content: { path: string | null; bytes: number | null; files: number | null; truncated: boolean };
 }
