@@ -505,6 +505,7 @@ export interface AnnouncementDetailOut extends AnnouncementOut {
 // --- Docs (editable "about the app" sections) ---------------------------------
 export interface DocOut {
   slug: string;
+  section: string | null;
   title: string;
   body: string;
   order_index: number;

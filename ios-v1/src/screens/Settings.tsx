@@ -59,11 +59,23 @@ export default function Settings() {
       {/* Spacer pushes the everyday actions down to the thumb zone. */}
       <View style={{ flex: 1 }} />
 
-      {/* Contributor panel (#7): usage + telemetry rollups. Contributor is the
-          top tier (contributor = admin + docs/roles/announcements), so this is
-          contributor-only — admins are below and don't see it. */}
+      {/* Contributor menu: contributor is the top tier (= admin + docs / roles /
+          announcements), so these are contributor-only — admins are below and
+          don't see them. */}
       {currentRole === 'contributor' && (
         <>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.purpleDocs }]}
+            onPress={() => navigation.navigate('Contributor')}
+          >
+            <Text style={styles.actionBtnText}>contributor</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
+            onPress={() => navigation.navigate('UserRoles')}
+          >
+            <Text style={styles.actionBtnText}>user roles</Text>
+          </Pressable>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
             onPress={() => navigation.navigate('UserStats')}
@@ -75,12 +87,6 @@ export default function Settings() {
             onPress={() => navigation.navigate('InfraStats')}
           >
             <Text style={styles.actionBtnText}>infra stats</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
-            onPress={() => navigation.navigate('UserRoles')}
-          >
-            <Text style={styles.actionBtnText}>user roles</Text>
           </Pressable>
         </>
       )}

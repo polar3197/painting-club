@@ -363,4 +363,13 @@ async def run_migrations():
                     "order_index": order_index,
                 },
             )
+        # Docs go multi-per-section: add `section` and backfill the original
+        # one-per-section rows (slug == section key) so they land in the right
+        # section list. Idempotent.
+        await conn.execute(text(
+            "ALTER TABLE doc ADD COLUMN IF NOT EXISTS section VARCHAR(50)"
+        ))
+        await conn.execute(text(
+            "UPDATE doc SET section = slug WHERE section IS NULL"
+        ))
     print("Migrations applied.")

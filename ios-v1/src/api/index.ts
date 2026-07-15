@@ -919,10 +919,36 @@ export function get_docs(token: string | null): Promise<DocOut[]> {
   }) as Promise<DocOut[]>;
 }
 
+export function get_docs_by_section(section: string, token: string | null): Promise<DocOut[]> {
+  return request(`/docs/section/${section}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<DocOut[]>;
+}
+
 export function get_doc(slug: string, token: string | null): Promise<DocOut> {
   return request(`/docs/${slug}`, {
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<DocOut>;
+}
+
+export function create_doc(
+  section: string,
+  title: string,
+  body: string,
+  token: string | null,
+): Promise<DocOut> {
+  return request('/docs', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ section, title, body }),
+  }) as Promise<DocOut>;
+}
+
+export function delete_doc(slug: string, token: string | null): Promise<{ ok: boolean }> {
+  return request(`/docs/${slug}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean }>;
 }
 
 export function update_doc(

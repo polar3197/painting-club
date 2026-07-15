@@ -152,74 +152,30 @@ const MAX_SPEED = 6000;         // ceiling: fast but still reads as motion, not 
 const REST_DAMPING = 0.7;       // per-second exponential velocity decay (light)
 const MIN_SPEED = 24;           // px/s below which the ball is treated as at rest
 
-// A single slingshot "ball" living inside a shared play area. The arena owns
-// the measured width/height (passed in as shared values); the ball owns its own
-// position/velocity. Grab it (freezes it), drag to stretch from its rest
-// anchor, release and it launches OPPOSITE the pull, bouncing off the arena
-// walls with high elasticity and light friction until it settles. Each ball
-// also gets an initial velocity so they're already bouncing on load. A clean
-// tap fires onOpen. Physics runs on the UI thread via useFrameCallback, paused
-// whenever the screen isn't focused. Fully separate from SpinningPromptDiamond.
-function Ball({ label, sublabel, accent, onOpen, W, H, initFracX, initFracY, initVX, initVY }: {
+// A single slingshot "ball": presentational + gesture only. Its position and
+// velocity live as shared values OWNED BY the arena, so the arena's single
+// physics loop can resolve ball-to-ball collisions. Grab it (freezes it), drag
+// to stretch from its rest anchor, release and it launches OPPOSITE the pull. A
+// clean tap fires onOpen. Fully separate from SpinningPromptDiamond.
+function Ball({ label, sublabel, accent, onOpen, W, H, posX, posY, velX, velY, dragging }: {
   label: string;
   sublabel?: string | null;
   accent: string;
   onOpen?: () => void;
   W: Reanimated.SharedValue<number>;
   H: Reanimated.SharedValue<number>;
-  initFracX: number;
-  initFracY: number;
-  initVX: number;
-  initVY: number;
+  posX: Reanimated.SharedValue<number>;
+  posY: Reanimated.SharedValue<number>;
+  velX: Reanimated.SharedValue<number>;
+  velY: Reanimated.SharedValue<number>;
+  dragging: Reanimated.SharedValue<boolean>;
 }) {
-  const posX = useSharedValue(0);
-  const posY = useSharedValue(0);
-  const velX = useSharedValue(0);
-  const velY = useSharedValue(0);
-  const dragging = useSharedValue(false);
-  const inited = useSharedValue(false);
+  // Only the drag-sling scratch anchors are local; pos/vel/dragging are the
+  // arena's shared values, passed in.
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
   const anchorX = useSharedValue(0);
   const anchorY = useSharedValue(0);
-  const isFocused = useIsFocused();
-
-  const frame = useFrameCallback((info) => {
-    'worklet';
-    if (W.value === 0 || H.value === 0) return;
-    // Lazy init once the arena is measured: drop the ball at its start fraction
-    // and give it an initial velocity so it's bouncing the moment it appears.
-    if (!inited.value) {
-      posX.value = (W.value - BALL_SIZE) * initFracX;
-      posY.value = (H.value - BALL_SIZE) * initFracY;
-      velX.value = initVX;
-      velY.value = initVY;
-      inited.value = true;
-    }
-    if (dragging.value) return;
-    const dt = Math.min((info.timeSincePreviousFrame ?? 16) / 1000, 0.05);
-    if (dt <= 0) return;
-    let x = posX.value + velX.value * dt;
-    let y = posY.value + velY.value * dt;
-    const maxX = W.value - BALL_SIZE;
-    const maxY = H.value - BALL_SIZE;
-    if (x < 0) { x = 0; velX.value = -velX.value * WALL_RESTITUTION; }
-    else if (x > maxX) { x = maxX; velX.value = -velX.value * WALL_RESTITUTION; }
-    if (y < 0) { y = 0; velY.value = -velY.value * WALL_RESTITUTION; }
-    else if (y > maxY) { y = maxY; velY.value = -velY.value * WALL_RESTITUTION; }
-    const damp = Math.exp(-REST_DAMPING * dt);
-    velX.value *= damp;
-    velY.value *= damp;
-    if (Math.hypot(velX.value, velY.value) < MIN_SPEED) { velX.value = 0; velY.value = 0; }
-    posX.value = x;
-    posY.value = y;
-  }, false);
-
-  // Only integrate while this screen is focused — no physics off-screen.
-  useEffect(() => {
-    frame.setActive(isFocused);
-    return () => frame.setActive(false);
-  }, [isFocused, frame]);
 
   const pan = Gesture.Pan()
     .onBegin(() => {
@@ -309,10 +265,109 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
 }) {
   const W = useSharedValue(0);
   const H = useSharedValue(0);
+  const isFocused = useIsFocused();
+
+  // Ball 0 = week's prompt, Ball 1 = event. Position/velocity live here (not in
+  // each Ball) so the single frame loop below can resolve collisions between
+  // them. They start at REST — flinging one can knock the other.
+  const p0x = useSharedValue(0), p0y = useSharedValue(0);
+  const v0x = useSharedValue(0), v0y = useSharedValue(0);
+  const d0 = useSharedValue(false);
+  const p1x = useSharedValue(0), p1y = useSharedValue(0);
+  const v1x = useSharedValue(0), v1y = useSharedValue(0);
+  const d1 = useSharedValue(false);
+  const inited = useSharedValue(false);
+
   const onLayout = (e: LayoutChangeEvent) => {
     W.value = e.nativeEvent.layout.width;
     H.value = e.nativeEvent.layout.height;
   };
+
+  const frame = useFrameCallback((info) => {
+    'worklet';
+    if (W.value === 0 || H.value === 0) return;
+    const maxX = W.value - BALL_SIZE;
+    const maxY = H.value - BALL_SIZE;
+
+    // Lazy init: drop both balls at well-separated (non-overlapping) spots at
+    // REST — the big vertical gap keeps their centers > BALL_SIZE apart on any
+    // screen; the collision pass below is a safety net regardless.
+    if (!inited.value) {
+      p0x.value = maxX * 0.16;
+      p0y.value = maxY * 0.06;
+      p1x.value = maxX * 0.64;
+      p1y.value = maxY * 0.78;
+      inited.value = true;
+    }
+
+    const dt = Math.min((info.timeSincePreviousFrame ?? 16) / 1000, 0.05);
+    if (dt <= 0) return;
+    const damp = Math.exp(-REST_DAMPING * dt);
+
+    // Integrate ball 0 (wall bounce + light friction) unless it's being held.
+    if (!d0.value) {
+      let x = p0x.value + v0x.value * dt;
+      let y = p0y.value + v0y.value * dt;
+      if (x < 0) { x = 0; v0x.value = -v0x.value * WALL_RESTITUTION; }
+      else if (x > maxX) { x = maxX; v0x.value = -v0x.value * WALL_RESTITUTION; }
+      if (y < 0) { y = 0; v0y.value = -v0y.value * WALL_RESTITUTION; }
+      else if (y > maxY) { y = maxY; v0y.value = -v0y.value * WALL_RESTITUTION; }
+      v0x.value *= damp; v0y.value *= damp;
+      if (Math.hypot(v0x.value, v0y.value) < MIN_SPEED) { v0x.value = 0; v0y.value = 0; }
+      p0x.value = x; p0y.value = y;
+    }
+    // Integrate ball 1.
+    if (!d1.value) {
+      let x = p1x.value + v1x.value * dt;
+      let y = p1y.value + v1y.value * dt;
+      if (x < 0) { x = 0; v1x.value = -v1x.value * WALL_RESTITUTION; }
+      else if (x > maxX) { x = maxX; v1x.value = -v1x.value * WALL_RESTITUTION; }
+      if (y < 0) { y = 0; v1y.value = -v1y.value * WALL_RESTITUTION; }
+      else if (y > maxY) { y = maxY; v1y.value = -v1y.value * WALL_RESTITUTION; }
+      v1x.value *= damp; v1y.value *= damp;
+      if (Math.hypot(v1x.value, v1y.value) < MIN_SPEED) { v1x.value = 0; v1y.value = 0; }
+      p1x.value = x; p1y.value = y;
+    }
+
+    // Ball-to-ball collision (equal mass, elastic with the wall restitution).
+    // Separate any overlap, then exchange normal velocity if approaching.
+    const r = BALL_SIZE / 2;
+    const c0x = p0x.value + r, c0y = p0y.value + r;
+    const c1x = p1x.value + r, c1y = p1y.value + r;
+    let dx = c1x - c0x, dy = c1y - c0y;
+    let dist = Math.hypot(dx, dy);
+    if (dist === 0) { dx = 0.01; dist = 0.01; }  // guard exact overlap
+    if (dist < BALL_SIZE) {
+      const nx = dx / dist, ny = dy / dist;
+      const overlap = BALL_SIZE - dist;
+      // A held ball stays put; the free one takes the full push.
+      if (d0.value && !d1.value) {
+        p1x.value = Math.max(0, Math.min(p1x.value + nx * overlap, maxX));
+        p1y.value = Math.max(0, Math.min(p1y.value + ny * overlap, maxY));
+      } else if (d1.value && !d0.value) {
+        p0x.value = Math.max(0, Math.min(p0x.value - nx * overlap, maxX));
+        p0y.value = Math.max(0, Math.min(p0y.value - ny * overlap, maxY));
+      } else if (!d0.value && !d1.value) {
+        p0x.value = Math.max(0, Math.min(p0x.value - nx * overlap / 2, maxX));
+        p0y.value = Math.max(0, Math.min(p0y.value - ny * overlap / 2, maxY));
+        p1x.value = Math.max(0, Math.min(p1x.value + nx * overlap / 2, maxX));
+        p1y.value = Math.max(0, Math.min(p1y.value + ny * overlap / 2, maxY));
+      }
+      const rvn = (v0x.value - v1x.value) * nx + (v0y.value - v1y.value) * ny;
+      if (rvn > 0) {  // approaching → exchange normal component
+        const j = (1 + WALL_RESTITUTION) * rvn / 2;
+        v0x.value -= j * nx; v0y.value -= j * ny;
+        v1x.value += j * nx; v1y.value += j * ny;
+      }
+    }
+  }, false);
+
+  // Only integrate while this screen is focused — no physics off-screen.
+  useEffect(() => {
+    frame.setActive(isFocused);
+    return () => frame.setActive(false);
+  }, [isFocused, frame]);
+
   return (
     <View style={[styles.bounceLayer, { top: topInset }]} onLayout={onLayout} pointerEvents="box-none">
       <Ball
@@ -320,23 +375,15 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
         sublabel={prompt?.title ?? null}
         accent="#E30022"
         onOpen={prompt ? onOpenPrompt : undefined}
-        W={W}
-        H={H}
-        initFracX={0.26}
-        initFracY={0.2}
-        initVX={1600}
-        initVY={1300}
+        W={W} H={H}
+        posX={p0x} posY={p0y} velX={v0x} velY={v0y} dragging={d0}
       />
       <Ball
         label="event"
         accent="#1E73BE"
         onOpen={onOpenEvent}
-        W={W}
-        H={H}
-        initFracX={0.72}
-        initFracY={0.66}
-        initVX={-1500}
-        initVY={-1400}
+        W={W} H={H}
+        posX={p1x} posY={p1y} velX={v1x} velY={v1y} dragging={d1}
       />
     </View>
   );
@@ -498,10 +545,6 @@ export default function Home() {
         </Pressable>
       )}
 
-      {/* Live announcements feed card. Renders nothing when empty for
-          non-contributors, so Home stays minimal until there's something to say. */}
-      <Announcements />
-
       {SHOW_INTRO && (
         <>
           <View style={styles.titleContainer}>
@@ -548,6 +591,13 @@ export default function Home() {
           ))}
         </View>
       )}
+
+      {/* Announcements banner pinned to the bottom of the Home area, above the
+          corner buttons. marginTop:auto drops it to the bottom of the column;
+          the card itself renders nothing until there's an announcement. */}
+      <View style={styles.announcementsSlot}>
+        <Announcements />
+      </View>
 
     </View>
 
@@ -710,6 +760,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     marginTop: 8,
+  },
+  announcementsSlot: {
+    // Drop to the bottom of the content column; clear the corner buttons.
+    marginTop: 'auto',
+    marginBottom: 44,
   },
   diamondCell: {
     width: DIAMOND_CELL,

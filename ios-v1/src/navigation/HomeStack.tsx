@@ -5,6 +5,7 @@ import WeeklyPromptDetail from '../screens/WeeklyPromptDetail';
 import About from '../screens/About';
 import AboutSection from '../screens/AboutSection';
 import AboutPost from '../screens/AboutPost';
+import AboutDoc from '../screens/AboutDoc';
 import ComingSoon from '../screens/ComingSoon';
 import RequestFeature from '../screens/RequestFeature';
 import AnnouncementsFeed from '../screens/AnnouncementsFeed';
@@ -30,6 +31,7 @@ export default function HomeStack() {
       <Stack.Screen name="About" component={About} />
       <Stack.Screen name="AboutSection" component={AboutSection} />
       <Stack.Screen name="AboutPost" component={AboutPost} />
+      <Stack.Screen name="AboutDoc" component={AboutDoc} />
       <Stack.Screen name="ComingSoon" component={ComingSoon} />
       <Stack.Screen name="RequestFeature" component={RequestFeature} />
       <Stack.Screen name="AnnouncementsFeed" component={AnnouncementsFeed} />

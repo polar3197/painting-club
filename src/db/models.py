@@ -139,14 +139,18 @@ class AnnouncementComment(Base):
 
 
 class Doc(Base):
-    """An editable "about the app" document, one per About section (slug =
-    ethos/art/aims). Backs the previously-static aboutContent: any member reads,
-    contributors edit. `body` is plain text (paragraphs separated by blank
-    lines); `order_index` fixes the section order in the About hub."""
+    """An editable "about the app" document. Each About section (ethos/art/aims)
+    holds MANY docs — `section` groups them, `slug` is the per-doc stable id.
+    Backs the previously-static aboutContent: any member reads, contributors
+    create/edit/delete. `body` is plain text (paragraphs separated by blank
+    lines); `order_index` orders docs within a section."""
     __tablename__ = "doc"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    slug = Column(String(50), unique=True, nullable=False)
+    slug = Column(String(80), unique=True, nullable=False)
+    # Which About section this doc belongs to (ethos/art/aims). Backfilled from
+    # slug for the original one-per-section rows.
+    section = Column(String(50), index=True)
     title = Column(String(300), nullable=False)
     body = Column(Text, nullable=False, default="")
     order_index = Column(Integer, nullable=False, default=0)

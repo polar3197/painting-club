@@ -528,8 +528,15 @@ class DocIn(BaseModel):
     body: str
 
 
+class DocCreateIn(BaseModel):
+    section: str  # 'ethos' | 'art' | 'aims'
+    title: str
+    body: str = ""
+
+
 class DocOut(BaseModel):
     slug: str
+    section: str | None = None
     title: str
     body: str
     order_index: int = 0

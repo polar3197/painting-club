@@ -68,6 +68,7 @@ from api.models import (
     AnnouncementOut,
     AnnouncementDetailOut,
     DocIn,
+    DocCreateIn,
     DocOut,
     AnnouncementCommentIn,
     AnnouncementCommentOut,
@@ -260,8 +261,12 @@ from db.db_ops.announcements import (
 
 from db.db_ops.docs import (
     db_list_docs,
+    db_list_docs_by_section,
     db_get_doc,
+    db_create_doc,
     db_update_doc,
+    db_delete_doc,
+    VALID_SECTIONS,
 )
 
 from db.db_ops.comments import (
@@ -1755,6 +1760,7 @@ async def delete_announcement_comment(
 def _doc_out(doc) -> DocOut:
     return DocOut(
         slug=doc.slug,
+        section=doc.section,
         title=doc.title,
         body=doc.body,
         order_index=doc.order_index,
@@ -1768,6 +1774,32 @@ async def list_docs(
     _: Member = Depends(get_current_member),
 ):
     return [_doc_out(d) for d in await db_list_docs(db)]
+
+
+# Static two-segment path — declared before /docs/{slug} so it can't be shadowed.
+@app.get("/docs/section/{section}", response_model=list[DocOut])
+async def list_docs_in_section(
+    section: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    return [_doc_out(d) for d in await db_list_docs_by_section(db, section)]
+
+
+@app.post("/docs", response_model=DocOut, status_code=201)
+async def create_doc(
+    payload: DocCreateIn,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_contributor_member),
+):
+    section = (payload.section or "").strip().lower()
+    if section not in VALID_SECTIONS:
+        raise HTTPException(status_code=400, detail=f"section must be one of {sorted(VALID_SECTIONS)}")
+    title = (payload.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    doc = await db_create_doc(db, section, title, payload.body or "")
+    return _doc_out(doc)
 
 
 @app.get("/docs/{slug}", response_model=DocOut)
@@ -1796,6 +1828,17 @@ async def update_doc(
     if doc is None:
         raise HTTPException(status_code=404, detail="Doc not found")
     return _doc_out(doc)
+
+
+@app.delete("/docs/{slug}")
+async def delete_doc(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_contributor_member),
+):
+    if not await db_delete_doc(db, slug):
+        raise HTTPException(status_code=404, detail="Doc not found")
+    return {"ok": True}
 
 
 @app.patch("/series/{series_id}/order")

@@ -26,6 +26,7 @@ import UserStats from '../screens/UserStats';
 import InfraStats from '../screens/InfraStats';
 import UserRoles from '../screens/UserRoles';
 import UserRoleDetail from '../screens/UserRoleDetail';
+import Contributor from '../screens/Contributor';
 import EditProfile from '../screens/EditProfile';
 import Messages from '../screens/Messages';
 import ConversationThread from '../screens/ConversationThread';
@@ -199,6 +200,7 @@ export default function RootNavigator() {
       <RootStack.Screen name="InfraStats" component={InfraStats} />
       <RootStack.Screen name="UserRoles" component={UserRoles} />
       <RootStack.Screen name="UserRoleDetail" component={UserRoleDetail} />
+      <RootStack.Screen name="Contributor" component={Contributor} />
       <RootStack.Screen name="EditProfile" component={EditProfile} />
       <RootStack.Screen name="Messages" component={Messages} />
       <RootStack.Screen name="ConversationThread" component={ConversationThread} />

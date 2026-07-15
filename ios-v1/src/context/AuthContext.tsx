@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { get_blocks, refresh_token } from '../api';
+import { get_blocks, refresh_token, get_profile } from '../api';
 import { setObservabilityToken, recordLogin } from '../api/observability';
 
 interface AuthContextType {
@@ -74,9 +74,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // are non-fatal — the stored token keeps working until it expires.
           refresh_token(storedToken)
             .then(async (res) => {
+              const freshToken = res?.access_token || storedToken;
               if (res?.access_token) {
                 await SecureStore.setItemAsync('token', res.access_token);
                 setToken(res.access_token);
+              }
+              // Sync role from the server so a role change (e.g. promotion to
+              // contributor) shows up without a full re-login.
+              try {
+                const profile = await get_profile(storedUser, freshToken);
+                if (profile?.role && profile.role !== storedRole) {
+                  await SecureStore.setItemAsync('role', profile.role);
+                  setCurrentRole(profile.role);
+                }
+              } catch {
+                // offline / transient — keep the cached role
               }
             })
             .catch(() => {});

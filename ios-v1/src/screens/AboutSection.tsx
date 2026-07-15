@@ -4,284 +4,168 @@ import {
   Text,
   ScrollView,
   Pressable,
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   ActivityIndicator,
-  Alert,
-  // Raw RN input (not AppTextInput) so the editor keeps autocorrect + spellcheck.
-  TextInput,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { get_doc, update_doc, DocOut } from '../api';
+import { get_docs_by_section, DocOut } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { ABOUT_SECTIONS } from '../constants/aboutContent';
 import type { HomeStackParamList } from '../navigation/types';
 
+type Nav = NativeStackNavigationProp<HomeStackParamList, 'AboutSection'>;
 type SectionRoute = RouteProp<HomeStackParamList, 'AboutSection'>;
 
-// One About section, now backed by the editable `doc` API (slug == section key).
-// Any member reads the doc as a clean blog page; contributors get an inline
-// editor (title + body) that PUTs back to /docs/{slug}.
+// One About section: a ROW LIST of its docs (a section holds many). Any member
+// reads; contributors get a "+" to add a new doc and can edit/delete each from
+// the doc screen. Tapping a row opens the doc.
 export default function AboutSection() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<Nav>();
   const { section } = useRoute<SectionRoute>().params;
   const { token, currentRole } = useAuth();
 
-  const fallbackLabel = ABOUT_SECTIONS.find((s) => s.key === section)?.label ?? section;
-  const isContributor = currentRole === 'contributor' || currentRole === 'admin';
+  const label = ABOUT_SECTIONS.find((s) => s.key === section)?.label ?? section;
+  const isContributor = currentRole === 'contributor';
 
-  const [doc, setDoc] = useState<DocOut | null>(null);
+  const [docs, setDocs] = useState<DocOut[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [draftTitle, setDraftTitle] = useState('');
-  const [draftBody, setDraftBody] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const d = await get_doc(section, token);
-      setDoc(d);
+      setDocs(await get_docs_by_section(section, token));
     } catch {
-      // leave doc null → empty state below
+      // keep what's on screen
     } finally {
       setLoading(false);
     }
   }, [section, token]);
 
+  // Refetch on focus so a create/edit/delete on the doc screen reflects here.
   useEffect(() => {
-    load();
-  }, [load]);
+    const unsub = navigation.addListener('focus', load);
+    return unsub;
+  }, [navigation, load]);
 
-  const startEdit = () => {
-    if (!doc) return;
-    setDraftTitle(doc.title);
-    setDraftBody(doc.body);
-    setEditing(true);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   };
 
-  const save = async () => {
-    const title = draftTitle.trim();
-    if (!title || saving) return;
-    setSaving(true);
-    try {
-      const updated = await update_doc(section, title, draftBody, token);
-      setDoc(updated);
-      setEditing(false);
-    } catch (err: any) {
-      Alert.alert('could not save', err?.message || 'try again');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Body renders as a blog page: blank-line-separated paragraphs, in order.
-  const paragraphs = (doc?.body ?? '')
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
-  if (loading) {
-    return (
-      <View style={[styles.page, styles.center]}>
-        <ActivityIndicator color={Colors.darkerGold} />
-      </View>
-    );
-  }
-
-  if (editing) {
-    return (
-      <KeyboardAvoidingView
-        style={styles.page}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.editContent,
-            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40 },
-          ]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-        >
-          <Text style={styles.editLabel}>title</Text>
-          <TextInput
-            style={styles.titleInput}
-            value={draftTitle}
-            onChangeText={setDraftTitle}
-            placeholder="section title"
-            placeholderTextColor={Colors.textMuted}
-            autoCapitalize="sentences"
-            autoCorrect
-            spellCheck
-          />
-
-          <Text style={styles.editLabel}>body</Text>
-          <TextInput
-            style={styles.bodyInput}
-            value={draftBody}
-            onChangeText={setDraftBody}
-            placeholder="write this section…"
-            placeholderTextColor={Colors.textMuted}
-            autoCapitalize="sentences"
-            autoCorrect
-            spellCheck
-            multiline
-          />
-
-          <View style={styles.editActions}>
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={() => setEditing(false)}
-              disabled={saving}
-            >
-              <Text style={styles.cancelText}>cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.saveBtn, (!draftTitle.trim() || saving) && styles.saveDisabled]}
-              onPress={save}
-              disabled={!draftTitle.trim() || saving}
-            >
-              <Text style={styles.saveText}>{saving ? 'saving…' : 'save'}</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    );
-  }
+  const emptyText =
+    section === 'art' ? 'currently artless'
+    : section === 'aims' ? 'currently aimless'
+    : 'nothing here yet';
 
   return (
-    <ScrollView
-      style={styles.page}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 60 },
-      ]}
-    >
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>{doc?.title || fallbackLabel}</Text>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{label}</Text>
         {isContributor && (
-          <Pressable hitSlop={8} onPress={startEdit}>
-            <Text style={styles.editLink}>edit</Text>
+          <Pressable
+            style={styles.addBtn}
+            hitSlop={10}
+            onPress={() => navigation.navigate('AboutDoc', { section, create: true })}
+          >
+            <Text style={styles.addBtnText}>+</Text>
           </Pressable>
         )}
       </View>
 
-      {paragraphs.length === 0 ? (
-        <Text style={styles.empty}>
-          {section === 'art' ? 'currently artless' : section === 'aims' ? 'currently aimless' : 'nothing here yet'}
-        </Text>
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={Colors.darkerGold} />
+        </View>
       ) : (
-        paragraphs.map((p, i) => (
-          <Text key={i} style={styles.body}>{p}</Text>
-        ))
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {docs.length === 0 ? (
+            <Text style={styles.empty}>{emptyText}</Text>
+          ) : (
+            docs.map((d) => (
+              <Pressable
+                key={d.slug}
+                style={styles.row}
+                onPress={() => navigation.navigate('AboutDoc', { slug: d.slug })}
+              >
+                <Text style={styles.rowTitle} numberOfLines={1}>{d.title}</Text>
+                {!!d.body && <Text style={styles.rowBody} numberOfLines={2}>{d.body}</Text>}
+              </Pressable>
+            ))
+          )}
+        </ScrollView>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: {
+  container: {
     flex: 1,
-    backgroundColor: Colors.white,
-  },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  content: {
+    backgroundColor: Colors.mainBg,
     paddingHorizontal: 24,
-    gap: 18,
   },
-  titleRow: {
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    paddingBottom: 10,
+    marginBottom: 16,
   },
   title: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.lg,
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xl,
+  },
+  addBtn: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: 30,
+    lineHeight: 32,
     color: Colors.black,
-    flex: 1,
-  },
-  editLink: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    color: Colors.darkerGold,
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 12,
-  },
-  body: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    lineHeight: 20,
-    color: Colors.textPrimary,
   },
   empty: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.sm,
+    color: Colors.textSecondary,
+    marginTop: 24,
   },
-  // --- editor ---
-  editContent: {
-    paddingHorizontal: 20,
+  row: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.artCardBg,
+    padding: 14,
+    marginBottom: 10,
+    gap: 4,
   },
-  editLabel: {
-    fontFamily: Fonts.mono,
+  rowTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
+    color: Colors.black,
+  },
+  rowBody: {
+    fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.textSecondary,
-    marginBottom: 6,
-  },
-  titleInput: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.white,
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.base,
-    padding: 10,
-    marginBottom: 18,
-  },
-  bodyInput: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.white,
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.base,
-    lineHeight: 22,
-    minHeight: 320,
-    padding: 10,
-    textAlignVertical: 'top',
-    marginBottom: 18,
-  },
-  editActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
-  cancelBtn: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  cancelText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    color: Colors.black,
-  },
-  saveBtn: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.greenBright,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-  },
-  saveDisabled: { opacity: 0.5 },
-  saveText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    color: Colors.black,
   },
 });

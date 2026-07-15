@@ -6,24 +6,21 @@ import { useAuth } from '../context/AuthContext';
 import { get_announcements, AnnouncementOut } from '../api';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { HomeStackParamList } from '../navigation/types';
-import AnnouncementComposeDialog from './AnnouncementComposeDialog';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeFeed'>;
 
 // How many announcements the inline Home card shows before "see all".
 const PREVIEW_COUNT = 3;
 
-// The inline Home announcements card: shows the most recent few, each tapping
-// through to its discussion. Contributors get a compose affordance. Empty +
-// non-contributor renders nothing so Home stays clean.
+// Read-only inline Home announcements card: shows the most recent few, each
+// tapping through to its discussion. Rendered ONLY when there's at least one
+// announcement (stays invisible otherwise). Authoring lives in the contributor
+// Settings menu, not here — everyone just reads.
 export default function Announcements() {
   const navigation = useNavigation<Nav>();
-  const { token, currentRole } = useAuth();
+  const { token } = useAuth();
   const isFocused = useIsFocused();
   const [items, setItems] = useState<AnnouncementOut[]>([]);
-  const [composing, setComposing] = useState(false);
-
-  const isContributor = currentRole === 'contributor' || currentRole === 'admin';
 
   const load = useCallback(() => {
     get_announcements(token)
@@ -35,8 +32,8 @@ export default function Announcements() {
     if (isFocused) load();
   }, [isFocused, load]);
 
-  // Nothing to show and no reason to show the compose entry — stay out of the way.
-  if (items.length === 0 && !isContributor) return null;
+  // Invisible until there's something to announce.
+  if (items.length === 0) return null;
 
   const preview = items.slice(0, PREVIEW_COUNT);
   const extra = items.length - preview.length;
@@ -45,11 +42,6 @@ export default function Announcements() {
     <View style={styles.wrapper}>
       <View style={styles.header}>
         <Text style={styles.headerText}>announcements</Text>
-        {isContributor && (
-          <Pressable hitSlop={8} onPress={() => setComposing(true)}>
-            <Text style={styles.postBtn}>+ post</Text>
-          </Pressable>
-        )}
       </View>
 
       <View style={styles.body}>
@@ -69,12 +61,6 @@ export default function Announcements() {
           </Pressable>
         ))}
 
-        {items.length === 0 && isContributor && (
-          <Pressable style={styles.emptyItem} onPress={() => setComposing(true)}>
-            <Text style={styles.emptyText}>post the first announcement</Text>
-          </Pressable>
-        )}
-
         {extra > 0 && (
           <Pressable
             style={styles.seeAll}
@@ -84,13 +70,6 @@ export default function Announcements() {
           </Pressable>
         )}
       </View>
-
-      {composing && (
-        <AnnouncementComposeDialog
-          onClose={() => setComposing(false)}
-          onPosted={load}
-        />
-      )}
     </View>
   );
 }
