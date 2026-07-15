@@ -512,3 +512,25 @@ export interface DocOut {
   order_index: number;
   updated_at: string | null;
 }
+
+// --- Infra health (Raspberry Pi host metrics; contributor "infra stats") ------
+export interface InfraHealthOut {
+  ok: boolean;
+  // False when the host's /proc was unreadable (e.g. dev off-Linux) — show
+  // "unavailable" instead of misleading zeros.
+  host_metrics_available: boolean;
+  kernel: string | null;
+  uptime_seconds: number | null;
+  temperature_c: number | null;
+  cpu: {
+    percent: number | null;
+    cores: number | null;
+    load_1: number | null;
+    load_5: number | null;
+    load_15: number | null;
+  };
+  memory: { total: number | null; used: number | null; available: number | null; percent: number | null };
+  disk: { path: string | null; total: number | null; used: number | null; free: number | null; percent: number | null };
+  // Size of the Docker static-files volume (uploaded art + profile images).
+  content: { path: string | null; bytes: number | null; files: number | null; truncated: boolean };
+}

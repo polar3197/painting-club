@@ -50,6 +50,7 @@ import type {
   EventUpdate,
   UsageSummary,
   TelemetrySummary,
+  InfraHealthOut,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -995,4 +996,10 @@ export function update_doc(
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ title, body }),
   }) as Promise<DocOut>;
+}
+
+export function get_infra_health(token: string | null): Promise<InfraHealthOut> {
+  return request('/infra/health', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<InfraHealthOut>;
 }

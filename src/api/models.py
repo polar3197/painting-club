@@ -625,6 +625,50 @@ class MemberRoleOut(BaseModel):
     role: str
 
 
+# --- Infra health (Raspberry Pi host metrics; contributor "infra stats") -------
+
+class CpuHealth(BaseModel):
+    percent: float | None = None
+    cores: int | None = None
+    load_1: float | None = None
+    load_5: float | None = None
+    load_15: float | None = None
+
+class MemoryHealth(BaseModel):
+    total: int | None = None       # bytes
+    used: int | None = None
+    available: int | None = None
+    percent: float | None = None
+
+class DiskHealth(BaseModel):
+    path: str | None = None
+    total: int | None = None       # bytes
+    used: int | None = None
+    free: int | None = None
+    percent: float | None = None
+
+class ContentHealth(BaseModel):
+    # Size of the Docker static-files volume (uploaded art / profile images) —
+    # the main driver of disk growth on the Pi.
+    path: str | None = None
+    bytes: int | None = None
+    files: int | None = None
+    truncated: bool = False
+
+class InfraHealthOut(BaseModel):
+    ok: bool = True
+    # False when host /proc was unreadable (e.g. running off-Linux in dev), so
+    # the client shows "unavailable" rather than misleading zeros.
+    host_metrics_available: bool = True
+    kernel: str | None = None
+    uptime_seconds: int | None = None
+    temperature_c: float | None = None
+    cpu: CpuHealth = CpuHealth()
+    memory: MemoryHealth = MemoryHealth()
+    disk: DiskHealth = DiskHealth()
+    content: ContentHealth = ContentHealth()
+
+
 # --- Observability -------------------------------------------------------------
 
 class UsageEventIn(BaseModel):

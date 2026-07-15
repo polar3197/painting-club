@@ -70,6 +70,7 @@ from api.models import (
     DocIn,
     DocCreateIn,
     DocOut,
+    InfraHealthOut,
     AnnouncementCommentIn,
     AnnouncementCommentOut,
     SearchOptions,
@@ -284,6 +285,7 @@ from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
 from db.models import Member, Media, Media_Members, Art, Comment, Visual2D, WrittenForm, WeeklyPrompt
 
 from api.auth import create_token, decode_token
+from api.infra_health import read_host_health
 
 
 bearer = HTTPBearer()
@@ -3229,3 +3231,14 @@ async def telemetry_summary(
     _: Member = Depends(get_contributor_member),
 ):
     return await db_telemetry_summary(db, days)
+
+
+@app.get("/infra/health", response_model=InfraHealthOut)
+async def infra_health(_: Member = Depends(get_contributor_member)):
+    """Live Raspberry Pi host health — CPU / memory / disk / temperature /
+    uptime, plus the size of the Docker static-files volume (uploaded art +
+    profile images, the real driver of disk growth). Read on request from /proc
+    and the mounted volume; nothing is stored. Contributor-only."""
+    disk_path = os.environ.get("INFRA_DISK_PATH", "/src")
+    content_path = os.environ.get("INFRA_CONTENT_PATH", "/app/static")
+    return InfraHealthOut(**await read_host_health(disk_path, content_path))

@@ -10,24 +10,25 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
-import { TelemetrySummary, get_telemetry_summary } from '../api';
+import { InfraHealthOut, get_infra_health } from '../api';
 
-const WINDOW_DAYS = 14;
+const REFRESH_MS = 15000;
 
-// Contributor "infra stats": device/perf telemetry — event counts by kind,
-// app-version spread, crashes per day, and a recent crash/warning list.
-// Read-only, backed by /telemetry/summary. Reached from Settings.
+// Contributor "infra stats": live Raspberry Pi host health — CPU / memory /
+// disk / temperature / uptime, plus the size of the Docker static-files volume
+// (uploaded art + profile images), which is what actually fills the Pi's disk.
+// Read-only, backed by /infra/health. Reached from Settings.
 export default function InfraStats() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const [data, setData] = useState<TelemetrySummary | null>(null);
+  const [data, setData] = useState<InfraHealthOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setData(await get_telemetry_summary(WINDOW_DAYS, token));
+      setData(await get_infra_health(token));
       setError(false);
     } catch {
       setError(true);
@@ -38,6 +39,8 @@ export default function InfraStats() {
 
   useEffect(() => {
     load();
+    const iv = setInterval(load, REFRESH_MS);
+    return () => clearInterval(iv);
   }, [load]);
 
   const onRefresh = async () => {
@@ -54,11 +57,6 @@ export default function InfraStats() {
     );
   }
 
-  const maxCrash = Math.max(1, ...(data?.crashes_per_day.map((d) => d.count) || [1]));
-  const hasAny =
-    (data?.counts_by_kind.length ?? 0) > 0 ||
-    (data?.recent.length ?? 0) > 0;
-
   return (
     <ScrollView
       style={styles.container}
@@ -70,70 +68,59 @@ export default function InfraStats() {
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.title}>infra stats</Text>
-      <Text style={styles.sub}>last {data?.days ?? WINDOW_DAYS} days</Text>
+      <Text style={styles.sub}>
+        raspberry pi · {data?.kernel || 'host'}{data?.uptime_seconds != null ? ` · up ${fmtUptime(data.uptime_seconds)}` : ''}
+      </Text>
 
       {error && !data ? (
-        <Text style={styles.empty}>couldn't load stats. pull to retry.</Text>
-      ) : !hasAny ? (
-        <Text style={styles.empty}>no telemetry yet. crashes and memory warnings show up here.</Text>
-      ) : (
+        <Text style={styles.empty}>couldn't reach the pi. pull to retry.</Text>
+      ) : data && !data.host_metrics_available ? (
+        <Text style={styles.empty}>
+          host metrics unavailable here (the api isn't running on the pi).
+        </Text>
+      ) : data ? (
         <>
-          <Section title="events by kind">
-            {data!.counts_by_kind.map((k) => (
-              <Row key={k.kind} label={k.kind} value={k.count} />
-            ))}
+          <Section title="cpu">
+            <Meter label="usage" percent={data.cpu.percent} value={data.cpu.percent != null ? `${data.cpu.percent}%` : '—'} />
+            <Row label="cores" value={data.cpu.cores != null ? String(data.cpu.cores) : '—'} />
+            <Row
+              label="load (1 · 5 · 15m)"
+              value={[data.cpu.load_1, data.cpu.load_5, data.cpu.load_15].map((l) => (l != null ? l.toFixed(2) : '—')).join('  ')}
+            />
           </Section>
 
-          {data!.app_versions.length > 0 && (
-            <Section title="app versions">
-              {data!.app_versions.map((v) => (
-                <Row key={v.version} label={v.version} value={v.count} />
-              ))}
-            </Section>
-          )}
-
-          <Section title="crashes per day">
-            {data!.crashes_per_day.length === 0 ? (
-              <Text style={styles.empty}>no crashes 🎉</Text>
-            ) : (
-              data!.crashes_per_day.map((d) => (
-                <View key={d.date} style={styles.barRow}>
-                  <Text style={styles.barLabel}>{shortDate(d.date)}</Text>
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { width: `${Math.round((d.count / maxCrash) * 100)}%` }]} />
-                  </View>
-                  <Text style={styles.barCount}>{d.count}</Text>
-                </View>
-              ))
-            )}
+          <Section title="memory">
+            <Meter label="used" percent={data.memory.percent} value={`${fmtBytes(data.memory.used)} / ${fmtBytes(data.memory.total)}`} />
+            <Row label="available" value={fmtBytes(data.memory.available)} />
           </Section>
 
-          {data!.recent.length > 0 && (
-            <Section title="recent crashes & warnings">
-              {data!.recent.map((r, i) => (
-                <View key={i} style={styles.recentRow}>
-                  <View style={styles.recentHead}>
-                    <Text style={[styles.recentKind, r.kind === 'crash' && styles.recentCrash]}>
-                      {r.kind}
-                    </Text>
-                    <Text style={styles.recentMeta}>
-                      {[r.device_model, r.os_version && `iOS ${r.os_version}`, r.app_version && `v${r.app_version}`]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </Text>
-                  </View>
-                  {!!r.detail && (
-                    <Text style={styles.recentDetail} numberOfLines={3}>{r.detail}</Text>
-                  )}
-                  {!!r.occurred_at && (
-                    <Text style={styles.recentTime}>{r.occurred_at.replace('T', ' ').slice(0, 16)}</Text>
-                  )}
-                </View>
-              ))}
+          <Section title="disk (sd card)">
+            <Meter label="used" percent={data.disk.percent} value={`${fmtBytes(data.disk.used)} / ${fmtBytes(data.disk.total)}`} />
+            <Row label="free" value={fmtBytes(data.disk.free)} />
+          </Section>
+
+          <Section title="people's content">
+            <Text style={styles.note}>
+              uploaded art + profile images (the static-files volume) — this rides on the disk above.
+            </Text>
+            <Row label="size" value={fmtBytes(data.content.bytes)} />
+            <Row
+              label="files"
+              value={
+                data.content.files != null
+                  ? `${data.content.files.toLocaleString()}${data.content.truncated ? '+' : ''}`
+                  : '—'
+              }
+            />
+          </Section>
+
+          {data.temperature_c != null && (
+            <Section title="temperature">
+              <Row label="cpu temp" value={`${data.temperature_c}°C`} />
             </Section>
           )}
         </>
-      )}
+      ) : null}
     </ScrollView>
   );
 }
@@ -147,7 +134,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, value }: { label: string; value: number }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
@@ -156,9 +143,45 @@ function Row({ label, value }: { label: string; value: number }) {
   );
 }
 
-function shortDate(iso: string): string {
-  const [, m, d] = iso.split('-');
-  return `${m}/${d}`;
+// A labelled percent meter with a threshold-coloured fill.
+function Meter({ label, percent, value }: { label: string; percent: number | null; value: string }) {
+  const pct = percent == null ? 0 : Math.max(0, Math.min(100, percent));
+  return (
+    <View style={styles.meterWrap}>
+      <View style={styles.meterHead}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        <Text style={styles.meterValue}>{value}</Text>
+      </View>
+      <View style={styles.barTrack}>
+        <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: meterColor(percent) }]} />
+      </View>
+    </View>
+  );
+}
+
+function meterColor(p: number | null): string {
+  if (p == null) return 'rgba(0,0,0,0.2)';
+  if (p >= 90) return Colors.redBright;
+  if (p >= 70) return Colors.primaryGold;
+  return Colors.greenMuted;
+}
+
+function fmtBytes(n: number | null | undefined): string {
+  if (n == null) return '—';
+  const gb = n / 1e9;
+  if (gb >= 1) return `${gb.toFixed(1)} GB`;
+  const mb = n / 1e6;
+  if (mb >= 1) return `${mb.toFixed(0)} MB`;
+  return `${(n / 1e3).toFixed(0)} KB`;
+}
+
+function fmtUptime(s: number): string {
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 
 const styles = StyleSheet.create({
@@ -195,6 +218,12 @@ const styles = StyleSheet.create({
     color: Colors.black,
     marginBottom: 10,
   },
+  note: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.micro,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -215,74 +244,29 @@ const styles = StyleSheet.create({
     color: Colors.black,
     marginLeft: 12,
   },
-  barRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 7,
+  meterWrap: {
+    marginBottom: 14,
   },
-  barLabel: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.tiny,
-    color: Colors.textPrimary,
-    width: 60,
-  },
-  barTrack: {
-    flex: 1,
-    height: 14,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.2)',
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: Colors.redBright,
-  },
-  barCount: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.tiny,
-    color: Colors.textSecondary,
-    width: 34,
-    textAlign: 'right',
-  },
-  recentRow: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.white,
-    padding: 10,
-    marginBottom: 8,
-    gap: 4,
-  },
-  recentHead: {
+  meterHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
+    marginBottom: 6,
   },
-  recentKind: {
-    fontFamily: Fonts.serif,
+  meterValue: {
+    fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
-    color: Colors.textPrimary,
+    color: Colors.black,
+    marginLeft: 12,
   },
-  recentCrash: {
-    color: Colors.redBright,
-    fontWeight: '700',
+  barTrack: {
+    height: 16,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderWidth: 1,
+    borderColor: '#000',
   },
-  recentMeta: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.micro,
-    color: Colors.textSecondary,
-    flexShrink: 1,
-    textAlign: 'right',
-  },
-  recentDetail: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.micro,
-    color: Colors.textPrimary,
-  },
-  recentTime: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.micro,
-    color: Colors.textMuted,
+  barFill: {
+    height: '100%',
   },
   empty: {
     fontFamily: Fonts.mono,
