@@ -431,7 +431,7 @@ class SeriesOrderUpdate(BaseModel):
 class PromptSummary(BaseModel):
     id: uuid.UUID
     title: str
-    media_name: str
+    media_name: str | None = None  # null = medium-agnostic
     is_active: bool
     created_at: datetime
 
@@ -440,8 +440,10 @@ class PromptOut(BaseModel):
     id: uuid.UUID
     title: str
     short_summary: str | None = None
-    media_id: uuid.UUID
-    media_name: str
+    # Null when the prompt is medium-agnostic (promoted from a suggestion with
+    # no medium).
+    media_id: uuid.UUID | None = None
+    media_name: str | None = None
     is_active: bool
     submission_count: int = 0
 

@@ -72,12 +72,6 @@ export default function Settings() {
           </Pressable>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
-            onPress={() => navigation.navigate('WeeklyPromptSwitch')}
-          >
-            <Text style={styles.actionBtnText}>weekly prompt</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
             onPress={() => navigation.navigate('UserRoles')}
           >
             <Text style={styles.actionBtnText}>user roles</Text>

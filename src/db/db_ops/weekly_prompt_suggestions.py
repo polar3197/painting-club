@@ -1,7 +1,49 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from datetime import datetime
 
-from db.models import Member, Media, WeeklyPromptSuggestion
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, update
+
+from db.models import Member, Media, WeeklyPromptSuggestion, WeeklyPrompt
+
+
+async def db_activate_suggestion(db: AsyncSession, suggestion_id):
+    """Promote an approved suggestion to THE active weekly prompt: create a
+    WeeklyPrompt from it (medium-agnostic if the suggestion had no medium),
+    archive the currently-active prompt, and retire the suggestion from the
+    queue. Returns (prompt, media_name | None)."""
+    suggestion = (
+        await db.execute(
+            select(WeeklyPromptSuggestion).filter(WeeklyPromptSuggestion.id == suggestion_id)
+        )
+    ).scalar_one_or_none()
+    if suggestion is None:
+        raise ValueError("Suggestion not found")
+
+    # Archive the current active prompt so the one-active partial index is happy.
+    await db.execute(
+        update(WeeklyPrompt)
+        .where(WeeklyPrompt.is_active.is_(True))
+        .values(is_active=False, archived_at=datetime.utcnow())
+    )
+    prompt = WeeklyPrompt(
+        title=(suggestion.prompt_text or "").strip(),
+        media_id=suggestion.media_id,   # may be None → medium-agnostic
+        is_active=True,
+    )
+    db.add(prompt)
+    # Retire the suggestion from the proposed/up-next queues.
+    suggestion.status = "activated"
+    suggestion.order_index = None
+    await db.flush()
+    await db.commit()
+    await db.refresh(prompt)
+
+    media_name = None
+    if prompt.media_id is not None:
+        media_name = (
+            await db.execute(select(Media.name).filter(Media.id == prompt.media_id))
+        ).scalar_one_or_none()
+    return prompt, media_name
 
 
 async def db_create_suggestion(

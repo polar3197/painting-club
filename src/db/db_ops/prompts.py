@@ -12,7 +12,7 @@ async def db_get_active_prompt(db: AsyncSession):
     row = (
         await db.execute(
             select(WeeklyPrompt, Media.name)
-            .join(Media, Media.id == WeeklyPrompt.media_id)
+            .outerjoin(Media, Media.id == WeeklyPrompt.media_id)
             .filter(WeeklyPrompt.is_active.is_(True))
             .limit(1)
         )
@@ -33,7 +33,7 @@ async def db_list_prompts(db: AsyncSession):
     rows = (
         await db.execute(
             select(WeeklyPrompt, Media.name)
-            .join(Media, Media.id == WeeklyPrompt.media_id)
+            .outerjoin(Media, Media.id == WeeklyPrompt.media_id)
             .order_by(WeeklyPrompt.created_at.desc())
         )
     ).all()
@@ -44,7 +44,7 @@ async def db_get_prompt(db: AsyncSession, prompt_id):
     row = (
         await db.execute(
             select(WeeklyPrompt, Media.name)
-            .join(Media, Media.id == WeeklyPrompt.media_id)
+            .outerjoin(Media, Media.id == WeeklyPrompt.media_id)
             .filter(WeeklyPrompt.id == prompt_id)
         )
     ).first()
@@ -161,13 +161,20 @@ async def db_archive_prompt(db: AsyncSession, prompt_id) -> WeeklyPrompt:
 
 
 async def db_validate_submission_medium(db: AsyncSession, prompt_id, medium: str) -> bool:
-    """Return True when the named medium matches the prompt's required medium."""
+    """Return True when the medium is acceptable for the prompt. A medium-agnostic
+    prompt (media_id NULL) accepts any real medium; a medium-specific prompt
+    accepts only its own."""
     media_id = (
         await db.execute(select(Media.id).filter(Media.name == medium))
     ).scalar_one_or_none()
     if media_id is None:
         return False
-    prompt_media_id = (
-        await db.execute(select(WeeklyPrompt.media_id).filter(WeeklyPrompt.id == prompt_id))
+    prompt = (
+        await db.execute(select(WeeklyPrompt).filter(WeeklyPrompt.id == prompt_id))
     ).scalar_one_or_none()
-    return prompt_media_id is not None and str(prompt_media_id) == str(media_id)
+    if prompt is None:
+        return False
+    # Agnostic prompt: any real medium is fine.
+    if prompt.media_id is None:
+        return True
+    return str(prompt.media_id) == str(media_id)

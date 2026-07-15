@@ -249,6 +249,7 @@ from db.db_ops.weekly_prompt_suggestions import (
     db_list_suggestions_admin,
     db_review_suggestion,
     db_reorder_suggestions,
+    db_activate_suggestion,
 )
 
 from db.db_ops.announcements import (
@@ -1508,9 +1509,34 @@ async def admin_activate_prompt(
         prompt = await db_activate_prompt(db, prompt_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    media_name = (
-        await db.execute(select(Media.name).filter(Media.id == prompt.media_id))
-    ).scalar_one()
+    media_name = None
+    if prompt.media_id is not None:
+        media_name = (
+            await db.execute(select(Media.name).filter(Media.id == prompt.media_id))
+        ).scalar_one_or_none()
+    return PromptOut(
+        id=prompt.id,
+        title=prompt.title,
+        short_summary=prompt.short_summary,
+        media_id=prompt.media_id,
+        media_name=media_name,
+        is_active=prompt.is_active,
+        submission_count=0,
+    )
+
+
+@app.post("/admin/weekly-prompts/{suggestion_id}/activate", response_model=PromptOut)
+async def admin_activate_suggestion(
+    suggestion_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_admin_member),
+) -> PromptOut:
+    """Promote an approved suggestion to the active week's prompt (creates the
+    prompt, archives the current, retires the suggestion). Admin/contributor."""
+    try:
+        prompt, media_name = await db_activate_suggestion(db, _parse_uuid(suggestion_id, "suggestion"))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return PromptOut(
         id=prompt.id,
         title=prompt.title,

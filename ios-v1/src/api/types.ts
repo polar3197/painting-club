@@ -104,8 +104,9 @@ export interface PromptOut {
   id: string;
   title: string;
   short_summary: string | null;
-  media_id: string;
-  media_name: string;
+  // Null when the prompt is medium-agnostic (promoted from an agnostic suggestion).
+  media_id: string | null;
+  media_name: string | null;
   is_active: boolean;
   submission_count: number;
 }
@@ -118,7 +119,7 @@ export interface PromptDetailOut extends PromptOut {
 export interface PromptSummary {
   id: string;
   title: string;
-  media_name: string;
+  media_name: string | null; // null = medium-agnostic
   is_active: boolean;
   created_at: string;
 }

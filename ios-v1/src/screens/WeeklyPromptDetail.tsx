@@ -82,7 +82,7 @@ export default function WeeklyPromptDetail() {
       return;
     }
     let cancelled = false;
-    get_members_visual_2d(currentUser, prompt.media_name)
+    get_members_visual_2d(currentUser, prompt.media_name ?? '')
       .then((list) => {
         if (cancelled) return;
         const found = list.find((p) => p.id === prompt.viewer_submission_id) ?? null;
@@ -193,7 +193,7 @@ export default function WeeklyPromptDetail() {
 
       {showDialog && currentUser && (
         <AddArtDialog
-          selectedMedium={prompt.media_name}
+          selectedMedium={prompt.media_name ?? ''}
           username={currentUser}
           piece={viewerPiece ?? undefined}
           minimal

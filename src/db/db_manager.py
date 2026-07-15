@@ -275,6 +275,11 @@ async def run_migrations():
             "CREATE UNIQUE INDEX IF NOT EXISTS one_active_weekly_prompt "
             "ON weekly_prompt ((TRUE)) WHERE is_active = true"
         ))
+        # Allow medium-agnostic prompts (promoted from a suggestion with no
+        # medium). Idempotent — DROP NOT NULL is a no-op once already nullable.
+        await conn.execute(text(
+            "ALTER TABLE weekly_prompt ALTER COLUMN media_id DROP NOT NULL"
+        ))
         # SQLAlchemy create_all skips DB-side defaults — set them here so raw
         # SQL inserts (seeds, future migrations) don't need to specify id/created_at.
         await conn.execute(text(

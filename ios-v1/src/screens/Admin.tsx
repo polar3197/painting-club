@@ -19,7 +19,10 @@ import {
   ReportOut,
   get_admin_prompt_queue,
   review_prompt_suggestion,
+  activate_suggestion,
+  get_active_prompt,
   PromptSuggestionOut,
+  PromptOut,
   get_admin_members,
   set_member_role,
   AdminMemberOut,
@@ -31,9 +34,11 @@ import ConfirmDialog from '../components/ConfirmDialog';
 function PromptSuggestionRow({
   s,
   onReview,
+  onActivate,
 }: {
   s: PromptSuggestionOut;
   onReview?: (id: string, status: 'approved' | 'rejected') => void;
+  onActivate?: (id: string) => void;
 }) {
   return (
     <View style={styles.promptRow}>
@@ -55,6 +60,16 @@ function PromptSuggestionRow({
             onPress={() => onReview(s.id, 'rejected')}
           >
             <Text style={styles.promptBtnText}>reject</Text>
+          </Pressable>
+        </View>
+      )}
+      {onActivate && (
+        <View style={styles.promptBtns}>
+          <Pressable
+            style={[styles.promptBtn, { backgroundColor: Colors.primaryGold }]}
+            onPress={() => onActivate(s.id)}
+          >
+            <Text style={styles.promptBtnText}>make this week's</Text>
           </Pressable>
         </View>
       )}
@@ -360,6 +375,7 @@ export default function Admin() {
   const [reports, setReports] = useState<ReportOut[]>([]);
   const [proposed, setProposed] = useState<PromptSuggestionOut[]>([]);
   const [upNext, setUpNext] = useState<PromptSuggestionOut[]>([]);
+  const [activePrompt, setActivePrompt] = useState<PromptOut | null>(null);
 
   const fetchApps = () => {
     get_applications(token).then(setApplications).catch(() => {});
@@ -381,6 +397,16 @@ export default function Admin() {
         setUpNext(q.up_next);
       })
       .catch(() => {});
+    get_active_prompt(token).then(setActivePrompt).catch(() => {});
+  };
+
+  const handleActivateSuggestion = async (id: string) => {
+    try {
+      await activate_suggestion(id, token);
+      fetchPrompts();
+    } catch (err: any) {
+      Alert.alert("Couldn't activate", err?.message || 'try again.');
+    }
   };
 
   useEffect(() => {
@@ -471,20 +497,33 @@ export default function Admin() {
 
       {tab === 'prompts' ? (
         <>
-          <Text style={styles.sectionHeader}>proposed</Text>
+          <Text style={styles.sectionHeader}>this week's prompt</Text>
+          {activePrompt ? (
+            <View style={styles.activePromptRow}>
+              <Text style={styles.promptText}>{activePrompt.title}</Text>
+              <Text style={styles.promptMeta}>{activePrompt.media_name ?? 'any medium'}</Text>
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>no active prompt</Text>
+          )}
+
+          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>up next</Text>
+          <Text style={styles.hintText}>activate one to make it this week's (archives the current).</Text>
+          {upNext.length === 0 ? (
+            <Text style={styles.emptyText}>nothing approved yet</Text>
+          ) : (
+            upNext.map((s) => (
+              <PromptSuggestionRow key={s.id} s={s} onActivate={handleActivateSuggestion} />
+            ))
+          )}
+
+          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>proposed</Text>
           {proposed.length === 0 ? (
             <Text style={styles.emptyText}>no proposed prompts</Text>
           ) : (
             proposed.map((s) => (
               <PromptSuggestionRow key={s.id} s={s} onReview={handleReviewPrompt} />
             ))
-          )}
-
-          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>up next</Text>
-          {upNext.length === 0 ? (
-            <Text style={styles.emptyText}>nothing approved yet</Text>
-          ) : (
-            upNext.map((s) => <PromptSuggestionRow key={s.id} s={s} />)
           )}
         </>
       ) : tab === 'reports' ? (
@@ -637,6 +676,20 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     gap: 6,
+  },
+  activePromptRow: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.greenBright,
+    padding: 12,
+    marginBottom: 8,
+    gap: 6,
+  },
+  hintText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
+    color: Colors.textSecondary,
+    marginBottom: 10,
   },
   promptText: {
     fontFamily: Fonts.serif,

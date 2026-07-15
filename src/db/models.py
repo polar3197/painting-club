@@ -89,7 +89,9 @@ class WeeklyPrompt(Collection):
     __tablename__ = "weekly_prompt"
 
     id = Column(UUID(as_uuid=True), ForeignKey('collection.id', ondelete='CASCADE'), primary_key=True)
-    media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=False)
+    # Nullable: a prompt promoted from a "medium-agnostic" suggestion has no
+    # required medium (submissions of any medium are accepted).
+    media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=True)
     is_active = Column(Boolean, nullable=False, default=False)
     archived_at = Column(DateTime)
 

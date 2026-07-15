@@ -789,6 +789,14 @@ export function review_prompt_suggestion(
   }) as Promise<PromptSuggestionOut>;
 }
 
+// Promote an approved suggestion to THE active week's prompt (archives current).
+export function activate_suggestion(id: string, token: string | null): Promise<PromptOut> {
+  return request(`/admin/weekly-prompts/${id}/activate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<PromptOut>;
+}
+
 // --- Events -------------------------------------------------------------------
 
 export function list_events(token: string | null): Promise<EventOut[]> {
