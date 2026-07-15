@@ -331,13 +331,17 @@ async def get_optional_member(credentials: Optional[HTTPAuthorizationCredentials
         return None
 
 async def get_admin_member(current_member: Member = Depends(get_current_member)):
-    if current_member.role != "admin":
+    # Role hierarchy: member < admin < contributor. Contributor is the top tier
+    # (admin's powers + docs/roles/announcements), so a contributor passes any
+    # admin gate.
+    if current_member.role not in ("admin", "contributor"):
         raise HTTPException(status_code=403, detail="Admins only")
     return current_member
 
 async def get_contributor_member(current_member: Member = Depends(get_current_member)):
-    # Admin implies contributor. Gates announcement/docs authoring + moderation.
-    if current_member.role not in ("contributor", "admin"):
+    # Contributor is the highest tier — admins do NOT implicitly qualify. Gates
+    # announcement/docs authoring + moderation and the usage/telemetry panel.
+    if current_member.role != "contributor":
         raise HTTPException(status_code=403, detail="Contributors only")
     return current_member
 
@@ -1614,7 +1618,8 @@ async def review_prompt_suggestion(
 # ---------------------------------------------------------------------------
 
 def _is_contributor(member: Member) -> bool:
-    return (member.role or "member") in ("contributor", "admin")
+    # Contributor is the top tier; admins are below and do not moderate.
+    return (member.role or "member") == "contributor"
 
 
 def _announcement_out(row, username, firstname, comment_count) -> AnnouncementOut:

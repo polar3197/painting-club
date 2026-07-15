@@ -50,7 +50,7 @@ export default function Settings() {
 
       {/* Delete account stays up top — intentionally out of the thumb zone so
           the destructive action takes deliberate reach. */}
-      {currentUser && currentRole !== 'admin' && (
+      {currentUser && currentRole !== 'admin' && currentRole !== 'contributor' && (
         <Pressable style={styles.deleteBtn} onPress={() => setShowDeleteDialog(true)}>
           <Text style={styles.deleteBtnText}>delete acc</Text>
         </Pressable>
@@ -59,9 +59,10 @@ export default function Settings() {
       {/* Spacer pushes the everyday actions down to the thumb zone. */}
       <View style={{ flex: 1 }} />
 
-      {/* Contributor panel (#7): usage + telemetry rollups. Admin implies
-          contributor, so both roles see these. */}
-      {(currentRole === 'contributor' || currentRole === 'admin') && (
+      {/* Contributor panel (#7): usage + telemetry rollups. Contributor is the
+          top tier (contributor = admin + docs/roles/announcements), so this is
+          contributor-only — admins are below and don't see it. */}
+      {currentRole === 'contributor' && (
         <>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
@@ -78,7 +79,7 @@ export default function Settings() {
         </>
       )}
 
-      {currentRole === 'admin' && (
+      {(currentRole === 'admin' || currentRole === 'contributor') && (
         <Pressable
           style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
           onPress={() => navigation.navigate('Admin')}
