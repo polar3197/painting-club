@@ -22,15 +22,19 @@ http {
         listen 80;
         server_name localhost;
 
-        # Profile pics + thumbs stay public (avatars); overwritten in place on
-        # re-upload, so no-cache forces revalidation.
+        # Profile pics are member-only too: signed like art (the API signs
+        # Profile.profile_pic_path). Profile thumbnails are unused by the app, so
+        # direct access is blocked.
         location /static/profile/ {
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
             alias /app/static/profile/;
-            add_header Cache-Control "no-cache, must-revalidate";
+            add_header Cache-Control "private, no-store";
         }
         location /static/profile-thumbs/ {
-            alias /app/static/profile-thumbs/;
-            add_header Cache-Control "no-cache, must-revalidate";
+            return 403;
         }
 
         # --- Member-only art bytes -------------------------------------------

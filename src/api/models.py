@@ -58,6 +58,10 @@ class Profile(BaseModel):
     blocked_usernames: list[str] | None = None
     profile_colors: dict[str, str] | None = None
 
+    @field_serializer("profile_pic_path")
+    def _sign_profile_pic(self, v):
+        return sign_path(v)
+
 class ProfileUpdate(BaseModel):
     firstname: str | None
     lastname: str | None

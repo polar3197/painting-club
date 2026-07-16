@@ -30,11 +30,10 @@ SECRET = os.environ.get("STATIC_URL_SECRET", "")
 DEFAULT_TTL = int(os.environ.get("STATIC_URL_TTL", str(6 * 3600)))  # 6 hours
 
 # Only these path prefixes are gated by nginx secure_link and therefore signed —
-# the art bytes (visual / written / audio). Profile pictures (/static/profile/…)
-# stay open by design; thumbnails are served through the auth-gated
-# /art/{id}/thumb route (nginx denies /static/thumbs/ directly), so they aren't
-# signed here.
-SIGNED_PREFIXES = ("/static/art/", "/static/written-form/", "/static/audio/")
+# the art bytes (visual / written / audio) and member profile pictures.
+# Thumbnails (/static/thumbs, /static/profile-thumbs) are served/denied at nginx
+# and not signed here.
+SIGNED_PREFIXES = ("/static/art/", "/static/written-form/", "/static/audio/", "/static/profile/")
 
 
 def sign_path(path: str | None, ttl: int = DEFAULT_TTL) -> str | None:

@@ -450,7 +450,7 @@ async def setup_account_endpoint(
 #     return [MemberOut(id=m.id, username=m.username) for m in members]
 
 @app.get("/members/search-options", response_model=SearchOptions)
-async def get_search_options(medium: str | None = None, username: str | None = None, db: AsyncSession = Depends(get_db)):
+async def get_search_options(medium: str | None = None, username: str | None = None, db: AsyncSession = Depends(get_db), _: Member = Depends(get_current_member)):
     usernames, fullnames, cities, keywords, titles, songs, mediums = await db_get_search_options(db, medium=medium, username=username)
     if not usernames and not cities:
         raise HTTPException(status_code=404)
@@ -462,7 +462,7 @@ async def search_art(q: str = "", db: AsyncSession = Depends(get_db), _: Member 
     return results
 
 @app.get("/members/{username}/profile")
-async def get_profile(username: str, db: AsyncSession = Depends(get_db), current_member: Optional[Member] = Depends(get_optional_member)) -> Profile:
+async def get_profile(username: str, db: AsyncSession = Depends(get_db), current_member: Member = Depends(get_current_member)) -> Profile:
     result = await db_get_profile(db, username)
     if not result:
         raise HTTPException(status_code=404)
