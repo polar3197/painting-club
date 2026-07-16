@@ -29,6 +29,8 @@ import {
   resolveImageUrl,
   profilePicSrc,
   thumbUrl,
+  thumbSource,
+  authHeaders,
   upload_profile_picture,
   get_media,
   open_dm,
@@ -151,8 +153,9 @@ function Visual2DPiece({
   useEffect(() => {
     if (piece.aspect_ratio) return;
     let cancelled = false;
-    RNImage.getSize(
+    RNImage.getSizeWithHeaders(
       thumbUrl(piece.id),
+      authHeaders(),
       (w, h) => {
         if (!cancelled && w > 0 && h > 0) setMeasuredRatio(w / h);
       },
@@ -194,7 +197,7 @@ function Visual2DPiece({
           <View style={[styles.artVisualInner, { aspectRatio }]}>
             <Image
               source={{ uri: resolveImageUrl(piece.file_path) }}
-              placeholder={{ uri: thumbUrl(piece.id) }}
+              placeholder={thumbSource(piece.id)}
               transition={200}
               style={[styles.artImage, { opacity: knownRatio ? 1 : 0 }]}
               contentFit="contain"

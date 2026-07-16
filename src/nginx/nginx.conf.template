@@ -1,0 +1,101 @@
+# Rendered at container start by the nginx image's envsubst step: ONLY
+# ${STATIC_URL_SECRET} is substituted (NGINX_ENVSUBST_FILTER), so every real
+# nginx $variable is left intact. The secret is injected from the environment
+# so it never lives in this (public) repo.
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    upstream backend {
+        server api:8000;
+    }
+
+    upstream frontend {
+        server frontend:5173;
+    }
+
+    server {
+        listen 80;
+        server_name localhost;
+
+        # Profile pics + thumbs stay public (avatars); overwritten in place on
+        # re-upload, so no-cache forces revalidation.
+        location /static/profile/ {
+            alias /app/static/profile/;
+            add_header Cache-Control "no-cache, must-revalidate";
+        }
+        location /static/profile-thumbs/ {
+            alias /app/static/profile-thumbs/;
+            add_header Cache-Control "no-cache, must-revalidate";
+        }
+
+        # --- Member-only art bytes -------------------------------------------
+        # The API hands signed URLs (secure_link) only to authenticated members;
+        # nginx refuses any request without a valid, unexpired signature. "" =>
+        # bad/absent signature (403); "0" => expired (410). Fail-closed.
+        location /static/art/ {
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/art/;
+            add_header Cache-Control "private, no-store";
+        }
+        location /static/written-form/ {
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/written-form/;
+            add_header Cache-Control "private, no-store";
+        }
+        location /static/audio/ {
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/audio/;
+            add_header Cache-Control "private, no-store";
+        }
+
+        # Thumbnails are reachable only through the auth-gated /art/{id}/thumb
+        # API route; block direct file access.
+        location /static/thumbs/ {
+            return 403;
+        }
+
+        # Other static (event images, etc.) stays public for now.
+        location /static/ {
+            alias /app/static/;
+            expires 1d;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # API requests
+        location /api/ {
+            client_max_body_size 20M;
+            proxy_pass http://backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Frontend requests
+        location / {
+            proxy_pass http://frontend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+}

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { get_blocks, refresh_token, get_profile } from '../api';
+import { get_blocks, refresh_token, get_profile, setAuthToken } from '../api';
 import { setObservabilityToken, recordLogin } from '../api/observability';
 
 interface AuthContextType {
@@ -112,6 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // device events can flush (and get cleared on logout).
   useEffect(() => {
     setObservabilityToken(token);
+    // Default bearer for token-less API calls (search, member art) now that the
+    // art routes are member-gated.
+    setAuthToken(token);
   }, [token]);
 
   const login = useCallback(async (user: string, tok: string, role: string) => {

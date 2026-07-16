@@ -457,7 +457,7 @@ async def get_search_options(medium: str | None = None, username: str | None = N
     return SearchOptions(usernames=usernames, fullnames=fullnames, cities=cities, keywords=keywords, titles=titles, songs=songs, mediums=mediums)
 
 @app.get("/art/search", response_model=list[ArtResult])
-async def search_art(q: str = "", db: AsyncSession = Depends(get_db)):
+async def search_art(q: str = "", db: AsyncSession = Depends(get_db), _: Member = Depends(get_current_member)):
     results = await db_search_art(db, q)
     return results
 
@@ -580,6 +580,7 @@ async def get_visual_2d(
     username: str, 
     medium: str, 
     db: AsyncSession = Depends(get_db), 
+    _: Member = Depends(get_current_member),
 ) -> list[Visual2DOut]:
     results = await db_get_visual_2d(db, username, medium)
     if results is None:
@@ -1251,6 +1252,7 @@ async def get_written_form(
     username: str,
     medium: str,
     db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
 ) -> list[WrittenFormOut]:
     results = await db_get_written_form(db, username, medium)
     if results is None:
@@ -2003,6 +2005,7 @@ async def get_audio(
     username: str,
     medium: str,
     db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
 ) -> list[AudioOut]:
     results = await db_get_audio(db, username, medium)
     if results is None:
@@ -2122,7 +2125,7 @@ async def remove_audio(art_id: str, current_user: Member = Depends(get_current_m
 
 
 @app.get("/art/{art_id}/thumb")
-async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db)):
+async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db), _: Member = Depends(get_current_member)):
     """512px JPEG thumbnail used as a low-fi placeholder. Lazy-generates on first request
     for art uploaded before eager-gen was in place; future requests hit the cached file."""
     result = await db.execute(select(Art.file_path).filter(Art.id == art_id))

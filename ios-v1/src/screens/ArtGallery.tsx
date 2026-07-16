@@ -12,6 +12,7 @@ import {
   get_members_written_form,
   resolveImageUrl,
   thumbUrl,
+  thumbSource,
   ArtResult,
   MediaType,
   Profile,
@@ -98,7 +99,7 @@ function VisualCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: 
     >
       <Image
         source={{ uri: resolveImageUrl(item.file_path) }}
-        placeholder={{ uri: thumbUrl(item.id) }}
+        placeholder={thumbSource(item.id)}
         transition={200}
         style={[styles.cardImage, { height: cardWidth }]}
         contentFit="cover"

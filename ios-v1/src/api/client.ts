@@ -21,6 +21,15 @@ export function setAuthExpiredHandler(fn: (() => void) | null) {
   onAuthExpired = fn;
 }
 
+// Default bearer token attached to every request that doesn't set its own
+// Authorization header. Lets historically token-less calls (search, member art)
+// carry the member's auth now that the art routes are gated. Managed by
+// AuthContext on login / logout / refresh.
+let defaultAuthToken: string | null = null;
+export function setAuthToken(t: string | null) {
+  defaultAuthToken = t;
+}
+
 export async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const isFormData = options.body instanceof FormData;
   let response: Response;
@@ -29,6 +38,8 @@ export async function request(path: string, options: RequestOptions = {}): Promi
       ...options,
       headers: {
         ...(!isFormData && { 'Content-Type': 'application/json' }),
+        // Default token first so an explicit per-call Authorization still wins.
+        ...(defaultAuthToken ? { Authorization: `Bearer ${defaultAuthToken}` } : {}),
         ...(options.headers || {}),
       },
     });
@@ -70,6 +81,19 @@ export function resolveImageUrl(path: string): string {
 
 export function thumbUrl(artId: string): string {
   return `${API_BASE}/art/${artId}/thumb`;
+}
+
+/** Bearer header for the current session, or {} when logged out. For image
+ *  fetches (which don't go through request()) that hit auth-gated routes. */
+export function authHeaders(): Record<string, string> {
+  return defaultAuthToken ? { Authorization: `Bearer ${defaultAuthToken}` } : {};
+}
+
+/** expo-image source for the (auth-gated) thumbnail route: the URL plus the
+ *  bearer header, since a bare <Image> GET carries no token of its own. Reads
+ *  the session token from module state, so callers need no token in scope. */
+export function thumbSource(artId: string): { uri: string; headers?: Record<string, string> } {
+  return { uri: thumbUrl(artId), headers: defaultAuthToken ? { Authorization: `Bearer ${defaultAuthToken}` } : undefined };
 }
 
 /** Small JPEG placeholder for a member's profile pic. Served directly from nginx. */

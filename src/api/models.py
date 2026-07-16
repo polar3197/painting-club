@@ -1,8 +1,10 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, field_serializer
 from datetime import date as Date, datetime, time as TimeOfDay
 from typing import List
 import re
 import uuid
+
+from api.signed_urls import sign_path
 
 # Recolorable profile page components — mirrors PROFILE_COLOR_ELEMENTS in
 # ios-v1/src/constants/profileColors.ts. Unknown keys are rejected so clients
@@ -247,6 +249,10 @@ class ArtResult(BaseModel):
     creator_city: str | None
     aspect_ratio: float | None = None
 
+    @field_serializer("file_path")
+    def _sign_file_path(self, v):
+        return sign_path(v)
+
 class ApplicationIn(BaseModel):
     firstname: str
     lastname: str
@@ -366,6 +372,10 @@ class Visual2DOut(BaseModel):
     series_name: str | None = None
     order_index: int | None = None
 
+    @field_serializer("file_path")
+    def _sign_file_path(self, v):
+        return sign_path(v)
+
 
 class WrittenFormOut(BaseModel):
     id: uuid.UUID
@@ -379,6 +389,10 @@ class WrittenFormOut(BaseModel):
     order_index: int | None = None
     # Optional image used as the piece's card cover. None = text-snippet card.
     cover_image_path: str | None = None
+
+    @field_serializer("file_path", "cover_image_path")
+    def _sign_paths(self, v):
+        return sign_path(v)
 
 
 class WrittenFormUpdate(BaseModel):
@@ -406,6 +420,10 @@ class AudioOut(BaseModel):
     series_id: uuid.UUID | None = None
     series_name: str | None = None
     order_index: int | None = None
+
+    @field_serializer("file_path")
+    def _sign_file_path(self, v):
+        return sign_path(v)
 
 
 class AudioUpdate(BaseModel):
@@ -563,6 +581,10 @@ class BookmarkedArtOut(BaseModel):
     # handle a missing ratio by measuring).
     aspect_ratio: float | None = None
     bookmarked_at: datetime
+
+    @field_serializer("file_path")
+    def _sign_file_path(self, v):
+        return sign_path(v)
 
 
 # --- Events --------------------------------------------------------------------

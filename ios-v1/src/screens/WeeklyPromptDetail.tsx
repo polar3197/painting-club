@@ -22,6 +22,7 @@ import {
   get_members_visual_2d,
   resolveImageUrl,
   thumbUrl,
+  thumbSource,
   PromptDetailOut,
   PromptSummary,
   Visual2DIn,
@@ -161,7 +162,7 @@ export default function WeeklyPromptDetail() {
                 >
                   <Image
                     source={{ uri: resolveImageUrl(item.file_path) }}
-                    placeholder={{ uri: thumbUrl(item.id) }}
+                    placeholder={thumbSource(item.id)}
                     transition={200}
                     style={styles.cellImage}
                     contentFit="cover"
