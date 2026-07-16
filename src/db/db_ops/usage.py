@@ -2,6 +2,7 @@
 
 Owned by Stream B. Do not share this file with Stream A.
 """
+import os
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, func, cast, Date
@@ -10,6 +11,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import UsageEvent, Member
 
 VALID_KINDS = {"login", "screen"}
+
+# Calendar rollups (per-day buckets and "today") use this display timezone
+# rather than UTC, so contributors see days that match local wall-clock. The
+# club runs on PT; override via the REPORT_TZ env var. The UTC->local conversion
+# happens in Postgres, whose tz database is always present (the slim python
+# container's is not, so ZoneInfo would fail there).
+REPORT_TZ = os.environ.get("REPORT_TZ", "America/Los_Angeles")
+
+
+def _local_ts(col):
+    """A naive-UTC timestamp column -> naive local (REPORT_TZ) wall-clock time.
+    `timezone('UTC', col)` reads the stored value as UTC (yielding a timestamptz
+    instant); `timezone(REPORT_TZ, ...)` then converts that instant to local
+    wall time. cast(..., Date) on the result gives the local calendar day."""
+    return func.timezone(REPORT_TZ, func.timezone("UTC", col))
 
 
 def naive_utc(dt):
@@ -67,7 +83,8 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
     collected (no client change) and dedupes a sitting's many events into one."""
     days = max(1, min(days, 90))
     since = datetime.utcnow() - timedelta(days=days)
-    day = cast(UsageEvent.created_at, Date)
+    # Bucket by local (REPORT_TZ) calendar day, not UTC.
+    day = cast(_local_ts(UsageEvent.created_at), Date)
 
     # Distinct active members per day (any event kind).
     active_rows = (
@@ -97,7 +114,7 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
     # Visits per day, by sessionizing each member's event stream on gaps.
     ev_rows = (
         await db.execute(
-            select(UsageEvent.member_id, UsageEvent.created_at)
+            select(UsageEvent.member_id, _local_ts(UsageEvent.created_at))
             .filter(UsageEvent.created_at >= since)
             .order_by(UsageEvent.member_id, UsageEvent.created_at)
         )
@@ -106,22 +123,23 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
     total_visits = 0
     prev_member = None
     prev_time = None
-    for member_id, created_at in ev_rows:
-        if member_id != prev_member or prev_time is None or (created_at - prev_time) > SESSION_GAP:
-            d = created_at.date()
-            visits_by_day[d] = visits_by_day.get(d, 0) + 1
+    # `ts` is already local (REPORT_TZ), so .date() is the local day; the gap
+    # comparison is unaffected by the timezone shift (it's a duration).
+    for member_id, ts in ev_rows:
+        if member_id != prev_member or prev_time is None or (ts - prev_time) > SESSION_GAP:
+            visits_by_day[ts.date()] = visits_by_day.get(ts.date(), 0) + 1
             total_visits += 1
         prev_member = member_id
-        prev_time = created_at
+        prev_time = ts
     visits_per_day = [{"date": d.isoformat(), "count": c} for d, c in sorted(visits_by_day.items())]
 
-    # Who was active today (distinct members with any event today).
-    today = datetime.utcnow().date()
+    # Who was active today (local day), distinct members with any event today.
+    local_today = cast(func.timezone(REPORT_TZ, func.now()), Date)
     active_today_rows = (
         await db.execute(
             select(Member.username, Member.firstname)
             .join(UsageEvent, UsageEvent.member_id == Member.id)
-            .filter(cast(UsageEvent.created_at, Date) == today)
+            .filter(cast(_local_ts(UsageEvent.created_at), Date) == local_today)
             .distinct()
             .order_by(Member.username)
         )
