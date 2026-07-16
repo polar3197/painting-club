@@ -2137,9 +2137,11 @@ async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db), _: Memb
     if not src_abs.exists():
         raise HTTPException(status_code=404, detail="Source file missing")
 
-    # Short max-age (not immutable) so PATCH /art/{id} file replacements show up
-    # within ~a minute without us having to version the thumb URL per piece.
-    cache_headers = {"Cache-Control": "public, max-age=60, must-revalidate"}
+    # `private` so the CDN can't cache this now-auth-gated route; max-age lets the
+    # phone keep the thumb instead of re-fetching it constantly. A replaced piece
+    # gets a new full-image path, so a briefly-stale thumb placeholder is hidden
+    # under the fresh full image anyway.
+    cache_headers = {"Cache-Control": "private, max-age=3600"}
 
     # PDFs have no thumb — serve the original
     if src_abs.suffix.lower() == ".pdf":

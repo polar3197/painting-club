@@ -35,17 +35,27 @@ DEFAULT_TTL = int(os.environ.get("STATIC_URL_TTL", str(6 * 3600)))  # 6 hours
 # and not signed here.
 SIGNED_PREFIXES = ("/static/art/", "/static/written-form/", "/static/audio/", "/static/profile/")
 
+# Signed URLs are STABLE within a bucket window: a given piece yields the SAME
+# URL for the whole window, so the phone's image cache (keyed by URL) hits across
+# navigation instead of re-downloading on every page change. The URL rotates once
+# per bucket and stays valid at least DEFAULT_TTL past the window's end.
+STATIC_URL_BUCKET = int(os.environ.get("STATIC_URL_BUCKET", str(DEFAULT_TTL)))
+
 
 def sign_path(path: str | None, ttl: int = DEFAULT_TTL) -> str | None:
     """Append `?md5=…&expires=…` to a locked art path. Paths outside
     SIGNED_PREFIXES (e.g. profile pics) and empty paths are returned untouched.
-    A no-op when SECRET is unset."""
+    A no-op when SECRET is unset. The expiry is bucketed so the URL is stable
+    within a window (cacheable), not unique per request."""
     if not path or not SECRET:
         return path
     base = path.split("?", 1)[0]
     if not base.startswith(SIGNED_PREFIXES):
         return path
-    expires = int(time.time()) + ttl
+    now = int(time.time())
+    # Round to the next bucket boundary, then add ttl — constant for every call
+    # within the current bucket, and always ≥ now + ttl so it can't expire mid-use.
+    expires = (now // STATIC_URL_BUCKET + 1) * STATIC_URL_BUCKET + ttl
     raw = f"{expires}{base} {SECRET}".encode()
     md5 = (
         base64.b64encode(hashlib.md5(raw).digest())

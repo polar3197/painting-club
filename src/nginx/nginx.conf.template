@@ -31,7 +31,7 @@ http {
             if ($secure_link = "")  { return 403; }
             if ($secure_link = "0") { return 410; }
             alias /app/static/profile/;
-            add_header Cache-Control "private, no-store";
+            add_header Cache-Control "private, max-age=21600";
         }
         location /static/profile-thumbs/ {
             return 403;
@@ -47,7 +47,7 @@ http {
             if ($secure_link = "")  { return 403; }
             if ($secure_link = "0") { return 410; }
             alias /app/static/art/;
-            add_header Cache-Control "private, no-store";
+            add_header Cache-Control "private, max-age=21600";
         }
         location /static/written-form/ {
             secure_link $arg_md5,$arg_expires;
@@ -55,7 +55,7 @@ http {
             if ($secure_link = "")  { return 403; }
             if ($secure_link = "0") { return 410; }
             alias /app/static/written-form/;
-            add_header Cache-Control "private, no-store";
+            add_header Cache-Control "private, max-age=21600";
         }
         location /static/audio/ {
             secure_link $arg_md5,$arg_expires;
@@ -63,7 +63,7 @@ http {
             if ($secure_link = "")  { return 403; }
             if ($secure_link = "0") { return 410; }
             alias /app/static/audio/;
-            add_header Cache-Control "private, no-store";
+            add_header Cache-Control "private, max-age=21600";
         }
 
         # Thumbnails are reachable only through the auth-gated /art/{id}/thumb
