@@ -7,16 +7,6 @@ export function todayLocalISO(): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-// Device-local tomorrow as YYYY-MM-DD. Adding a day via setDate handles
-// month/year rollover and DST for us.
-export function tomorrowLocalISO(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
 // Server timestamps are naive UTC (no zone suffix) — tag them as UTC so
 // new Date() doesn't misread them as local time. (ConversationThread has its own
 // copy of this; worth collapsing into this one when that file is next touched.)

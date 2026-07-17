@@ -15,44 +15,12 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
 import { useAdminPending } from '../hooks';
 import Announcements from '../components/Announcements';
-import { get_active_prompt, list_events, PromptOut } from '../api';
-import { parseUtc, todayLocalISO, tomorrowLocalISO } from '../utils/date';
+import { get_active_prompt, PromptOut } from '../api';
+import { parseUtc } from '../utils/date';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { HomeStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeFeed'>;
-
-// How close the soonest event is — drives the events ball's border + glow.
-type EventUrgency = 'none' | 'tomorrow' | 'today';
-
-// The events ball warms up as an event approaches: resting blue when nothing is
-// near, amber the day before, hot orange on the day itself. The glow is an
-// offset-less shadow in the accent color, so it reads as light coming off the
-// ball rather than a drop shadow under it; 'today' is both brighter and wider.
-// Warm hues stay clear of the prompt ball's crimson so the two never blur.
-const EVENT_BALL: Record<EventUrgency, { accent: string; glow: object }> = {
-  none: { accent: '#1E73BE', glow: Shadows.card },
-  tomorrow: {
-    accent: '#F5A623',
-    glow: {
-      shadowColor: '#F5A623',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.7,
-      shadowRadius: 16,
-      elevation: 10,
-    },
-  },
-  today: {
-    accent: '#FF5A1F',
-    glow: {
-      shadowColor: '#FF5A1F',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.95,
-      shadowRadius: 28,
-      elevation: 14,
-    },
-  },
-};
 
 // Home screen is being cleared out for now. Everything below is kept fully
 // intact — flip these flags back to `true` to restore each piece. The weekly
@@ -286,12 +254,10 @@ function PromptLifespanRing({ remaining }: { remaining: number }) {
 // physics loop can resolve ball-to-ball collisions. Grab it (freezes it), drag
 // to stretch from its rest anchor, release and it launches OPPOSITE the pull. A
 // clean tap fires onOpen. Fully separate from SpinningPromptDiamond.
-function Ball({ label, sublabel, accent, glow, lifespanRemaining, onOpen, W, H, posX, posY, velX, velY, dragging }: {
+function Ball({ label, sublabel, accent, lifespanRemaining, onOpen, W, H, posX, posY, velX, velY, dragging }: {
   label: string;
   sublabel?: string | null;
   accent: string;
-  // Overrides the resting card shadow — see EVENT_BALL.
-  glow?: object;
   // 1 → 0: draw the depleting lifespan ring instead of a plain border. Null/
   // undefined keeps the plain border (unknown age, or a ball without a lifespan).
   lifespanRemaining?: number | null;
@@ -385,7 +351,6 @@ function Ball({ label, sublabel, accent, glow, lifespanRemaining, onOpen, W, H, 
           // With a ring, the border still reserves its space (so the label lays
           // out identically) but the ring paints over it.
           { borderColor: hasRing ? 'transparent' : accent },
-          glow,
           ballStyle,
         ]}
       >
@@ -403,9 +368,8 @@ function Ball({ label, sublabel, accent, glow, lifespanRemaining, onOpen, W, H, 
 // so they share one set of walls. box-none lets touches on empty space fall
 // through; each ball grabs only its own circle. Bounded to the Home area (above
 // the tab bar), so a ball can never reach the nav bar.
-function BounceArena({ prompt, eventUrgency, onOpenPrompt, onOpenEvent, topInset }: {
+function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
   prompt: PromptOut | null;
-  eventUrgency: EventUrgency;
   onOpenPrompt: () => void;
   onOpenEvent?: () => void;
   topInset: number;
@@ -528,8 +492,7 @@ function BounceArena({ prompt, eventUrgency, onOpenPrompt, onOpenEvent, topInset
       />
       <Ball
         label="events"
-        accent={EVENT_BALL[eventUrgency].accent}
-        glow={EVENT_BALL[eventUrgency].glow}
+        accent="#1E73BE"
         onOpen={onOpenEvent}
         W={W} H={H}
         posX={p1x} posY={p1y} velX={v1x} velY={v1y} dragging={d1}
@@ -626,8 +589,6 @@ export default function Home() {
   // sync with the rest of the page) from "resolved, no active prompt" (render
   // nothing). Starts true so the banner shell paints on the first frame.
   const [promptLoading, setPromptLoading] = useState(true);
-  const [eventUrgency, setEventUrgency] = useState<EventUrgency>('none');
-  const homeFocused = useIsFocused();
 
   // Home toy mode: 'fidget' (spinning diamond, the default) or 'bounce'
   // (slingshot ball). Persisted so it reopens in the last-used mode.
@@ -667,24 +628,6 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [token]);
 
-  // Re-read on every focus (not just token change) so the ball's heat is right
-  // after the app sits open across midnight — "today" would otherwise go stale.
-  useEffect(() => {
-    if (!homeFocused) return;
-    let cancelled = false;
-    list_events(token)
-      .then((events) => {
-        if (cancelled) return;
-        const today = todayLocalISO();
-        const tomorrow = tomorrowLocalISO();
-        if (events.some((e) => e.event_date === today)) setEventUrgency('today');
-        else if (events.some((e) => e.event_date === tomorrow)) setEventUrgency('tomorrow');
-        else setEventUrgency('none');
-      })
-      .catch(() => { if (!cancelled) setEventUrgency('none'); });
-    return () => { cancelled = true; };
-  }, [token, homeFocused]);
-
   return (
     <View style={[styles.gradient, styles.homeBg]}>
     {/* The bouncing balls ride a full-bleed layer BEHIND everything below, so
@@ -693,7 +636,6 @@ export default function Home() {
     {showBounce && (
       <BounceArena
         prompt={prompt}
-        eventUrgency={eventUrgency}
         topInset={insets.top}
         onOpenPrompt={() => prompt && navigation.navigate('WeeklyPromptDetail', { promptId: prompt.id })}
         onOpenEvent={() => navigation.navigate('Events')}
