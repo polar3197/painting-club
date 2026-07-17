@@ -34,7 +34,9 @@ export type HomeStackParamList = {
   RequestFeature: undefined;
   AnnouncementsFeed: undefined;
   AnnouncementDetail: { id: string };
-  Events: undefined;
+  // focusDate (YYYY-MM-DD): open the calendar on that day/month — a freshly
+  // created event hands its own date back so you land on it.
+  Events: { focusDate?: string } | undefined;
   EventDetail: { eventId: string };
   EventEdit: { eventId?: string };
 };

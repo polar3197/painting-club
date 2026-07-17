@@ -122,6 +122,9 @@ async def db_create_prompt(
         short_summary=(short_summary or None),
         media_id=media_id,
         is_active=activate,
+        # Only stamped when it goes live now; a drafted prompt gets its
+        # activated_at when someone actually activates it.
+        activated_at=datetime.utcnow() if activate else None,
     )
     db.add(prompt)
     await db.flush()
@@ -142,6 +145,9 @@ async def db_activate_prompt(db: AsyncSession, prompt_id) -> WeeklyPrompt:
     if prompt is None:
         raise ValueError("Prompt not found")
     prompt.is_active = True
+    # Restamp on every activation: the week runs from when it went live, so a
+    # re-run of an old prompt starts a fresh 7 days rather than reading as expired.
+    prompt.activated_at = datetime.utcnow()
     prompt.archived_at = None
     await db.commit()
     await db.refresh(prompt)

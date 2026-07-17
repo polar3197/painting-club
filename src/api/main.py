@@ -1442,6 +1442,7 @@ async def get_active_prompt(
         media_id=prompt.media_id,
         media_name=media_name,
         is_active=prompt.is_active,
+        activated_at=prompt.activated_at,
         submission_count=count,
     )
 
@@ -1465,6 +1466,7 @@ async def get_prompt(
         media_id=prompt.media_id,
         media_name=media_name,
         is_active=prompt.is_active,
+        activated_at=prompt.activated_at,
         submission_count=len(submissions),
         submissions=submissions,
         viewer_submission_id=viewer_submission_id,
@@ -1497,6 +1499,7 @@ async def admin_create_prompt(
         media_id=prompt.media_id,
         media_name=media_name,
         is_active=prompt.is_active,
+        activated_at=prompt.activated_at,
         submission_count=0,
     )
 
@@ -1523,6 +1526,7 @@ async def admin_activate_prompt(
         media_id=prompt.media_id,
         media_name=media_name,
         is_active=prompt.is_active,
+        activated_at=prompt.activated_at,
         submission_count=0,
     )
 
@@ -1546,6 +1550,7 @@ async def admin_activate_suggestion(
         media_id=prompt.media_id,
         media_name=media_name,
         is_active=prompt.is_active,
+        activated_at=prompt.activated_at,
         submission_count=0,
     )
 
@@ -1570,6 +1575,7 @@ async def admin_archive_prompt(
         media_id=prompt.media_id,
         media_name=media_name,
         is_active=prompt.is_active,
+        activated_at=prompt.activated_at,
         submission_count=0,
     )
 

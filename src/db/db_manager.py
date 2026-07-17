@@ -410,4 +410,20 @@ async def run_migrations():
         await conn.execute(text(
             "UPDATE doc SET section = slug WHERE section IS NULL"
         ))
+        # Weekly prompts get an explicit activated_at — the client's 7-day
+        # lifespan ring measures from when a prompt WENT LIVE, which is not
+        # collection.created_at (that's when an admin drafted it, possibly days
+        # earlier). Backfill from created_at only for prompts that have already
+        # been live: it's the sole approximation available for rows predating
+        # this column, while never-activated drafts stay NULL so they don't read
+        # as having gone live at draft time. Idempotent.
+        await conn.execute(text(
+            "ALTER TABLE weekly_prompt ADD COLUMN IF NOT EXISTS activated_at TIMESTAMP"
+        ))
+        await conn.execute(text(
+            "UPDATE weekly_prompt wp SET activated_at = c.created_at "
+            "FROM collection c "
+            "WHERE c.id = wp.id AND wp.activated_at IS NULL "
+            "  AND (wp.is_active = TRUE OR wp.archived_at IS NOT NULL)"
+        ))
     print("Migrations applied.")

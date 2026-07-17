@@ -8,7 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { EventOut, list_events, resolveImageUrl } from '../api';
@@ -28,15 +28,29 @@ const ymd = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}
 export default function Events() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { token } = useAuth();
   const [events, setEvents] = useState<EventOut[]>([]);
 
+  const focusDate: string | undefined = route.params?.focusDate;
   const today = todayLocalISO();
+  // Land on focusDate when we were handed one (new event), else today.
   const [cursor, setCursor] = useState(() => {
-    const [y, m] = today.split('-').map(Number);
+    const [y, m] = (focusDate || today).split('-').map(Number);
     return { y, m0: m - 1 };
   });
-  const [selected, setSelected] = useState<string>(today);
+  const [selected, setSelected] = useState<string>(focusDate || today);
+
+  // Creating an event pops back here with its date. Jump to that day and month,
+  // then clear the param so it's one-shot — otherwise a later visit would keep
+  // yanking the calendar back to an old event instead of leaving it put.
+  useEffect(() => {
+    if (!focusDate) return;
+    const [y, m] = focusDate.split('-').map(Number);
+    setCursor({ y, m0: m - 1 });
+    setSelected(focusDate);
+    navigation.setParams({ focusDate: undefined });
+  }, [focusDate, navigation]);
 
   const load = useCallback(async () => {
     try {

@@ -7,6 +7,23 @@ export function todayLocalISO(): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+// Device-local tomorrow as YYYY-MM-DD. Adding a day via setDate handles
+// month/year rollover and DST for us.
+export function tomorrowLocalISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// Server timestamps are naive UTC (no zone suffix) — tag them as UTC so
+// new Date() doesn't misread them as local time. (ConversationThread has its own
+// copy of this; worth collapsing into this one when that file is next touched.)
+export function parseUtc(s: string): Date {
+  return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z');
+}
+
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 // Lowercase "jul 20 · 7:00pm" from an event's date (YYYY-MM-DD) + optional time

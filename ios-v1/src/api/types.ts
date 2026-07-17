@@ -109,6 +109,10 @@ export interface PromptOut {
   media_name: string | null;
   is_active: boolean;
   submission_count: number;
+  // When the prompt went live (naive UTC — parse with parseUtc). Null for a
+  // prompt that has never been activated, and absent entirely against a backend
+  // older than the activated_at change, so treat it as optional.
+  activated_at?: string | null;
 }
 
 export interface PromptDetailOut extends PromptOut {

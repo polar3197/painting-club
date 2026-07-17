@@ -93,6 +93,11 @@ class WeeklyPrompt(Collection):
     # required medium (submissions of any medium are accepted).
     media_id = Column(UUID(as_uuid=True), ForeignKey('media.id'), nullable=True)
     is_active = Column(Boolean, nullable=False, default=False)
+    # When this prompt was made the active one. Distinct from Collection.created_at:
+    # a prompt drafted in advance is created days before it goes live, and the
+    # client's 7-day lifespan ring measures from going live, not from drafting.
+    # Null until first activated.
+    activated_at = Column(DateTime)
     archived_at = Column(DateTime)
 
     __mapper_args__ = {"polymorphic_identity": "weekly_prompt"}

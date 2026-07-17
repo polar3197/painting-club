@@ -29,6 +29,8 @@ async def db_activate_suggestion(db: AsyncSession, suggestion_id):
         title=(suggestion.prompt_text or "").strip(),
         media_id=suggestion.media_id,   # may be None → medium-agnostic
         is_active=True,
+        # Promotion goes live immediately, so activation is now.
+        activated_at=datetime.utcnow(),
     )
     db.add(prompt)
     # Retire the suggestion from the proposed/up-next queues.

@@ -468,6 +468,12 @@ class PromptOut(BaseModel):
     media_name: str | None = None
     is_active: bool
     submission_count: int = 0
+    # When the prompt BECAME ACTIVE (naive UTC, like every other timestamp here)
+    # — not when its row was created, which for a prompt queued up in advance is
+    # whenever an admin drafted it. Drives the client's 7-day lifespan ring.
+    # Optional: null for a never-activated prompt, and a construction site that
+    # misses it degrades to "no age known" rather than 500-ing.
+    activated_at: datetime | None = None
 
 
 class PromptDetailOut(PromptOut):

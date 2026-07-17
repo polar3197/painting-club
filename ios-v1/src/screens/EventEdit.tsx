@@ -125,8 +125,10 @@ export default function EventEdit() {
       if (isEdit) {
         navigation.goBack();
       } else {
-        // Replace so back from the new event's detail returns to the list.
-        navigation.replace('EventDetail', { eventId: id });
+        // Land back on the calendar, opened to the new event's day, rather than
+        // dropping the creator into its detail page. navigate (not replace) pops
+        // to the Events screen already under us instead of stacking a second one.
+        navigation.navigate('Events', { focusDate: date });
       }
     } catch (err: any) {
       appAlert('could not save', err?.message || 'try again');

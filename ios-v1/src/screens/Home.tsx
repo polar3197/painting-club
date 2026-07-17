@@ -15,11 +15,44 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
 import { useAdminPending } from '../hooks';
 import Announcements from '../components/Announcements';
-import { get_active_prompt, PromptOut } from '../api';
+import { get_active_prompt, list_events, PromptOut } from '../api';
+import { parseUtc, todayLocalISO, tomorrowLocalISO } from '../utils/date';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { HomeStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeFeed'>;
+
+// How close the soonest event is — drives the events ball's border + glow.
+type EventUrgency = 'none' | 'tomorrow' | 'today';
+
+// The events ball warms up as an event approaches: resting blue when nothing is
+// near, amber the day before, hot orange on the day itself. The glow is an
+// offset-less shadow in the accent color, so it reads as light coming off the
+// ball rather than a drop shadow under it; 'today' is both brighter and wider.
+// Warm hues stay clear of the prompt ball's crimson so the two never blur.
+const EVENT_BALL: Record<EventUrgency, { accent: string; glow: object }> = {
+  none: { accent: '#1E73BE', glow: Shadows.card },
+  tomorrow: {
+    accent: '#F5A623',
+    glow: {
+      shadowColor: '#F5A623',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.7,
+      shadowRadius: 16,
+      elevation: 10,
+    },
+  },
+  today: {
+    accent: '#FF5A1F',
+    glow: {
+      shadowColor: '#FF5A1F',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.95,
+      shadowRadius: 28,
+      elevation: 14,
+    },
+  },
+};
 
 // Home screen is being cleared out for now. Everything below is kept fully
 // intact — flip these flags back to `true` to restore each piece. The weekly
@@ -152,15 +185,116 @@ const MAX_SPEED = 6000;         // ceiling: fast but still reads as motion, not 
 const REST_DAMPING = 0.7;       // per-second exponential velocity decay (light)
 const MIN_SPEED = 24;           // px/s below which the ball is treated as at rest
 
+const PROMPT_RED = '#E30022';
+const RING_THICKNESS = 6;      // matches styles.ball's borderWidth
+const PROMPT_LIFESPAN_DAYS = 7;
+
+// Fraction of the prompt's 7-day life still left, 1 → 0. Null when the backend
+// hasn't told us when it went live (older API, or a prompt never activated), in
+// which case the caller falls back to a plain full ring rather than guessing.
+function promptRemaining(activatedAt: string | null | undefined): number | null {
+  if (!activatedAt) return null;
+  const start = parseUtc(activatedAt).getTime();
+  if (!Number.isFinite(start)) return null;
+  const elapsedDays = (Date.now() - start) / 86_400_000;
+  // Clamp: a clock skewed slightly ahead of the server shouldn't overfill.
+  return Math.max(0, Math.min(1, 1 - elapsedDays / PROMPT_LIFESPAN_DAYS));
+}
+
+// The prompt ball's ring as a depleting 7-day gauge: the remaining fraction is
+// a solid red arc sweeping clockwise from 12 o'clock; spent days leave a white
+// band outlined in hairline red.
+//
+// Drawn with plain Views because the project has no react-native-svg, and adding
+// it would mean a native rebuild (no OTA). The arc is the standard two-half-disc
+// pie: each window clips to one side of the circle and holds a half-disc rotated
+// about the circle's center, so the pair can express any angle 0–360. A disc of
+// the ball's own background then punches the middle out, turning the pie into an
+// annulus. Purely decorative — pointerEvents none keeps the slingshot grabbable.
+function PromptLifespanRing({ remaining }: { remaining: number }) {
+  const S = BALL_SIZE;
+  const deg = remaining * 360;
+  // Right window shows 0–180°, left shows 180–360°. Each half-disc sits flush
+  // against the circle's center and rotates about it, so its trailing edge lands
+  // exactly on `deg` and the window clips away everything past its own half.
+  const rightRotate = Math.min(deg, 180) - 180;
+  const leftRotate = Math.max(deg, 180) - 360;
+  const inner = S - RING_THICKNESS * 2;
+
+  return (
+    <View style={[styles.ringWrap, { width: S, height: S }]} pointerEvents="none">
+      {/* Spent portion: white band. The red arc paints over what's left. */}
+      <View
+        style={[
+          styles.ringLayer,
+          { width: S, height: S, borderRadius: S / 2, borderWidth: RING_THICKNESS, borderColor: '#FFFFFF' },
+        ]}
+      />
+      <View style={[styles.ringWindow, { left: S / 2, width: S / 2, height: S }]}>
+        <View
+          style={{
+            position: 'absolute', left: 0, top: 0,
+            width: S / 2, height: S,
+            borderTopRightRadius: S / 2, borderBottomRightRadius: S / 2,
+            backgroundColor: PROMPT_RED,
+            transformOrigin: 'left center',
+            transform: [{ rotate: `${rightRotate}deg` }],
+          }}
+        />
+      </View>
+      <View style={[styles.ringWindow, { left: 0, width: S / 2, height: S }]}>
+        <View
+          style={{
+            position: 'absolute', left: 0, top: 0,
+            width: S / 2, height: S,
+            borderTopLeftRadius: S / 2, borderBottomLeftRadius: S / 2,
+            backgroundColor: PROMPT_RED,
+            transformOrigin: 'right center',
+            transform: [{ rotate: `${leftRotate}deg` }],
+          }}
+        />
+      </View>
+      {/* Punch the pie's middle out so only the ring band survives. */}
+      <View
+        style={{
+          position: 'absolute', left: RING_THICKNESS, top: RING_THICKNESS,
+          width: inner, height: inner, borderRadius: inner / 2,
+          backgroundColor: Colors.secondary,
+        }}
+      />
+      {/* Hairline red edges, over both arc and white so the band always reads
+          as outlined rather than floating. */}
+      <View
+        style={[
+          styles.ringLayer,
+          { width: S, height: S, borderRadius: S / 2, borderWidth: StyleSheet.hairlineWidth, borderColor: PROMPT_RED },
+        ]}
+      />
+      <View
+        style={{
+          position: 'absolute', left: RING_THICKNESS, top: RING_THICKNESS,
+          width: inner, height: inner, borderRadius: inner / 2,
+          borderWidth: StyleSheet.hairlineWidth, borderColor: PROMPT_RED,
+        }}
+      />
+    </View>
+  );
+}
+
 // A single slingshot "ball": presentational + gesture only. Its position and
 // velocity live as shared values OWNED BY the arena, so the arena's single
 // physics loop can resolve ball-to-ball collisions. Grab it (freezes it), drag
 // to stretch from its rest anchor, release and it launches OPPOSITE the pull. A
 // clean tap fires onOpen. Fully separate from SpinningPromptDiamond.
-function Ball({ label, sublabel, accent, onOpen, W, H, posX, posY, velX, velY, dragging }: {
+function Ball({ label, sublabel, accent, glow, lifespanRemaining, onOpen, W, H, posX, posY, velX, velY, dragging }: {
   label: string;
   sublabel?: string | null;
   accent: string;
+  // Overrides the resting card shadow — see EVENT_BALL.
+  glow?: object;
+  // 1 → 0: draw the depleting lifespan ring instead of a plain border. Null/
+  // undefined keeps the plain border (unknown age, or a ball without a lifespan).
+  lifespanRemaining?: number | null;
   onOpen?: () => void;
   W: Reanimated.SharedValue<number>;
   H: Reanimated.SharedValue<number>;
@@ -241,9 +375,21 @@ function Ball({ label, sublabel, accent, onOpen, W, H, posX, posY, velX, velY, d
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
   }));
 
+  const hasRing = lifespanRemaining != null;
+
   return (
     <GestureDetector gesture={composed}>
-      <Reanimated.View style={[styles.ball, { borderColor: accent }, ballStyle]}>
+      <Reanimated.View
+        style={[
+          styles.ball,
+          // With a ring, the border still reserves its space (so the label lays
+          // out identically) but the ring paints over it.
+          { borderColor: hasRing ? 'transparent' : accent },
+          glow,
+          ballStyle,
+        ]}
+      >
+        {hasRing ? <PromptLifespanRing remaining={lifespanRemaining!} /> : null}
         <Text style={styles.diamondHeading}>{label}</Text>
         {sublabel ? <Text style={styles.diamondSub} numberOfLines={2}>{sublabel}</Text> : null}
       </Reanimated.View>
@@ -257,8 +403,9 @@ function Ball({ label, sublabel, accent, onOpen, W, H, posX, posY, velX, velY, d
 // so they share one set of walls. box-none lets touches on empty space fall
 // through; each ball grabs only its own circle. Bounded to the Home area (above
 // the tab bar), so a ball can never reach the nav bar.
-function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
+function BounceArena({ prompt, eventUrgency, onOpenPrompt, onOpenEvent, topInset }: {
   prompt: PromptOut | null;
+  eventUrgency: EventUrgency;
   onOpenPrompt: () => void;
   onOpenEvent?: () => void;
   topInset: number;
@@ -373,14 +520,16 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
       <Ball
         label={"week's\nprompt"}
         sublabel={prompt?.title ?? null}
-        accent="#E30022"
+        accent={PROMPT_RED}
+        lifespanRemaining={promptRemaining(prompt?.activated_at)}
         onOpen={prompt ? onOpenPrompt : undefined}
         W={W} H={H}
         posX={p0x} posY={p0y} velX={v0x} velY={v0y} dragging={d0}
       />
       <Ball
         label="events"
-        accent="#1E73BE"
+        accent={EVENT_BALL[eventUrgency].accent}
+        glow={EVENT_BALL[eventUrgency].glow}
         onOpen={onOpenEvent}
         W={W} H={H}
         posX={p1x} posY={p1y} velX={v1x} velY={v1y} dragging={d1}
@@ -477,6 +626,8 @@ export default function Home() {
   // sync with the rest of the page) from "resolved, no active prompt" (render
   // nothing). Starts true so the banner shell paints on the first frame.
   const [promptLoading, setPromptLoading] = useState(true);
+  const [eventUrgency, setEventUrgency] = useState<EventUrgency>('none');
+  const homeFocused = useIsFocused();
 
   // Home toy mode: 'fidget' (spinning diamond, the default) or 'bounce'
   // (slingshot ball). Persisted so it reopens in the last-used mode.
@@ -516,6 +667,24 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [token]);
 
+  // Re-read on every focus (not just token change) so the ball's heat is right
+  // after the app sits open across midnight — "today" would otherwise go stale.
+  useEffect(() => {
+    if (!homeFocused) return;
+    let cancelled = false;
+    list_events(token)
+      .then((events) => {
+        if (cancelled) return;
+        const today = todayLocalISO();
+        const tomorrow = tomorrowLocalISO();
+        if (events.some((e) => e.event_date === today)) setEventUrgency('today');
+        else if (events.some((e) => e.event_date === tomorrow)) setEventUrgency('tomorrow');
+        else setEventUrgency('none');
+      })
+      .catch(() => { if (!cancelled) setEventUrgency('none'); });
+    return () => { cancelled = true; };
+  }, [token, homeFocused]);
+
   return (
     <View style={[styles.gradient, styles.homeBg]}>
     {/* The bouncing balls ride a full-bleed layer BEHIND everything below, so
@@ -524,6 +693,7 @@ export default function Home() {
     {showBounce && (
       <BounceArena
         prompt={prompt}
+        eventUrgency={eventUrgency}
         topInset={insets.top}
         onOpenPrompt={() => prompt && navigation.navigate('WeeklyPromptDetail', { promptId: prompt.id })}
         onOpenEvent={() => navigation.navigate('Events')}
@@ -737,6 +907,24 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     // top set inline to the safe-area inset so the ball clears the notch.
+    overflow: 'hidden',
+  },
+  // The lifespan ring overlays the ball's whole border box: it's a child of the
+  // ball, so it's offset by the border width to cover it rather than sitting
+  // inside it. The ball keeps its (transparent) border so layout is unchanged.
+  ringWrap: {
+    position: 'absolute',
+    top: -RING_THICKNESS,
+    left: -RING_THICKNESS,
+  },
+  ringLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  ringWindow: {
+    position: 'absolute',
+    top: 0,
     overflow: 'hidden',
   },
   ball: {
