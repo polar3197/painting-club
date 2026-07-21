@@ -257,7 +257,6 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
               <TextInput
                 style={styles.input}
                 value={input}
-                placeholder="go for it. comment..."
                 placeholderTextColor={Colors.textMuted}
                 autoCapitalize="none"
                 onChangeText={setInput}
