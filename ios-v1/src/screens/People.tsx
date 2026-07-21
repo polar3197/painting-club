@@ -8,7 +8,7 @@ import Spinner from '../components/Spinner';
 import { useMembers, useDebouncedValue } from '../hooks';
 import { resolveImageUrl, profilePicSource, profileThumbSource, Profile } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
-import { GridMode, columnsFor } from '../constants/grid';
+import { columnsFor } from '../constants/grid';
 import type { SearchStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
@@ -54,12 +54,12 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
-  // Grid display mode from SearchTabs (pinch-toggled): feed forces 1 per
-  // row; gallery uses the per-count formula.
-  mode: GridMode;
+  // Posts-per-row target (1..4) from the pinch gesture; the per-count
+  // formula still caps it.
+  columns: number;
 }
 
-export default function People({ query, onResetFilters, onListScroll, onVerticalScroll, mode }: Props) {
+export default function People({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
   const navigation = useNavigation<Nav>();
   // `loading` is true only for the initial fetch — while it runs the member
   // count is 0, which would paint a 1-column grid that reflows once the
@@ -89,7 +89,7 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
   // Decouple the slider's target column count from the rendered one and
   // crossfade the change: FlatList must remount to change numColumns, so we fade
   // the grid out, swap columns while invisible, then fade back in (no vanish).
-  const targetColumns = mode === 'feed' ? 1 : columnsFor(filtered.length);
+  const targetColumns = Math.min(columns, columnsFor(filtered.length));
   const [renderedColumns, setRenderedColumns] = useState(targetColumns);
   const gridOpacity = useRef(new Animated.Value(1)).current;
   const transitioning = useRef(false);

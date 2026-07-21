@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ArtGallery from './ArtGallery';
 import People from './People';
 import { Colors, Fonts } from '../constants/theme';
-import type { GridMode } from '../constants/grid';
+import PinchHint, { markPinchHintSeen } from '../components/PinchHint';
 
 // iOS animates layout changes out of the box; Android needs this opt-in. Lets
 // the grid crossfade when the column count changes instead of hard-flashing.
@@ -87,44 +87,53 @@ export default function SearchTabs() {
   // lists swipe — typing live-filters whichever half is showing, and only the
   // placeholder changes when you swipe across.
   const [query, setQuery] = useState('');
-  // Grid mode: gallery (4-up target, count-formula capped) vs feed (1 per
-  // row with captions). Toggled by the pinch gesture; replaces the old
-  // density slider.
-  const [mode, setMode] = useState<GridMode>('gallery');
+  // Posts-per-row target (1..4), driven by the pinch gesture: 1 is the
+  // full-width feed with details, 4 the dense gallery. Each grid still caps
+  // this with its count-based formula. Replaces the old density slider.
+  const [columns, setColumns] = useState(4);
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
   const [keyboardUp, setKeyboardUp] = useState(false);
 
-  // Wrap the mode change in a LayoutAnimation so the grid crossfades to the
-  // new column count instead of hard-remounting (the flash).
-  const handleModeChange = useCallback((m: GridMode) => {
+  // Wrap the column change in a LayoutAnimation so the grid crossfades to
+  // the new count instead of hard-remounting (the flash).
+  const handleColumnsChange = useCallback((c: number) => {
+    markPinchHintSeen();
     LayoutAnimation.configureNext(
       LayoutAnimation.create(260, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity),
     );
-    setMode(m);
+    setColumns(c);
   }, []);
 
-  // Pinch-to-zoom: spread = feed (bigger), pinch = gallery (denser). The grid
-  // scales slightly under the fingers for feedback, then snaps back while the
-  // LayoutAnimation crossfade swaps the column count.
+  // Pinch-to-zoom steps through every density: spread to go 4 → 3 → 2 → 1
+  // (bigger cards), pinch to go back. Columns change live as the gesture
+  // crosses each step; the grid nudges under the fingers for feedback.
   const pinchScale = useSharedValue(1);
-  const commitPinch = useCallback((m: GridMode) => {
-    handleModeChange(m);
-  }, [handleModeChange]);
+  const pinchBase = useSharedValue(4);
+  const stepTo = useCallback((c: number) => {
+    if (c !== columnsRef.current) handleColumnsChange(c);
+  }, [handleColumnsChange]);
   const pinch = Gesture.Pinch()
+    .onStart(() => {
+      pinchBase.value = columnsRef.current;
+    })
     .onUpdate((e) => {
       // Damp the raw scale so the grid nudges rather than balloons.
       pinchScale.value = 1 + (e.scale - 1) * 0.08;
+      // Every ~1.35x of spread is one column step; log keeps in/out symmetric.
+      const steps = Math.round(Math.log(e.scale) / Math.log(1.35));
+      const target = Math.min(4, Math.max(1, pinchBase.value - steps));
+      runOnJS(stepTo)(target);
     })
-    .onEnd((e) => {
+    .onEnd(() => {
       pinchScale.value = withTiming(1, { duration: 160 });
-      if (e.scale > 1.05) runOnJS(commitPinch)('feed');
-      else if (e.scale < 0.95) runOnJS(commitPinch)('gallery');
     });
   const pinchStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pinchScale.value }],
   }));
 
-  // Browsers encode trackpad pinch as ctrl+wheel. Dev-preview convenience;
-  // native never runs this.
+  // Browsers encode trackpad pinch as ctrl+wheel; each notch of accumulated
+  // delta is one column step. Dev-preview convenience; native never runs this.
   const wheelAcc = useRef(0);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -132,12 +141,17 @@ export default function SearchTabs() {
       if (!e.ctrlKey) return;
       e.preventDefault();
       wheelAcc.current += e.deltaY;
-      if (wheelAcc.current < -60) { wheelAcc.current = 0; commitPinch('feed'); }
-      else if (wheelAcc.current > 60) { wheelAcc.current = 0; commitPinch('gallery'); }
+      if (wheelAcc.current < -60) {
+        wheelAcc.current = 0;
+        stepTo(Math.max(1, columnsRef.current - 1));
+      } else if (wheelAcc.current > 60) {
+        wheelAcc.current = 0;
+        stepTo(Math.min(4, columnsRef.current + 1));
+      }
     };
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => window.removeEventListener('wheel', onWheel);
-  }, [commitPinch]);
+  }, [stepTo]);
 
   // Keyboard-driven animation. `kb` (native driver) shrinks the toggle-bar
   // icons and `kbH` (JS driver) animates its layout height as the keyboard
@@ -300,7 +314,7 @@ export default function SearchTabs() {
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
-              mode={mode}
+              columns={columns}
             />
           </View>
           <View style={[styles.page, { height: pageHeight }]}>
@@ -309,10 +323,11 @@ export default function SearchTabs() {
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
-              mode={mode}
+              columns={columns}
             />
           </View>
         </Animated.ScrollView>
+        <PinchHint />
         </Reanimated.View>
         </GestureDetector>
       </View>

@@ -19,10 +19,11 @@ import {
 } from '../api';
 import ArtComments from '../components/ArtComments';
 import { appAlert } from '../components/AppAlert';
+import BookmarkButton from '../components/BookmarkButton';
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
-import { GridMode, columnsFor } from '../constants/grid';
+import { columnsFor } from '../constants/grid';
 import type { SearchStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
@@ -94,90 +95,125 @@ function mergeArt(visual: ArtResult[], written: ArtResult[]): ArtResult[] {
 }
 
 // Image card — visual-2d pieces (and anything an old backend returns untyped).
-// Below the art in feed mode: title / creator · medium, plus the comments
-// button (visual pieces only — ArtComments is visual-2d only).
-function FeedCaption({ item, onComment }: { item: ArtResult; onComment?: () => void }) {
+function VisualCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: number; onPress: () => void }) {
   return (
-    <View style={styles.feedCaption}>
-      <View style={styles.feedCaptionText}>
-        {!!item.title && (
-          <Text style={styles.feedTitle} numberOfLines={1}>{item.title}</Text>
-        )}
-        <Text style={styles.feedByline} numberOfLines={1}>
-          {item.creator_username} · {item.medium}
-        </Text>
-      </View>
-      {onComment && (
-        <Pressable style={styles.feedCommentBtn} onPress={onComment} hitSlop={8}>
-          <Text style={styles.feedCommentBtnText}>comments</Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-function VisualCard({ item, cardWidth, onPress, feed, onComment }: {
-  item: ArtResult;
-  cardWidth: number;
-  onPress: () => void;
-  feed?: boolean;
-  onComment?: () => void;
-}) {
-  // Feed shows the piece at its true shape; gallery tiles stay square. Thumbs
-  // preserve aspect ratio (ArtComments measures them for exactly that), so
-  // cover-fitting the ratio-correct box doesn't crop.
-  const height = feed ? cardWidth / (item.aspect_ratio || 1) : cardWidth;
-  return (
-    <View style={feed ? styles.feedItem : null}>
-      <Pressable
-        style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
-        onPress={onPress}
-      >
-        {/* Grid tiles load the 512px thumbnail, not the multi-MB original — the
-            tile is far smaller than full-res, and this cuts gallery bandwidth
-            ~10-50x. Full-res still loads in the zoom viewer on tap. */}
-        <Image
-          source={thumbSource(item.id, item.file_path)}
-          // Web: expo-image's cross-dissolve strands memory-cached images at
-          // opacity 0 after a FlatList column-swap remount, so no fade there.
-          transition={Platform.OS === 'web' ? 0 : 200}
-          // memory-disk: remounted rows (FlatList virtualization) paint
-          // synchronously from memory instead of replaying the fade — without
-          // this the 1-column view "refreshes" every image as you scroll.
-          cachePolicy="memory-disk"
-          style={[styles.cardImage, { height }]}
-          contentFit="cover"
-        />
-      </Pressable>
-      {feed && <FeedCaption item={item} onComment={onComment} />}
-    </View>
+    <Pressable
+      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      {/* Grid tiles load the 512px thumbnail, not the multi-MB original — the
+          tile is far smaller than full-res, and this cuts gallery bandwidth
+          ~10-50x. Full-res still loads in the zoom viewer on tap. */}
+      <Image
+        source={thumbSource(item.id, item.file_path)}
+        // Web: expo-image's cross-dissolve strands memory-cached images at
+        // opacity 0 after a FlatList column-swap remount, so no fade there.
+        transition={Platform.OS === 'web' ? 0 : 200}
+        // memory-disk: remounted rows (FlatList virtualization) paint
+        // synchronously from memory instead of replaying the fade — without
+        // this the 1-column view "refreshes" every image as you scroll.
+        cachePolicy="memory-disk"
+        style={[styles.cardImage, { height: cardWidth }]}
+        contentFit="cover"
+      />
+    </Pressable>
   );
 }
 
 // Paper card — written-form pieces. Shows a text snippet for .txt/.md, else a
 // blank page (matching the profile's WrittenFormPiece thumbnail treatment).
-function WrittenCard({ item, cardWidth, onPress, feed }: {
-  item: ArtResult;
-  cardWidth: number;
-  onPress: () => void;
-  feed?: boolean;
-}) {
+function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: number; onPress: () => void }) {
   const isText = isTextExt(extFromPath(item.file_path));
   const text = useWrittenFormText(item.file_path);
   const snippet = snippetOf(text);
   return (
-    <View style={feed ? styles.feedItem : null}>
+    <Pressable
+      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
+      <View style={[styles.cardPage, { height: cardWidth }]}>
+        {isText && !!snippet && (
+          <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+// Feed (1-per-row) card, modeled on the profile page's art element: bordered
+// card, framed art at true aspect ratio, then title + date badge, creator ·
+// medium, location/song detail rows, and a comments + bookmark footer.
+// Renders the 512px thumb (not the full-res original) — a feed of every
+// piece can't afford profile-page bandwidth.
+function FeedArtCard({ item, onPress, onComment }: {
+  item: ArtResult;
+  onPress: () => void;
+  onComment?: () => void;
+}) {
+  const isWritten = item.art_type === 'written_form';
+  const isText = isTextExt(extFromPath(item.file_path));
+  // No-ops for non-text extensions, so safe to call for visual pieces too.
+  const text = useWrittenFormText(item.file_path);
+  const snippet = snippetOf(text);
+  return (
+    <View style={styles.feedElement}>
       <Pressable
-        style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+        style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
         onPress={onPress}
       >
-        <View style={[styles.cardPage, { height: cardWidth }]}>
-          {isText && !!snippet && (
-            <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
+        {isWritten ? (
+          <View style={[styles.cardPage, styles.feedPage]}>
+            {isText && !!snippet && (
+              <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
+            )}
+          </View>
+        ) : (
+          <View style={{ width: '100%', aspectRatio: item.aspect_ratio || 1 }}>
+            <Image
+              source={thumbSource(item.id, item.file_path)}
+              transition={Platform.OS === 'web' ? 0 : 200}
+              cachePolicy="memory-disk"
+              style={styles.feedImage}
+              contentFit="contain"
+            />
+          </View>
+        )}
+      </Pressable>
+      <View style={styles.feedDetails}>
+        <View style={styles.feedTitleRow}>
+          {!!item.title && <Text style={styles.feedTitle}>{item.title}</Text>}
+          {!!item.date && (
+            <View style={styles.feedDateBadge}>
+              <Text style={styles.feedDateBadgeText}>{item.date}</Text>
+            </View>
           )}
         </View>
-      </Pressable>
-      {feed && <FeedCaption item={item} />}
+        <Text style={styles.feedByline} numberOfLines={1}>
+          {item.creator_username} · {item.medium}
+        </Text>
+        {!!item.location && (
+          <View style={styles.feedDetailRow}>
+            <Image source={require('../../assets/imgs/location.png')} style={styles.feedDetailIcon} />
+            <Text style={styles.feedDetailText}>{item.location}</Text>
+          </View>
+        )}
+        {!!item.song && (
+          <View style={styles.feedDetailRow}>
+            <Image source={require('../../assets/imgs/music.png')} style={styles.feedDetailIcon} />
+            <Text style={styles.feedDetailText}>{item.song}</Text>
+          </View>
+        )}
+        <View style={styles.feedFooter}>
+          <View style={styles.feedFooterMain}>
+            {onComment && (
+              <Pressable style={styles.feedCommentBtn} onPress={onComment}>
+                <Text style={styles.feedCommentBtnText}>comments</Text>
+              </Pressable>
+            )}
+          </View>
+          <BookmarkButton artId={item.id} size={32} style={styles.feedBookmarkBtn} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -193,12 +229,12 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
-  // Grid display mode from SearchTabs (pinch-toggled): feed forces 1 per
-  // row; gallery uses the per-count formula.
-  mode: GridMode;
+  // Posts-per-row target (1..4) from the pinch gesture; the per-count
+  // formula still caps it. 1 renders the full-width feed cards.
+  columns: number;
 }
 
-export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, mode }: Props) {
+export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
   const navigation = useNavigation<Nav>();
   const { token } = useAuth();
   // Visual paints immediately; written fans out and merges in when ready.
@@ -242,7 +278,7 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
   // remount makes every photo vanish + reappear. So we decouple the target
   // column count (from the slider) from the one actually rendered, and crossfade:
   // fade the grid out, swap columns while it's invisible, fade back in.
-  const targetColumns = mode === 'feed' ? 1 : columnsFor(filtered.length);
+  const targetColumns = Math.min(columns, columnsFor(filtered.length));
   const [renderedColumns, setRenderedColumns] = useState(targetColumns);
   const gridOpacity = useRef(new Animated.Value(1)).current;
   const transitioning = useRef(false);
@@ -302,16 +338,19 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
         artId: item.id,
         medium: item.medium,
       });
+    if (feed) {
+      return (
+        <FeedArtCard
+          item={item}
+          onPress={onPress}
+          onComment={item.art_type === 'written_form' ? undefined : () => openComments(item)}
+        />
+      );
+    }
     return item.art_type === 'written_form' ? (
-      <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} feed={feed} />
+      <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} />
     ) : (
-      <VisualCard
-        item={item}
-        cardWidth={cardWidth}
-        onPress={onPress}
-        feed={feed}
-        onComment={feed ? () => openComments(item) : undefined}
-      />
+      <VisualCard item={item} cardWidth={cardWidth} onPress={onPress} />
     );
   };
 
@@ -395,39 +434,96 @@ const styles = StyleSheet.create({
     gap: COLUMN_GAP,
     marginBottom: 12,
   },
-  // Feed (1 per row): full-width card + caption strip, spaced like posts.
-  feedItem: {
-    marginBottom: 28,
+  // Feed (1 per row): profile-page-style art element — bordered card with a
+  // framed true-ratio artwork, details block, and comments/bookmark footer.
+  feedElement: {
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    padding: 12,
+    backgroundColor: Colors.artCardBg,
   },
-  feedCaption: {
+  feedVisual: {
+    width: '100%',
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  feedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  feedPage: {
+    aspectRatio: 1,
+  },
+  feedDetails: {
+    paddingHorizontal: 4,
+  },
+  feedTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    gap: 10,
-  },
-  feedCaptionText: {
-    flex: 1,
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 2,
   },
   feedTitle: {
     fontFamily: Fonts.serif,
-    fontSize: FontSizes.sm,
+    fontSize: FontSizes.lg,
+    flex: 1,
+  },
+  feedDateBadge: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginLeft: 'auto',
+    marginTop: 4,
+  },
+  feedDateBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
   },
   feedByline: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
     color: Colors.textMuted,
-    marginTop: 2,
+    marginBottom: 6,
+  },
+  feedDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  feedDetailIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 6,
+  },
+  feedDetailText: {
+    fontSize: FontSizes.xs,
+  },
+  feedFooter: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  feedFooterMain: {
+    flex: 1,
   },
   feedCommentBtn: {
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.secondary,
-    paddingHorizontal: 12,
+    alignSelf: 'stretch',
+    alignItems: 'center',
     paddingVertical: 6,
   },
   feedCommentBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
+  },
+  feedBookmarkBtn: {
+    alignSelf: 'stretch',
   },
   card: {
     borderWidth: 1,
