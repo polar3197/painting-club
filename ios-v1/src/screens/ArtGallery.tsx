@@ -17,7 +17,7 @@ import {
 } from '../api';
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
 import { useAuth } from '../context/AuthContext';
-import { Colors, Fonts } from '../constants/theme';
+import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { GridMode, columnsFor } from '../constants/grid';
 import type { SearchStackParamList } from '../navigation/types';
 
@@ -90,46 +90,89 @@ function mergeArt(visual: ArtResult[], written: ArtResult[]): ArtResult[] {
 }
 
 // Image card — visual-2d pieces (and anything an old backend returns untyped).
-function VisualCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: number; onPress: () => void }) {
+// Below the art in feed mode: title / creator · medium, plus the comments
+// button (visual pieces only — ArtComments is visual-2d only).
+function FeedCaption({ item, onComment }: { item: ArtResult; onComment?: () => void }) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
-      onPress={onPress}
-    >
-      {/* Grid tiles load the 512px thumbnail, not the multi-MB original — the
-          tile is far smaller than full-res, and this cuts gallery bandwidth
-          ~10-50x. Full-res still loads in the zoom viewer on tap. */}
-      <Image
-        source={thumbSource(item.id, item.file_path)}
-        transition={200}
-        // memory-disk: remounted rows (FlatList virtualization) paint
-        // synchronously from memory instead of replaying the fade — without
-        // this the 1-column view "refreshes" every image as you scroll.
-        cachePolicy="memory-disk"
-        style={[styles.cardImage, { height: cardWidth }]}
-        contentFit="cover"
-      />
-    </Pressable>
+    <View style={styles.feedCaption}>
+      <View style={styles.feedCaptionText}>
+        {!!item.title && (
+          <Text style={styles.feedTitle} numberOfLines={1}>{item.title}</Text>
+        )}
+        <Text style={styles.feedByline} numberOfLines={1}>
+          {item.creator_username} · {item.medium}
+        </Text>
+      </View>
+      {onComment && (
+        <Pressable style={styles.feedCommentBtn} onPress={onComment} hitSlop={8}>
+          <Text style={styles.feedCommentBtnText}>comments</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function VisualCard({ item, cardWidth, onPress, feed, onComment }: {
+  item: ArtResult;
+  cardWidth: number;
+  onPress: () => void;
+  feed?: boolean;
+  onComment?: () => void;
+}) {
+  // Feed shows the piece at its true shape; gallery tiles stay square. Thumbs
+  // preserve aspect ratio (ArtComments measures them for exactly that), so
+  // cover-fitting the ratio-correct box doesn't crop.
+  const height = feed ? cardWidth / (item.aspect_ratio || 1) : cardWidth;
+  return (
+    <View style={feed ? styles.feedItem : null}>
+      <Pressable
+        style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+        onPress={onPress}
+      >
+        {/* Grid tiles load the 512px thumbnail, not the multi-MB original — the
+            tile is far smaller than full-res, and this cuts gallery bandwidth
+            ~10-50x. Full-res still loads in the zoom viewer on tap. */}
+        <Image
+          source={thumbSource(item.id, item.file_path)}
+          transition={200}
+          // memory-disk: remounted rows (FlatList virtualization) paint
+          // synchronously from memory instead of replaying the fade — without
+          // this the 1-column view "refreshes" every image as you scroll.
+          cachePolicy="memory-disk"
+          style={[styles.cardImage, { height }]}
+          contentFit="cover"
+        />
+      </Pressable>
+      {feed && <FeedCaption item={item} onComment={onComment} />}
+    </View>
   );
 }
 
 // Paper card — written-form pieces. Shows a text snippet for .txt/.md, else a
 // blank page (matching the profile's WrittenFormPiece thumbnail treatment).
-function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: number; onPress: () => void }) {
+function WrittenCard({ item, cardWidth, onPress, feed }: {
+  item: ArtResult;
+  cardWidth: number;
+  onPress: () => void;
+  feed?: boolean;
+}) {
   const isText = isTextExt(extFromPath(item.file_path));
   const text = useWrittenFormText(item.file_path);
   const snippet = snippetOf(text);
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
-      onPress={onPress}
-    >
-      <View style={[styles.cardPage, { height: cardWidth }]}>
-        {isText && !!snippet && (
-          <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
-        )}
-      </View>
-    </Pressable>
+    <View style={feed ? styles.feedItem : null}>
+      <Pressable
+        style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+        onPress={onPress}
+      >
+        <View style={[styles.cardPage, { height: cardWidth }]}>
+          {isText && !!snippet && (
+            <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
+          )}
+        </View>
+      </Pressable>
+      {feed && <FeedCaption item={item} />}
+    </View>
   );
 }
 
@@ -227,6 +270,7 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
   const numColumns = renderedColumns;
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
 
+  const feed = numColumns === 1;
   const renderCard = ({ item }: { item: ArtResult }) => {
     const onPress = () =>
       navigation.navigate('UserProfile', {
@@ -234,15 +278,11 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
         artId: item.id,
         medium: item.medium,
       });
-    const card =
-      item.art_type === 'written_form' ? (
-        <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} />
-      ) : (
-        <VisualCard item={item} cardWidth={cardWidth} onPress={onPress} />
-      );
-    // Multi-column rows get their vertical gap from columnWrapperStyle; a single
-    // full-width column has no wrapper, so space the stacked cards here.
-    return numColumns === 1 ? <View style={styles.soloItem}>{card}</View> : card;
+    return item.art_type === 'written_form' ? (
+      <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} feed={feed} />
+    ) : (
+      <VisualCard item={item} cardWidth={cardWidth} onPress={onPress} feed={feed} />
+    );
   };
 
   if (!loaded) {
@@ -322,9 +362,39 @@ const styles = StyleSheet.create({
     gap: COLUMN_GAP,
     marginBottom: 12,
   },
-  // Vertical gap between full-width cards when the grid is 1 per row.
-  soloItem: {
-    marginBottom: 20,
+  // Feed (1 per row): full-width card + caption strip, spaced like posts.
+  feedItem: {
+    marginBottom: 28,
+  },
+  feedCaption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 10,
+  },
+  feedCaptionText: {
+    flex: 1,
+  },
+  feedTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.sm,
+  },
+  feedByline: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  feedCommentBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  feedCommentBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
   },
   card: {
     borderWidth: 1,
