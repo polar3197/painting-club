@@ -7,9 +7,7 @@ import {
   Animated,
   ScrollView,
   Keyboard,
-  LayoutAnimation,
   Platform,
-  UIManager,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -22,12 +20,6 @@ import ArtGallery from './ArtGallery';
 import People from './People';
 import { Colors, Fonts } from '../constants/theme';
 import PinchHint, { markPinchHintSeen } from '../components/PinchHint';
-
-// iOS animates layout changes out of the box; Android needs this opt-in. Lets
-// the grid crossfade when the column count changes instead of hard-flashing.
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HALF = SCREEN_WIDTH / 2;
@@ -95,23 +87,28 @@ export default function SearchTabs() {
   columnsRef.current = columns;
   const [keyboardUp, setKeyboardUp] = useState(false);
 
-  // Wrap the column change in a LayoutAnimation so the grid crossfades to
-  // the new count instead of hard-remounting (the flash).
+  // The grids animate the column swap themselves (dim-crossfade around the
+  // FlatList remount) — no LayoutAnimation here, the two systems fighting is
+  // what made the swap flash.
   const handleColumnsChange = useCallback((c: number) => {
     markPinchHintSeen();
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(260, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity),
-    );
     setColumns(c);
   }, []);
 
   // Pinch-to-zoom steps through every density: spread to go 4 → 3 → 2 → 1
   // (bigger cards), pinch to go back. Columns change live as the gesture
   // crosses each step; the grid nudges under the fingers for feedback.
+  // Steps are rate-limited so each crossfade can finish — committing every
+  // frame mid-gesture remounted the list repeatedly and looked jerky.
   const pinchScale = useSharedValue(1);
   const pinchBase = useSharedValue(4);
+  const lastStepAt = useRef(0);
   const stepTo = useCallback((c: number) => {
-    if (c !== columnsRef.current) handleColumnsChange(c);
+    if (c === columnsRef.current) return;
+    const now = Date.now();
+    if (now - lastStepAt.current < 350) return;
+    lastStepAt.current = now;
+    handleColumnsChange(c);
   }, [handleColumnsChange]);
   const pinch = Gesture.Pinch()
     .onStart(() => {

@@ -39,7 +39,7 @@ export default function PinchHint() {
   return (
     <Animated.View style={[styles.wrap, { opacity }]} pointerEvents="none">
       <View style={styles.bubble}>
-        <Text style={styles.glyph}>)( ‹—› )(</Text>
+        <Text style={styles.glyph}>›‹ ‹—› ›‹</Text>
         <Text style={styles.text}>pinch to zoom</Text>
       </View>
     </Animated.View>

@@ -206,8 +206,18 @@ function FeedArtCard({ item, onPress, onComment }: {
         <View style={styles.feedFooter}>
           <View style={styles.feedFooterMain}>
             {onComment && (
-              <Pressable style={styles.feedCommentBtn} onPress={onComment}>
-                <Text style={styles.feedCommentBtnText}>comments</Text>
+              // Charlie's hand-drawn speech bubble — friendlier than a boxy
+              // text button, and it matches the app's inked icon language.
+              <Pressable
+                style={({ pressed }) => [styles.feedCommentBtn, pressed && styles.cardPressed]}
+                onPress={onComment}
+                hitSlop={8}
+              >
+                <Image
+                  source={require('../../assets/imgs/comment-bubble.png')}
+                  style={styles.feedCommentIcon}
+                  contentFit="contain"
+                />
               </Pressable>
             )}
           </View>
@@ -511,16 +521,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   feedCommentBtn: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.secondary,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
   },
-  feedCommentBtnText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
+  feedCommentIcon: {
+    width: 38,
+    height: 32,
   },
   feedBookmarkBtn: {
     alignSelf: 'stretch',
