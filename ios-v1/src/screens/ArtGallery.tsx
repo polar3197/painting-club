@@ -22,7 +22,8 @@ import { appAlert } from '../components/AppAlert';
 import BookmarkButton from '../components/BookmarkButton';
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
 import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
-import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { showArtZoom, hideArtZoom, ArtZoomConfig } from '../components/ArtZoomOverlay';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { columnsFor } from '../constants/grid';
@@ -143,13 +144,16 @@ function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth:
 }
 
 // Instagram-style transient zoom: pinch a feed photo to magnify it under
-// your fingers (following the focal drift), spring back on release. Runs
-// simultaneously with the grid's density pinch — the two split by direction
-// in feed mode: spreading magnifies the art (density already clamps at 1
-// column), pinching-in re-grids (this scale clamps at 1, so no visual
-// fight). In gallery mode this handler isn't mounted at all.
-function ZoomableArt({ children, densityPinchRef }: {
+// your fingers (following the focal drift), spring back on release. The
+// zoomed copy renders in the root-level ArtZoomOverlayHost so it floats over
+// EVERYTHING (header, nav bar); the inline art hides while a zoom is live.
+// Runs simultaneously with the grid's density pinch — the two split by
+// direction in feed mode: spreading magnifies the art (density already
+// clamps at 1 column), pinching-in re-grids (this scale clamps at 1, so no
+// visual fight). In gallery mode this handler isn't mounted at all.
+function ZoomableArt({ children, source, densityPinchRef }: {
   children: React.ReactNode;
+  source: ArtZoomConfig['source'];
   densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
 }) {
   const scale = useSharedValue(1);
@@ -157,13 +161,36 @@ function ZoomableArt({ children, densityPinchRef }: {
   const ty = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
-  const active = useSharedValue(0);
+  const hidden = useSharedValue(0);
+  const wrapRef = useRef<any>(null);
+
+  // Measure the framed art in window coordinates and hand the zoom to the
+  // root overlay; the inline copy goes invisible so only the floating one
+  // moves. (JS side — called from the gesture via runOnJS.)
+  const beginZoom = useCallback(() => {
+    const node = wrapRef.current as any;
+    const show = (x: number, y: number, width: number, height: number) => {
+      showArtZoom({ source, x, y, width, height, scale, tx, ty });
+      hidden.value = 1;
+    };
+    if (Platform.OS === 'web') {
+      const r = node?.getBoundingClientRect?.();
+      if (r) show(r.left, r.top, r.width, r.height);
+    } else if (node?.measureInWindow) {
+      node.measureInWindow((x: number, y: number, w: number, h: number) => show(x, y, w, h));
+    }
+  }, [source, scale, tx, ty, hidden]);
+
+  const finishZoom = useCallback(() => {
+    hideArtZoom();
+    hidden.value = 0;
+  }, [hidden]);
 
   let pinch = Gesture.Pinch()
     .onStart((e) => {
       startX.value = e.focalX;
       startY.value = e.focalY;
-      active.value = 1;
+      runOnJS(beginZoom)();
     })
     .onUpdate((e) => {
       scale.value = Math.min(4, Math.max(1, e.scale));
@@ -174,7 +201,7 @@ function ZoomableArt({ children, densityPinchRef }: {
       scale.value = withTiming(1, { duration: 220 });
       tx.value = withTiming(0, { duration: 220 });
       ty.value = withTiming(0, { duration: 220 }, (finished) => {
-        if (finished) active.value = 0;
+        if (finished) runOnJS(finishZoom)();
       });
     });
   if (densityPinchRef) pinch = pinch.simultaneousWithExternalGesture(densityPinchRef);
@@ -183,7 +210,7 @@ function ZoomableArt({ children, densityPinchRef }: {
   // touch pinch never sees. When the cursor is over this art, zoom it here
   // and stop the event before SearchTabs' window-level density listener gets
   // it; no gesture end exists, so spring back after a beat of inactivity.
-  const wrapRef = useRef<any>(null);
+  const zoomingRef = useRef(false);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const node = wrapRef.current as unknown as HTMLElement | null;
@@ -191,17 +218,22 @@ function ZoomableArt({ children, densityPinchRef }: {
     let resetTimer: ReturnType<typeof setTimeout> | undefined;
     const springBack = () => {
       scale.value = withTiming(1, { duration: 220 });
-      tx.value = withTiming(0, { duration: 220 }, (finished) => {
-        if (finished) active.value = 0;
-      });
+      tx.value = withTiming(0, { duration: 220 });
       ty.value = withTiming(0, { duration: 220 });
+      setTimeout(() => {
+        zoomingRef.current = false;
+        finishZoom();
+      }, 240);
     };
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
       e.stopPropagation();
+      if (!zoomingRef.current) {
+        zoomingRef.current = true;
+        beginZoom();
+      }
       scale.value = Math.min(4, Math.max(1, scale.value * (1 - e.deltaY / 200)));
-      active.value = 1;
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = setTimeout(springBack, 400);
     };
@@ -213,19 +245,13 @@ function ZoomableArt({ children, densityPinchRef }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const zoomStyle = useAnimatedStyle(() => ({
-    // Lift the zooming card above its neighbors for the duration.
-    zIndex: active.value ? 100 : 0,
-    transform: [
-      { translateX: tx.value },
-      { translateY: ty.value },
-      { scale: scale.value },
-    ],
+  const inlineStyle = useAnimatedStyle(() => ({
+    opacity: hidden.value ? 0 : 1,
   }));
 
   return (
     <GestureDetector gesture={pinch}>
-      <Reanimated.View ref={wrapRef} style={zoomStyle}>{children}</Reanimated.View>
+      <Reanimated.View ref={wrapRef} style={inlineStyle}>{children}</Reanimated.View>
     </GestureDetector>
   );
 }
@@ -260,7 +286,7 @@ function FeedArtCard({ item, onPress, onComment, densityPinchRef }: {
           </View>
         </Pressable>
       ) : (
-        <ZoomableArt densityPinchRef={densityPinchRef}>
+        <ZoomableArt source={thumbSource(item.id, item.file_path)} densityPinchRef={densityPinchRef}>
           <Pressable
             style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
             onPress={onPress}
@@ -622,12 +648,20 @@ const styles = StyleSheet.create({
   feedFooterMain: {
     flex: 1,
   },
+  // Same bordered square treatment as BookmarkButton so the two footer
+  // actions read as a matched pair.
   feedCommentBtn: {
-    paddingVertical: 2,
+    width: 32,
+    height: 32,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   feedCommentIcon: {
-    width: 38,
-    height: 32,
+    width: 24,
+    height: 20,
   },
   feedBookmarkBtn: {
     alignSelf: 'flex-start',
