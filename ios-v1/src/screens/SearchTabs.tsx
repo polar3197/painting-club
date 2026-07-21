@@ -12,7 +12,7 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import Reanimated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -103,6 +103,10 @@ export default function SearchTabs() {
   const pinchScale = useSharedValue(1);
   const pinchBase = useSharedValue(4);
   const lastStepAt = useRef(0);
+  // Handed to the feed cards so an image's own pinch-zoom can block this
+  // density pinch when the gesture starts on a photo (Instagram-style zoom
+  // and grid zoom coexist without fighting).
+  const densityPinchRef = useRef<GestureType | undefined>(undefined);
   const stepTo = useCallback((c: number) => {
     if (c === columnsRef.current) return;
     const now = Date.now();
@@ -111,12 +115,17 @@ export default function SearchTabs() {
     handleColumnsChange(c);
   }, [handleColumnsChange]);
   const pinch = Gesture.Pinch()
+    .withRef(densityPinchRef)
     .onStart(() => {
       pinchBase.value = columnsRef.current;
     })
     .onUpdate((e) => {
+      // Spreading at 1 column can't zoom further in — that direction belongs
+      // to the feed photo's own pinch-zoom, so skip the nudge too.
+      const inert = pinchBase.value === 1 && e.scale > 1;
       // Damp the raw scale so the grid nudges rather than balloons.
-      pinchScale.value = 1 + (e.scale - 1) * 0.08;
+      pinchScale.value = inert ? 1 : 1 + (e.scale - 1) * 0.08;
+      if (inert) return;
       // Every ~1.35x of spread is one column step; log keeps in/out symmetric.
       const steps = Math.round(Math.log(e.scale) / Math.log(1.35));
       const target = Math.min(4, Math.max(1, pinchBase.value - steps));
@@ -312,6 +321,7 @@ export default function SearchTabs() {
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
               columns={columns}
+              densityPinchRef={densityPinchRef}
             />
           </View>
           <View style={[styles.page, { height: pageHeight }]}>

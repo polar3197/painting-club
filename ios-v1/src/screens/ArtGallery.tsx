@@ -21,6 +21,8 @@ import ArtComments from '../components/ArtComments';
 import { appAlert } from '../components/AppAlert';
 import BookmarkButton from '../components/BookmarkButton';
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
+import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { columnsFor } from '../constants/grid';
@@ -140,15 +142,70 @@ function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth:
   );
 }
 
+// Instagram-style transient zoom: pinch a feed photo to magnify it under
+// your fingers (following the focal drift), spring back on release. Runs
+// simultaneously with the grid's density pinch — the two split by direction
+// in feed mode: spreading magnifies the art (density already clamps at 1
+// column), pinching-in re-grids (this scale clamps at 1, so no visual
+// fight). In gallery mode this handler isn't mounted at all.
+function ZoomableArt({ children, densityPinchRef }: {
+  children: React.ReactNode;
+  densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
+}) {
+  const scale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  const active = useSharedValue(0);
+
+  let pinch = Gesture.Pinch()
+    .onStart((e) => {
+      startX.value = e.focalX;
+      startY.value = e.focalY;
+      active.value = 1;
+    })
+    .onUpdate((e) => {
+      scale.value = Math.min(4, Math.max(1, e.scale));
+      tx.value = e.focalX - startX.value;
+      ty.value = e.focalY - startY.value;
+    })
+    .onEnd(() => {
+      scale.value = withTiming(1, { duration: 220 });
+      tx.value = withTiming(0, { duration: 220 });
+      ty.value = withTiming(0, { duration: 220 }, (finished) => {
+        if (finished) active.value = 0;
+      });
+    });
+  if (densityPinchRef) pinch = pinch.simultaneousWithExternalGesture(densityPinchRef);
+
+  const zoomStyle = useAnimatedStyle(() => ({
+    // Lift the zooming card above its neighbors for the duration.
+    zIndex: active.value ? 100 : 0,
+    transform: [
+      { translateX: tx.value },
+      { translateY: ty.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={pinch}>
+      <Reanimated.View style={zoomStyle}>{children}</Reanimated.View>
+    </GestureDetector>
+  );
+}
+
 // Feed (1-per-row) card, modeled on the profile page's art element: bordered
 // card, framed art at true aspect ratio, then title + date badge, creator ·
 // medium, location/song detail rows, and a comments + bookmark footer.
 // Renders the 512px thumb (not the full-res original) — a feed of every
 // piece can't afford profile-page bandwidth.
-function FeedArtCard({ item, onPress, onComment }: {
+function FeedArtCard({ item, onPress, onComment, densityPinchRef }: {
   item: ArtResult;
   onPress: () => void;
   onComment?: () => void;
+  densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
 }) {
   const isWritten = item.art_type === 'written_form';
   const isText = isTextExt(extFromPath(item.file_path));
@@ -157,28 +214,35 @@ function FeedArtCard({ item, onPress, onComment }: {
   const snippet = snippetOf(text);
   return (
     <View style={styles.feedElement}>
-      <Pressable
-        style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
-        onPress={onPress}
-      >
-        {isWritten ? (
+      {isWritten ? (
+        <Pressable
+          style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
+          onPress={onPress}
+        >
           <View style={[styles.cardPage, styles.feedPage]}>
             {isText && !!snippet && (
               <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
             )}
           </View>
-        ) : (
-          <View style={{ width: '100%', aspectRatio: item.aspect_ratio || 1 }}>
-            <Image
-              source={thumbSource(item.id, item.file_path)}
-              transition={Platform.OS === 'web' ? 0 : 200}
-              cachePolicy="memory-disk"
-              style={styles.feedImage}
-              contentFit="contain"
-            />
-          </View>
-        )}
-      </Pressable>
+        </Pressable>
+      ) : (
+        <ZoomableArt densityPinchRef={densityPinchRef}>
+          <Pressable
+            style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
+            onPress={onPress}
+          >
+            <View style={{ width: '100%', aspectRatio: item.aspect_ratio || 1 }}>
+              <Image
+                source={thumbSource(item.id, item.file_path)}
+                transition={Platform.OS === 'web' ? 0 : 200}
+                cachePolicy="memory-disk"
+                style={styles.feedImage}
+                contentFit="contain"
+              />
+            </View>
+          </Pressable>
+        </ZoomableArt>
+      )}
       <View style={styles.feedDetails}>
         <View style={styles.feedTitleRow}>
           {!!item.title && <Text style={styles.feedTitle}>{item.title}</Text>}
@@ -242,9 +306,12 @@ interface Props {
   // Posts-per-row target (1..4) from the pinch gesture; the per-count
   // formula still caps it. 1 renders the full-width feed cards.
   columns: number;
+  // The grid-density pinch's ref (SearchTabs) so feed photos' own pinch-zoom
+  // can block it when a gesture starts on the art.
+  densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
 }
 
-export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
+export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, columns, densityPinchRef }: Props) {
   const navigation = useNavigation<Nav>();
   const { token } = useAuth();
   // Visual paints immediately; written fans out and merges in when ready.
@@ -354,6 +421,7 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
           item={item}
           onPress={onPress}
           onComment={item.art_type === 'written_form' ? undefined : () => openComments(item)}
+          densityPinchRef={densityPinchRef}
         />
       );
     }
