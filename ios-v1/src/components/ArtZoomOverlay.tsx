@@ -23,6 +23,10 @@ export type ArtZoomConfig = {
   scale: SharedValue<number>;
   tx: SharedValue<number>;
   ty: SharedValue<number>;
+  // Initial pinch focal point in element coordinates (finger midpoint on
+  // native, cursor on web) — the zoom anchors here, not the image center.
+  startX: SharedValue<number>;
+  startY: SharedValue<number>;
 };
 
 let showFn: ((cfg: ArtZoomConfig) => void) | null = null;
@@ -56,13 +60,24 @@ function Overlay({ cfg }: { cfg: ArtZoomConfig }) {
     // Instagram-style: the world falls away as the piece grows.
     opacity: interpolate(cfg.scale.value, [1, 1.8], [0, 0.55], Extrapolation.CLAMP),
   }));
-  const imgStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: cfg.tx.value },
-      { translateY: cfg.ty.value },
-      { scale: cfg.scale.value },
-    ],
-  }));
+  const imgStyle = useAnimatedStyle(() => {
+    // Anchor the scale at the initial focal point: RN scales about the
+    // element center, so shift that center to the focal point, scale, and
+    // shift back. tx/ty carry the focal drift on top.
+    const fx = cfg.startX.value - cfg.width / 2;
+    const fy = cfg.startY.value - cfg.height / 2;
+    return {
+      transform: [
+        { translateX: cfg.tx.value },
+        { translateY: cfg.ty.value },
+        { translateX: fx },
+        { translateY: fy },
+        { scale: cfg.scale.value },
+        { translateX: -fx },
+        { translateY: -fy },
+      ],
+    };
+  });
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Reanimated.View style={[StyleSheet.absoluteFill, styles.dim, dimStyle]} />

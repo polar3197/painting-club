@@ -170,7 +170,7 @@ function ZoomableArt({ children, source, densityPinchRef }: {
   const beginZoom = useCallback(() => {
     const node = wrapRef.current as any;
     const show = (x: number, y: number, width: number, height: number) => {
-      showArtZoom({ source, x, y, width, height, scale, tx, ty });
+      showArtZoom({ source, x, y, width, height, scale, tx, ty, startX, startY });
       hidden.value = 1;
     };
     if (Platform.OS === 'web') {
@@ -179,7 +179,7 @@ function ZoomableArt({ children, source, densityPinchRef }: {
     } else if (node?.measureInWindow) {
       node.measureInWindow((x: number, y: number, w: number, h: number) => show(x, y, w, h));
     }
-  }, [source, scale, tx, ty, hidden]);
+  }, [source, scale, tx, ty, hidden, startX, startY]);
 
   const finishZoom = useCallback(() => {
     hideArtZoom();
@@ -231,11 +231,20 @@ function ZoomableArt({ children, source, densityPinchRef }: {
       e.stopPropagation();
       if (!zoomingRef.current) {
         zoomingRef.current = true;
+        // Anchor the zoom at the cursor (web's stand-in for the finger
+        // midpoint), in element coordinates.
+        const r = node.getBoundingClientRect?.();
+        if (r) {
+          startX.value = e.clientX - r.left;
+          startY.value = e.clientY - r.top;
+        }
         beginZoom();
       }
       scale.value = Math.min(4, Math.max(1, scale.value * (1 - e.deltaY / 200)));
       if (resetTimer) clearTimeout(resetTimer);
-      resetTimer = setTimeout(springBack, 400);
+      // Trackpad pinch streams events every ~10-20ms, so a short idle gap is
+      // enough to call it released — 400ms read as a stall.
+      resetTimer = setTimeout(springBack, 140);
     };
     node.addEventListener('wheel', onWheel, { passive: false });
     return () => {
