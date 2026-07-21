@@ -8,6 +8,7 @@ import Spinner from '../components/Spinner';
 import { useMembers, useDebouncedValue } from '../hooks';
 import { resolveImageUrl, profilePicSource, profileThumbSource, Profile } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
+import { GridMode, columnsFor } from '../constants/grid';
 import type { SearchStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
@@ -15,11 +16,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COLUMN_GAP = 10;
 const LIST_PAD = 20; // horizontal padding on each side of the list
 
-// Cards per row grow ~square with the result count, capped at 4 — a full
-// directory stays dense, and a narrowed search slims to fewer, larger cards.
-function columnsFor(n: number): number {
-  return Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n)))));
-}
 const PEOPLE_KEYS = ['username', 'firstname', 'lastname', 'city', 'media'];
 
 // Roster tile avatar. Loads the small (256px) gated profile-pic thumbnail so a
@@ -37,6 +33,9 @@ function RosterAvatar({ item, size }: { item: Profile; size: number }) {
     <Image
       source={useThumb ? profileThumbSource(item.id) : fullOrDefault}
       transition={200}
+      // memory-disk: remounted rows (FlatList virtualization) paint
+      // synchronously from memory instead of replaying the fade.
+      cachePolicy="memory-disk"
       style={[styles.cardImage, { height: size }]}
       contentFit="cover"
       onError={useThumb ? () => setThumbFailed(true) : undefined}
@@ -53,13 +52,17 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
-  // Column target from the density slider (1..4); the per-count formula caps it.
-  columns: number;
+  // Grid display mode from SearchTabs (pinch-toggled): feed forces 1 per
+  // row; gallery uses the per-count formula.
+  mode: GridMode;
 }
 
-export default function People({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
+export default function People({ query, onResetFilters, onListScroll, onVerticalScroll, mode }: Props) {
   const navigation = useNavigation<Nav>();
-  const [members, , , refetchMembers] = useMembers('', '');
+  // `loading` is true only for the initial fetch — while it runs the member
+  // count is 0, which would paint a 1-column grid that reflows once the
+  // roster lands. Spin until it settles instead.
+  const [members, , loading, refetchMembers] = useMembers('', '');
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -84,11 +87,17 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
   // Decouple the slider's target column count from the rendered one and
   // crossfade the change: FlatList must remount to change numColumns, so we fade
   // the grid out, swap columns while invisible, then fade back in (no vanish).
-  const targetColumns = Math.min(columns, columnsFor(filtered.length));
+  const targetColumns = mode === 'feed' ? 1 : columnsFor(filtered.length);
   const [renderedColumns, setRenderedColumns] = useState(targetColumns);
   const gridOpacity = useRef(new Animated.Value(1)).current;
   const transitioning = useRef(false);
   useEffect(() => {
+    // Behind the initial-load spinner nothing is visible — snap columns
+    // silently so the first paint starts at the right count.
+    if (loading) {
+      if (targetColumns !== renderedColumns) setRenderedColumns(targetColumns);
+      return;
+    }
     if (targetColumns === renderedColumns) {
       if (transitioning.current) {
         transitioning.current = false;
@@ -107,7 +116,7 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
     return () => {
       cancelled = true;
     };
-  }, [targetColumns, renderedColumns, gridOpacity]);
+  }, [loading, targetColumns, renderedColumns, gridOpacity]);
 
   const numColumns = renderedColumns;
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
@@ -131,6 +140,14 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
     </Pressable>
   );
 
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Spinner size={48} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: gridOpacity }}>
@@ -143,6 +160,10 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
         // the list (see gridOpacity / renderedColumns).
         key={numColumns}
         numColumns={numColumns}
+        // Solo cards are viewport-width squares, so rows cross the
+        // virtualization boundary constantly — keep more of them mounted to
+        // avoid remount churn while scrolling.
+        windowSize={numColumns === 1 ? 41 : 21}
         columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
         contentContainerStyle={styles.list}
         keyboardDismissMode="on-drag"
@@ -173,6 +194,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.mainBg,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   refreshSpinnerOverlay: {
     position: 'absolute',

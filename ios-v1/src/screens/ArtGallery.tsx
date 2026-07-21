@@ -18,6 +18,7 @@ import {
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts } from '../constants/theme';
+import { GridMode, columnsFor } from '../constants/grid';
 import type { SearchStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
@@ -101,6 +102,10 @@ function VisualCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: 
       <Image
         source={thumbSource(item.id, item.file_path)}
         transition={200}
+        // memory-disk: remounted rows (FlatList virtualization) paint
+        // synchronously from memory instead of replaying the fade — without
+        // this the 1-column view "refreshes" every image as you scroll.
+        cachePolicy="memory-disk"
         style={[styles.cardImage, { height: cardWidth }]}
         contentFit="cover"
       />
@@ -128,11 +133,6 @@ function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth:
   );
 }
 
-// Cards per row grow ~square with the result count, capped at 4 — a big gallery
-// stays 4-up, and a narrowed search slims down to fewer, larger cards.
-function columnsFor(n: number): number {
-  return Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n)))));
-}
 const ART_KEYS = ['title', 'medium', 'song', 'creator_username', 'location', 'keywords'];
 
 interface Props {
@@ -144,12 +144,12 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
-  // Column target from the density slider (1..4). The per-count formula still
-  // caps it — the slider only reduces columns from the formula's value.
-  columns: number;
+  // Grid display mode from SearchTabs (pinch-toggled): feed forces 1 per
+  // row; gallery uses the per-count formula.
+  mode: GridMode;
 }
 
-export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
+export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, mode }: Props) {
   const navigation = useNavigation<Nav>();
   const { token } = useAuth();
   // Visual paints immediately; written fans out and merges in when ready.
@@ -157,9 +157,15 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
   const [writtenArt, setWrittenArt] = useState<ArtResult[]>([]);
   const art = useMemo(() => mergeArt(visualArt, writtenArt), [visualArt, writtenArt]);
   const [refreshing, setRefreshing] = useState(false);
+  // Until the first visual fetch settles the result count is 0, which would
+  // paint a 1-column grid that reflows once results land — spin instead.
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    search_art('').then(setVisualArt).catch(() => {});
+    search_art('')
+      .then(setVisualArt)
+      .catch(() => {})
+      .finally(() => setLoaded(true));
     fetchWrittenArt(token).then(setWrittenArt).catch(() => {});
   }, [token]);
 
@@ -187,11 +193,17 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
   // remount makes every photo vanish + reappear. So we decouple the target
   // column count (from the slider) from the one actually rendered, and crossfade:
   // fade the grid out, swap columns while it's invisible, fade back in.
-  const targetColumns = Math.min(columns, columnsFor(filtered.length));
+  const targetColumns = mode === 'feed' ? 1 : columnsFor(filtered.length);
   const [renderedColumns, setRenderedColumns] = useState(targetColumns);
   const gridOpacity = useRef(new Animated.Value(1)).current;
   const transitioning = useRef(false);
   useEffect(() => {
+    // Behind the initial-load spinner nothing is visible — snap columns
+    // silently so the first paint starts at the right count.
+    if (!loaded) {
+      if (targetColumns !== renderedColumns) setRenderedColumns(targetColumns);
+      return;
+    }
     if (targetColumns === renderedColumns) {
       if (transitioning.current) {
         transitioning.current = false;
@@ -210,7 +222,7 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
     return () => {
       cancelled = true;
     };
-  }, [targetColumns, renderedColumns, gridOpacity]);
+  }, [loaded, targetColumns, renderedColumns, gridOpacity]);
 
   const numColumns = renderedColumns;
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
@@ -233,6 +245,14 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
     return numColumns === 1 ? <View style={styles.soloItem}>{card}</View> : card;
   };
 
+  if (!loaded) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Spinner size={48} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: gridOpacity }}>
@@ -245,6 +265,10 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
         // around this list (see gridOpacity / renderedColumns).
         key={numColumns}
         numColumns={numColumns}
+        // Solo cards are viewport-width squares, so rows cross the
+        // virtualization boundary constantly — keep more of them mounted to
+        // avoid remount churn while scrolling.
+        windowSize={numColumns === 1 ? 41 : 21}
         columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
         contentContainerStyle={styles.list}
         keyboardDismissMode="on-drag"
@@ -275,6 +299,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.mainBg,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   refreshSpinnerOverlay: {
     position: 'absolute',

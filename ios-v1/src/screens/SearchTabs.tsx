@@ -19,8 +19,8 @@ import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ArtGallery from './ArtGallery';
 import People from './People';
-import DensitySlider from '../components/DensitySlider';
 import { Colors, Fonts } from '../constants/theme';
+import type { GridMode } from '../constants/grid';
 
 // iOS animates layout changes out of the box; Android needs this opt-in. Lets
 // the grid crossfade when the column count changes instead of hard-flashing.
@@ -86,20 +86,19 @@ export default function SearchTabs() {
   // lists swipe — typing live-filters whichever half is showing, and only the
   // placeholder changes when you swipe across.
   const [query, setQuery] = useState('');
-  // Density slider: posts-per-row target (1..4), default 4 (leftmost). Each grid
-  // clamps this to its own count-based formula, so the slider only ever reduces
-  // columns from the formula's value. Hidden while the keyboard is up.
-  const [columns, setColumns] = useState(4);
+  // Grid mode: gallery (4-up target, count-formula capped) vs feed (1 per
+  // row with captions). Toggled by the pinch gesture; replaces the old
+  // density slider.
+  const [mode, setMode] = useState<GridMode>('gallery');
   const [keyboardUp, setKeyboardUp] = useState(false);
 
-  // Slider commits its column count on release; wrap the state change in a
-  // LayoutAnimation so the grid crossfades to the new column count instead of
-  // hard-remounting (the flash).
-  const handleColumnsChange = useCallback((v: number) => {
+  // Wrap the mode change in a LayoutAnimation so the grid crossfades to the
+  // new column count instead of hard-remounting (the flash).
+  const handleModeChange = useCallback((m: GridMode) => {
     LayoutAnimation.configureNext(
       LayoutAnimation.create(260, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity),
     );
-    setColumns(v);
+    setMode(m);
   }, []);
 
   // Keyboard-driven animation. `kb` (native driver) shrinks the toggle-bar
@@ -261,7 +260,7 @@ export default function SearchTabs() {
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
-              columns={columns}
+              mode={mode}
             />
           </View>
           <View style={[styles.page, { height: pageHeight }]}>
@@ -270,7 +269,7 @@ export default function SearchTabs() {
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
-              columns={columns}
+              mode={mode}
             />
           </View>
         </Animated.ScrollView>
@@ -290,13 +289,6 @@ export default function SearchTabs() {
           autoCorrect={false}
           returnKeyType="search"
         />
-        {/* Density slider sits just beneath the search input — drag right for
-            fewer, bigger tiles. Hidden while typing (keyboard up). */}
-        {!keyboardUp && (
-          <View style={styles.sliderRow}>
-            <DensitySlider value={columns} max={4} onChange={handleColumnsChange} />
-          </View>
-        )}
       </Reanimated.View>
     </View>
   );
@@ -365,10 +357,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     fontSize: 14,
     backgroundColor: Colors.white,
-  },
-  sliderRow: {
-    marginTop: 8,
-    paddingHorizontal: 6,
   },
   pager: {
     flex: 1,
