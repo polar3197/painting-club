@@ -13,7 +13,8 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
+import Reanimated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -100,6 +101,43 @@ export default function SearchTabs() {
     );
     setMode(m);
   }, []);
+
+  // Pinch-to-zoom: spread = feed (bigger), pinch = gallery (denser). The grid
+  // scales slightly under the fingers for feedback, then snaps back while the
+  // LayoutAnimation crossfade swaps the column count.
+  const pinchScale = useSharedValue(1);
+  const commitPinch = useCallback((m: GridMode) => {
+    handleModeChange(m);
+  }, [handleModeChange]);
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      // Damp the raw scale so the grid nudges rather than balloons.
+      pinchScale.value = 1 + (e.scale - 1) * 0.08;
+    })
+    .onEnd((e) => {
+      pinchScale.value = withTiming(1, { duration: 160 });
+      if (e.scale > 1.05) runOnJS(commitPinch)('feed');
+      else if (e.scale < 0.95) runOnJS(commitPinch)('gallery');
+    });
+  const pinchStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pinchScale.value }],
+  }));
+
+  // Browsers encode trackpad pinch as ctrl+wheel. Dev-preview convenience;
+  // native never runs this.
+  const wheelAcc = useRef(0);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      wheelAcc.current += e.deltaY;
+      if (wheelAcc.current < -60) { wheelAcc.current = 0; commitPinch('feed'); }
+      else if (wheelAcc.current > 60) { wheelAcc.current = 0; commitPinch('gallery'); }
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, [commitPinch]);
 
   // Keyboard-driven animation. `kb` (native driver) shrinks the toggle-bar
   // icons and `kbH` (JS driver) animates its layout height as the keyboard
@@ -241,6 +279,8 @@ export default function SearchTabs() {
         style={styles.pager}
         onLayout={(e) => setPageHeight(e.nativeEvent.layout.height)}
       >
+        <GestureDetector gesture={pinch}>
+        <Reanimated.View style={[{ flex: 1 }, pinchStyle]}>
         <Animated.ScrollView
           ref={scrollRef}
           horizontal
@@ -273,6 +313,8 @@ export default function SearchTabs() {
             />
           </View>
         </Animated.ScrollView>
+        </Reanimated.View>
+        </GestureDetector>
       </View>
 
       {/* Search bar lives at the bottom (thumb zone) and rises to sit on top of
