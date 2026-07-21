@@ -105,6 +105,40 @@
     font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
 }
 
+.profile-action-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+/* Mail doorway — unread dot for the owner, "message me" for visitors. */
+.profile-mail-btn {
+    position: relative;
+    background: transparent;
+    border: 1px solid black;
+    border-radius: 5px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px 12px;
+    cursor: pointer;
+}
+
+.profile-mail-btn:hover {
+    background: rgb(238, 190, 100);
+}
+
+.profile-mail-dot {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #b00020;
+    border: 1px solid #000;
+}
+
 .user-field-element {
     display: flex;
     flex-direction: column;

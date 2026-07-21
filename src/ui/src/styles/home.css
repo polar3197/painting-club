@@ -48,6 +48,8 @@
 
 .home-left-content {
     display: flex;
+    flex-direction: column;
+    gap: 18px;
     justify-content: center;
     align-items: center;
     border: 2px black solid;
@@ -114,6 +116,21 @@
     font-size: 14px;
     color: #555;
     opacity: 0.6;
+}
+
+/* Doorway to the feature-request board — mirrors the iOS home corner button. */
+.feature-request-link {
+    background: transparent;
+    border: none;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    color: #333;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.feature-request-link:hover {
+    color: #000;
 }
 
 .stamp-wrapper {

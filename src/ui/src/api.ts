@@ -41,8 +41,12 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
   const data = isJson ? await response.json() : null;
 
   // Expired/invalid token on an authenticated request → clear session + kick to landing.
-  // Skip the redirect for the login endpoint itself so bad-password attempts don't bounce the page.
-  if (response.status === 401 && !path.startsWith("/members/login")) {
+  // Skip the redirect for login/redeem so bad-password or bad-code attempts don't bounce the page.
+  if (
+    response.status === 401 &&
+    !path.startsWith("/members/login") &&
+    !path.startsWith("/members/redeem-setup-code")
+  ) {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     localStorage.removeItem("role");
@@ -193,6 +197,8 @@ export interface Visual2DIn {
   keywords?: string;
   comments_enabled?: boolean;
   collection_id?: string | null;
+  // Series name ("series" of paintings — same grouping as albums/collections).
+  series_name?: string;
   file: File;
 }
 
@@ -211,6 +217,9 @@ export interface Visual2DOut {
   file_path: string;
   comments_enabled: boolean;
   aspect_ratio: number | null;
+  series_id: string | null;
+  series_name: string | null;
+  order_index: number | null;
 }
 
 export function getHealth(): Promise<unknown> {
@@ -290,21 +299,32 @@ export function set_media_visibility(medium: string, hidden: boolean, token: str
   });
 }
 
+// The three medium categories a piece can belong to. The requester picks one
+// when proposing a new media form so the admin no longer has to classify it.
+export type MediaTypeKind = "visual_2d" | "written_form" | "audio";
+
 export interface MediaRequest {
   id: string;
   member_id: string;
   username: string;
   requested_name: string;
   status: string;
+  // What the requester picked at submission. Null on rows created before
+  // requesters chose their own type.
+  requested_type: string | null;
   resolved_type: string | null;
   created_at: string;
 }
 
-export function submit_media_request(name: string, token: string | null): Promise<MediaRequest> {
+export function submit_media_request(
+  name: string,
+  type: MediaTypeKind,
+  token: string | null,
+): Promise<MediaRequest> {
   return request(`/media-requests`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, type }),
   }) as Promise<MediaRequest>;
 }
 
@@ -386,6 +406,7 @@ export function add_new_visual_2d(token: string | null, payload: Visual2DIn) {
   if (payload.keywords != null) fd.append("keywords", String(payload.keywords));
   if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
   if (payload.collection_id) fd.append("collection_id", payload.collection_id);
+  if (payload.series_name) fd.append("series_name", payload.series_name);
   fd.append("file", payload.file);
 
   return request("/art/upload/visual-2d", {
@@ -406,6 +427,8 @@ export interface Visual2DUpdatePayload {
   keywords?: string[] | null;
   comments_enabled?: boolean;
   medium?: string | null;
+  series_name?: string | null;
+  clear_series?: boolean;
   // When set, the on-disk file (and thumbnail) gets replaced.
   file?: File | null;
 }
@@ -422,6 +445,8 @@ export function update_visual_2d(id: string, token: string | null, payload: Visu
   if (payload.keywords != null) fd.append("keywords", payload.keywords.join(", "));
   if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
   if (payload.medium) fd.append("medium", payload.medium);
+  if (payload.series_name) fd.append("series_name", payload.series_name);
+  if (payload.clear_series) fd.append("clear_series", String(payload.clear_series));
   if (payload.file) fd.append("file", payload.file);
   return request(`/art/${id}`, {
     method: "PATCH",
@@ -643,4 +668,379 @@ export function update_report_status(
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ status }),
   }) as Promise<ReportOut>;
+}
+
+// ---------------------------------------------------------------------------
+// Session / account extras (ported from the iOS client)
+// ---------------------------------------------------------------------------
+
+// Sliding session: swap a still-valid token for a fresh 30-day one on app load.
+export function refresh_token(token: string): Promise<LoginResponse> {
+  return request("/members/refresh-token", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<LoginResponse>;
+}
+
+// Always answers {ok: true}; the reset code lands in the admin panel's
+// "password resets" section for manual delivery, redeemed via "secret code?".
+export function forgot_password(username: string): Promise<{ ok: boolean }> {
+  return request("/members/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ username }),
+  }) as Promise<{ ok: boolean }>;
+}
+
+export function accept_terms(token: string): Promise<{ terms_accepted_at: string }> {
+  return request("/members/accept-terms", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ terms_accepted_at: string }>;
+}
+
+export interface PasswordResetOut {
+  username: string;
+  email: string | null;
+  firstname: string | null;
+  lastname: string | null;
+  code: string;
+  expires_at: string | null;
+}
+
+export function get_password_resets(token: string | null): Promise<PasswordResetOut[]> {
+  return request("/admin/password-resets", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<PasswordResetOut[]>;
+}
+
+// ---------------------------------------------------------------------------
+// Audio (music + voice memos)
+// ---------------------------------------------------------------------------
+
+export interface AudioIn {
+  username: string;
+  medium: string;
+  title: string;
+  date?: string;
+  keywords?: string;
+  comments_enabled?: boolean;
+  // Performer/composer — only meaningful for uploaded music.
+  artist?: string;
+  // Client-measured length in seconds, captured once the picked file loads.
+  duration_seconds?: number | null;
+  // Album name — the audio flavour of a series (created server-side on demand).
+  series_name?: string;
+  file: File;
+}
+
+export interface AudioOut {
+  id: string;
+  title: string;
+  date: string | null;
+  keywords: string[];
+  file_path: string;
+  comments_enabled: boolean;
+  artist: string | null;
+  duration_seconds: number | null;
+  // Album membership (an album is a series of audio pieces).
+  series_id: string | null;
+  series_name: string | null;
+  order_index: number | null;
+}
+
+export interface AudioUpdatePayload {
+  title: string;
+  date?: string | null;
+  keywords?: string[] | null;
+  comments_enabled?: boolean;
+  medium?: string | null;
+  artist?: string | null;
+  duration_seconds?: number | null;
+  series_name?: string | null;
+  clear_series?: boolean;
+  // When set, the on-disk audio file gets replaced.
+  file?: File | null;
+}
+
+export function add_new_audio(token: string | null, payload: AudioIn) {
+  const fd = new FormData();
+  fd.append("username", payload.username);
+  fd.append("medium", payload.medium);
+  fd.append("title", payload.title);
+  if (payload.date) fd.append("date", payload.date);
+  if (payload.keywords != null) fd.append("keywords", String(payload.keywords));
+  if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
+  if (payload.artist) fd.append("artist", payload.artist);
+  if (payload.duration_seconds != null) fd.append("duration_seconds", String(payload.duration_seconds));
+  if (payload.series_name) fd.append("series_name", payload.series_name);
+  fd.append("file", payload.file);
+
+  return request("/art/upload/audio", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function get_members_audio(username: string, medium: string): Promise<AudioOut[]> {
+  return request(`/members/${username}/art/audio/${medium}`) as Promise<AudioOut[]>;
+}
+
+export function update_audio(id: string, token: string | null, payload: AudioUpdatePayload) {
+  const fd = new FormData();
+  fd.append("title", payload.title);
+  if (payload.date) fd.append("date", payload.date);
+  if (payload.keywords != null) fd.append("keywords", payload.keywords.join(", "));
+  if (payload.comments_enabled != null) fd.append("comments_enabled", String(payload.comments_enabled));
+  if (payload.medium) fd.append("medium", payload.medium);
+  if (payload.artist != null) fd.append("artist", payload.artist);
+  if (payload.duration_seconds != null) fd.append("duration_seconds", String(payload.duration_seconds));
+  if (payload.series_name) fd.append("series_name", payload.series_name);
+  if (payload.clear_series) fd.append("clear_series", String(payload.clear_series));
+  if (payload.file) fd.append("file", payload.file);
+  return request(`/art/audio/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+export function remove_audio(id: string, token: string | null) {
+  return request(`/art/audio/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Comments received (on your own art)
+// ---------------------------------------------------------------------------
+
+export interface CommentReceivedOut {
+  id: string;
+  text: string;
+  created_at: string;
+  art_id: string;
+  art_title: string | null;
+  art_medium: string;
+  commenter_username: string;
+  commenter_firstname: string | null;
+}
+
+export interface CommentsReceivedPage {
+  comments: CommentReceivedOut[];
+  next_cursor: string | null;
+  // Snapshot of comments_last_viewed_at BEFORE the server bumped it on this
+  // first-page fetch. Compare each comment.created_at against this to decide
+  // seen vs unseen (gold).
+  previous_view_at: string | null;
+}
+
+export function get_comments_received(
+  token: string | null,
+  cursor: string | null,
+  limit = 20,
+): Promise<CommentsReceivedPage> {
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  params.set("limit", String(limit));
+  return request(`/members/me/comments-received?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<CommentsReceivedPage>;
+}
+
+// ---------------------------------------------------------------------------
+// Feature requests
+// ---------------------------------------------------------------------------
+
+export interface FeatureRequestOut {
+  id: string;
+  // Requester — only present when the viewer is an admin.
+  username: string | null;
+  title: string;
+  up: number;
+  down: number;
+  my_vote: number | null; // +1 | -1 | null
+  is_owner: boolean;
+  created_at: string;
+}
+
+export interface FeatureRequestVoteOut {
+  up: number;
+  down: number;
+  my_vote: number | null;
+}
+
+export function get_feature_requests(token: string | null): Promise<FeatureRequestOut[]> {
+  return request("/feature-requests", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<FeatureRequestOut[]>;
+}
+
+export function create_feature_request(title: string, token: string | null): Promise<FeatureRequestOut> {
+  return request("/feature-requests", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title }),
+  }) as Promise<FeatureRequestOut>;
+}
+
+export function vote_feature_request(
+  request_id: string,
+  value: 1 | -1,
+  token: string | null,
+): Promise<FeatureRequestVoteOut> {
+  return request(`/feature-requests/${request_id}/vote`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ value }),
+  }) as Promise<FeatureRequestVoteOut>;
+}
+
+export function delete_feature_request(request_id: string, token: string | null) {
+  return request(`/feature-requests/${request_id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Messaging (DMs + groups)
+// ---------------------------------------------------------------------------
+
+export interface MemberDirectoryEntry {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+}
+
+export interface ParticipantOut {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+  role: string;
+}
+
+export interface ConversationOut {
+  id: string;
+  type: 'dm' | 'group';
+  // Partner display name for DMs, group title for groups.
+  title: string;
+  partner_username: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  last_sender_username: string | null;
+  unread: number;
+}
+
+export interface MessageOut {
+  id: string;
+  sender_username: string;
+  sender_firstname: string | null;
+  body: string;
+  created_at: string;
+}
+
+export interface MessagesPage {
+  messages: MessageOut[]; // newest first
+  next_cursor: string | null;
+  // Read cursor BEFORE this fetch bumped it (first page only) — messages newer
+  // than this were unseen when the thread was opened.
+  previous_read_at: string | null;
+}
+
+// All members except the viewer, with blocked pairs excluded server-side.
+export function get_member_directory(token: string | null): Promise<MemberDirectoryEntry[]> {
+  return request("/members/directory", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MemberDirectoryEntry[]>;
+}
+
+export function get_unread_count(token: string | null): Promise<{ unread: number }> {
+  return request("/conversations/unread-count", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ unread: number }>;
+}
+
+export function get_conversations(token: string | null): Promise<ConversationOut[]> {
+  return request("/conversations", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<ConversationOut[]>;
+}
+
+// Idempotent: returns the existing DM with that member if one exists.
+export function open_dm(username: string, token: string | null): Promise<ConversationOut> {
+  return request("/conversations/dm", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ username }),
+  }) as Promise<ConversationOut>;
+}
+
+export function create_group(
+  title: string,
+  usernames: string[],
+  token: string | null,
+): Promise<ConversationOut> {
+  return request("/conversations/group", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title, usernames }),
+  }) as Promise<ConversationOut>;
+}
+
+// First page (no cursor) bumps the viewer's read cursor server-side.
+export function get_messages(
+  conversation_id: string,
+  token: string | null,
+  cursor: string | null = null,
+  limit = 30,
+): Promise<MessagesPage> {
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  params.set("limit", String(limit));
+  return request(`/conversations/${conversation_id}/messages?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MessagesPage>;
+}
+
+export function send_message(
+  conversation_id: string,
+  body: string,
+  token: string | null,
+): Promise<MessageOut> {
+  return request(`/conversations/${conversation_id}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ body }),
+  }) as Promise<MessageOut>;
+}
+
+export function get_participants(
+  conversation_id: string,
+  token: string | null,
+): Promise<ParticipantOut[]> {
+  return request(`/conversations/${conversation_id}/participants`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<ParticipantOut[]>;
+}
+
+export function add_group_members(
+  conversation_id: string,
+  usernames: string[],
+  token: string | null,
+): Promise<{ ok: boolean; added: number }> {
+  return request(`/conversations/${conversation_id}/participants`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ usernames }),
+  }) as Promise<{ ok: boolean; added: number }>;
+}
+
+// Leaving as the last participant deletes the conversation server-side.
+export function leave_group(conversation_id: string, token: string | null) {
+  return request(`/conversations/${conversation_id}/leave`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }

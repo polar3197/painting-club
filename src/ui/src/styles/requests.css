@@ -1,0 +1,130 @@
+/* Feature-request board — same list as the iOS "request something" screen. */
+
+.requests-page {
+  max-width: 620px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 16px;
+  font-family: Cambria, Cochin, Georgia, Times, "Times New Roman", serif;
+}
+
+.requests-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.requests-header h2 {
+  font-weight: 400;
+  font-size: 22px;
+  margin: 0;
+}
+
+.requests-new-btn,
+.requests-form button {
+  background: transparent;
+  border: 1px solid #000;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.requests-new-btn:hover,
+.requests-form button:hover:enabled {
+  background: rgb(238, 190, 100);
+}
+
+.requests-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.requests-form input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #000;
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  padding: 6px 2px;
+}
+
+.requests-form button:disabled {
+  color: #999;
+  border-color: #999;
+  cursor: default;
+}
+
+.requests-muted {
+  color: #666;
+  font-size: 14px;
+}
+
+.request-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid #000;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.request-main {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.request-title {
+  font-size: 15px;
+  word-break: break-word;
+}
+
+/* Collapsed rows clamp to two lines; click expands (mirrors iOS tap-to-expand). */
+.request-title.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.request-requester {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.request-votes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vote-btn {
+  background: transparent;
+  border: 1px solid #000;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vote-btn.active {
+  background: rgb(238, 190, 100);
+}
+
+.request-delete {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #b00020;
+  cursor: pointer;
+  padding: 2px 4px;
+}

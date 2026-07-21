@@ -1,6 +1,6 @@
 import { useState, FormEvent } from "react";
 import "../../styles/login.css";
-import { login_user, get_profile } from "../../api";
+import { login_user, get_profile, redeem_setup_code } from "../../api";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ApplicationDialog from "../Utils/ApplicationDialog";
@@ -14,6 +14,8 @@ export default function Login(
   const [member, setMember] = useState(true);
   const [memberStatus, setMemberStatus] = useState("not a member?");
   const [showApplication, setShowApplication] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+  const [setupCode, setSetupCode] = useState("");
   const { login } = useAuth()!;
   const navigate = useNavigate();
 
@@ -24,6 +26,23 @@ export default function Login(
     } else {
       setMember(true);
       setMemberStatus("not a member?");
+    }
+    setShowCode(false);
+  };
+
+  // Admin hands out one-time setup codes (invites + password resets); redeeming
+  // one yields a temp-account token that must finish through /setup.
+  const handleRedeemCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const code = setupCode.trim();
+    if (!code) return;
+    try {
+      const res = await redeem_setup_code(code);
+      // No username yet — the member picks one on /setup, which reads this token.
+      localStorage.setItem("token", res.access_token);
+      navigate("/setup");
+    } catch (err) {
+      alert((err as Error).message);
     }
   };
 
@@ -100,11 +119,29 @@ export default function Login(
             <button type="submit">login</button>
           </form>
         )}
-        {!member && (
+        {!member && !showCode && (
           <div className="non-member">
             <button onClick={() => navigate("/members")}>view artists profiles</button>
             <button onClick={() => setShowApplication(true)}>request account</button>
+            <button onClick={() => setShowCode(true)}>secret code?</button>
           </div>
+        )}
+        {!member && showCode && (
+          <form className="user-form" onSubmit={handleRedeemCode}>
+            <div className="input-wrapper">
+              <div className="input-title">code:</div>
+              <input
+                type="text"
+                placeholder="paste it"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoFocus
+                value={setupCode}
+                onChange={(event) => setSetupCode(event.target.value)}
+              />
+            </div>
+            <button type="submit">redeem</button>
+          </form>
         )}
       </div>
       <div className="login-footer">

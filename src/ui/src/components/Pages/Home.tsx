@@ -38,6 +38,18 @@ export default function Home() {
             ) : (
               <div className="prompt-banner-empty">no prompt this week</div>
             )}
+            <button
+              className="feature-request-link"
+              onClick={() => navigate("/requests")}
+            >
+              request something for the app
+            </button>
+            <button
+              className="feature-request-link"
+              onClick={() => navigate("/ethos")}
+            >
+              about the app
+            </button>
           </div>
         </div>
         <div className="home-right">

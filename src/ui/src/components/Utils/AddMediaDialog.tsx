@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { get_media, submit_media_request, set_media_visibility, MediaType } from "../../api";
+import { get_media, submit_media_request, set_media_visibility, MediaType, MediaTypeKind } from "../../api";
 import "../../styles/utils/add-media-dialog.css";
 
 type Tab = "hide-show" | "new";
+
+// The requester classifies their proposed media form so the admin doesn't have
+// to. Labels are the human-facing names; values match the backend discriminator.
+const TYPE_OPTIONS: { value: MediaTypeKind; label: string }[] = [
+    { value: "visual_2d", label: "2d-visual" },
+    { value: "written_form", label: "written-form" },
+    { value: "audio", label: "audio" },
+];
 
 const AddMediaDialog = (
     { shown, hidden, onAdd, onVisibilityChange, onClose }
@@ -22,6 +30,7 @@ const AddMediaDialog = (
     const hiddenSet = new Set(hidden);
     const [error, setError] = useState<string | null>(null);
     const [requestName, setRequestName] = useState("");
+    const [requestType, setRequestType] = useState<MediaTypeKind | null>(null);
     const [requestSent, setRequestSent] = useState(false);
     const [requestError, setRequestError] = useState<string | null>(null);
 
@@ -36,12 +45,13 @@ const AddMediaDialog = (
 
     const handleRequest = async () => {
         const name = requestName.trim();
-        if (!name) return;
+        if (!name || !requestType) return;
         setRequestError(null);
         try {
             const token = localStorage.getItem("token");
-            await submit_media_request(name, token);
+            await submit_media_request(name, requestType, token);
             setRequestName("");
+            setRequestType(null);
             setRequestSent(true);
             setTimeout(() => setRequestSent(false), 2500);
         } catch (e: any) {
@@ -134,7 +144,28 @@ const AddMediaDialog = (
                                     placeholder="artform name"
                                     onChange={(e) => setRequestName(e.target.value)}
                                 />
-                                <button className="add-media-request-btn" onClick={handleRequest}>request</button>
+                                <button
+                                    className="add-media-request-btn"
+                                    onClick={handleRequest}
+                                    disabled={!requestName.trim() || !requestType}
+                                >
+                                    request
+                                </button>
+                            </div>
+                            <div className="add-media-type-row">
+                                {TYPE_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        className={
+                                            "add-media-type-chip" +
+                                            (requestType === opt.value ? " selected" : "")
+                                        }
+                                        onClick={() => setRequestType(opt.value)}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
                             {requestSent && <div className="add-media-request-sent">request sent</div>}
                             {requestError && <div className="add-media-error">{requestError}</div>}

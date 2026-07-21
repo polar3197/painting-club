@@ -139,6 +139,42 @@
     background-color: rgb(238, 190, 100);
 }
 
+.add-media-request-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.add-media-request-btn:disabled:hover {
+    background-color: rgb(250, 244, 202);
+}
+
+/* ---- requester's media-type picker ---- */
+.add-media-type-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.add-media-type-chip {
+    flex: 1;
+    border: 1px black solid;
+    background-color: white;
+    padding: 4px 6px;
+    cursor: pointer;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 13px;
+    color: rgb(90, 90, 90);
+}
+
+.add-media-type-chip:hover {
+    background-color: rgb(250, 244, 202);
+}
+
+.add-media-type-chip.selected {
+    /* Selection is signalled by the fill colour alone — no weight/size shift. */
+    background-color: rgb(238, 190, 100);
+}
+
 .add-media-request-sent {
     font-family: 'Times New Roman', Times, serif;
     font-size: 13px;

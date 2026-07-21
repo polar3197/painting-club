@@ -130,6 +130,24 @@
     background-color: lightcoral;
 }
 
+.sidebar-glyph {
+    font-size: 20px;
+    line-height: 1;
+}
+
+/* Red unread dot on the messages rail item. */
+.sidebar-unread-dot {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #b00020;
+    border: 1px solid #000;
+    pointer-events: none;
+}
+
 .sidebar-tooltip {
     position: absolute;
     left: 110%;

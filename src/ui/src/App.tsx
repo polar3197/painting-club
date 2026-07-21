@@ -16,6 +16,10 @@ import "./styles/app-layout.css";
 import Home from "./components/Pages/Home";
 import WeeklyPrompt from "./components/Pages/WeeklyPrompt";
 import WeeklyPromptGrid from "./components/Pages/WeeklyPromptGrid";
+import Messages from "./components/Pages/Messages";
+import RequestFeature from "./components/Pages/RequestFeature";
+import Stuff from "./components/Pages/Stuff";
+import Share from "./components/Pages/Share";
 
 export default function App() {
   useEffect(() => {
@@ -41,8 +45,13 @@ export default function App() {
           <Route path="/members" element={<People />} />
           <Route path="/art" element={<ArtGallery />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/requests" element={<RequestFeature />} />
+          <Route path="/stuff" element={<Stuff />} />
+          <Route path="/share" element={<Share />} />
 
           {/* <Route path="/groups" element={<Groups />} /> */}
+          {/* Bare-username catch-all — keep LAST so it can't shadow real routes. */}
           <Route path="/:username" element={<UserProfile />} />
         </Route>
 

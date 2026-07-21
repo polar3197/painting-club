@@ -1,7 +1,10 @@
 import "../../styles/sidebar.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { get_unread_count } from "../../api";
+
+const UNREAD_POLL_MS = 15000;
 
 interface SidebarProps {
   isOpen: boolean;
@@ -41,11 +44,30 @@ const SidebarElement = ({
   );
 };
 
-const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
+// Rail mirrors the iOS tab bar: home (title), me, stuff, share, messages.
+// Admin/logout/delete live behind the profile gear; docs hang off Home.
+const Sidebar = ({ isOpen }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, currentRole, logout } = useAuth()!;
-  console.log("CU: ", currentUser);
+  const { currentUser } = useAuth()!;
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setUnread(0);
+      return;
+    }
+    const tick = () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      get_unread_count(token).then((r) => setUnread(r.unread)).catch(() => {});
+    };
+    tick();
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") tick();
+    }, UNREAD_POLL_MS);
+    return () => clearInterval(timer);
+  }, [currentUser]);
 
   const gotoHome = () => {
     navigate("/home");
@@ -64,27 +86,17 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     }
   };
 
-  const gotoProfiles = () => {
-    console.log("go to profiles");
-    navigate(`/members`);
+  const gotoStuff = () => {
+    navigate("/stuff");
   };
 
-  // const gotoGroups = () => {
-  //   console.log("go to groups");
-  // };
-
-  const gotoArt = () => {
-    navigate("/art");
+  const gotoShare = () => {
+    navigate(currentUser ? "/share" : "/not-a-member");
   };
 
-  const gotoDocs = () => {
-    navigate("/ethos");
+  const gotoMessages = () => {
+    navigate(currentUser ? "/messages" : "/not-a-member");
   };
-
-  const gotoLogout = () => {
-    logout(); // removes token from localStorage
-    navigate("/landing-page");
-  }
 
   return (
     <div className={`sidebar ${isOpen ? "open" : "closed"}`}>
@@ -99,24 +111,15 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
         <SidebarElement isOpen={isOpen} label="me" imgSrc="/imgs/me.png" onClick={gotoMe}>
           {isOpen ? "Me" : <img src="/imgs/me.png" width="100%" height="100%" />}
         </SidebarElement>
-        <SidebarElement isOpen={isOpen} label="people" imgSrc="/imgs/profiles.png" onClick={gotoProfiles}>
-          {isOpen ? "People" : <img src="/imgs/profiles.png" width="100%" height="100%" />}
+        <SidebarElement isOpen={isOpen} label="stuff" imgSrc="/imgs/art.png" onClick={gotoStuff}>
+          {isOpen ? "Stuff" : <img src="/imgs/art.png" width="100%" height="100%" />}
         </SidebarElement>
-        <SidebarElement isOpen={isOpen} label="art" imgSrc="/imgs/art.png" onClick={gotoArt}>
-          {isOpen ? "Art" : <img src="/imgs/art.png" width="100%" height="100%" />}
+        <SidebarElement isOpen={isOpen} label="share" onClick={gotoShare}>
+          {isOpen ? "Share" : <span className="sidebar-glyph">+</span>}
         </SidebarElement>
-        {currentRole === "admin" && (
-          <SidebarElement isOpen={isOpen} label="admin" onClick={() => navigate("/admin")}>
-            {isOpen ? "Admin" : "★"}
-          </SidebarElement>
-        )}
-      </div>
-      <div className="sidebar-bottom">
-        <SidebarElement isOpen={isOpen} label="ethos" extraClass="docs" onClick={gotoDocs}>
-          {isOpen ? "Docs" : "¶"}
-        </SidebarElement>
-        <SidebarElement isOpen={isOpen} label="logout" extraClass="logout" onClick={gotoLogout}>
-          {isOpen ? "Logout" : "≤"}
+        <SidebarElement isOpen={isOpen} label="messages" onClick={gotoMessages}>
+          {isOpen ? "Messages" : <span className="sidebar-glyph">✉</span>}
+          {unread > 0 && <span className="sidebar-unread-dot" />}
         </SidebarElement>
       </div>
     </div>

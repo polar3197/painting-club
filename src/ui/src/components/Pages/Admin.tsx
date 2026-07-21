@@ -145,7 +145,9 @@ const MediaRequestRow = ({
     req: MediaRequest;
     onResolve: (id: string, status: "approved" | "rejected", type: string | null, name: string | null) => void;
 }) => {
-    const [pickingType, setPickingType] = useState(false);
+    // The requester now picks the type, so the admin just confirms. Entering
+    // `confirming` reveals an editable name (admin may rename before approving).
+    const [confirming, setConfirming] = useState(false);
     const [editName, setEditName] = useState(req.requested_name);
 
     const finalName = () => {
@@ -153,10 +155,13 @@ const MediaRequestRow = ({
         return n && n !== req.requested_name ? n : null;
     };
 
+    // Requester's chosen type (pending), or the type it was approved with.
+    const typeLabel = req.resolved_type ?? req.requested_type;
+
     return (
         <div className="application-row-item">
             <div className="application-row-info">
-                {pickingType ? (
+                {confirming ? (
                     <input
                         className="application-name"
                         value={editName}
@@ -167,7 +172,7 @@ const MediaRequestRow = ({
                     <p className="application-name">{req.requested_name}</p>
                 )}
                 <p className="application-meta">@{req.username}</p>
-                {req.resolved_type && <p className="application-meta">type: {req.resolved_type}</p>}
+                {typeLabel && <p className="application-meta">type: {typeLabel}</p>}
                 <p className="application-date">{new Date(req.created_at).toLocaleDateString()}</p>
             </div>
             <div className="application-row-actions">
@@ -177,13 +182,26 @@ const MediaRequestRow = ({
                 >
                     {req.status}
                 </div>
-                {req.status === "pending" && !pickingType && (
+                {req.status === "pending" && !confirming && (
                     <>
-                        <div className="application-btn approve" onClick={() => setPickingType(true)}>approve</div>
+                        <div className="application-btn approve" onClick={() => setConfirming(true)}>approve</div>
                         <div className="application-btn reject" onClick={() => onResolve(req.id, "rejected", null, null)}>reject</div>
                     </>
                 )}
-                {req.status === "pending" && pickingType && (
+                {req.status === "pending" && confirming && req.requested_type && (
+                    <>
+                        <div
+                            className="application-btn approve"
+                            onClick={() => onResolve(req.id, "approved", null, finalName())}
+                        >
+                            confirm {req.requested_type}
+                        </div>
+                        <div className="application-btn reject" onClick={() => setConfirming(false)}>cancel</div>
+                    </>
+                )}
+                {/* Legacy fallback: requests submitted before requesters picked
+                    their own type carry no requested_type, so the admin classifies them. */}
+                {req.status === "pending" && confirming && !req.requested_type && (
                     <select
                         defaultValue=""
                         style={{ fontFamily: "'Times New Roman', Times, serif", padding: "2px 4px" }}
@@ -194,6 +212,7 @@ const MediaRequestRow = ({
                         <option value="" disabled>pick type</option>
                         <option value="visual_2d">visual_2d</option>
                         <option value="written_form">written_form</option>
+                        <option value="audio">audio</option>
                     </select>
                 )}
             </div>
