@@ -11,7 +11,7 @@ import {
 import * as WebViewModule from 'react-native-webview';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { resolveImageUrl } from '../api';
+import { resolveImageUrl, imageSource } from '../api';
 import { extFromPath, isTextExt, useWrittenFormTextState } from '../hooks';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -320,7 +320,7 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
           <View style={styles.readerWrap}>
             <WebView
               key={pdfAttempt}
-              source={{ uri: resolveImageUrl(filePath) }}
+              source={imageSource(filePath)}
               style={styles.webview}
               bounces={false}
               showsHorizontalScrollIndicator={false}

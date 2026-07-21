@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 import { WrittenFormOut } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import SeriesZoomIn from './SeriesZoomIn';
+import BookmarkButton from './BookmarkButton';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 const THUMB_PREVIEW_LINES = 6;
@@ -42,6 +43,10 @@ interface SeriesRowProps {
   onRefresh: () => void;
   onMediumMove?: (newMedium: string) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
+  // Set by the profile when a gallery tap landed on a piece inside this series:
+  // opens the collection automatically once the row has scrolled into view.
+  autoOpen?: boolean;
+  onAutoOpened?: () => void;
 }
 
 export default function SeriesRow({
@@ -54,10 +59,21 @@ export default function SeriesRow({
   onRefresh,
   onMediumMove,
   onLayout,
+  autoOpen,
+  onAutoOpened,
 }: SeriesRowProps) {
   const ordered = sortPieces(pieces);
   const topPiece = ordered[ordered.length - 1] ?? pieces[0];
   const [isZoomedIn, setIsZoomedIn] = useState(false);
+
+  // Open the collection when the profile requests it (deep-link from the search
+  // gallery). Cleared via onAutoOpened so it fires once, not on every render.
+  useEffect(() => {
+    if (autoOpen) {
+      setIsZoomedIn(true);
+      onAutoOpened?.();
+    }
+  }, [autoOpen]);
 
   const ext = extFromPath(topPiece.file_path);
   const textContent = useWrittenFormText(topPiece.file_path);
@@ -115,6 +131,12 @@ export default function SeriesRow({
             <Text style={styles.detailText}>
               {ordered.length} piece{ordered.length === 1 ? '' : 's'}
             </Text>
+            {/* Collection-level save: bookmarks every piece in the series. */}
+            <BookmarkButton
+              artIds={ordered.map((p) => p.id)}
+              size={30}
+              style={styles.seriesBookmarkBtn}
+            />
           </View>
         </Pressable>
       </View>
@@ -175,6 +197,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-start',
     gap: 4,
+  },
+  seriesBookmarkBtn: {
+    marginTop: 8,
   },
   seriesTitle: {
     fontFamily: Fonts.serif,

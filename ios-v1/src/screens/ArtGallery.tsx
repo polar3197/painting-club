@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,8 +10,6 @@ import {
   get_media,
   get_members,
   get_members_written_form,
-  resolveImageUrl,
-  thumbUrl,
   thumbSource,
   ArtResult,
   MediaType,
@@ -19,7 +17,7 @@ import {
 } from '../api';
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
 import { useAuth } from '../context/AuthContext';
-import { Colors, Fonts, FontSizes } from '../constants/theme';
+import { Colors, Fonts } from '../constants/theme';
 import type { SearchStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<SearchStackParamList, 'SearchTabs'>;
@@ -97,17 +95,15 @@ function VisualCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: 
       style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
       onPress={onPress}
     >
+      {/* Grid tiles load the 512px thumbnail, not the multi-MB original — the
+          tile is far smaller than full-res, and this cuts gallery bandwidth
+          ~10-50x. Full-res still loads in the zoom viewer on tap. */}
       <Image
-        source={{ uri: resolveImageUrl(item.file_path) }}
-        placeholder={thumbSource(item.id)}
+        source={thumbSource(item.id, item.file_path)}
         transition={200}
         style={[styles.cardImage, { height: cardWidth }]}
         contentFit="cover"
       />
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.cardMedium} numberOfLines={1}>{item.medium}</Text>
-      </View>
     </Pressable>
   );
 }
@@ -127,10 +123,6 @@ function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth:
         {isText && !!snippet && (
           <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
         )}
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.cardMedium} numberOfLines={1}>{item.medium}</Text>
       </View>
     </Pressable>
   );
@@ -152,9 +144,12 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
+  // Column target from the density slider (1..4). The per-count formula still
+  // caps it — the slider only reduces columns from the formula's value.
+  columns: number;
 }
 
-export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll }: Props) {
+export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
   const navigation = useNavigation<Nav>();
   const { token } = useAuth();
   // Visual paints immediately; written fans out and merges in when ready.
@@ -188,7 +183,36 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
     return fuse.search(debouncedQuery).map((r) => r.item);
   }, [art, fuse, debouncedQuery]);
 
-  const numColumns = columnsFor(filtered.length);
+  // FlatList must remount to change numColumns (it throws otherwise), and a bare
+  // remount makes every photo vanish + reappear. So we decouple the target
+  // column count (from the slider) from the one actually rendered, and crossfade:
+  // fade the grid out, swap columns while it's invisible, fade back in.
+  const targetColumns = Math.min(columns, columnsFor(filtered.length));
+  const [renderedColumns, setRenderedColumns] = useState(targetColumns);
+  const gridOpacity = useRef(new Animated.Value(1)).current;
+  const transitioning = useRef(false);
+  useEffect(() => {
+    if (targetColumns === renderedColumns) {
+      if (transitioning.current) {
+        transitioning.current = false;
+        Animated.timing(gridOpacity, { toValue: 1, duration: 110, useNativeDriver: true }).start();
+      }
+      return;
+    }
+    transitioning.current = true;
+    let cancelled = false;
+    // Dip to a dim floor (not 0) so content is always on screen — no blank
+    // "pause" while the list remounts, just a brief dim as it swaps columns.
+    Animated.timing(gridOpacity, { toValue: 0.4, duration: 55, useNativeDriver: true }).start(({ finished }) => {
+      if (cancelled || !finished) return;
+      setRenderedColumns(targetColumns);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetColumns, renderedColumns, gridOpacity]);
+
+  const numColumns = renderedColumns;
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
 
   const renderCard = ({ item }: { item: ArtResult }) => {
@@ -198,19 +222,27 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
         artId: item.id,
         medium: item.medium,
       });
-    return item.art_type === 'written_form' ? (
-      <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} />
-    ) : (
-      <VisualCard item={item} cardWidth={cardWidth} onPress={onPress} />
-    );
+    const card =
+      item.art_type === 'written_form' ? (
+        <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} />
+      ) : (
+        <VisualCard item={item} cardWidth={cardWidth} onPress={onPress} />
+      );
+    // Multi-column rows get their vertical gap from columnWrapperStyle; a single
+    // full-width column has no wrapper, so space the stacked cards here.
+    return numColumns === 1 ? <View style={styles.soloItem}>{card}</View> : card;
   };
 
   return (
     <View style={styles.container}>
+      <Animated.View style={{ flex: 1, opacity: gridOpacity }}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderCard}
+        // FlatList REQUIRES a key change when numColumns changes (it throws
+        // otherwise). The remount flash is softened by the opacity crossfade
+        // around this list (see gridOpacity / renderedColumns).
         key={numColumns}
         numColumns={numColumns}
         columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
@@ -229,6 +261,7 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
           />
         }
       />
+      </Animated.View>
       {refreshing && (
         <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
           <Spinner size={48} />
@@ -261,6 +294,10 @@ const styles = StyleSheet.create({
     gap: COLUMN_GAP,
     marginBottom: 12,
   },
+  // Vertical gap between full-width cards when the grid is 1 per row.
+  soloItem: {
+    marginBottom: 20,
+  },
   card: {
     borderWidth: 1,
     borderColor: '#000',
@@ -285,18 +322,5 @@ const styles = StyleSheet.create({
     fontSize: 8,
     lineHeight: 10,
     color: Colors.black,
-  },
-  cardBody: {
-    padding: 8,
-  },
-  cardTitle: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.xs,
-    fontWeight: '700',
-  },
-  cardMedium: {
-    fontSize: FontSizes.tiny,
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
 });

@@ -57,9 +57,18 @@ export default function AddArt() {
   const route = useRoute();
   const preseededMedium = (route.params as { medium?: string } | undefined)?.medium ?? null;
 
-  const { currentUser, token } = useAuth();
+  const { currentUser, token, myMedia, setMyMedia } = useAuth();
   const { startUpload, startWrittenUpload, startAudioUpload } = useUploads();
   const [profile, setProfile] = useProfile(currentUser ?? '');
+
+  // The medium grid reads `myMedia` from context so it paints on the first frame
+  // (prefetched at launch) instead of flashing empty while useProfile resolves.
+  // useProfile still fetches on focus and on every media mutation (which flow
+  // through setProfile) — syncing its result back here keeps the cache fresh, so
+  // that focus-refetch doubles as the revalidate.
+  useEffect(() => {
+    if (profile?.media) setMyMedia(profile.media);
+  }, [profile?.media, setMyMedia]);
   const [showAddMedia, setShowAddMedia] = useState(false);
 
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
@@ -124,8 +133,6 @@ export default function AddArt() {
   const isVisual = mediumType === 'visual_2d';
   const isWritten = mediumType === 'written_form';
   const isAudio = mediumType === 'audio';
-
-  const myMedia = profile?.media ?? [];
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });

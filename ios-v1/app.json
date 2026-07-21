@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Painting Club",
+    "name": "paint club",
     "slug": "painting-club",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -20,7 +20,7 @@
       "backgroundColor": "#fffaf5"
     },
     "ios": {
-      "buildNumber": "9",
+      "buildNumber": "10",
       "supportsTablet": false,
       "bundleIdentifier": "com.paintingclub.app",
       "infoPlist": {

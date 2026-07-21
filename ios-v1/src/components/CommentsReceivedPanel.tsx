@@ -29,12 +29,17 @@ const PANEL_CHROME = 8;
 const ROW_GAP = 4;
 
 interface CommentsReceivedPanelProps {
+  // The row height this panel is pinned to by the parent carousel (measured
+  // from the artist-statement page). We derive rowHeight from this instead of
+  // measuring ourselves — self-measurement fed back into the shared row height
+  // and made the statement box oscillate.
+  height: number;
   // Fires when the user taps a comment. Caller is responsible for routing to
   // the art piece (set medium, scroll to artId).
   onTapComment: (c: CommentReceivedOut) => void;
 }
 
-export default function CommentsReceivedPanel({ onTapComment }: CommentsReceivedPanelProps) {
+export default function CommentsReceivedPanel({ height, onTapComment }: CommentsReceivedPanelProps) {
   const { token } = useAuth();
   const [items, setItems] = useState<CommentReceivedOut[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -77,15 +82,12 @@ export default function CommentsReceivedPanel({ onTapComment }: CommentsReceived
     if (nextCursor && !loading) loadPage(nextCursor);
   }, [nextCursor, loading, loadPage]);
 
-  // We measure ourselves rather than receiving height as a prop — the parent
-  // sizes us via flex/alignItems, and depending on a prop here was what caused
-  // the previous render-loop where each cycle added the border thickness.
-  const [measuredHeight, setMeasuredHeight] = useState(0);
-  // 4 bordered rows + 3 gaps between them = available list height. ROW_GAP is
-  // applied via marginBottom on each row (we tolerate one extra trailing gap
-  // because it just lands inside the scrollable area).
+  // Row height derived from the fixed height the parent pins us to. 4 bordered
+  // rows + 3 gaps between them = available list height. ROW_GAP is applied via
+  // marginBottom on each row (we tolerate one extra trailing gap because it
+  // just lands inside the scrollable area).
   const rowHeight = Math.floor(
-    Math.max(36, (measuredHeight - PANEL_CHROME - VISIBLE_ROWS * ROW_GAP) / VISIBLE_ROWS),
+    Math.max(36, (height - PANEL_CHROME - VISIBLE_ROWS * ROW_GAP) / VISIBLE_ROWS),
   );
 
   const isUnseen = (createdAt: string) =>
@@ -116,10 +118,7 @@ export default function CommentsReceivedPanel({ onTapComment }: CommentsReceived
   };
 
   return (
-    <View
-      style={styles.block}
-      onLayout={(e) => setMeasuredHeight(e.nativeEvent.layout.height)}
-    >
+    <View style={styles.block}>
       {initialLoaded && items.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyText}>ppls comments on ur posts will appear here</Text>

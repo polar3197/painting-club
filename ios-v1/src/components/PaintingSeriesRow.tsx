@@ -21,15 +21,15 @@ import {
   get_members_visual_2d,
   remove_visual_2d,
   rename_series,
-  resolveImageUrl,
   set_series_order,
-  thumbUrl,
+  thumbSource,
   update_visual_2d,
   Visual2DIn,
   Visual2DOut,
 } from '../api';
 import ArtCarousel from './ArtCarousel';
 import AddArtDialog from './AddArtDialog';
+import BookmarkButton from './BookmarkButton';
 import ConfirmDialog from './ConfirmDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -63,6 +63,13 @@ interface PaintingSeriesRowProps {
   onRefresh: () => void;
   onMediumMove?: (newMedium: string) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
+  // Set by the profile when a gallery tap landed on a piece inside this series:
+  // opens the gallery modal automatically once the row has scrolled into view.
+  autoOpen?: boolean;
+  onAutoOpened?: () => void;
+  // Tapping the card image opens the profile's vertical-scroll zoom viewer at
+  // this collection. Falls back to opening the editable grid if not provided.
+  onOpenZoom?: () => void;
 }
 
 /**
@@ -81,11 +88,23 @@ export default function PaintingSeriesRow({
   onRefresh,
   onMediumMove,
   onLayout,
+  autoOpen,
+  onAutoOpened,
+  onOpenZoom,
 }: PaintingSeriesRowProps) {
   const ordered = sortSeries(pieces);
   const cover = ordered[0];
   const seriesId = pieces[0]?.series_id ?? null;
   const [open, setOpen] = useState(false);
+
+  // Open the gallery when the profile requests it (deep-link from the search
+  // gallery). Cleared via onAutoOpened so it fires once, not on every render.
+  useEffect(() => {
+    if (autoOpen) {
+      setOpen(true);
+      onAutoOpened?.();
+    }
+  }, [autoOpen]);
   const [measuredRatio, setMeasuredRatio] = useState<number | null>(null);
   const aspectRatio = measuredRatio ?? cover.aspect_ratio ?? 1;
 
@@ -108,12 +127,14 @@ export default function PaintingSeriesRow({
       <View style={[styles.artElement, { backgroundColor: cardBg }]} onLayout={onLayout}>
         <Pressable
           style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
+          // Tapping a collection opens its grid view (where each piece can be
+          // bookmarked individually); the vertical-scroll viewer is reached by
+          // tapping a piece inside the grid.
           onPress={() => setOpen(true)}
         >
           <View style={[styles.artVisualInner, { aspectRatio }]}>
             <Image
-              source={{ uri: resolveImageUrl(cover.file_path) }}
-              placeholder={{ uri: thumbUrl(cover.id) }}
+              source={thumbSource(cover.id, cover.file_path)}
               transition={200}
               style={styles.artImage}
               contentFit="contain"
@@ -130,10 +151,24 @@ export default function PaintingSeriesRow({
         <View style={styles.artDetails}>
           <View style={styles.titleRow}>
             <Text style={styles.artTitle}>{seriesName}</Text>
+            {/* Collection-level save: bookmarks every piece in the series. */}
+            <BookmarkButton
+              artIds={ordered.map((p) => p.id)}
+              size={30}
+              style={styles.seriesBookmarkBtn}
+            />
           </View>
           <Text style={styles.seriesCaption}>
             series of {ordered.length}
           </Text>
+          {/* Owner-only edit: tapping the card opens the grid for viewing, so
+              managing the collection (reorder / add / rename / remove) lives
+              behind this button, which opens the same grid in edit mode. */}
+          {isOwner && (
+            <Pressable style={styles.editSeriesBtn} onPress={() => setOpen(true)}>
+              <Text style={styles.editSeriesBtnText}>edit</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </>
@@ -505,8 +540,7 @@ function PaintingSeriesZoomIn({
                     onPress={() => setZoomIndex(i)}
                   >
                     <Image
-                      source={{ uri: resolveImageUrl(p.file_path) }}
-                      placeholder={{ uri: thumbUrl(p.id) }}
+                      source={thumbSource(p.id, p.file_path)}
                       transition={200}
                       style={[styles.cellImage, { width: cellW - 2, height: cellW - 2 }]}
                       contentFit="cover"
@@ -515,16 +549,19 @@ function PaintingSeriesZoomIn({
                   {/* One-line titles keep every cell the same height, which the
                       drag's grid-pitch math depends on. */}
                   <Text style={styles.cellTitle} numberOfLines={1}>{p.title}</Text>
-                  {isOwner && (
-                    <View style={styles.cellButtons}>
-                      <Pressable style={styles.btn} onPress={() => setEditingPiece(p)}>
-                        <Text style={styles.btnText}>edit</Text>
-                      </Pressable>
-                      <Pressable style={styles.btn} onPress={() => setPendingRemove(p)}>
-                        <Text style={styles.btnText}>remove</Text>
-                      </Pressable>
-                    </View>
-                  )}
+                  <View style={styles.cellFooter}>
+                    {isOwner && (
+                      <View style={styles.cellButtons}>
+                        <Pressable style={styles.btn} onPress={() => setEditingPiece(p)}>
+                          <Text style={styles.btnText}>edit</Text>
+                        </Pressable>
+                        <Pressable style={styles.btn} onPress={() => setPendingRemove(p)}>
+                          <Text style={styles.btnText}>remove</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                    <BookmarkButton artId={p.id} size={24} style={styles.cellBookmarkBtn} />
+                  </View>
                 </View>
               ))}
             </View>
@@ -536,7 +573,7 @@ function PaintingSeriesZoomIn({
               {standalone.map((p) => (
                 <View key={p.id} style={styles.addRow}>
                   <Image
-                    source={{ uri: thumbUrl(p.id) }}
+                    source={thumbSource(p.id, p.file_path)}
                     style={styles.addThumb}
                     contentFit="cover"
                   />
@@ -608,6 +645,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 6,
   },
+  seriesBookmarkBtn: {
+    marginLeft: 'auto',
+  },
   artTitle: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.lg,
@@ -616,6 +656,20 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.textSecondary,
     marginBottom: 2,
+  },
+  editSeriesBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  editSeriesBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
   },
 
   // Gallery modal
@@ -699,10 +753,17 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     marginTop: 2,
   },
+  cellFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  cellBookmarkBtn: {
+    marginLeft: 'auto',
+  },
   cellButtons: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 6,
   },
   btn: {
     borderWidth: 1,

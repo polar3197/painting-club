@@ -121,10 +121,18 @@ export default function Settings() {
       )}
 
       <Pressable
-        style={[styles.actionBtn, { backgroundColor: 'rgb(255, 215, 0)', marginBottom: insets.bottom + 20 }]}
+        style={[styles.actionBtn, { backgroundColor: 'rgb(255, 215, 0)', marginBottom: 10 }]}
         onPress={() => setShowLogoutConfirm(true)}
       >
         <Text style={styles.actionBtnText}>logout</Text>
+      </Pressable>
+
+      {/* Small back button in the bottom-left thumb zone. */}
+      <Pressable
+        style={[styles.backBtn, { marginBottom: insets.bottom + 16 }]}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.backBtnText}>‹ back</Text>
       </Pressable>
     </View>
   );
@@ -169,5 +177,21 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.black,
+  },
+  // Bottom-left back button — under half the screen width, in the thumb zone.
+  backBtn: {
+    alignSelf: 'flex-start',
+    width: '40%',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  backBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
+    textAlign: 'center',
   },
 });

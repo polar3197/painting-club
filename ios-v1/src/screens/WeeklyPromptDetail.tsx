@@ -18,10 +18,9 @@ import { useAuth } from '../context/AuthContext';
 import {
   get_prompt,
   list_prompts,
+  activate_prompt,
   add_new_visual_2d,
   get_members_visual_2d,
-  resolveImageUrl,
-  thumbUrl,
   thumbSource,
   PromptDetailOut,
   PromptSummary,
@@ -50,11 +49,17 @@ function columnsFor(n: number): number {
   return Math.min(5, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n)))));
 }
 
+// This screen submits/browses visual-2D art only. A prompt tied to a specific
+// medium hands its name straight to the dialog; a medium-agnostic ("any medium")
+// prompt has no medium, so default it to the 2D-visual pane. The dialog's own
+// medium picker still lets the submitter switch among the 2D media from here.
+const DEFAULT_ANY_MEDIUM = 'painting';
+
 export default function WeeklyPromptDetail() {
   const route = useRoute<RouteT>();
   const navigation = useNavigation<NavT>();
   const insets = useSafeAreaInsets();
-  const { token, currentUser } = useAuth();
+  const { token, currentUser, currentRole } = useAuth();
 
   const promptId = route.params.promptId;
   const [prompt, setPrompt] = useState<PromptDetailOut | null>(null);
@@ -83,7 +88,14 @@ export default function WeeklyPromptDetail() {
       return;
     }
     let cancelled = false;
-    get_members_visual_2d(currentUser, prompt.media_name ?? '')
+    // An any-medium prompt has no media_name, and the viewer's existing piece
+    // could be filed under any 2D medium — read it off the submission itself so
+    // the edit dialog opens the right pane and finds the piece.
+    const existingMedium =
+      prompt.submissions.find((s) => s.id === prompt.viewer_submission_id)?.medium
+      ?? prompt.media_name
+      ?? DEFAULT_ANY_MEDIUM;
+    get_members_visual_2d(currentUser, existingMedium)
       .then((list) => {
         if (cancelled) return;
         const found = list.find((p) => p.id === prompt.viewer_submission_id) ?? null;
@@ -98,6 +110,18 @@ export default function WeeklyPromptDetail() {
     if (allPrompts.length === 0) {
       list_prompts(token).then(setAllPrompts).catch(() => {});
     }
+  };
+
+  // Contributor-only: make an archived prompt the active one again. The backend
+  // archives whatever is currently live, so this both revives the old week and
+  // retires the current one. Land on the reactivated prompt so it shows live.
+  const handleReactivate = (id: string) => {
+    activate_prompt(id, token)
+      .then(() => {
+        setShowPromptList(false);
+        navigation.replace('WeeklyPromptDetail', { promptId: id });
+      })
+      .catch((err: any) => appAlert('Error', err?.message || 'Could not activate'));
   };
 
   const onCreateSubmission = (payload: Visual2DIn) => {
@@ -124,6 +148,13 @@ export default function WeeklyPromptDetail() {
   }
 
   const submissions = prompt.submissions;
+  // Medium the submit/edit dialog opens on: the viewer's existing piece keeps its
+  // own medium; a new submission to a specific prompt uses that prompt's medium;
+  // a new submission to an any-medium prompt defaults to the 2D-visual pane.
+  const dialogMedium =
+    submissions.find((s) => s.id === prompt.viewer_submission_id)?.medium
+    ?? prompt.media_name
+    ?? DEFAULT_ANY_MEDIUM;
   const numColumns = columnsFor(submissions.length);
   const cellSize = (GRID_INNER_W - GRID_GAP * (numColumns - 1)) / numColumns;
 
@@ -133,7 +164,7 @@ export default function WeeklyPromptDetail() {
         {/* Title + summary occupy the top third. Tap to browse past prompts. */}
         <Pressable style={styles.header} onPress={openPromptList}>
           <Text style={styles.heading}>
-            {prompt.title} ({prompt.media_name})
+            {prompt.title} ({prompt.media_name ?? 'any medium'})
           </Text>
           {!!prompt.short_summary && (
             <Text style={styles.summary}>{prompt.short_summary}</Text>
@@ -160,9 +191,10 @@ export default function WeeklyPromptDetail() {
                   style={({ pressed }) => [styles.cell, { width: cellSize, height: cellSize }, pressed && styles.pressed]}
                   onPress={() => setZoomIndex(index)}
                 >
+                  {/* 512px thumbnail, not the full-res original — the grid cell
+                      is small; full-res loads in the zoom viewer on tap. */}
                   <Image
-                    source={{ uri: resolveImageUrl(item.file_path) }}
-                    placeholder={thumbSource(item.id)}
+                    source={thumbSource(item.id, item.file_path)}
                     transition={200}
                     style={styles.cellImage}
                     contentFit="cover"
@@ -173,28 +205,35 @@ export default function WeeklyPromptDetail() {
           )}
         </View>
 
-        <Pressable
-          style={({ pressed }) => [styles.dropFrame, pressed && styles.dropFramePressed]}
-          onPress={() => setShowDialog(true)}
-        >
-          <Text style={styles.dropFrameText}>
-            {prompt.viewer_submission_id ? 'edit your submission' : 'add your art'}
-          </Text>
-        </Pressable>
+        {prompt.is_active ? (
+          <>
+            <Pressable
+              style={({ pressed }) => [styles.dropFrame, pressed && styles.dropFramePressed]}
+              onPress={() => setShowDialog(true)}
+            >
+              <Text style={styles.dropFrameText}>
+                {prompt.viewer_submission_id ? 'edit your submission' : 'add your art'}
+              </Text>
+            </Pressable>
 
-        <Pressable
-          style={({ pressed }) => [styles.proposeBtn, pressed && styles.dropFramePressed]}
-          onPress={() => setShowPropose(true)}
-        >
-          <Text style={styles.proposeBtnText}>propose next week's prompt</Text>
-        </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.proposeBtn, pressed && styles.dropFramePressed]}
+              onPress={() => setShowPropose(true)}
+            >
+              <Text style={styles.proposeBtnText}>propose next week's prompt</Text>
+            </Pressable>
+          </>
+        ) : (
+          // Archived prompt: no submitting or proposing against a closed week.
+          <Text style={styles.dunzoText}>this prompt is dunzo</Text>
+        )}
       </View>
 
       {showPropose && <ProposePromptDialog onClose={() => setShowPropose(false)} />}
 
       {showDialog && currentUser && (
         <AddArtDialog
-          selectedMedium={prompt.media_name ?? ''}
+          selectedMedium={dialogMedium}
           username={currentUser}
           piece={viewerPiece ?? undefined}
           minimal
@@ -251,6 +290,15 @@ export default function WeeklyPromptDetail() {
                     }}
                   >
                     <Text style={styles.promptRowTitle} numberOfLines={1}>{item.title}</Text>
+                    {currentRole === 'contributor' && !item.is_active && (
+                      <Pressable
+                        style={({ pressed }) => [styles.reactivateBtn, pressed && styles.pressed]}
+                        onPress={() => handleReactivate(item.id)}
+                        hitSlop={8}
+                      >
+                        <Text style={styles.reactivateBtnText}>make active</Text>
+                      </Pressable>
+                    )}
                     <View
                       style={[
                         styles.promptRowDate,
@@ -368,6 +416,26 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
     color: Colors.textPrimary,
+  },
+  // Shown in place of the submit/propose buttons on an archived (closed) prompt.
+  dunzoText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.base,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  reactivateBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.greenBright,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  reactivateBtnText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xxs,
+    color: Colors.black,
   },
   errorText: {
     fontFamily: Fonts.mono,

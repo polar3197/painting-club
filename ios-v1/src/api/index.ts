@@ -1,5 +1,5 @@
 export * from './types';
-export { resolveImageUrl, getPortfolioUrl, thumbUrl, thumbSource, authHeaders, profileThumbUrl, profilePicSrc, setAuthToken } from './client';
+export { resolveImageUrl, imageSource, stableCacheKey, getPortfolioUrl, thumbUrl, thumbSource, authHeaders, profileThumbUrl, profileThumbSource, profilePicSrc, profilePicSource, setAuthToken } from './client';
 
 import { request } from './client';
 import type {
@@ -24,6 +24,7 @@ import type {
   ArtResult,
   CommentOut,
   CommentsReceivedPage,
+  BookmarkedArtOut,
   MediaType,
   MediaTypeKind,
   MediaRequest,
@@ -527,6 +528,28 @@ export function delete_comment(art_id: string, comment_id: string, token: string
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<void>;
+}
+
+// --- Bookmarks (a member's saved collection of other people's pieces) ---------
+
+export function list_my_bookmarks(token: string | null): Promise<BookmarkedArtOut[]> {
+  return request('/members/me/bookmarks', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<BookmarkedArtOut[]>;
+}
+
+export function add_bookmark(art_id: string, token: string | null): Promise<{ ok: boolean }> {
+  return request(`/art/${art_id}/bookmark`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean }>;
+}
+
+export function remove_bookmark(art_id: string, token: string | null): Promise<{ ok: boolean }> {
+  return request(`/art/${art_id}/bookmark`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean }>;
 }
 
 export function submit_application(payload: ApplicationIn): Promise<unknown> {

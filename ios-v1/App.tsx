@@ -1,18 +1,23 @@
 import 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { setAudioModeAsync } from 'expo-audio';
+import { Image } from 'expo-image';
+import * as SecureStore from 'expo-secure-store';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { UploadProvider } from './src/context/UploadContext';
+import { BookmarkProvider } from './src/context/BookmarkContext';
 import { Colors } from './src/constants/theme';
 import { setAuthExpiredHandler } from './src/api/client';
 import { recordScreen, initDeviceTelemetry } from './src/api/observability';
 import RootNavigator from './src/navigation';
 import UpdateBanner from './src/components/UpdateBanner';
 import { AppAlertHost } from './src/components/AppAlert';
+import { ToastHost } from './src/components/Toast';
 
 const navTheme = {
   ...DefaultTheme,
@@ -60,11 +65,32 @@ export default function App() {
     initDeviceTelemetry();
   }, []);
 
+  // One-time reclaim of runaway image cache. Earlier builds cached each art
+  // image under its rotating signed URL, so the same pieces accumulated as
+  // gigabytes of duplicate disk entries. Now that images carry a stable cacheKey
+  // (one entry each), purge the bloated cache a single time so the space comes
+  // back; it won't refill. The flag guards it to once per install — bump the key
+  // if a future change needs another purge.
+  useEffect(() => {
+    (async () => {
+      try {
+        if (await SecureStore.getItemAsync('disk_cache_purged_v2')) return;
+        await Image.clearDiskCache();
+        await Image.clearMemoryCache();
+        await SecureStore.setItemAsync('disk_cache_purged_v2', '1');
+      } catch {
+        // Non-fatal: worst case the stale cache lingers until the OS evicts it.
+      }
+    })();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+      <KeyboardProvider>
+        <SafeAreaProvider>
         <AuthProvider>
           <UploadProvider>
+            <BookmarkProvider>
             <NavigationContainer
               theme={navTheme}
               ref={navigationRef}
@@ -80,11 +106,14 @@ export default function App() {
               <RootNavigator />
               <UpdateBanner />
               <AppAlertHost />
+              <ToastHost />
               <StatusBar style="dark" />
             </NavigationContainer>
+            </BookmarkProvider>
           </UploadProvider>
         </AuthProvider>
-      </SafeAreaProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

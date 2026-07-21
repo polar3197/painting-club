@@ -9,6 +9,7 @@ const tabIcons = {
   me: require('../../assets/imgs/me.png'),
   people: require('../../assets/imgs/profiles.png'),
   art: require('../../assets/imgs/art.png'),
+  bookmark: require('../../assets/imgs/bookmark.png'),
 };
 
 import LandingPage from '../screens/LandingPage';
@@ -19,6 +20,7 @@ import Admin from '../screens/Admin';
 import Ethos from '../screens/Ethos';
 import Portfolio from '../screens/Portfolio';
 import SearchStack from './SearchStack';
+import BookmarkStack from './BookmarkStack';
 import HomeStack from './HomeStack';
 import AddArt from '../screens/AddArt';
 import Settings from '../screens/Settings';
@@ -100,6 +102,11 @@ const AddArtGated = () => (
     <AddArt />
   </BackendGate>
 );
+const BookmarkStackGated = () => (
+  <BackendGate>
+    <BookmarkStack />
+  </BackendGate>
+);
 const MeScreenGated = () => (
   <BackendGate>
     <MeScreen />
@@ -127,6 +134,9 @@ function MainTabs() {
           if (route.name === 'AddTab') {
             return <AddIcon size={size} />;
           }
+          if (route.name === 'Bookmark') {
+            return <Image source={tabIcons.bookmark} style={{ width: size, height: size }} />;
+          }
           return <Ionicons name="home-outline" size={size} color={color} />;
         },
         tabBarActiveTintColor: Colors.darkerGold,
@@ -152,11 +162,16 @@ function MainTabs() {
           tabBarLabel: ' ',
         }}
       />
-      <Tab.Screen name="SearchTab" component={SearchStackGated} options={{ tabBarLabel: 'stuff' }} />
+      <Tab.Screen name="SearchTab" component={SearchStackGated} options={{ tabBarLabel: 'everything' }} />
       <Tab.Screen
         name="AddTab"
         component={AddArtGated}
         options={{ tabBarLabel: 'share' }}
+      />
+      <Tab.Screen
+        name="Bookmark"
+        component={BookmarkStackGated}
+        options={{ tabBarLabel: 'saved' }}
       />
       <Tab.Screen
         name="Me"

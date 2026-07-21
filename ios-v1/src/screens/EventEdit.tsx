@@ -8,7 +8,6 @@ import {
   Switch,
   Image,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { appAlert } from '../components/AppAlert';
@@ -148,16 +147,16 @@ export default function EventEdit() {
   const previewUri = picked?.uri || (existingImage ? resolveImageUrl(existingImage) : null);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 },
+          { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 },
         ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{isEdit ? 'edit event' : 'new event'}</Text>
@@ -239,7 +238,7 @@ export default function EventEdit() {
           <Text style={styles.saveBtnText}>{saving ? 'saving…' : isEdit ? 'save' : 'create event'}</Text>
         </Pressable>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -248,27 +247,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.mainBg,
   },
+  scroll: {
+    flex: 1,
+  },
   center: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     paddingHorizontal: 24,
-    gap: 6,
+    gap: 4,
   },
   title: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xl,
-    marginBottom: 12,
+    marginBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   label: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.textSecondary,
-    marginTop: 14,
+    marginTop: 8,
     marginBottom: 4,
   },
   hint: {
@@ -281,13 +283,13 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     backgroundColor: Colors.white,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.black,
   },
   multiline: {
-    height: 96,
+    height: 72,
     textAlignVertical: 'top',
   },
   rowTwo: {
@@ -300,11 +302,11 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
     gap: 12,
   },
   cover: {
-    height: 160,
+    height: 104,
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.secondary,
@@ -322,11 +324,11 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   saveBtn: {
-    marginTop: 28,
+    marginTop: 14,
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.primaryGold,
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   saveBtnDisabled: {

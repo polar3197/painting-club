@@ -16,9 +16,8 @@ import {
   get_members_visual_2d,
   get_members_written_form,
   get_media,
-  resolveImageUrl,
   getPortfolioUrl,
-  thumbUrl,
+  thumbSource,
   Visual2DOut,
   WrittenFormOut,
   MediaType,
@@ -139,8 +138,7 @@ export default function Portfolio() {
         onPressOut={() => setPressedId(null)}
       >
         <Image
-          source={{ uri: resolveImageUrl(cell.piece.file_path) }}
-          placeholder={{ uri: thumbUrl(cell.piece.id) }}
+          source={thumbSource(cell.piece.id, cell.piece.file_path)}
           transition={200}
           style={StyleSheet.absoluteFill}
           contentFit="contain"

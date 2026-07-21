@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { remove_audio, resolveImageUrl, AudioOut } from '../api';
 import ConfirmDialog from './ConfirmDialog';
+import BookmarkButton from './BookmarkButton';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 // True when this bundle runs against the OTA stub (build #8 lacks the native
@@ -396,6 +397,9 @@ export default function AudioPiece({ isOwner, piece, onRemove, onEdit, onLayout 
               <Text style={styles.rowPlayText}>▶</Text>
             </Pressable>
           )}
+          {/* Always in the header, right of the play button (or far right when
+              the track is expanded and the play button moves into the body). */}
+          <BookmarkButton artId={piece.id} size={34} />
         </View>
 
         {expanded && (

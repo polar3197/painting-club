@@ -1,12 +1,12 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl } from 'react-native';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import Spinner from '../components/Spinner';
 import { useMembers, useDebouncedValue } from '../hooks';
-import { resolveImageUrl, profilePicSrc, Profile } from '../api';
+import { resolveImageUrl, profilePicSource, profileThumbSource, Profile } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { SearchStackParamList } from '../navigation/types';
 
@@ -22,6 +22,28 @@ function columnsFor(n: number): number {
 }
 const PEOPLE_KEYS = ['username', 'firstname', 'lastname', 'city', 'media'];
 
+// Roster tile avatar. Loads the small (256px) gated profile-pic thumbnail so a
+// directory of members isn't pulling a full-res photo per tile. If that route
+// 404s — a backend that predates it — it falls back to the full pic, so the
+// roster keeps working across the deploy that adds the route. No pic → default.
+function RosterAvatar({ item, size }: { item: Profile; size: number }) {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const hasPic = !!item.profile_pic_path;
+  // Full-pic fallback is keyed (stableCacheKey) so the roster doesn't re-cache
+  // every member's full-res photo on each browse — that was the gigabyte leak.
+  const fullOrDefault = profilePicSource(item) ?? { uri: resolveImageUrl(`/imgs/${item.id}.png`) };
+  const useThumb = hasPic && !thumbFailed;
+  return (
+    <Image
+      source={useThumb ? profileThumbSource(item.id) : fullOrDefault}
+      transition={200}
+      style={[styles.cardImage, { height: size }]}
+      contentFit="cover"
+      onError={useThumb ? () => setThumbFailed(true) : undefined}
+    />
+  );
+}
+
 interface Props {
   // Search state is owned by SearchTabs so the bar can stay fixed above the
   // swiping lists; this screen just renders the filtered grid.
@@ -31,9 +53,11 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
+  // Column target from the density slider (1..4); the per-count formula caps it.
+  columns: number;
 }
 
-export default function People({ query, onResetFilters, onListScroll, onVerticalScroll }: Props) {
+export default function People({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
   const navigation = useNavigation<Nav>();
   const [members, , , refetchMembers] = useMembers('', '');
   const [refreshing, setRefreshing] = useState(false);
@@ -57,20 +81,50 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
     return fuse.search(debouncedQuery).map((r) => r.item);
   }, [members, fuse, debouncedQuery]);
 
-  const numColumns = columnsFor(filtered.length);
+  // Decouple the slider's target column count from the rendered one and
+  // crossfade the change: FlatList must remount to change numColumns, so we fade
+  // the grid out, swap columns while invisible, then fade back in (no vanish).
+  const targetColumns = Math.min(columns, columnsFor(filtered.length));
+  const [renderedColumns, setRenderedColumns] = useState(targetColumns);
+  const gridOpacity = useRef(new Animated.Value(1)).current;
+  const transitioning = useRef(false);
+  useEffect(() => {
+    if (targetColumns === renderedColumns) {
+      if (transitioning.current) {
+        transitioning.current = false;
+        Animated.timing(gridOpacity, { toValue: 1, duration: 110, useNativeDriver: true }).start();
+      }
+      return;
+    }
+    transitioning.current = true;
+    let cancelled = false;
+    // Dip to a dim floor (not 0) so content never fully leaves the screen — no
+    // blank "pause" while the list remounts, just a brief dim during the swap.
+    Animated.timing(gridOpacity, { toValue: 0.4, duration: 55, useNativeDriver: true }).start(({ finished }) => {
+      if (cancelled || !finished) return;
+      setRenderedColumns(targetColumns);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetColumns, renderedColumns, gridOpacity]);
+
+  const numColumns = renderedColumns;
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
 
   const renderCard = ({ item }: { item: Profile }) => (
     <Pressable
-      style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        { width: cardWidth },
+        // Single full-width column has no columnWrapper gap, so space the stacked
+        // cards here.
+        numColumns === 1 && styles.soloItem,
+        pressed && styles.cardPressed,
+      ]}
       onPress={() => navigation.navigate('UserProfile', { username: item.username })}
     >
-      <Image
-        source={{ uri: profilePicSrc(item) ?? resolveImageUrl(`/imgs/${item.id}.png`) }}
-        transition={200}
-        style={[styles.cardImage, { height: cardWidth }]}
-        contentFit="cover"
-      />
+      <RosterAvatar item={item} size={cardWidth} />
       <View style={styles.cardBody}>
         <Text style={styles.cardUsername} numberOfLines={1}>{item.username}</Text>
       </View>
@@ -79,10 +133,14 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
 
   return (
     <View style={styles.container}>
+      <Animated.View style={{ flex: 1, opacity: gridOpacity }}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.username}
         renderItem={renderCard}
+        // FlatList requires a key change when numColumns changes (throws
+        // otherwise). Remount flash is softened by the opacity crossfade around
+        // the list (see gridOpacity / renderedColumns).
         key={numColumns}
         numColumns={numColumns}
         columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
@@ -101,6 +159,7 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
           />
         }
       />
+      </Animated.View>
       {refreshing && (
         <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
           <Spinner size={48} />
@@ -132,6 +191,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     gap: COLUMN_GAP,
     marginBottom: 12,
+  },
+  // Vertical gap between full-width cards when the grid is 1 per row.
+  soloItem: {
+    marginBottom: 20,
   },
   card: {
     borderWidth: 1,

@@ -7,19 +7,32 @@ import {
   Animated,
   ScrollView,
   Keyboard,
+  LayoutAnimation,
+  Platform,
+  UIManager,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ArtGallery from './ArtGallery';
 import People from './People';
+import DensitySlider from '../components/DensitySlider';
 import { Colors, Fonts } from '../constants/theme';
+
+// iOS animates layout changes out of the box; Android needs this opt-in. Lets
+// the grid crossfade when the column count changes instead of hard-flashing.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HALF = SCREEN_WIDTH / 2;
-// Inset of the sliding selection box inside each half.
-const BOX_MARGIN = 14;
+// Inset of the sliding selection box inside each half. Small, so the pill fills
+// most of its half rather than hugging the word.
+const BOX_MARGIN = 8;
 
 // Height of the bottom Tab.Navigator bar (see navigation/index.tsx). The search
 // bar rests just above it, so the keyboard overlap into this screen is the
@@ -29,34 +42,34 @@ const NAV_TAB_HEIGHT = 90;
 // The toggle bar shrinks toward the smaller height while the keyboard is up so
 // the icons "minimize" and hand their vertical space to the grid.
 const TAB_BAR_HEIGHT = 84;
-const TAB_BAR_HEIGHT_MIN = 50;
-const ICON_SCALE_MIN = 0.42;
-// How much the selection box narrows when the keyboard is up.
-const BOX_SCALE_X_MIN = 0.6;
+const TAB_BAR_HEIGHT_MIN = 42;
 
 // Persistent gap between the toggle bar and the top of the scrolling grid, so
 // content never scrolls flush against the bottom of the icons.
-const TAB_PAGER_GAP = 20;
-// Scroll offsets (with hysteresis) at which the toggle bar collapses/expands as
-// the grid scrolls — the same minimize the keyboard triggers.
-const SCROLL_COLLAPSE_ON = 40;
-const SCROLL_COLLAPSE_OFF = 8;
+const TAB_PAGER_GAP = 10;
+// Scroll distance over which the toggle bar continuously collapses as the grid
+// scrolls (0 at the top → fully collapsed after this many px). A continuous
+// track rather than a threshold snap so the minimize doesn't feel abrupt.
+const SCROLL_COLLAPSE_RANGE = 72;
 
 // The two halves of the search tab. `iconScale` mirrors the per-asset scaling
 // the standalone banners used so the profiles mark reads at the same visual
 // weight as the art mark.
+// Art first (leftmost, opens here): its grid loads 512px thumbnails and paints
+// fast, which gives the People page — full-res pics until the profile-thumb route
+// deploys — a moment to load before you swipe to it.
 const TABS = [
-  {
-    key: 'people',
-    icon: require('../../assets/imgs/profiles.png'),
-    iconScale: 1.375,
-    placeholder: 'search people (by city, person, title, medium, ...)',
-  },
   {
     key: 'art',
     icon: require('../../assets/imgs/art.png'),
     iconScale: 1,
     placeholder: 'search art (by city, person, title, medium, ...)',
+  },
+  {
+    key: 'people',
+    icon: require('../../assets/imgs/profiles.png'),
+    iconScale: 1.375,
+    placeholder: 'search people (by city, person, title, medium, ...)',
   },
 ];
 
@@ -73,29 +86,51 @@ export default function SearchTabs() {
   // lists swipe — typing live-filters whichever half is showing, and only the
   // placeholder changes when you swipe across.
   const [query, setQuery] = useState('');
+  // Density slider: posts-per-row target (1..4), default 4 (leftmost). Each grid
+  // clamps this to its own count-based formula, so the slider only ever reduces
+  // columns from the formula's value. Hidden while the keyboard is up.
+  const [columns, setColumns] = useState(4);
+  const [keyboardUp, setKeyboardUp] = useState(false);
 
-  // Keyboard-driven animation. `kb` (0→1, native driver) handles transforms —
-  // lifting the search bar above the keyboard and shrinking the icons. `kbH`
-  // (0→1, JS driver) animates the toggle bar's layout height. Both are driven
-  // by the keyboard's own duration so the minimize tracks the keyboard slide.
+  // Slider commits its column count on release; wrap the state change in a
+  // LayoutAnimation so the grid crossfades to the new column count instead of
+  // hard-remounting (the flash).
+  const handleColumnsChange = useCallback((v: number) => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(260, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity),
+    );
+    setColumns(v);
+  }, []);
+
+  // Keyboard-driven animation. `kb` (native driver) shrinks the toggle-bar
+  // icons and `kbH` (JS driver) animates its layout height as the keyboard
+  // opens; both run over the keyboard's own duration so the minimize tracks the
+  // slide. The search bar's *lift* is handled separately by useAnimatedKeyboard
+  // below.
   const kb = useRef(new Animated.Value(0)).current;
   const kbH = useRef(new Animated.Value(0)).current;
-  // How far to lift the search bar. Set imperatively before each show so the
-  // transform stays in the animation system (no re-render, no first-frame jump).
-  const lift = useRef(new Animated.Value(0)).current;
+  // Keyboard-controller tracks the real keyboard frame natively (its native
+  // module drives this shared value every frame), so the search bar rises welded
+  // to the keyboard with no lag — unlike reanimated's useAnimatedKeyboard, which
+  // didn't track on this New-Architecture build. NOTE: its `height` is NEGATIVE
+  // when the keyboard is open (0 → -keyboardHeight). Lift only by the overlap
+  // into this screen — keyboard height minus the bottom tab bar it already
+  // covers — so the bar sits exactly atop the keyboard.
+  const { height: kbHeightSV } = useReanimatedKeyboardAnimation();
+  const searchBarStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: Math.min(0, kbHeightSV.value + NAV_TAB_HEIGHT) }],
+  }));
 
-  // Scroll-driven collapse mirrors the keyboard one: `sc` (native driver)
-  // drives the icon transforms, `scH` (JS driver) the toggle bar's layout
-  // height. Combined with the keyboard values below so either input minimizes
-  // the bar. `scrollCollapsed` tracks the current state to debounce retriggers.
+  // Scroll-driven collapse mirrors the keyboard one: `sc` (native driver) drives
+  // the icon/word crossfade + selection box, `scH` (JS driver) the toggle bar's
+  // layout height. Both are set continuously from the grid's scroll offset (no
+  // threshold snap), and summed with the keyboard values so either minimizes it.
   const sc = useRef(new Animated.Value(0)).current;
   const scH = useRef(new Animated.Value(0)).current;
-  const scrollCollapsed = useRef(false);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
-      const overlap = Math.max(0, e.endCoordinates.height - NAV_TAB_HEIGHT);
-      lift.setValue(-overlap);
+      setKeyboardUp(true);
       const duration = e.duration || 250;
       Animated.parallel([
         Animated.timing(kb, { toValue: 1, duration, useNativeDriver: true }),
@@ -103,6 +138,7 @@ export default function SearchTabs() {
       ]).start();
     });
     const hideSub = Keyboard.addListener('keyboardWillHide', (e) => {
+      setKeyboardUp(false);
       const duration = e.duration || 250;
       Animated.parallel([
         Animated.timing(kb, { toValue: 0, duration, useNativeDriver: true }),
@@ -113,24 +149,19 @@ export default function SearchTabs() {
       showSub.remove();
       hideSub.remove();
     };
-  }, [kb, kbH, lift]);
+  }, [kb, kbH]);
 
-  // Lift the bar by the keyboard overlap (keyboard only — scrolling doesn't move
-  // the search bar).
-  const barTranslateY = Animated.multiply(kb, lift);
   // Either the keyboard or a scrolled grid minimizes the bar. Summing the two
   // 0→1 drivers and clamping per-use means both at once still reads as fully
   // collapsed rather than doubling up.
   const collapse = Animated.add(kb, sc);
   const collapseH = Animated.add(kbH, scH);
-  const iconScale = collapse.interpolate({ inputRange: [0, 1], outputRange: [1, ICON_SCALE_MIN], extrapolate: 'clamp' });
-  const iconTranslateY = collapse.interpolate({ inputRange: [0, 1], outputRange: [8, 0], extrapolate: 'clamp' });
-  // Fade the little icon labels out as the bar minimizes so they never get
-  // clipped by the shrinking bar.
-  const labelOpacity = collapse.interpolate({ inputRange: [0, 0.5], outputRange: [1, 0], extrapolate: 'clamp' });
-  // Narrow the selection box (in addition to the bar's height shrink) as it
-  // minimizes.
-  const boxScaleX = collapse.interpolate({ inputRange: [0, 1], outputRange: [1, BOX_SCALE_X_MIN], extrapolate: 'clamp' });
+  // Collapse crossfade: the expanded content (icon + word) fades out while the
+  // word-only collapsed content fades in. Ranges are offset so the two never sit
+  // at full opacity together (no double-word ghosting mid-collapse). Both are
+  // opacity-only and native-driven — no layout/transform mixing on one node.
+  const expandedOpacity = collapse.interpolate({ inputRange: [0, 0.5], outputRange: [1, 0], extrapolate: 'clamp' });
+  const collapsedOpacity = collapse.interpolate({ inputRange: [0.5, 1], outputRange: [0, 1], extrapolate: 'clamp' });
   const tabBarHeight = collapseH.interpolate({
     inputRange: [0, 1],
     outputRange: [TAB_BAR_HEIGHT, TAB_BAR_HEIGHT_MIN],
@@ -154,21 +185,14 @@ export default function SearchTabs() {
     Keyboard.dismiss();
   }, []);
 
-  // Collapse the toggle bar once the grid scrolls past a small threshold, and
-  // restore it near the top — the same minimize the keyboard triggers, but
-  // driven by the vertical list scroll. Hysteresis keeps it from flickering
-  // when the offset hovers around the threshold.
+  // Continuously collapse the toggle bar as the grid scrolls: map the scroll
+  // offset to a 0→1 fraction and set both drivers directly — no threshold snap,
+  // no hysteresis. `sc` feeds the native transforms; `scH` the JS layout height.
   const onListVerticalScroll = useCallback(
     (offsetY: number) => {
-      const next = scrollCollapsed.current
-        ? offsetY > SCROLL_COLLAPSE_OFF
-        : offsetY > SCROLL_COLLAPSE_ON;
-      if (next === scrollCollapsed.current) return;
-      scrollCollapsed.current = next;
-      Animated.parallel([
-        Animated.timing(sc, { toValue: next ? 1 : 0, duration: 200, useNativeDriver: true }),
-        Animated.timing(scH, { toValue: next ? 1 : 0, duration: 200, useNativeDriver: false }),
-      ]).start();
+      const frac = Math.max(0, Math.min(1, offsetY / SCROLL_COLLAPSE_RANGE));
+      sc.setValue(frac);
+      scH.setValue(frac);
     },
     [sc, scH],
   );
@@ -186,37 +210,30 @@ export default function SearchTabs() {
         <Animated.View
           style={[
             styles.selectionBox,
-            {
-              transform: [
-                { translateX: boxTranslate },
-                // Track the icon's vertical position so the box stays centered
-                // on it in both the tall and shrunk states.
-                { translateY: iconTranslateY },
-                { scaleX: boxScaleX },
-              ],
-            },
+            { transform: [{ translateX: boxTranslate }] },
           ]}
         />
         {TABS.map((t, i) => (
           <Pressable key={t.key} style={styles.tabItem} onPress={() => goTo(i)}>
-            <Animated.Image
-              source={t.icon}
-              style={[
-                styles.tabIcon,
-                {
-                  transform: [
-                    { translateY: iconTranslateY },
-                    { scale: Animated.multiply(iconScale, t.iconScale) },
-                  ],
-                },
-              ]}
-              resizeMode="contain"
-            />
-            <Animated.Text
-              style={[styles.tabLabel, { opacity: labelOpacity, transform: [{ translateY: iconTranslateY }] }]}
+            {/* Expanded: icon above the word (the normal-view look). */}
+            <Animated.View
+              style={[styles.tabLayer, { opacity: expandedOpacity }]}
+              pointerEvents="none"
             >
-              {t.key}
-            </Animated.Text>
+              <Animated.Image
+                source={t.icon}
+                style={[styles.tabIcon, { transform: [{ scale: t.iconScale }] }]}
+                resizeMode="contain"
+              />
+              <Animated.Text style={styles.tabWord}>{t.key}</Animated.Text>
+            </Animated.View>
+            {/* Collapsed: just the word, centered in the short bar. */}
+            <Animated.View
+              style={[styles.tabLayer, { opacity: collapsedOpacity }]}
+              pointerEvents="none"
+            >
+              <Animated.Text style={styles.tabWordCollapsed}>{t.key}</Animated.Text>
+            </Animated.View>
           </Pressable>
         ))}
       </Animated.View>
@@ -239,27 +256,30 @@ export default function SearchTabs() {
           onMomentumScrollEnd={onMomentumEnd}
         >
           <View style={[styles.page, { height: pageHeight }]}>
-            <People
-              query={query}
-              onResetFilters={resetFilters}
-              onListScroll={dismissKeyboard}
-              onVerticalScroll={onListVerticalScroll}
-            />
-          </View>
-          <View style={[styles.page, { height: pageHeight }]}>
             <ArtGallery
               query={query}
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
+              columns={columns}
+            />
+          </View>
+          <View style={[styles.page, { height: pageHeight }]}>
+            <People
+              query={query}
+              onResetFilters={resetFilters}
+              onListScroll={dismissKeyboard}
+              onVerticalScroll={onListVerticalScroll}
+              columns={columns}
             />
           </View>
         </Animated.ScrollView>
       </View>
 
-      {/* Search bar lives at the bottom (thumb zone) and lifts to sit on top of
-          the keyboard while typing. */}
-      <Animated.View style={[styles.searchBar, { transform: [{ translateY: barTranslateY }] }]}>
+      {/* Search bar lives at the bottom (thumb zone) and rises to sit on top of
+          the keyboard while typing — welded to the keyboard frame via
+          react-native-keyboard-controller so it tracks the slide with no lag. */}
+      <Reanimated.View style={[styles.searchBar, searchBarStyle]}>
         <TextInput
           style={styles.searchInput}
           value={query}
@@ -270,7 +290,14 @@ export default function SearchTabs() {
           autoCorrect={false}
           returnKeyType="search"
         />
-      </Animated.View>
+        {/* Density slider sits just beneath the search input — drag right for
+            fewer, bigger tiles. Hidden while typing (keyboard up). */}
+        {!keyboardUp && (
+          <View style={styles.sliderRow}>
+            <DensitySlider value={columns} max={4} onChange={handleColumnsChange} />
+          </View>
+        )}
+      </Reanimated.View>
     </View>
   );
 }
@@ -290,22 +317,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Both content states fill the tab item and center themselves, so each reads
+  // centered regardless of the (animating) bar height. They crossfade.
+  tabLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tabIcon: {
     width: 46,
     height: 46,
   },
-  tabLabel: {
+  tabWord: {
     fontFamily: Fonts.mono,
     fontSize: 11,
     color: Colors.black,
     marginTop: 1,
   },
+  tabWordCollapsed: {
+    fontFamily: Fonts.mono,
+    fontSize: 15,
+    color: Colors.black,
+  },
   selectionBox: {
     position: 'absolute',
-    // Smaller vertical inset so the box stays tall enough to contain the icon
-    // even in the shrunk (keyboard-up) state.
-    top: 7,
-    bottom: 7,
+    // Small vertical inset so the pill sits snug in the short collapsed bar with
+    // little padding above/below the word.
+    top: 5,
+    bottom: 5,
     left: 0,
     width: HALF - BOX_MARGIN * 2,
     backgroundColor: Colors.primaryGold,
@@ -326,6 +365,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     fontSize: 14,
     backgroundColor: Colors.white,
+  },
+  sliderRow: {
+    marginTop: 8,
+    paddingHorizontal: 6,
   },
   pager: {
     flex: 1,

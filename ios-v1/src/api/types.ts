@@ -292,6 +292,27 @@ export interface ArtResult {
   aspect_ratio: number | null;
 }
 
+// A member's saved piece (any medium), shaped like a gallery card. Mirrors the
+// backend BookmarkedArtOut — enough to render the tile plus who made it and when
+// it was saved.
+export interface BookmarkedArtOut {
+  art_id: string;
+  title: string;
+  // 'visual_2d' | 'written_form' | 'audio' (Art.type discriminator).
+  art_type: string;
+  medium: string;
+  file_path: string | null;
+  date: string | null;
+  creator_username: string;
+  aspect_ratio: number | null;
+  // Set when the piece belongs to a collection/album/series (absent on older
+  // backends until the series-fields change deploys). Lets the saved page
+  // regroup pieces into one collection tile.
+  series_id?: string | null;
+  series_name?: string | null;
+  bookmarked_at: string;
+}
+
 export interface CommentOut {
   id: string;
   username: string;

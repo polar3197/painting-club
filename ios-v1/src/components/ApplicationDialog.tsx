@@ -4,6 +4,7 @@ import {
   Text,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -75,9 +76,14 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Text style={styles.closeBtnText}>x</Text>
           </Pressable>
-          {/* No scroll — the form is short enough to fit, and KeyboardAvoidingView
-              lifts the whole dialog above the keyboard so submit stays visible. */}
-          <View style={styles.form}>
+          {/* Scroll so the lower fields (reason) + submit ride above the keyboard
+              instead of clipping out of the maxHeight-capped dialog with no way
+              to reach them. Same recipe as SetupAccount. */}
+          <ScrollView
+            style={styles.form}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <TextInput
               style={styles.input}
               value={firstname}
@@ -140,7 +146,7 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
             <Pressable style={styles.submitBtn} onPress={handleSubmit}>
               <Text style={styles.submitBtnText}>submit</Text>
             </Pressable>
-          </View>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>

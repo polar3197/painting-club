@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, Keyboard, Platform } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
@@ -8,6 +9,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
 import {
   update_visual_2d,
+  remove_visual_2d,
   update_written_form,
   update_audio,
   Visual2DOut,
@@ -79,6 +81,8 @@ export default function AddArtDialog({
   const { token } = useAuth();
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
   const [newMedium, setNewMedium] = useState<string | null>(null);
+  // Two-step inline confirm for the weekly-prompt "remove" action (see handleRemove).
+  const [removeConfirm, setRemoveConfirm] = useState(false);
 
   useEffect(() => {
     get_media().then(setAllMedia).catch(() => {});
@@ -154,7 +158,10 @@ export default function AddArtDialog({
   // pushed off the top of the screen by KeyboardAvoidingView's padding hack).
   // We anchor the panel above the keyboard via modalRoot's paddingBottom and
   // cap the panel's height to what's left of the screen so the swipe handle
-  // and dropbox stay reachable when an input is focused.
+  // and dropbox stay reachable when an input is focused. The `kbHeight` state
+  // drives only the height cap (a discrete jump is fine there); the anchor
+  // *padding* is animated by useAnimatedKeyboard below so the panel rises welded
+  // to the keyboard frame instead of jumping a render behind it.
   const [kbHeight, setKbHeight] = useState(0);
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -163,6 +170,8 @@ export default function AddArtDialog({
     const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
+  const keyboard = useAnimatedKeyboard();
+  const modalRootStyle = useAnimatedStyle(() => ({ paddingBottom: keyboard.height.value }));
 
   const pickImage = async () => {
     const creating = !piece; // multi-select only for new pieces, not file swaps
@@ -486,6 +495,20 @@ export default function AddArtDialog({
     }
   };
 
+  // Remove (delete) the piece being edited. Only surfaced for weekly-prompt
+  // submissions (the minimal editor) — deleting the piece is what takes it out
+  // of the prompt. The confirm is INLINE (a two-step tap via removeConfirm)
+  // rather than an appAlert: appAlert renders its own Modal, and a Modal fired
+  // from inside this open sheet mounts behind it on iOS (tap does nothing).
+  // Same reason DeleteAccountDialog confirms inline instead of via appAlert.
+  const handleRemove = () => {
+    if (!piece) return;
+    onClose();
+    remove_visual_2d(piece.id, token)
+      .then(() => onSuccess())
+      .catch((err: any) => appAlert('Error', err?.message || 'Could not remove'));
+  };
+
   // Hard cap = 80% of screen. When the keyboard is up we further cap so the
   // panel never extends above the screen top — leaving room for the swipe
   // handle + status bar.
@@ -496,7 +519,7 @@ export default function AddArtDialog({
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.modalRoot, { paddingBottom: kbHeight }]}>
+      <Reanimated.View style={[styles.modalRoot, modalRootStyle]}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <Animated.View
           style={[styles.panel, { maxHeight: panelMaxHeight, transform: [{ translateY }] }]}
@@ -640,6 +663,22 @@ export default function AddArtDialog({
                   <Pressable style={styles.submitBtn} onPress={submit}>
                     <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
                   </Pressable>
+                  {piece && (
+                    removeConfirm ? (
+                      <View style={styles.removeConfirmRow}>
+                        <Pressable style={styles.removeBtn} onPress={handleRemove}>
+                          <Text style={styles.removeBtnText}>remove for real</Text>
+                        </Pressable>
+                        <Pressable style={styles.removeBtn} onPress={() => setRemoveConfirm(false)}>
+                          <Text style={styles.removeCancelText}>cancel</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Pressable style={styles.removeBtn} onPress={() => setRemoveConfirm(true)}>
+                        <Text style={styles.removeBtnText}>remove</Text>
+                      </Pressable>
+                    )
+                  )}
                 </View>
               )}
               {isVisual2D && !minimal && (
@@ -691,7 +730,7 @@ export default function AddArtDialog({
               )}
             </ScrollView>
         </Animated.View>
-      </View>
+      </Reanimated.View>
     </Modal>
   );
 }
@@ -867,6 +906,26 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
+  },
+  removeBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  removeConfirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  removeBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.redCoral,
+    textDecorationLine: 'underline',
+  },
+  removeCancelText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.textSecondary,
   },
   moveToRow: {
     flexDirection: 'row',

@@ -9,6 +9,13 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   blockedUsernames: string[];
+  // The current user's shown media (artforms), prefetched at launch so surfaces
+  // like the Share tab render their medium grid on first frame instead of
+  // flashing empty while a per-entry profile fetch resolves. Screens that mutate
+  // media push the updated list back via setMyMedia (see AddArt), which also
+  // makes their focus-refetch double as a revalidate.
+  myMedia: string[];
+  setMyMedia: (media: string[]) => void;
   login: (user: string, token: string, role: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshBlocks: () => Promise<void>;
@@ -29,6 +36,8 @@ const AuthContext = createContext<AuthContextType>({
   token: null,
   isLoading: true,
   blockedUsernames: [],
+  myMedia: [],
+  setMyMedia: () => {},
   login: async () => {},
   logout: async () => {},
   refreshBlocks: async () => {},
@@ -45,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [blockedUsernames, setBlockedUsernames] = useState<string[]>([]);
+  const [myMedia, setMyMedia] = useState<string[]>([]);
   const [needsProfilePicPrompt, setNeedsProfilePicPrompt] = useState(false);
 
   const triggerProfilePicPrompt = useCallback(() => setNeedsProfilePicPrompt(true), []);
@@ -108,6 +118,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else setBlockedUsernames([]);
   }, [token, refreshBlocks]);
 
+  // Prefetch the current user's media list whenever auth is established (hydrate
+  // or login), and clear it on logout. This is the cache the Share tab reads for
+  // an instant medium grid; the screens that change media keep it fresh.
+  useEffect(() => {
+    if (!currentUser || !token) {
+      setMyMedia([]);
+      return;
+    }
+    let live = true;
+    get_profile(currentUser, token)
+      .then((p) => { if (live) setMyMedia(p.media ?? []); })
+      .catch(() => {
+        // non-fatal — the Share tab's own focus-refetch will seed it instead
+      });
+    return () => { live = false; };
+  }, [currentUser, token]);
+
   // Keep the telemetry transport's token in sync with auth state so usage +
   // device events can flush (and get cleared on logout).
   useEffect(() => {
@@ -157,6 +184,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         isLoading,
         blockedUsernames,
+        myMedia,
+        setMyMedia,
         login,
         logout,
         refreshBlocks,

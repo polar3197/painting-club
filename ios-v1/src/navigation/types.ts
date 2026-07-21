@@ -11,8 +11,16 @@ export type MainTabParamList = {
   Home: undefined;
   SearchTab: undefined;
   AddTab: undefined;
+  Bookmark: undefined;
   Me: undefined;
   Admin: undefined;
+};
+
+// The Bookmark tab is its own stack so a saved piece opens the creator's profile
+// (scoped to the tapped piece) without leaving the tab — mirrors SearchStack.
+export type BookmarkStackParamList = {
+  Bookmarks: undefined;
+  UserProfile: { username: string; artId?: string; medium?: string };
 };
 
 // Art + People search now live behind a single tab. The two galleries are

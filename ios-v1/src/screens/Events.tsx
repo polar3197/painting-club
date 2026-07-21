@@ -149,7 +149,7 @@ export default function Events() {
       {/* Selected day's events */}
       <ScrollView
         style={styles.list}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
         showsVerticalScrollIndicator={false}
       >
         {selectedEvents.length === 0 ? (
@@ -177,6 +177,14 @@ export default function Events() {
           ))
         )}
       </ScrollView>
+
+      {/* Small back button in the bottom-left thumb zone. */}
+      <Pressable
+        style={[styles.backBtn, { marginBottom: insets.bottom + 12 }]}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.backBtnText}>‹ back</Text>
+      </Pressable>
     </View>
   );
 }
@@ -331,5 +339,22 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     fontSize: FontSizes.tiny,
     color: Colors.textSecondary,
+  },
+  // Bottom-left back button — under half the screen width, in the thumb zone.
+  backBtn: {
+    alignSelf: 'flex-start',
+    width: '40%',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginTop: 10,
+  },
+  backBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
+    textAlign: 'center',
   },
 });

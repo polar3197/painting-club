@@ -14,6 +14,7 @@ import { remove_written_form, WrittenFormOut } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
 import AddArtDialog from './AddArtDialog';
+import BookmarkButton from './BookmarkButton';
 import ConfirmDialog from './ConfirmDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -56,16 +57,19 @@ function ThumbCell({ piece, cellW, cellH, isOwner, onOpen, onEdit, onRemove }: T
         )}
       </Pressable>
       <Text style={styles.cellTitle} numberOfLines={2}>{piece.title}</Text>
-      {isOwner && (
-        <View style={styles.cellButtons}>
-          <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
-            <Text style={styles.btnText}>edit</Text>
-          </Pressable>
-          <Pressable style={[styles.btn, styles.removeBtn]} onPress={onRemove}>
-            <Text style={styles.btnText}>remove</Text>
-          </Pressable>
-        </View>
-      )}
+      <View style={styles.cellFooter}>
+        {isOwner && (
+          <View style={styles.cellButtons}>
+            <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
+              <Text style={styles.btnText}>edit</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.removeBtn]} onPress={onRemove}>
+              <Text style={styles.btnText}>remove</Text>
+            </Pressable>
+          </View>
+        )}
+        <BookmarkButton artId={piece.id} size={24} style={styles.cellBookmarkBtn} />
+      </View>
     </View>
   );
 }
@@ -272,10 +276,17 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     marginTop: 2,
   },
+  cellFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  cellBookmarkBtn: {
+    marginLeft: 'auto',
+  },
   cellButtons: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 6,
   },
   btn: {
     borderWidth: 1,

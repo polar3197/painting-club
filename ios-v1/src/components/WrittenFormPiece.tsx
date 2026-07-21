@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { remove_written_form, WrittenFormOut } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
+import BookmarkButton from './BookmarkButton';
 import ConfirmDialog from './ConfirmDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -98,16 +99,21 @@ export default function WrittenFormPiece({
                 {piece.series_name}
               </Text>
             )}
-            {isOwner && (
-              <View style={styles.buttons}>
-                <Pressable style={[styles.btn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
-                  <Text style={styles.btnText}>remove</Text>
-                </Pressable>
-                <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
-                  <Text style={styles.btnText}>edit</Text>
-                </Pressable>
-              </View>
-            )}
+            {/* Bookmark pinned to the right of the footer, always present; the
+                owner's remove/edit buttons sit to its left. */}
+            <View style={styles.footerRow}>
+              {isOwner && (
+                <View style={styles.buttons}>
+                  <Pressable style={[styles.btn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+                    <Text style={styles.btnText}>remove</Text>
+                  </Pressable>
+                  <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
+                    <Text style={styles.btnText}>edit</Text>
+                  </Pressable>
+                </View>
+              )}
+              <BookmarkButton artId={piece.id} size={30} style={styles.bookmarkBtn} />
+            </View>
           </View>
         </View>
       </View>
@@ -167,10 +173,18 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontWeight: '700',
   },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 'auto',
+    alignSelf: 'stretch',
+  },
   buttons: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 'auto',
+  },
+  bookmarkBtn: {
+    marginLeft: 'auto',
   },
   btn: {
     borderWidth: 1,

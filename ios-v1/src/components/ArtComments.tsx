@@ -5,7 +5,6 @@ import {
   Modal,
   Pressable,
   FlatList,
-  KeyboardAvoidingView,
   Keyboard,
   Platform,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
   Animated,
   PanResponder,
 } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
@@ -24,6 +24,7 @@ import {
   post_comment,
   delete_comment,
   resolveImageUrl,
+  stableCacheKey,
   thumbUrl,
   Visual2DOut,
   CommentOut,
@@ -66,6 +67,12 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const [pendingDelete, setPendingDelete] = useState<CommentOut | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const translateY = useRef(new Animated.Value(0)).current;
+  // Lift the sheet above the keyboard by padding the container's bottom to the
+  // live keyboard height (replacing KeyboardAvoidingView). useAnimatedKeyboard
+  // tracks the real frame on the UI thread, so the sheet rises welded to the
+  // keyboard instead of a beat behind it.
+  const keyboard = useAnimatedKeyboard();
+  const containerKbStyle = useAnimatedStyle(() => ({ paddingBottom: keyboard.height.value }));
 
   // Kebab / report state per active comment. Block lives on the user's profile-pic flip,
   // not in the comment menu.
@@ -213,10 +220,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
         targetId={activeComment?.id ?? null}
         onClose={() => setShowReport(false)}
       />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <Reanimated.View style={[styles.container, containerKbStyle]}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <Animated.View style={[styles.panel, { transform: [{ translateY }] }]}>
           <View {...panResponder.panHandlers}>
@@ -225,7 +229,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             </View>
             <View style={[styles.imageSection, { height: sectionHeight }]}>
               <Image
-                source={{ uri: imgUri }}
+                source={{ uri: imgUri, cacheKey: stableCacheKey(imgUri) }}
                 placeholder={{ uri: thumbUrl(piece.id) }}
                 transition={200}
                 style={[styles.image, computeImgSize(imgRatio, sectionHeight)]}
@@ -266,7 +270,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             </View>
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </Reanimated.View>
     </Modal>
   );
 }

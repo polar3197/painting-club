@@ -26,8 +26,9 @@ import {
   get_members_written_form,
   get_members_audio,
   get_search_options,
-  resolveImageUrl,
+  imageSource,
   profilePicSrc,
+  profilePicSource,
   thumbUrl,
   thumbSource,
   authHeaders,
@@ -43,8 +44,9 @@ import {
 } from '../api';
 import Dropdown from '../components/Dropdown';
 import ArtZoomIn from '../components/ArtZoomIn';
-import ArtCarousel from '../components/ArtCarousel';
+import ArtCarousel, { CarouselElement } from '../components/ArtCarousel';
 import ArtComments from '../components/ArtComments';
+import BookmarkButton from '../components/BookmarkButton';
 import AddArtDialog from '../components/AddArtDialog';
 import WrittenFormPiece from '../components/WrittenFormPiece';
 import AudioPiece from '../components/AudioPiece';
@@ -71,7 +73,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // auto-sizes to its content; this floor guarantees the comments page (which
 // always wants to show ~4 rows) isn't squished when a bio is very short.
 // Bumped to give each comment row more vertical room while still showing 4.
-const BIO_PAGE_MIN_HEIGHT = 180;
+// Floor for the artist-statement / comments carousel — sized to one line of
+// statement text (page padding 20 + border 2 + label ~26 + divider ~9 + one
+// 22px line). The box hugs its content and only grows once the statement wraps
+// past a single line. On your own profile the statement shares this row height
+// with the comments page, so a short statement also shortens that page (it still
+// scrolls).
+const BIO_PAGE_MIN_HEIGHT = 88;
 // Visual gap between the two bordered pages of the carousel so the swipe feels
 // like moving to a separate frame rather than sliding content under one.
 const BIO_PAGE_GAP = 40;
@@ -196,11 +204,19 @@ function Visual2DPiece({
         >
           <View style={[styles.artVisualInner, { aspectRatio }]}>
             <Image
-              source={{ uri: resolveImageUrl(piece.file_path) }}
-              placeholder={thumbSource(piece.id)}
-              transition={200}
+              source={imageSource(piece.file_path)}
+              placeholder={thumbSource(piece.id, piece.file_path)}
+              // Slower crossfade so the thumb→full-res change reads as a gentle
+              // sharpen rather than a snap while the RPi delivers the original.
+              // (The real linger fix is the mid-res display derivative — backend.)
+              transition={450}
               style={[styles.artImage, { opacity: knownRatio ? 1 : 0 }]}
               contentFit="contain"
+              // Match the placeholder's fit to the image's. Its default is
+              // 'scale-down' (and the source default is 'cover'), so without this
+              // the thumb paints cropped/zoomed for a frame and then snaps to the
+              // contained fit — the "starts zoomed then flashes" glitch.
+              placeholderContentFit="contain"
               onLoad={(e) => {
                 const { width, height } = e.source;
                 if (width > 0 && height > 0) setMeasuredRatio(width / height);
@@ -249,40 +265,46 @@ function Visual2DPiece({
             </Text>
           )}
           <View style={styles.artFooter}>
-            {isOwner ? (
-              <View style={styles.artButtons}>
-                <Pressable style={[styles.artBtn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
-                  <Text style={styles.artBtnText}>remove</Text>
-                </Pressable>
-                {piece.comments_enabled && (
-                  // Middle button flexes to fill the remaining width — paired
-                  // with the row's stretch layout this puts the three buttons
-                  // span the full art-element width with the same edge inset
-                  // on both sides.
+            {/* The existing action buttons flex to fill the row; the bookmark
+                square is pinned to the right and always present, whether or not
+                the comments button is shown. */}
+            <View style={styles.artFooterMain}>
+              {isOwner ? (
+                <View style={styles.artButtons}>
+                  <Pressable style={[styles.artBtn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+                    <Text style={styles.artBtnText}>remove</Text>
+                  </Pressable>
+                  {piece.comments_enabled && (
+                    // Middle button flexes to fill the remaining width — paired
+                    // with the row's stretch layout this puts the three buttons
+                    // span the full art-element width with the same edge inset
+                    // on both sides.
+                    <Pressable
+                      style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnStretch]}
+                      onPress={() => setShowComments(true)}
+                    >
+                      <Text style={styles.artBtnText}>comments</Text>
+                    </Pressable>
+                  )}
+                  <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
+                    <Text style={styles.artBtnText}>edit</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
+                  // Single button when viewing someone else's piece — stretch to
+                  // the full row width so it reads as the primary (only) action,
+                  // matching the visual weight of the owner-side three-button row.
                   <Pressable
-                    style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnStretch]}
+                    style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnFull]}
                     onPress={() => setShowComments(true)}
                   >
                     <Text style={styles.artBtnText}>comments</Text>
                   </Pressable>
-                )}
-                <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
-                  <Text style={styles.artBtnText}>edit</Text>
-                </Pressable>
-              </View>
-            ) : (
-              piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
-                // Single button when viewing someone else's piece — stretch to
-                // the full row width so it reads as the primary (only) action,
-                // matching the visual weight of the owner-side three-button row.
-                <Pressable
-                  style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnFull]}
-                  onPress={() => setShowComments(true)}
-                >
-                  <Text style={styles.artBtnText}>comments</Text>
-                </Pressable>
-              )
-            )}
+                )
+              )}
+            </View>
+            <BookmarkButton artId={piece.id} size={32} style={styles.artBookmarkBtn} />
           </View>
         </View>
       </View>
@@ -355,12 +377,16 @@ export default function UserProfile() {
   // Captured from onLayout so each page of the bio/comments carousel can size
   // to match the container exactly (paging snaps cleanly to that width).
   const [bioPageWidth, setBioPageWidth] = useState(0);
-  // The bio/comments carousel: wrapper has a static minHeight so short bios
-  // still leave room for the comments rows. Both pages auto-stretch to the
-  // tallest one via the ScrollView's default cross-axis alignment, so we don't
-  // need a measured height feeding back into the layout (previous attempts at
-  // that produced a recursive growth loop because the page border kept adding
-  // 2px to the measured value each cycle).
+  // The bio/comments carousel row height. This is measured ONLY from the artist
+  // statement page (a stable content measurement, floored by a constant
+  // minHeight so it can't feed back on itself) and then applied as a fixed
+  // height to the comments page. The comments page's FlatList is unbounded, so
+  // if we let the ScrollView's default `stretch` cross-axis alignment size the
+  // row off the tallest child, the list's content height would drive the row —
+  // and because the panel derived its own row height from that measurement, it
+  // ran away and made the one-line statement box oscillate. Statement drives,
+  // comments follow.
+  const [bioPageHeight, setBioPageHeight] = useState(BIO_PAGE_MIN_HEIGHT);
 
 
   const onRefresh = useCallback(async () => {
@@ -377,6 +403,10 @@ export default function UserProfile() {
   const [showAddMedia, setShowAddMedia] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
+  // Server mtime of the just-uploaded profile pic — busts the avatar's (otherwise
+  // stable) cache key so a change shows immediately. Null until this session's
+  // first upload; a natural refetch keeps whatever the server last returned.
+  const [picBust, setPicBust] = useState<string | null>(null);
   // Index into filteredArt of the piece shown in the zoom viewer (null = closed).
   // Held here (not per-tile) so the viewer can swipe across the whole gallery.
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
@@ -424,9 +454,13 @@ export default function UserProfile() {
     const name = asset.uri.split('/').pop() || 'pic.jpg';
     const type = asset.mimeType || 'image/jpeg';
     const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
-    // res.profile_pic_path already carries the server's `?v=<mtime>`, so this
-    // new URL busts the image cache on every upload — no client version needed.
-    setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
+    // The upload endpoint returns an UNSIGNED /static/profile path. Under the
+    // member-only lockdown nginx rejects unsigned /static/profile URLs (403), so
+    // showing that path directly fails — refetch the profile to get a SIGNED URL.
+    // The signed URL drops the ?v=<mtime> tag, so grab the version here and pass
+    // it as a cache-bust (see profilePicSource) or the old photo stays cached.
+    setPicBust(res.profile_pic_path?.match(/[?&]v=(\d+)/)?.[1] ?? String(Date.now()));
+    await refetchProfile();
     setProfileZoom(false);
   };
 
@@ -436,11 +470,35 @@ export default function UserProfile() {
   const mediaBarY = useRef(0);
   const keywordsBarY = useRef(0);
   const [pendingScroll, setPendingScroll] = useState<string | null>(scrollToArtId ?? null);
+  // A gallery tap can point at a piece that lives inside a collapsed series/
+  // collection/album row. Once we resolve which row contains it, we retarget the
+  // scroll to that row and (for gallery nav) auto-open it. `pendingOpenSeriesId`
+  // flips the matching row's `autoOpen` after the scroll settles.
+  const [pendingOpenSeriesId, setPendingOpenSeriesId] = useState<string | null>(null);
+  // Only auto-open the collection for gallery navigation (a route artId). The
+  // comments-panel tap reuses the same scroll mechanism but should just scroll.
+  const autoOpenSeriesRef = useRef<boolean>(!!scrollToArtId);
+  // The series row id to open once the scroll to it lands (set during resolution).
+  const openAfterScrollRef = useRef<string | null>(null);
+
+  // Scroll to a resolved target, then (if it's a series we deep-linked into)
+  // open its collection once the scroll settles. Shared by the layout callback
+  // and the already-laid-out fallback below.
+  const finishPendingScroll = useCallback((y: number, id: string) => {
+    scrollRef.current?.scrollTo({ y, animated: true });
+    setPendingScroll(null);
+    if (openAfterScrollRef.current === id) {
+      openAfterScrollRef.current = null;
+      setTimeout(() => setPendingOpenSeriesId(id), 350);
+    }
+  }, []);
 
   // Tap a row in the comments-received panel: route to that art piece by reusing
   // the existing scrollToArtId mechanism. Setting the medium triggers art refetch;
   // when the piece mounts and fires handleArtLayout, the page scrolls to it.
   const handleTapReceivedComment = useCallback((c: CommentReceivedOut) => {
+    // Comments-panel taps scroll to the piece/row but don't pop the collection open.
+    autoOpenSeriesRef.current = false;
     setSelectedMedium(c.art_medium);
     setSelectedKeywords([]);
     setPendingScroll(c.art_id);
@@ -641,6 +699,29 @@ export default function UserProfile() {
     return rows;
   }, [filteredArt]);
 
+  // The zoom viewer opens over these same collapsed slots (solo pieces + series),
+  // so swiping left/right in the viewer matches the grid. A series becomes one
+  // vertical-scroll slot; its pieces are ordered like PaintingSeriesRow (explicit
+  // order_index first, then fetch order).
+  const visualElements = useMemo<CarouselElement[]>(
+    () =>
+      visualRows.map((row) =>
+        row.kind === 'piece'
+          ? { kind: 'piece', piece: { id: row.piece.id, file_path: row.piece.file_path } }
+          : {
+              kind: 'collection',
+              pieces: [...row.pieces]
+                .sort(
+                  (a, b) =>
+                    (a.order_index ?? Number.MAX_SAFE_INTEGER) -
+                    (b.order_index ?? Number.MAX_SAFE_INTEGER),
+                )
+                .map((p) => ({ id: p.id, file_path: p.file_path })),
+            },
+      ),
+    [visualRows],
+  );
+
   // ...and for audio — an album shows as one tracklist tile.
   const audioRows = useMemo(() => {
     type Row =
@@ -674,27 +755,37 @@ export default function UserProfile() {
     const y = e.nativeEvent.layout.y + artSectionY.current;
     artPositions.current[pieceId] = y;
     if (pendingScroll && pieceId === pendingScroll) {
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({ y, animated: true });
-        setPendingScroll(null);
-      }, 300);
+      setTimeout(() => finishPendingScroll(y, pieceId), 300);
     }
-  }, [pendingScroll]);
+  }, [pendingScroll, finishPendingScroll]);
 
-  // Fallback path for the comments-panel tap-to-nav: when the target piece is
-  // already laid out (typical when the comment is on a piece in the medium
-  // you're currently viewing), handleArtLayout won't re-fire so it would never
-  // consume pendingScroll. This effect scrolls directly using the cached y.
+  // A gallery/comments target can point at a piece that lives inside a collapsed
+  // series row — only the row lays out (under its series id), never the piece,
+  // so a piece-id scroll target would never match. Resolve it to the containing
+  // row's id (and, for gallery nav, mark that row to auto-open once scrolled to).
+  useEffect(() => {
+    if (!pendingScroll) return;
+    const seriesRows = isV2d ? visualRows : isWritten ? writtenRows : isAudio ? audioRows : [];
+    for (const row of seriesRows) {
+      if (row.kind === 'series' && row.pieces.some((p) => p.id === pendingScroll)) {
+        if (autoOpenSeriesRef.current) openAfterScrollRef.current = row.id;
+        setPendingScroll(row.id);
+        return;
+      }
+    }
+  }, [pendingScroll, visualRows, writtenRows, audioRows, isV2d, isWritten, isAudio]);
+
+  // Fallback path: when the target row is already laid out (typical when it's in
+  // the medium you're already viewing, or after the resolution above retargets
+  // to an already-measured series row), handleArtLayout won't re-fire so it would
+  // never consume pendingScroll. This scrolls directly using the cached y.
   useEffect(() => {
     if (!pendingScroll) return;
     const y = artPositions.current[pendingScroll];
     if (y == null) return;
-    const t = setTimeout(() => {
-      scrollRef.current?.scrollTo({ y, animated: true });
-      setPendingScroll(null);
-    }, 100);
+    const t = setTimeout(() => finishPendingScroll(y, pendingScroll), 100);
     return () => clearTimeout(t);
-  }, [pendingScroll]);
+  }, [pendingScroll, finishPendingScroll]);
 
   if (loading) {
     return (
@@ -748,9 +839,12 @@ export default function UserProfile() {
 
       {/* Shared 2D-art zoom viewer: a paged carousel you can swipe through to
           see every piece in the current (filtered) medium without closing. */}
-      {zoomIndex !== null && filteredArt[zoomIndex] && (
+      {zoomIndex !== null && visualElements[zoomIndex] && (
         <ArtCarousel
           pieces={filteredArt}
+          // Element mode: solo pieces + collections (vertical-scroll slots). The
+          // index is into visualElements, matching the grid's collapsed order.
+          elements={visualElements}
           initialIndex={zoomIndex}
           isOwner={profile.is_owner}
           creatorUsername={profile.username}
@@ -892,7 +986,7 @@ export default function UserProfile() {
                 {profile.profile_pic_path ? (
                   <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                     <Image
-                      source={{ uri: profilePicSrc(profile) ?? '' }}
+                      source={profilePicSource(profile, picBust) ?? { uri: '' }}
                       transition={200}
                       priority="high"
                       style={[styles.profilePic, { borderColor: pageColors.picFrame }]}
@@ -913,14 +1007,20 @@ export default function UserProfile() {
               </View>
               {/* Paged carousel: page 1 = artist statement, page 2 = comments
                   received. Only the user's OWN profile shows the comments page
-                  (you can't see others' received-comments). The carousel auto-
-                  sizes to the bio content with a floor of BIO_PAGE_MIN_HEIGHT
-                  so the comments page is never too small. Using minHeight (not
-                  height) is important — a fixed height would constrain the bio
-                  page's onLayout measurement and prevent growth past the floor. */}
+                  (you can't see others' received-comments). The row height is
+                  measured from the statement page (see bioPageHeight) and the
+                  comments page is pinned to it — the comments FlatList is
+                  unbounded, so it must never be allowed to drive the row. */}
               <View
                 style={[styles.bioCarouselWrap, { minHeight: BIO_PAGE_MIN_HEIGHT }]}
-                onLayout={(e) => setBioPageWidth(e.nativeEvent.layout.width)}
+                // Only update on a real width change. Firing setState on every
+                // layout pass (incl. subpixel-identical ones) churned re-renders
+                // and, combined with the width-0 first pass below, made the
+                // statement box flash oversized then snap back.
+                onLayout={(e) => {
+                  const w = e.nativeEvent.layout.width;
+                  setBioPageWidth((prev) => (Math.abs(prev - w) < 0.5 ? prev : w));
+                }}
               >
                 {/* Each page keeps its prior visible inset (BIO_PAGE_INSET on
                     each side) via paddingHorizontal on the ScrollView's
@@ -931,7 +1031,7 @@ export default function UserProfile() {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   decelerationRate="fast"
-                  snapToInterval={(bioPageWidth - BIO_PAGE_INSET * 2) + BIO_PAGE_GAP}
+                  snapToInterval={Math.max(1, (bioPageWidth - BIO_PAGE_INSET * 2) + BIO_PAGE_GAP)}
                   snapToAlignment="start"
                   nestedScrollEnabled
                   // Only your own profile has a second (comments) page to swipe
@@ -939,16 +1039,35 @@ export default function UserProfile() {
                   // card can't drag/bounce around.
                   scrollEnabled={profile.is_owner}
                   bounces={profile.is_owner}
-                  contentContainerStyle={{ paddingHorizontal: BIO_PAGE_INSET }}
+                  // flex-start (not the default `stretch`) keeps each page at
+                  // its own height so the unbounded comments FlatList can't
+                  // stretch the statement page up to its content height.
+                  contentContainerStyle={{ paddingHorizontal: BIO_PAGE_INSET, alignItems: 'flex-start' }}
                 >
-                  <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, marginRight: BIO_PAGE_GAP, backgroundColor: pageColors.statementBox }]}>
-                    <Text style={styles.bioLabel}>Artist Statement</Text>
-                    <View style={styles.bioHr} />
-                    {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
-                  </View>
+                  {/* Both pages wait for a real width. At the initial width of 0
+                      the page width would be negative (clamped to 0) and the bio
+                      text would wrap one character per line — a giant box that
+                      then snapped small once onLayout resolved the width. */}
+                  {bioPageWidth > 0 && (
+                    <View
+                      style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, minHeight: BIO_PAGE_MIN_HEIGHT, marginRight: BIO_PAGE_GAP, backgroundColor: pageColors.statementBox }]}
+                      // Sole height source for the carousel row. The constant
+                      // minHeight floors it, so this measurement can't feed back
+                      // on itself; the comments page below is pinned to the
+                      // result rather than the other way around.
+                      onLayout={(e) => {
+                        const h = e.nativeEvent.layout.height;
+                        setBioPageHeight((prev) => (Math.abs(prev - h) < 0.5 ? prev : h));
+                      }}
+                    >
+                      <Text style={styles.bioLabel}>Artist Statement</Text>
+                      <View style={styles.bioHr} />
+                      {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
+                    </View>
+                  )}
                   {profile.is_owner && bioPageWidth > 0 && (
-                    <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, padding: 0 }]}>
-                      <CommentsReceivedPanel onTapComment={handleTapReceivedComment} />
+                    <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, height: bioPageHeight, padding: 0 }]}>
+                      <CommentsReceivedPanel height={bioPageHeight} onTapComment={handleTapReceivedComment} />
                     </View>
                   )}
                 </ScrollView>
@@ -1047,7 +1166,7 @@ export default function UserProfile() {
                   cardBg={pageColors.artCardBg}
                 />
               ))}
-            {visualRows.map((row) =>
+            {visualRows.map((row, ri) =>
               row.kind === 'piece' ? (
                 <Visual2DPiece
                   key={row.piece.id}
@@ -1057,9 +1176,9 @@ export default function UserProfile() {
                   cardBg={pageColors.artCardBg}
                   onRemove={() => setRefresh((r) => r + 1)}
                   onEdit={() => setEditingPiece(row.piece)}
-                  // The profile-wide carousel still swipes across every piece
-                  // in the medium, so zoom by position in filteredArt.
-                  onZoom={() => setZoomIndex(filteredArt.indexOf(row.piece))}
+                  // Open the zoom viewer at this slot; it swipes across all
+                  // visualElements (collapsed like the grid).
+                  onZoom={() => setZoomIndex(ri)}
                   onLayout={(e) => handleArtLayout(row.piece.id, e)}
                 />
               ) : (
@@ -1079,6 +1198,11 @@ export default function UserProfile() {
                     setSelectedKeywords([]);
                   }}
                   onLayout={(e) => handleArtLayout(row.id, e)}
+                  // Tapping the card opens the vertical-scroll zoom at this slot;
+                  // the owner-only edit button (inside the card) opens the grid.
+                  onOpenZoom={() => setZoomIndex(ri)}
+                  autoOpen={pendingOpenSeriesId === row.id}
+                  onAutoOpened={() => setPendingOpenSeriesId(null)}
                 />
               )
             )}
@@ -1119,6 +1243,8 @@ export default function UserProfile() {
                     setSelectedKeywords([]);
                   }}
                   onLayout={(e) => handleArtLayout(row.id, e)}
+                  autoOpen={pendingOpenSeriesId === row.id}
+                  onAutoOpened={() => setPendingOpenSeriesId(null)}
                 />
               )
             )}
@@ -1158,6 +1284,8 @@ export default function UserProfile() {
                   }}
                   onRefresh={() => setRefresh((r) => r + 1)}
                   onLayout={(e) => handleArtLayout(row.id, e)}
+                  autoOpen={pendingOpenSeriesId === row.id}
+                  onAutoOpened={() => setPendingOpenSeriesId(null)}
                 />
               )
             )}
@@ -1541,6 +1669,17 @@ const styles = StyleSheet.create({
   },
   artFooter: {
     marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  artFooterMain: {
+    // Holds the existing owner/viewer action buttons and absorbs the width the
+    // bookmark square doesn't, so those buttons keep their full-width layout.
+    flex: 1,
+  },
+  artBookmarkBtn: {
+    alignSelf: 'stretch',
   },
   artButtons: {
     flexDirection: 'row',

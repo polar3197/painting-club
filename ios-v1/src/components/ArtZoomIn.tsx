@@ -23,7 +23,7 @@ import Animated, {
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
-import { resolveImageUrl, block_user, unblock_user } from '../api';
+import { resolveImageUrl, stableCacheKey, block_user, unblock_user } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
@@ -351,7 +351,7 @@ export default function ArtZoomIn({
                 ]}
               >
                 <Image
-                  source={{ uri }}
+                  source={{ uri, cacheKey: stableCacheKey(uri) }}
                   style={{ width: '100%', height: '100%' }}
                   contentFit="contain"
                   onLoad={(e) => {
