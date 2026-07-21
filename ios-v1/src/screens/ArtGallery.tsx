@@ -179,6 +179,40 @@ function ZoomableArt({ children, densityPinchRef }: {
     });
   if (densityPinchRef) pinch = pinch.simultaneousWithExternalGesture(densityPinchRef);
 
+  // Web (dev preview): trackpad pinch arrives as ctrl+wheel, which RNGH's
+  // touch pinch never sees. When the cursor is over this art, zoom it here
+  // and stop the event before SearchTabs' window-level density listener gets
+  // it; no gesture end exists, so spring back after a beat of inactivity.
+  const wrapRef = useRef<any>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const node = wrapRef.current as unknown as HTMLElement | null;
+    if (!node || !node.addEventListener) return;
+    let resetTimer: ReturnType<typeof setTimeout> | undefined;
+    const springBack = () => {
+      scale.value = withTiming(1, { duration: 220 });
+      tx.value = withTiming(0, { duration: 220 }, (finished) => {
+        if (finished) active.value = 0;
+      });
+      ty.value = withTiming(0, { duration: 220 });
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      scale.value = Math.min(4, Math.max(1, scale.value * (1 - e.deltaY / 200)));
+      active.value = 1;
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(springBack, 400);
+    };
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      if (resetTimer) clearTimeout(resetTimer);
+      node.removeEventListener('wheel', onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const zoomStyle = useAnimatedStyle(() => ({
     // Lift the zooming card above its neighbors for the duration.
     zIndex: active.value ? 100 : 0,
@@ -191,7 +225,7 @@ function ZoomableArt({ children, densityPinchRef }: {
 
   return (
     <GestureDetector gesture={pinch}>
-      <Reanimated.View style={zoomStyle}>{children}</Reanimated.View>
+      <Reanimated.View ref={wrapRef} style={zoomStyle}>{children}</Reanimated.View>
     </GestureDetector>
   );
 }
