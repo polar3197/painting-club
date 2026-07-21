@@ -205,23 +205,23 @@ function FeedArtCard({ item, onPress, onComment }: {
         )}
         <View style={styles.feedFooter}>
           <View style={styles.feedFooterMain}>
-            {onComment && (
-              // Charlie's hand-drawn speech bubble — friendlier than a boxy
-              // text button, and it matches the app's inked icon language.
-              <Pressable
-                style={({ pressed }) => [styles.feedCommentBtn, pressed && styles.cardPressed]}
-                onPress={onComment}
-                hitSlop={8}
-              >
-                <Image
-                  source={require('../../assets/imgs/comment-bubble.png')}
-                  style={styles.feedCommentIcon}
-                  contentFit="contain"
-                />
-              </Pressable>
-            )}
+            <BookmarkButton artId={item.id} size={32} style={styles.feedBookmarkBtn} />
           </View>
-          <BookmarkButton artId={item.id} size={32} style={styles.feedBookmarkBtn} />
+          {onComment && (
+            // Charlie's hand-drawn speech bubble — friendlier than a boxy
+            // text button, and it matches the app's inked icon language.
+            <Pressable
+              style={({ pressed }) => [styles.feedCommentBtn, pressed && styles.cardPressed]}
+              onPress={onComment}
+              hitSlop={8}
+            >
+              <Image
+                source={require('../../assets/imgs/comment-bubble.png')}
+                style={styles.feedCommentIcon}
+                contentFit="contain"
+              />
+            </Pressable>
+          )}
         </View>
       </View>
     </View>
@@ -521,7 +521,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   feedCommentBtn: {
-    alignSelf: 'flex-start',
     paddingVertical: 2,
   },
   feedCommentIcon: {
@@ -529,7 +528,7 @@ const styles = StyleSheet.create({
     height: 32,
   },
   feedBookmarkBtn: {
-    alignSelf: 'stretch',
+    alignSelf: 'flex-start',
   },
   card: {
     borderWidth: 1,
