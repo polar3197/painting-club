@@ -904,7 +904,10 @@ async def upload_profile_picture(
 
     current_member.profile_pic_path = file_path
     await db.commit()
-    return {"profile_pic_path": versioned_pic_path(file_path)}
+    # Sign the returned path: the member-only lockdown makes nginx reject unsigned
+    # /static/profile URLs (403), so an unsigned upload response can't be shown.
+    # sign_path keeps the ?v=<mtime> tag so the client's cache busts on re-upload.
+    return {"profile_pic_path": sign_path(versioned_pic_path(file_path))}
 
 
 @app.post("/art/upload/visual-2d")
@@ -1477,8 +1480,12 @@ async def get_prompt(
 async def admin_create_prompt(
     payload: PromptCreate,
     db: AsyncSession = Depends(get_db),
-    _: Member = Depends(get_admin_member),
+    current_member: Member = Depends(get_admin_member),
 ) -> PromptOut:
+    # Admins can create/draft a prompt, but making it live on creation is
+    # contributor-only — same rule as the dedicated /activate routes.
+    if payload.activate and current_member.role != "contributor":
+        raise HTTPException(status_code=403, detail="Only contributors can activate a prompt")
     media_id = (
         await db.execute(select(Media.id, Media.name).filter(Media.name == payload.medium))
     ).one_or_none()
@@ -1508,8 +1515,10 @@ async def admin_create_prompt(
 async def admin_activate_prompt(
     prompt_id: str,
     db: AsyncSession = Depends(get_db),
-    _: Member = Depends(get_admin_member),
+    _: Member = Depends(get_contributor_member),
 ) -> PromptOut:
+    # Making a prompt the live one is contributor-only; admins can approve/queue
+    # suggestions but not flip which prompt goes live.
     try:
         prompt = await db_activate_prompt(db, prompt_id)
     except ValueError as e:
@@ -1535,10 +1544,11 @@ async def admin_activate_prompt(
 async def admin_activate_suggestion(
     suggestion_id: str,
     db: AsyncSession = Depends(get_db),
-    _: Member = Depends(get_admin_member),
+    _: Member = Depends(get_contributor_member),
 ) -> PromptOut:
     """Promote an approved suggestion to the active week's prompt (creates the
-    prompt, archives the current, retires the suggestion). Admin/contributor."""
+    prompt, archives the current, retires the suggestion). Contributor-only —
+    admins approve/queue suggestions, contributors decide what goes live."""
     try:
         prompt, media_name = await db_activate_suggestion(db, _parse_uuid(suggestion_id, "suggestion"))
     except ValueError as e:
@@ -2156,6 +2166,30 @@ async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db), _: Memb
     thumb_path = thumb_file(art_id)
     if not thumb_path.exists():
         if generate_thumbnail(art_id, src_abs) is None:
+            return FileResponse(src_abs, headers=cache_headers)
+
+    return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
+
+
+@app.get("/members/{member_id}/pic/thumb")
+async def get_profile_pic_thumb(member_id: str, db: AsyncSession = Depends(get_db), _: Member = Depends(get_current_member)):
+    """256px JPEG profile-pic thumbnail for the member roster/search grid, where
+    the full multi-MB pic would be loaded once per member. Member-gated (the raw
+    /static/profile-thumbs path is blocked at nginx). Lazy-generates for pics
+    uploaded before eager profile-thumb gen, falling back to the full pic."""
+    result = await db.execute(select(Member.profile_pic_path).filter(Member.id == member_id))
+    pic_path = result.scalar_one_or_none()
+    if not pic_path:
+        raise HTTPException(status_code=404, detail="No profile picture")
+
+    src_abs = abs_path(pic_path)
+    if not src_abs.exists():
+        raise HTTPException(status_code=404, detail="Source file missing")
+
+    cache_headers = {"Cache-Control": "private, max-age=3600"}
+    thumb_path = profile_thumb_file(member_id)
+    if not thumb_path.exists():
+        if generate_profile_thumb(member_id, src_abs) is None:
             return FileResponse(src_abs, headers=cache_headers)
 
     return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
@@ -2942,6 +2976,8 @@ async def list_my_bookmarks(
             date=r.date,
             creator_username=r.creator_username,
             aspect_ratio=r.aspect_ratio,
+            series_id=r.series_id,
+            series_name=r.series_name,
             bookmarked_at=r.bookmarked_at,
         )
         for r in rows

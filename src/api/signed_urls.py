@@ -49,7 +49,7 @@ def sign_path(path: str | None, ttl: int = DEFAULT_TTL) -> str | None:
     within a window (cacheable), not unique per request."""
     if not path or not SECRET:
         return path
-    base = path.split("?", 1)[0]
+    base, _, orig_query = path.partition("?")
     if not base.startswith(SIGNED_PREFIXES):
         return path
     now = int(time.time())
@@ -64,4 +64,9 @@ def sign_path(path: str | None, ttl: int = DEFAULT_TTL) -> str | None:
         .replace("/", "_")
         .replace("=", "")
     )
-    return f"{base}?md5={md5}&expires={expires}"
+    signed = f"{base}?md5={md5}&expires={expires}"
+    # Preserve any pre-existing query (e.g. a profile pic's ?v=<mtime>). nginx's
+    # secure_link checks only $uri + md5 + expires, so extra params don't affect
+    # validation — but keeping ?v= lets the client key its cache by version, so a
+    # re-uploaded pic busts the cache instead of showing the old one.
+    return f"{signed}&{orig_query}" if orig_query else signed

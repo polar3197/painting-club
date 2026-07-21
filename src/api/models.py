@@ -590,6 +590,10 @@ class BookmarkedArtOut(BaseModel):
     # Populated for visual pieces (NULL for written/audio — clients already
     # handle a missing ratio by measuring).
     aspect_ratio: float | None = None
+    # Set when the piece belongs to a collection/album/series, so the client can
+    # regroup saved pieces into one tile. NULL for standalone pieces.
+    series_id: uuid.UUID | None = None
+    series_name: str | None = None
     bookmarked_at: datetime
 
     @field_serializer("file_path")

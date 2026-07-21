@@ -1,12 +1,13 @@
 # Pending backend changes (apply when RPi access is available)
 
-> **NEXT PULL — two things ride together (2026-07-16): READY, NOT DEPLOYED.**
+> **NEXT PULL — three things ride together (2026-07-16..18): READY, NOT DEPLOYED.**
 > Run on the Pi (`quentin@192.168.86.92`, must be on the home LAN):
 > ```
 > cd ~/painting-club && git pull && docker restart nginx
 > ```
 > **The `docker restart nginx` is mandatory, not optional.** The api hot-reloads
-> from its bind mount, but nginx re-reads its config only on restart.
+> from its bind mount, but nginx re-reads its config only on restart. (Item 3 is
+> api-only and would hot-reload without the restart, but items 1–2 need it.)
 >
 > 1. **Image-caching fix (`fdaf75a`)** — art re-downloaded on every page change
 >    because each signed URL was unique per request (cache key never repeated)
@@ -23,9 +24,55 @@
 >    been live (drafts stay NULL); verified against a throwaway postgres —
 >    second run is `UPDATE 0`, so restarts don't drift.
 >
-> Ordering is free: the iOS client treats `activated_at` as optional and falls
-> back to a plain solid ring, so the OTA and this pull can land in either order
-> without a broken intermediate state.
+> 3. **`GET /members/{member_id}/pic/thumb`** — new member-gated route serving
+>    the 256px profile-pic thumbnail (mirrors `/art/{id}/thumb`). The People
+>    roster/search grid loads this instead of the full multi-MB pic per tile —
+>    the biggest remaining profile-pic bandwidth sink. The raw
+>    `/static/profile-thumbs/` path is blocked at nginx (lockdown), so this route
+>    is how members reach the already-generated thumbs. api-only, no nginx/db
+>    change. Lazy-generates + falls back to the full pic if a thumb is missing.
+>
+> 5. **Profile-pic upload returns a SIGNED path** (bug: changing your pic
+>    silently 403s). The upload endpoint returned `versioned_pic_path()` — an
+>    UNSIGNED `/static/profile/…?v=<mtime>` path — but the lockdown makes nginx
+>    require a signature there, so the new pic never loaded. Fix: `sign_path()`
+>    now preserves any pre-existing query (so the ?v= survives signing — nginx
+>    only checks $uri+md5+expires, so extra args don't affect validation), and
+>    the upload endpoint signs its response. This also fixes stale re-uploads for
+>    *other* viewers (the signed path now carries ?v=, so their cache busts).
+>    api-only. The iOS client already works around it (refetches for a signed URL
+>    + busts its own avatar key on upload), so this deploy just makes it clean.
+>
+> 4. **Prompt activation → contributor-only** (approve stays admin). Per Charlie:
+>    admins approve/queue suggestions, but only contributors decide what goes
+>    live. `admin_activate_prompt` + `admin_activate_suggestion` re-gated
+>    `get_admin_member` → `get_contributor_member`; `admin_create_prompt` stays
+>    admin but 403s when `activate=True` from a non-contributor. Untouched (stay
+>    admin): create/draft, archive, review/approve suggestions, reorder queue.
+>    api-only. Until this deploys, prod still lets admins activate — the iOS
+>    "make active" reactivate button already gates itself to contributors, so no
+>    broken state.
+>
+> Ordering is free: the iOS client treats `activated_at` as optional (falls back
+> to a plain solid ring), and the People roster falls back to the full pic if the
+> profile-thumb route 404s — so the OTA and this pull can land in either order
+> with no broken intermediate state. Until item 3 deploys, the roster simply
+> keeps loading full pics as it does today (no bandwidth win yet, no breakage).
+
+> **Bookmarks → series fields (2026-07-19): READY, NOT DEPLOYED. api-only,
+> hot-reloads on `git pull` (no nginx/db/migration).** `GET /members/me/bookmarks`
+> now returns `series_id` + `series_name` per saved piece so the iOS "saved" page
+> can regroup bookmarked pieces into their collection/album as one tile.
+> - `src/db/db_ops/bookmarks.py` `db_list_bookmarks`: added `Art.series_id` +
+>   `Series.name` via `outerjoin(Series, Series.id == Art.series_id)` (LEFT join —
+>   NULL for standalone pieces).
+> - `src/api/models.py` `BookmarkedArtOut`: added optional `series_id` +
+>   `series_name`.
+> - `src/api/main.py` `list_my_bookmarks`: maps the two new row fields.
+> Additive + backward-compatible. The shipped iOS OTA already handles their
+> absence (renders every saved piece individually until this lands); after the
+> pull, saved collections/albums collapse into grouped tiles. No client breakage
+> either order.
 
 > **Stream A status (2026-07-13): DEPLOYED ✅** #6 Bookmarks, #7 Events, #1 tab
 > order, plus user-orderable media tabs (`media_members.position`, migration
@@ -425,3 +472,96 @@ clobbering each other:
 - #4 Duplicate-email approval → 409 + orphan handling
 - #2 Backfill `aspect_ratio` for old art
 - #3 Written-form in `/art/search` (optional / only if the fan-out feels slow)
+
+---
+
+# Image delivery — kill the "linger then snap" on the main art display
+
+**Problem:** the profile art elements + zoom carousel fetch the **full multi-MB
+original** straight from the RPi. A soft 512px thumb placeholder lingers for the
+whole (slow) download, then the sharp original crossfades in — a big resolution
+jump that reads as a snap. Reported by Charlie as his biggest app pet peeve.
+
+**Track 1 (frontend, ALREADY SHIPPED via OTA — no backend work):** carousel now
+shows the cached thumb as a placeholder (`ArtCarousel` ZoomablePage) instead of
+blank→pop, and the profile + carousel crossfades were slowed 200→450ms so the
+change reads as a sharpen. This *softens* the snap but can't remove the linger —
+that needs a smaller file, i.e. Tracks 2 & 3 below.
+
+## Track 3 — mid-res "display" derivative (THE real fix; do this one)
+
+A phone can't show more than ~1500px wide, so stop delivering the original for
+normal viewing. Generate a ~1600px JPEG (~150–300KB) alongside the 512px thumb;
+point the profile + carousel at it. It lands ~50–100× faster than a 20MB
+original, so the linger nearly vanishes AND the 512→1600 jump is small. The
+original is only fetched on pinch-zoom.
+
+**Backend (`src/api/main.py`) — mirror the thumb machinery exactly:**
+```python
+DISPLAY_SIZE = 1600  # near THUMB_SIZE (main.py:741)
+
+def display_file(art_id: str) -> Path:
+    return STATIC_ROOT / "static" / "display" / f"{art_id}.jpg"
+
+def generate_display(art_id: str, src_abs: Path) -> Path | None:
+    """~1600px JPEG for the main viewer — mirrors generate_thumbnail."""
+    out = display_file(art_id)
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            img.draft("RGB", (DISPLAY_SIZE, DISPLAY_SIZE))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((DISPLAY_SIZE, DISPLAY_SIZE * 4), Image.LANCZOS)
+            img.save(out, format="JPEG", quality=88, optimize=True)
+        return out
+    except Exception as e:
+        print(f"[display] gen failed for {art_id}: {type(e).__name__}: {e}")
+        out.unlink(missing_ok=True)
+        return None
+```
+- **Eager gen at upload:** next to every `generate_thumbnail(...)` callsite
+  (`main.py:1000`, and the written-cover `:1134`), add `generate_display(...)`.
+- **Serve route** — clone `get_art_thumb` (`main.py:2133`) as
+  `GET /art/{art_id}/display`: same member gate, PDF→original, lazy-generate +
+  fall back to the original on failure, `Cache-Control: private, max-age=3600`.
+- **Cleanup:** where a thumb is unlinked on delete/replace (`main.py:536`,
+  `:1132`, `:1143`), also `display_file(aid).unlink(missing_ok=True)`.
+- **nginx:** block the raw `/static/display` path like `/static/thumbs` is
+  blocked (the gated route is the only way in). Verify in `src/nginx/nginx.conf`.
+- **Backfill:** none — the route lazy-generates on first request from the
+  original already on disk (same as thumbs).
+
+**Frontend wiring (ships AFTER the route is live, or now WITH the fallback):**
+- `src/api/client.ts`: add `displayUrl(artId)` + `displaySource(artId, version)`
+  mirroring `thumbUrl`/`thumbSource` (bearer header + version cacheKey).
+- Profile `Visual2DPiece` (`UserProfile.tsx`): `source={displaySource(...)}`
+  instead of `imageSource(piece.file_path)`; keep the thumb placeholder.
+- Carousel: use `displaySource` as the page image; optionally swap to the
+  original when that page is pinch-zoomed (maximumZoomScale 4) so deep zoom stays
+  crisp. v1 can just use the display everywhere.
+- **Graceful fallback:** expo-image `onError` → swap `source` to the original
+  (`imageSource`). Makes the FE safe to ship before the backend deploys and on
+  any pre-route backend (same spirit as `thumbSource`'s 404 handling).
+
+**Cost:** ~200KB extra per piece on disk (negligible); bandwidth *drops* 50–100×
+for normal viewing.
+
+## Track 2 — bigger thumbnail (cheap standalone win, optional if doing Track 3)
+
+One-liner: `THUMB_SIZE = 512` → `768` (`main.py:741`). The placeholder itself is
+sharper, so the lingering state isn't ugly and the eventual snap is subtle — even
+without Track 3.
+- **Regenerate existing thumbs:** on-disk thumbs are already 512 and won't
+  auto-regen. After deploy, `rm -rf <STATIC_ROOT>/static/thumbs/*` — the thumb
+  route regenerates each at 768 on next request. (Or a startup pass that regens
+  thumbs whose height/width != THUMB_SIZE.)
+- **Frontend:** none — same URL, just larger bytes.
+- **Tradeoff:** the same thumb feeds the grid tiles, so 768 makes the grid a
+  touch heavier. Recommend 768 (not 1024) to keep the grid light. **If you do
+  Track 3, Track 2 is largely redundant** — the display lands fast enough that
+  the 512 placeholder's brief blur is fine. Do Track 3 first; Track 2 is the
+  fallback if Track 3 slips.
+
+**Deploy order:** Track 3 backend → deploy → OTA the FE wiring (or ship the FE
+first with the `onError` fallback so order doesn't matter).

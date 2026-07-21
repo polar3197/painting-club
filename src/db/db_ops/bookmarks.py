@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
-from db.models import Art, Bookmark, Media, Member, Visual2D
+from db.models import Art, Bookmark, Media, Member, Series, Visual2D
 
 
 async def db_add_bookmark(db: AsyncSession, member_id, art_id) -> None:
@@ -44,12 +44,17 @@ async def db_list_bookmarks(db: AsyncSession, member_id):
             Member.username.label("creator_username"),
             Bookmark.created_at.label("bookmarked_at"),
             visual.c.aspect_ratio,
+            # series_id groups saved pieces into their collection/album on the
+            # client; series_name labels it. NULL for standalone pieces.
+            Art.series_id,
+            Series.name.label("series_name"),
         )
         .select_from(Bookmark)
         .join(Art, Art.id == Bookmark.art_id)
         .join(Media, Media.id == Art.media_id)
         .join(Member, Member.id == Art.creator_id)
         .outerjoin(visual, visual.c.id == Art.id)
+        .outerjoin(Series, Series.id == Art.series_id)
         .filter(Bookmark.member_id == member_id)
         .order_by(desc(Bookmark.created_at))
     )
