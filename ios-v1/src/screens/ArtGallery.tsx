@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,12 +9,16 @@ import {
   search_art,
   get_media,
   get_members,
+  get_members_visual_2d,
   get_members_written_form,
   thumbSource,
   ArtResult,
   MediaType,
   Profile,
+  Visual2DOut,
 } from '../api';
+import ArtComments from '../components/ArtComments';
+import { appAlert } from '../components/AppAlert';
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -134,7 +138,9 @@ function VisualCard({ item, cardWidth, onPress, feed, onComment }: {
             ~10-50x. Full-res still loads in the zoom viewer on tap. */}
         <Image
           source={thumbSource(item.id, item.file_path)}
-          transition={200}
+          // Web: expo-image's cross-dissolve strands memory-cached images at
+          // opacity 0 after a FlatList column-swap remount, so no fade there.
+          transition={Platform.OS === 'web' ? 0 : 200}
           // memory-disk: remounted rows (FlatList virtualization) paint
           // synchronously from memory instead of replaying the fade — without
           // this the 1-column view "refreshes" every image as you scroll.
@@ -270,6 +276,24 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
   const numColumns = renderedColumns;
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
 
+  // Comments open straight from the feed. ArtResult is a slim search row, so
+  // fetch the full piece (comments_enabled etc.) on demand.
+  const [commentPiece, setCommentPiece] = useState<Visual2DOut | null>(null);
+  const openComments = useCallback(async (item: ArtResult) => {
+    try {
+      const pieces = await get_members_visual_2d(item.creator_username, item.medium);
+      const piece = pieces.find((p) => p.id === item.id);
+      if (!piece) throw new Error('piece not found');
+      if (!piece.comments_enabled) {
+        appAlert('comments are off', 'the artist turned comments off for this piece');
+        return;
+      }
+      setCommentPiece(piece);
+    } catch {
+      appAlert('could not open comments', 'try again');
+    }
+  }, []);
+
   const feed = numColumns === 1;
   const renderCard = ({ item }: { item: ArtResult }) => {
     const onPress = () =>
@@ -281,7 +305,13 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
     return item.art_type === 'written_form' ? (
       <WrittenCard item={item} cardWidth={cardWidth} onPress={onPress} feed={feed} />
     ) : (
-      <VisualCard item={item} cardWidth={cardWidth} onPress={onPress} feed={feed} />
+      <VisualCard
+        item={item}
+        cardWidth={cardWidth}
+        onPress={onPress}
+        feed={feed}
+        onComment={feed ? () => openComments(item) : undefined}
+      />
     );
   };
 
@@ -330,6 +360,9 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
         <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
           <Spinner size={48} />
         </View>
+      )}
+      {commentPiece && (
+        <ArtComments piece={commentPiece} onClose={() => setCommentPiece(null)} />
       )}
     </View>
   );

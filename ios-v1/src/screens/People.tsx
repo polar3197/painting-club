@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -32,7 +32,9 @@ function RosterAvatar({ item, size }: { item: Profile; size: number }) {
   return (
     <Image
       source={useThumb ? profileThumbSource(item.id) : fullOrDefault}
-      transition={200}
+      // Web: expo-image's cross-dissolve strands memory-cached images at
+      // opacity 0 after a FlatList column-swap remount, so no fade there.
+      transition={Platform.OS === 'web' ? 0 : 200}
       // memory-disk: remounted rows (FlatList virtualization) paint
       // synchronously from memory instead of replaying the fade.
       cachePolicy="memory-disk"
