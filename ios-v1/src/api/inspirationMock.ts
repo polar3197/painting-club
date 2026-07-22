@@ -82,6 +82,40 @@ const KLIMT: WebNodeExternal = {
   image: require('../../assets/imgs/klimpt.png'),
 };
 
+// External pieces Charlie authored in the demo, images bundled so they ship
+// with the OTA (the originals were session-local file picks).
+const BUNDLED_EXTERNALS: WebNodeExternal[] = [
+  KLIMT,
+  {
+    kind: 'external',
+    id: 'ext-hodler-kien-valley',
+    artist: 'Ferdinand Hodler',
+    title: 'The Kien Valley with the Bluemlisalp Massif',
+    image: require('../../assets/imgs/externals/hodler-kien-valley.jpg'),
+  },
+  {
+    kind: 'external',
+    id: 'ext-avery-dune-and-sea-ii',
+    artist: 'Milton Avery',
+    title: 'Dune and Sea II',
+    image: require('../../assets/imgs/externals/avery-dune-and-sea-ii.jpg'),
+  },
+  {
+    kind: 'external',
+    id: 'ext-porter-plane-tree',
+    artist: 'Fairfield Porter',
+    title: 'Plane Tree',
+    image: require('../../assets/imgs/externals/porter-plane-tree.jpg'),
+  },
+  {
+    kind: 'external',
+    id: 'ext-manet-the-railway',
+    artist: 'Manet',
+    title: 'The Railway',
+    image: require('../../assets/imgs/externals/manet-the-railway.jpg'),
+  },
+];
+
 async function ensureSeeded(): Promise<void> {
   if (seeded) return;
   seeded = true;
@@ -99,7 +133,7 @@ async function ensureSeeded(): Promise<void> {
   } catch {
     // Corrupt/absent state: start clean.
   }
-  nodes.set(KLIMT.id, KLIMT);
+  for (const ext of BUNDLED_EXTERNALS) nodes.set(ext.id, ext);
   try {
     const art = await search_art('');
     const visual = art.filter((a) => a.art_type !== 'written_form').slice(0, 14);
@@ -181,18 +215,33 @@ async function ensureSeeded(): Promise<void> {
       // Written/audio seeding is best-effort — the visual web still works.
     }
 
-    // CURATED SEED THREADS — connections Charlie authors in the demo get
-    // baked in here (matched by creator+title so they survive re-seeding on
-    // every launch, independent of ids/search order). Currently EMPTY: the
-    // web starts blank and fills with what Charlie draws in the browser;
-    // read the persisted demo state back and add seedLink lines from it.
+    // CURATED SEED THREADS — the connections Charlie authored in the demo,
+    // baked in (matched by creator+title so they survive re-seeding on every
+    // launch, independent of ids/search order). Erased in Phase 1 when the
+    // real backend replaces this mock.
     let seedCounter = 0;
-    const byTitle = (creator: string, title: string): string | undefined =>
-      visual.find(
-        (a) =>
-          a.creator_username === creator &&
-          (a.title || '').trim().toLowerCase() === title,
-      )?.id;
+    // Match against the FULL search list (not just the top-14 catalog slice)
+    // and register the piece as a node — curated links may cite older pieces.
+    const byTitle = (creator: string, title: string): string | undefined => {
+      const a = art.find(
+        (p) =>
+          p.creator_username === creator &&
+          (p.title || '').trim().toLowerCase() === title,
+      );
+      if (!a) return undefined;
+      registerArt({
+        kind: 'art',
+        id: a.id,
+        title: a.title,
+        creator: a.creator_username,
+        medium: a.medium,
+        file_path: a.file_path,
+        aspect_ratio: a.aspect_ratio,
+        mine: a.creator_username === viewer,
+        artKind: 'visual',
+      });
+      return a.id;
+    };
     const seedLink = (from?: string, to?: string) => {
       if (!from || !to || from === to) return;
       const id = `seed-${++seedCounter}`;
@@ -200,16 +249,26 @@ async function ensureSeeded(): Promise<void> {
       if (edges.some((e) => e.from === from && e.to === to)) return;
       edges.push({ id, from, to });
     };
-    void byTitle;
-    void seedLink;
+    seedLink(byTitle('charlie', 'bernal hill'), 'ext-hodler-kien-valley');
+    seedLink(byTitle('charlie', 'the beach'), 'ext-avery-dune-and-sea-ii');
+    seedLink(byTitle('charlie', 'wippets on the couch'), 'ext-porter-plane-tree');
+    seedLink(byTitle('charlie', 'wippets on the couch'), 'ext-manet-the-railway');
     void writtenIds;
     void audioIds;
 
-    // Re-apply member-made demo links persisted on this device.
+    // Re-apply member-made demo links persisted on this device. Externals
+    // saved with blob: URIs are dead (the picked image lived only in that
+    // browser session) — drop them and any edges pointing at them; their
+    // baked equivalents above carry the connection now.
+    const deadExternals = new Set(
+      demoState.x.filter((x) => x.uri.startsWith('blob:')).map((x) => x.id),
+    );
     for (const x of demoState.x) {
+      if (deadExternals.has(x.id)) continue;
       nodes.set(x.id, { kind: 'external', id: x.id, artist: x.artist, title: x.title, image: { uri: x.uri } });
     }
     for (const [from, to] of demoState.e) {
+      if (deadExternals.has(to)) continue;
       const id = userEdgeId(from, to);
       if (demoState.r.includes(id)) continue;
       if (nodes.has(from) && nodes.has(to) && !edges.some((e) => e.from === from && e.to === to)) {
