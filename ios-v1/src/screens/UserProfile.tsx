@@ -47,6 +47,7 @@ import ArtZoomIn from '../components/ArtZoomIn';
 import ArtCarousel, { CarouselElement } from '../components/ArtCarousel';
 import ArtComments from '../components/ArtComments';
 import BookmarkButton from '../components/BookmarkButton';
+import { registerArt } from '../api/inspiration';
 import AddArtDialog from '../components/AddArtDialog';
 import WrittenFormPiece from '../components/WrittenFormPiece';
 import AudioPiece from '../components/AudioPiece';
@@ -141,6 +142,7 @@ function Visual2DPiece({
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const { token, currentUser } = useAuth();
+  const webNav = useNavigation<any>();
   const [showComments, setShowComments] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   // Start from the server-provided ratio captured at upload, but override it
@@ -304,6 +306,31 @@ function Visual2DPiece({
                 )
               )}
             </View>
+            {/* Charlie's hand-drawn web — opens the inspiration web centered
+                on this piece. */}
+            <Pressable
+              style={({ pressed }) => [styles.artWebBtn, pressed && { transform: [{ scale: 0.95 }] }]}
+              onPress={() => {
+                registerArt({
+                  kind: 'art',
+                  id: piece.id,
+                  title: piece.title,
+                  creator: piece.username,
+                  medium: piece.medium,
+                  file_path: piece.file_path,
+                  aspect_ratio: piece.aspect_ratio,
+                  mine: isOwner,
+                });
+                (webNav as any).navigate('Web', { artId: piece.id });
+              }}
+              hitSlop={8}
+            >
+              <Image
+                source={require('../../assets/imgs/web.png')}
+                style={styles.artWebIcon}
+                contentFit="contain"
+              />
+            </Pressable>
             <BookmarkButton artId={piece.id} size={32} style={styles.artBookmarkBtn} />
           </View>
         </View>
@@ -1677,6 +1704,20 @@ const styles = StyleSheet.create({
     // Holds the existing owner/viewer action buttons and absorbs the width the
     // bookmark square doesn't, so those buttons keep their full-width layout.
     flex: 1,
+  },
+  artWebBtn: {
+    width: 32,
+    height: 32,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  artWebIcon: {
+    width: 24,
+    height: 24,
   },
   artBookmarkBtn: {
     alignSelf: 'stretch',

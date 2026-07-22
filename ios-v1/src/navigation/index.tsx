@@ -13,6 +13,7 @@ const tabIcons = {
 };
 
 import LandingPage from '../screens/LandingPage';
+import WebScreen from '../screens/WebScreen';
 import SetupAccount from '../screens/SetupAccount';
 import NotMember from '../screens/NotMember';
 import UserProfile from '../screens/UserProfile';
@@ -210,6 +211,7 @@ export default function RootNavigator() {
         options={{ animation: 'fade' }}
       />
       <RootStack.Screen name="Ethos" component={Ethos} />
+      <RootStack.Screen name="Web" component={WebScreen} />
       <RootStack.Screen name="Settings" component={Settings} />
       <RootStack.Screen name="UserStats" component={UserStats} />
       <RootStack.Screen name="InfraStats" component={InfraStats} />

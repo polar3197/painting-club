@@ -24,6 +24,7 @@ import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '.
 import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { showArtZoom, hideArtZoom, ArtZoomConfig } from '../components/ArtZoomOverlay';
+import { registerArt } from '../api/inspiration';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { columnsFor } from '../constants/grid';
@@ -270,10 +271,11 @@ function ZoomableArt({ children, source, densityPinchRef }: {
 // medium, location/song detail rows, and a comments + bookmark footer.
 // Renders the 512px thumb (not the full-res original) — a feed of every
 // piece can't afford profile-page bandwidth.
-function FeedArtCard({ item, onPress, onComment, densityPinchRef }: {
+function FeedArtCard({ item, onPress, onComment, onWeb, densityPinchRef }: {
   item: ArtResult;
   onPress: () => void;
   onComment?: () => void;
+  onWeb: () => void;
   densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
 }) {
   const isWritten = item.art_type === 'written_form';
@@ -337,8 +339,21 @@ function FeedArtCard({ item, onPress, onComment, densityPinchRef }: {
           </View>
         )}
         <View style={styles.feedFooter}>
-          <View style={styles.feedFooterMain}>
+          <View style={[styles.feedFooterMain, styles.feedFooterLeft]}>
             <BookmarkButton artId={item.id} size={32} style={styles.feedBookmarkBtn} />
+            {/* Charlie's hand-drawn web — opens the inspiration web centered
+                on this piece. */}
+            <Pressable
+              style={({ pressed }) => [styles.feedWebBtn, pressed && styles.cardPressed]}
+              onPress={onWeb}
+              hitSlop={8}
+            >
+              <Image
+                source={require('../../assets/imgs/web.png')}
+                style={styles.feedWebIcon}
+                contentFit="contain"
+              />
+            </Pressable>
           </View>
           {onComment && (
             // Charlie's hand-drawn speech bubble — friendlier than a boxy
@@ -382,7 +397,7 @@ interface Props {
 
 export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, columns, densityPinchRef }: Props) {
   const navigation = useNavigation<Nav>();
-  const { token } = useAuth();
+  const { token, currentUser } = useAuth();
   // Visual paints immediately; written fans out and merges in when ready.
   const [visualArt, setVisualArt] = useState<ArtResult[]>([]);
   const [writtenArt, setWrittenArt] = useState<ArtResult[]>([]);
@@ -485,11 +500,25 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
         medium: item.medium,
       });
     if (feed) {
+      const onWeb = () => {
+        registerArt({
+          kind: 'art',
+          id: item.id,
+          title: item.title,
+          creator: item.creator_username,
+          medium: item.medium,
+          file_path: item.file_path,
+          aspect_ratio: item.aspect_ratio,
+          mine: item.creator_username === currentUser,
+        });
+        (navigation as any).navigate('Web', { artId: item.id });
+      };
       return (
         <FeedArtCard
           item={item}
           onPress={onPress}
           onComment={item.art_type === 'written_form' ? undefined : () => openComments(item)}
+          onWeb={onWeb}
           densityPinchRef={densityPinchRef}
         />
       );
@@ -656,6 +685,24 @@ const styles = StyleSheet.create({
   },
   feedFooterMain: {
     flex: 1,
+  },
+  feedFooterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  feedWebBtn: {
+    width: 32,
+    height: 32,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedWebIcon: {
+    width: 24,
+    height: 24,
   },
   // Same bordered square treatment as BookmarkButton so the two footer
   // actions read as a matched pair.
