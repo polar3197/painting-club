@@ -57,6 +57,15 @@ export function getWeb(artId: string, depth: number = 2): Promise<WebGraph> {
   return mock.getWeb(artId, depth);
 }
 
+/**
+ * The entire web at once — every piece that has at least one connection
+ * (singletons excluded), across all disconnected clusters. `focusId` is ''
+ * (no single center).
+ */
+export function getFullWeb(): Promise<WebGraph> {
+  return mock.getFullWeb();
+}
+
 export function addInspiration(fromArtId: string, toNodeId: string): Promise<WebEdge> {
   return mock.addInspiration(fromArtId, toNodeId);
 }

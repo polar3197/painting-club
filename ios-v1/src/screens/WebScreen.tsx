@@ -10,6 +10,7 @@ import { thumbSource } from '../api';
 import * as Haptics from 'expo-haptics';
 import {
   getWeb,
+  getFullWeb,
   removeInspiration,
   setInspirationViewer,
   WebGraph,
@@ -29,14 +30,19 @@ const CANVAS_HALF = CANVAS / 2;
 
 type Pos = { x: number; y: number };
 
-// Static force layout — run the simulation to rest, read positions.
-function layoutGraph(g: WebGraph): Map<string, Pos> {
+// Static force layout — run the simulation to rest, read positions. In
+// focused mode the focus is pinned at the origin (centered); in whole-web
+// mode nothing is pinned so disconnected clusters settle where they land and
+// the centroid stays centered.
+function layoutGraph(g: WebGraph, pinFocus: boolean): Map<string, Pos> {
   type SimNode = { id: string; x?: number; y?: number; fx?: number | null; fy?: number | null };
   const nodes: SimNode[] = g.nodes.map((n) => ({ id: n.id }));
-  const focus = nodes.find((n) => n.id === g.focusId);
-  if (focus) {
-    focus.fx = 0;
-    focus.fy = 0;
+  if (pinFocus) {
+    const focus = nodes.find((n) => n.id === g.focusId);
+    if (focus) {
+      focus.fx = 0;
+      focus.fy = 0;
+    }
   }
   const links = g.edges.map((e) => ({ source: e.from, target: e.to }));
   const sim = forceSimulation(nodes as any)
@@ -45,7 +51,7 @@ function layoutGraph(g: WebGraph): Map<string, Pos> {
     .force('center', forceCenter(0, 0))
     .force('collide', forceCollide(72))
     .stop();
-  for (let i = 0; i < 250; i++) sim.tick();
+  for (let i = 0; i < 300; i++) sim.tick();
   return new Map(nodes.map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
 }
 
@@ -165,6 +171,7 @@ export default function WebScreen() {
   const [graph, setGraph] = useState<WebGraph | null>(null);
   const [positions, setPositions] = useState<Map<string, Pos>>(new Map());
   const [linkFrom, setLinkFrom] = useState<WebNodeArt | null>(null);
+  const [mode, setMode] = useState<'focused' | 'full'>('focused');
 
   // Canvas pan/zoom.
   const txv = useSharedValue(SCREEN_W / 2 - CANVAS_HALF);
@@ -178,18 +185,31 @@ export default function WebScreen() {
     setInspirationViewer(currentUser);
   }, [currentUser]);
 
-  const focusNode = useCallback((id: string) => {
-    getWeb(id)
-      .then((g) => {
-        setGraph(g);
-        setPositions(layoutGraph(g));
-        // Re-center the plane on the (pinned-at-origin) focus.
-        txv.value = withTiming(SCREEN_W / 2 - CANVAS_HALF, { duration: 240 });
-        tyv.value = withTiming(SCREEN_H / 2 - CANVAS_HALF, { duration: 240 });
-      })
-      .catch(() => {});
+  // Lay a graph out and recentre the plane on the origin (pinned focus in
+  // focused mode, centroid in whole-web mode). Whole-web starts zoomed out so
+  // more of the constellation is in frame.
+  const applyGraph = useCallback((g: WebGraph, pin: boolean) => {
+    setGraph(g);
+    setPositions(layoutGraph(g, pin));
+    txv.value = withTiming(SCREEN_W / 2 - CANVAS_HALF, { duration: 240 });
+    tyv.value = withTiming(SCREEN_H / 2 - CANVAS_HALF, { duration: 240 });
+    scalev.value = withTiming(pin ? 1 : 0.55, { duration: 240 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const focusNode = useCallback((id: string) => {
+    setMode('focused');
+    getWeb(id)
+      .then((g) => applyGraph(g, true))
+      .catch(() => {});
+  }, [applyGraph]);
+
+  const showFullWeb = useCallback(() => {
+    setMode('full');
+    getFullWeb()
+      .then((g) => applyGraph(g, false))
+      .catch(() => {});
+  }, [applyGraph]);
 
   useEffect(() => {
     if (entryArtId) focusNode(entryArtId);
@@ -329,7 +349,25 @@ export default function WebScreen() {
         <Text style={styles.backBtnText}>←</Text>
       </Pressable>
 
-      {focused && (
+      <Pressable
+        style={[styles.toggleBtn, mode === 'full' && styles.toggleBtnActive]}
+        onPress={() => (mode === 'full' ? focusNode(entryArtId) : showFullWeb())}
+        hitSlop={8}
+      >
+        <Image source={require('../../assets/imgs/web.png')} style={styles.toggleIcon} contentFit="contain" />
+        <Text style={styles.toggleText}>{mode === 'full' ? 'this piece' : 'whole web'}</Text>
+      </Pressable>
+
+      {mode === 'full' && graph && (
+        <View style={styles.caption} pointerEvents="none">
+          <Text style={styles.captionTitle}>whole web</Text>
+          <Text style={styles.captionByline}>
+            {graph.nodes.length} connected {graph.nodes.length === 1 ? 'piece' : 'pieces'} · tap one to focus
+          </Text>
+        </View>
+      )}
+
+      {mode === 'focused' && focused && (
         <View style={styles.caption} pointerEvents="box-none">
           <View style={styles.captionRow}>
             <View style={styles.captionText}>
@@ -452,6 +490,30 @@ const styles = StyleSheet.create({
   backBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
+  },
+  toggleBtn: {
+    position: 'absolute',
+    top: 54,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 10,
+    height: 36,
+  },
+  toggleBtnActive: {
+    backgroundColor: Colors.primaryGold,
+  },
+  toggleIcon: {
+    width: 18,
+    height: 18,
+  },
+  toggleText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
   },
   caption: {
     position: 'absolute',

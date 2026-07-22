@@ -218,6 +218,22 @@ export async function getWeb(artId: string, depth: number): Promise<WebGraph> {
   };
 }
 
+export async function getFullWeb(): Promise<WebGraph> {
+  await ensureSeeded();
+  // Only nodes touched by an edge — singletons are excluded by construction.
+  const connected = new Set<string>();
+  for (const e of edges) {
+    connected.add(e.from);
+    connected.add(e.to);
+  }
+  const outNodes: WebNode[] = [];
+  for (const id of connected) {
+    const n = nodes.get(id);
+    if (n) outNodes.push(n);
+  }
+  return { focusId: '', nodes: outNodes, edges: [...edges] };
+}
+
 export async function addInspiration(fromArtId: string, toNodeId: string): Promise<WebEdge> {
   await ensureSeeded();
   const from = nodes.get(fromArtId);
