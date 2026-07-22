@@ -404,15 +404,14 @@ export default function WebScreen() {
                       styles.nodeCircle,
                       { borderRadius: size / 2 },
                       n.id === focusId && styles.nodeFocused,
+                      // Outside-the-club pieces wear a slightly wider pale-red
+                      // ring instead of a name label (the caption names the
+                      // artist when you focus them).
+                      n.kind === 'external' && styles.nodeExternal,
                     ]}
                   >
                     <NodeFace n={n} />
                   </View>
-                  {n.kind === 'external' && (
-                    <Text style={styles.nodeArtist} numberOfLines={1}>
-                      {n.artist}
-                    </Text>
-                  )}
                 </Pressable>
               );
             })}
@@ -538,6 +537,11 @@ const styles = StyleSheet.create({
   nodeFocused: {
     borderWidth: 3,
   },
+  // External (non-club) pieces: a soft, slightly wider red ring.
+  nodeExternal: {
+    borderColor: Colors.redCoral,
+    borderWidth: 4,
+  },
   nodeImage: {
     width: '100%',
     height: '100%',
@@ -552,16 +556,6 @@ const styles = StyleSheet.create({
   nodeGlyph: {
     width: '55%',
     height: '55%',
-  },
-  nodeArtist: {
-    position: 'absolute',
-    bottom: -20,
-    left: -20,
-    right: -20,
-    textAlign: 'center',
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.tiny,
-    color: Colors.textMuted,
   },
   loading: {
     ...StyleSheet.absoluteFillObject,
