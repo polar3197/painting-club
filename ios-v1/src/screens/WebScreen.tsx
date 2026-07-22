@@ -7,13 +7,17 @@ import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force';
 import { useAuth } from '../context/AuthContext';
 import { thumbSource } from '../api';
+import * as Haptics from 'expo-haptics';
 import {
   getWeb,
+  removeInspiration,
   setInspirationViewer,
   WebGraph,
   WebNode,
+  WebNodeArt,
 } from '../api/inspiration';
 import Spinner from '../components/Spinner';
+import ConnectCreateDialog from '../components/ConnectCreateDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -127,6 +131,7 @@ export default function WebScreen() {
 
   const [graph, setGraph] = useState<WebGraph | null>(null);
   const [positions, setPositions] = useState<Map<string, Pos>>(new Map());
+  const [linkFrom, setLinkFrom] = useState<WebNodeArt | null>(null);
 
   // Canvas pan/zoom.
   const txv = useSharedValue(SCREEN_W / 2 - CANVAS_HALF);
@@ -202,6 +207,30 @@ export default function WebScreen() {
   const hops = useMemo(() => (graph ? hopMap(graph) : new Map<string, number>()), [graph]);
   const focused = graph?.nodes.find((n) => n.id === graph.focusId) ?? null;
 
+  // The focused piece's own outgoing threads (for the caption's delete chips)
+  // and everything already linked (filtered out of the connect pane).
+  const focusedOutgoing = useMemo(() => {
+    if (!graph) return [] as { edge: { id: string; from: string; to: string }; target: WebNode }[];
+    return graph.edges
+      .filter((e) => e.from === graph.focusId)
+      .map((edge) => ({ edge, target: graph.nodes.find((n) => n.id === edge.to)! }))
+      .filter((x) => !!x.target);
+  }, [graph]);
+  const linkedIds = useMemo(
+    () => new Set(focusedOutgoing.map((x) => x.target.id)),
+    [focusedOutgoing],
+  );
+
+  const refresh = useCallback(() => {
+    if (graph) focusNode(graph.focusId);
+  }, [graph, focusNode]);
+
+  const openLinker = useCallback((n: WebNode) => {
+    if (n.kind !== 'art' || !n.mine) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setLinkFrom(n);
+  }, []);
+
   return (
     <View style={styles.container} ref={rootRef}>
       <GestureDetector gesture={gestures}>
@@ -222,6 +251,8 @@ export default function WebScreen() {
                 <Pressable
                   key={n.id}
                   onPress={() => n.id !== graph.focusId && focusNode(n.id)}
+                  onLongPress={() => openLinker(n)}
+                  delayLongPress={450}
                   style={[
                     styles.node,
                     {
@@ -263,15 +294,52 @@ export default function WebScreen() {
 
       {focused && (
         <View style={styles.caption} pointerEvents="box-none">
-          <Text style={styles.captionTitle} numberOfLines={1}>
-            {focused.kind === 'art' ? focused.title || 'untitled' : focused.title || 'untitled'}
-          </Text>
-          <Text style={styles.captionByline} numberOfLines={1}>
-            {focused.kind === 'art'
-              ? `${focused.creator} · ${focused.medium}`
-              : focused.artist}
-          </Text>
+          <View style={styles.captionRow}>
+            <View style={styles.captionText}>
+              <Text style={styles.captionTitle} numberOfLines={1}>
+                {focused.title || 'untitled'}
+              </Text>
+              <Text style={styles.captionByline} numberOfLines={1}>
+                {focused.kind === 'art'
+                  ? `${focused.creator} · ${focused.medium}`
+                  : focused.artist}
+              </Text>
+            </View>
+            {focused.kind === 'art' && focused.mine && (
+              <Pressable style={styles.addBtn} onPress={() => openLinker(focused)} hitSlop={8}>
+                <Text style={styles.addBtnText}>+ inspiration</Text>
+              </Pressable>
+            )}
+          </View>
+          {focused.kind === 'art' && focused.mine && focusedOutgoing.length > 0 && (
+            <View style={styles.chips}>
+              {focusedOutgoing.map(({ edge, target }) => (
+                <View key={edge.id} style={styles.chip}>
+                  <Text style={styles.chipText} numberOfLines={1}>
+                    {target.kind === 'art' ? target.title || 'untitled' : target.artist}
+                  </Text>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      removeInspiration(edge.id).then(refresh).catch(() => {});
+                    }}
+                  >
+                    <Text style={styles.chipX}>×</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
+      )}
+
+      {linkFrom && (
+        <ConnectCreateDialog
+          fromArt={linkFrom}
+          linkedIds={linkedIds}
+          onLinked={() => refresh()}
+          onClose={() => setLinkFrom(null)}
+        />
       )}
     </View>
   );
@@ -343,6 +411,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  captionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  captionText: {
+    flex: 1,
+  },
   captionTitle: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.sm,
@@ -352,5 +428,43 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.textMuted,
     marginTop: 2,
+  },
+  addBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.primaryGold,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  addBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    maxWidth: 220,
+  },
+  chipText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.tiny,
+    flexShrink: 1,
+  },
+  chipX: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.sm,
+    lineHeight: 18,
   },
 });
