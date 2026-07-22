@@ -452,14 +452,27 @@ export default function WebScreen() {
       {!zoomedOut && focused && (
         <View style={styles.caption} pointerEvents="box-none">
           <View style={styles.captionRow}>
-            <View style={styles.captionText}>
+            <Pressable
+              style={styles.captionText}
+              // In-app pieces open on the creator's profile, scrolled to the
+              // piece; external art has no page, so its caption isn't tappable.
+              disabled={focused.kind !== 'art'}
+              onPress={() => {
+                if (focused.kind !== 'art') return;
+                navigation.navigate('WebUserProfile', {
+                  username: focused.creator,
+                  artId: focused.id,
+                  medium: focused.medium,
+                });
+              }}
+            >
               <Text style={styles.captionTitle} numberOfLines={1}>
                 {focused.title || 'untitled'}
               </Text>
               <Text style={styles.captionByline} numberOfLines={1}>
                 {focused.kind === 'art' ? `${focused.creator} · ${focused.medium}` : focused.artist}
               </Text>
-            </View>
+            </Pressable>
             {focused.kind === 'art' && focused.mine && (
               <Pressable style={styles.addBtn} onPress={() => openLinker(focused)} hitSlop={8}>
                 <Text style={styles.addBtnText}>+ inspiration</Text>
