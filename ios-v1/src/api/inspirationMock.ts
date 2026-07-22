@@ -1,11 +1,17 @@
-// Phase-0 in-memory backend for the inspiration web. Seeds itself from the
-// member's real loaded art (search_art) plus one bundled external node (the
-// Klimt that already ships as the login background), and fabricates a few
-// deterministic seed threads so the demo web isn't empty. Mutations persist
-// for the session. Replaced wholesale by real fetches in Phase 1 — see
-// inspiration.ts.
+// Phase-0 backend for the inspiration web, shipping OTA until the Pi is
+// reachable for the real one. Two kinds of demo data, both erased in Phase 1:
+//
+// 1. CURATED SEED THREADS (code, below): hand-picked example connections
+//    between real club pieces, matched by title so they survive re-seeding
+//    on every launch. Delete the CURATED_LINKS table to erase.
+// 2. MEMBER-MADE DEMO LINKS: anything the club wires up in the demo persists
+//    on-device (SecureStore key DEMO_STATE_KEY) across restarts. Clearing
+//    that key — or Phase 1 simply ignoring it — erases them.
+//
+// Replaced wholesale by real fetches in Phase 1 — see inspiration.ts.
 
 import Fuse from 'fuse.js';
+import * as SecureStore from 'expo-secure-store';
 import {
   search_art,
   get_media,
@@ -15,11 +21,28 @@ import {
 } from '../api';
 import type { WebNode, WebNodeArt, WebNodeExternal, WebEdge, WebGraph } from './inspiration';
 
+// Wipe this key in Phase 1 to erase all member-made demo links/externals.
+const DEMO_STATE_KEY = 'inspiration_demo_state_v1';
+
+type DemoState = {
+  // user-added edges as [from, to]
+  e: [string, string][];
+  // user-created externals
+  x: { id: string; artist: string; title: string | null; uri: string }[];
+  // removed edge ids (covers seed edges too, so deletions stick)
+  r: string[];
+};
+
+let demoState: DemoState = { e: [], x: [], r: [] };
+
+function saveDemoState() {
+  SecureStore.setItemAsync(DEMO_STATE_KEY, JSON.stringify(demoState)).catch(() => {});
+}
+
 let viewer: string | null = null;
 const nodes = new Map<string, WebNode>();
 let edges: WebEdge[] = [];
 let seeded = false;
-let counter = 0;
 
 export function setViewer(username: string | null) {
   viewer = username;
@@ -62,6 +85,20 @@ const KLIMT: WebNodeExternal = {
 async function ensureSeeded(): Promise<void> {
   if (seeded) return;
   seeded = true;
+  // Member-made demo links persisted on this device (see header note).
+  try {
+    const raw = await SecureStore.getItemAsync(DEMO_STATE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      demoState = {
+        e: Array.isArray(parsed.e) ? parsed.e : [],
+        x: Array.isArray(parsed.x) ? parsed.x : [],
+        r: Array.isArray(parsed.r) ? parsed.r : [],
+      };
+    }
+  } catch {
+    // Corrupt/absent state: start clean.
+  }
   nodes.set(KLIMT.id, KLIMT);
   try {
     const art = await search_art('');
@@ -144,47 +181,48 @@ async function ensureSeeded(): Promise<void> {
       // Written/audio seeding is best-effort — the visual web still works.
     }
 
-    // Deterministic seed threads: a few piece-to-piece chains + two Klimt
-    // citations, plus one thread into the written and audio worlds when
-    // they exist, so first open shows a real cross-medium web.
-    const ids = visual.map((a) => a.id);
-    const link = (from?: string, to?: string) => {
+    // CURATED SEED THREADS — connections Charlie authors in the demo get
+    // baked in here (matched by creator+title so they survive re-seeding on
+    // every launch, independent of ids/search order). Currently EMPTY: the
+    // web starts blank and fills with what Charlie draws in the browser;
+    // read the persisted demo state back and add seedLink lines from it.
+    let seedCounter = 0;
+    const byTitle = (creator: string, title: string): string | undefined =>
+      visual.find(
+        (a) =>
+          a.creator_username === creator &&
+          (a.title || '').trim().toLowerCase() === title,
+      )?.id;
+    const seedLink = (from?: string, to?: string) => {
       if (!from || !to || from === to) return;
-      edges.push({ id: `e${++counter}`, from, to });
+      const id = `seed-${++seedCounter}`;
+      if (demoState.r.includes(id)) return; // a member deleted it — stays gone
+      if (edges.some((e) => e.from === from && e.to === to)) return;
+      edges.push({ id, from, to });
     };
-    link(ids[1], ids[0]);
-    link(ids[2], ids[0]);
-    link(ids[3], ids[1]);
-    link(ids[5], ids[4]);
-    link(ids[6], ids[4]);
-    link(ids[8], ids[7]);
-    link(ids[0], KLIMT.id);
-    link(ids[4], KLIMT.id);
-    link(ids[9], KLIMT.id);
-    // The club has no written/audio pieces yet (members declare the media
-    // but haven't posted) — fabricate one of each so the demo shows the
-    // cross-medium rendering. Clearly labeled; gone in Phase 1.
-    if (!writtenIds.length) {
-      writtenIds.push('demo-written');
-      registerArt({
-        kind: 'art', id: 'demo-written', title: 'ode to the fog (demo)',
-        creator: 'paint club', medium: 'poetry', file_path: '',
-        aspect_ratio: null, mine: false, artKind: 'written',
-      });
+    void byTitle;
+    void seedLink;
+    void writtenIds;
+    void audioIds;
+
+    // Re-apply member-made demo links persisted on this device.
+    for (const x of demoState.x) {
+      nodes.set(x.id, { kind: 'external', id: x.id, artist: x.artist, title: x.title, image: { uri: x.uri } });
     }
-    if (!audioIds.length) {
-      audioIds.push('demo-audio');
-      registerArt({
-        kind: 'art', id: 'demo-audio', title: 'fog song (demo)',
-        creator: 'paint club', medium: 'song', file_path: '',
-        aspect_ratio: null, mine: false, artKind: 'audio',
-      });
+    for (const [from, to] of demoState.e) {
+      const id = userEdgeId(from, to);
+      if (demoState.r.includes(id)) continue;
+      if (nodes.has(from) && nodes.has(to) && !edges.some((e) => e.from === from && e.to === to)) {
+        edges.push({ id, from, to });
+      }
     }
-    link(ids[0], writtenIds[0]);
-    link(ids[1], audioIds[0]);
   } catch {
     // Offline / auth hiccup: the web still works for registered entry nodes.
   }
+}
+
+function userEdgeId(from: string, to: string): string {
+  return `u-${from}-${to}`;
 }
 
 export async function getWeb(artId: string, depth: number): Promise<WebGraph> {
@@ -245,13 +283,22 @@ export async function addInspiration(fromArtId: string, toNodeId: string): Promi
   }
   const existing = edges.find((e) => e.from === fromArtId && e.to === toNodeId);
   if (existing) return existing;
-  const edge: WebEdge = { id: `e${++counter}`, from: fromArtId, to: toNodeId };
+  const edge: WebEdge = { id: userEdgeId(fromArtId, toNodeId), from: fromArtId, to: toNodeId };
   edges.push(edge);
+  // Persist so the link survives restarts (and can be baked into the seed).
+  demoState.e.push([fromArtId, toNodeId]);
+  demoState.r = demoState.r.filter((id) => id !== edge.id);
+  saveDemoState();
   return edge;
 }
 
 export async function removeInspiration(edgeId: string): Promise<void> {
   edges = edges.filter((e) => e.id !== edgeId);
+  // Persist the deletion: user edges leave the saved list, seed edges are
+  // remembered as removed so they stay gone across restarts.
+  demoState.e = demoState.e.filter(([from, to]) => userEdgeId(from, to) !== edgeId);
+  if (!demoState.r.includes(edgeId)) demoState.r.push(edgeId);
+  saveDemoState();
 }
 
 export async function searchLinkTargets(q: string): Promise<WebNode[]> {
@@ -272,11 +319,15 @@ export async function createExternalArt(input: {
 }): Promise<WebNodeExternal> {
   const node: WebNodeExternal = {
     kind: 'external',
-    id: `ext-${++counter}`,
+    id: `ext-u-${demoState.x.length + 1}-${input.artist.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     artist: input.artist,
     title: input.title || null,
     image: { uri: input.imageUri },
   };
   nodes.set(node.id, node);
+  // Persist. Note: on web the picked image is a blob: URI that dies with the
+  // session — the node survives but its image needs re-bundling at bake time.
+  demoState.x.push({ id: node.id, artist: node.artist, title: node.title, uri: input.imageUri });
+  saveDemoState();
   return node;
 }
