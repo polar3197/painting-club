@@ -510,6 +510,7 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
           file_path: item.file_path,
           aspect_ratio: item.aspect_ratio,
           mine: item.creator_username === currentUser,
+          artKind: item.art_type === 'written_form' ? 'written' : 'visual',
         });
         (navigation as any).navigate('Web', { artId: item.id });
       };

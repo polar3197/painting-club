@@ -119,8 +119,41 @@ function Thread({ a, b }: { a: Pos; b: Pos }) {
   );
 }
 
-function nodeImageSource(n: WebNode) {
-  return n.kind === 'art' ? thumbSource(n.id, n.file_path) : n.image;
+// What fills a node's circle: image thumbs for visual/external art, the
+// inked page/note glyphs for written and audio pieces (their content has no
+// visual thumbnail).
+function NodeFace({ n }: { n: WebNode }) {
+  if (n.kind === 'art' && n.artKind === 'written') {
+    return (
+      <View style={styles.nodeGlyphWrap}>
+        <Image
+          source={require('../../assets/imgs/bookmark.png')}
+          style={styles.nodeGlyph}
+          contentFit="contain"
+        />
+      </View>
+    );
+  }
+  if (n.kind === 'art' && n.artKind === 'audio') {
+    return (
+      <View style={styles.nodeGlyphWrap}>
+        <Image
+          source={require('../../assets/imgs/music.png')}
+          style={styles.nodeGlyph}
+          contentFit="contain"
+        />
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={n.kind === 'art' ? thumbSource(n.id, n.file_path) : n.image}
+      style={styles.nodeImage}
+      contentFit="cover"
+      transition={Platform.OS === 'web' ? 0 : 150}
+      cachePolicy="memory-disk"
+    />
+  );
 }
 
 export default function WebScreen() {
@@ -273,13 +306,7 @@ export default function WebScreen() {
                       n.id === graph.focusId && styles.nodeFocused,
                     ]}
                   >
-                    <Image
-                      source={nodeImageSource(n)}
-                      style={styles.nodeImage}
-                      contentFit="cover"
-                      transition={Platform.OS === 'web' ? 0 : 150}
-                      cachePolicy="memory-disk"
-                    />
+                    <NodeFace n={n} />
                   </View>
                   {n.kind === 'external' && (
                     <Text style={styles.nodeArtist} numberOfLines={1}>
@@ -383,6 +410,17 @@ const styles = StyleSheet.create({
   nodeImage: {
     width: '100%',
     height: '100%',
+  },
+  nodeGlyphWrap: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.secondary,
+  },
+  nodeGlyph: {
+    width: '55%',
+    height: '55%',
   },
   nodeArtist: {
     position: 'absolute',

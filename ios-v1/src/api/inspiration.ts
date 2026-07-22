@@ -20,6 +20,10 @@ export type WebNodeArt = {
   file_path: string;
   aspect_ratio: number | null;
   mine: boolean;
+  // Which club medium family this piece belongs to — decides how its node
+  // renders (image thumb / paper page / music note). Backend-wise all three
+  // share the base art table, so inspiration edges don't care.
+  artKind: 'visual' | 'written' | 'audio';
 };
 
 export type WebNodeExternal = {

@@ -334,6 +334,7 @@ function Visual2DPiece({
                   file_path: piece.file_path,
                   aspect_ratio: piece.aspect_ratio,
                   mine: isOwner,
+                  artKind: 'visual',
                 });
                 (webNav as any).navigate('Web', { artId: piece.id });
               }}

@@ -119,12 +119,27 @@ export default function ConnectCreateDialog({ fromArt, linkedIds, onLinked, onCl
                 keyboardShouldPersistTaps="handled"
                 renderItem={({ item }) => (
                   <Pressable style={styles.result} onPress={() => connect(item)}>
-                    <Image
-                      source={item.kind === 'art' ? thumbSource(item.id, item.file_path) : item.image}
-                      style={styles.resultThumb}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
+                    {item.kind === 'art' && item.artKind !== 'visual' ? (
+                      // Written/audio have no visual thumb — inked glyphs.
+                      <View style={[styles.resultThumb, styles.resultGlyphWrap]}>
+                        <Image
+                          source={
+                            item.artKind === 'written'
+                              ? require('../../assets/imgs/bookmark.png')
+                              : require('../../assets/imgs/music.png')
+                          }
+                          style={styles.resultGlyph}
+                          contentFit="contain"
+                        />
+                      </View>
+                    ) : (
+                      <Image
+                        source={item.kind === 'art' ? thumbSource(item.id, item.file_path) : item.image}
+                        style={styles.resultThumb}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+                    )}
                     <View style={styles.resultText}>
                       <Text style={styles.resultTitle} numberOfLines={1}>
                         {item.title || 'untitled'}
@@ -238,6 +253,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.artCardBg,
+  },
+  resultGlyphWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.secondary,
+  },
+  resultGlyph: {
+    width: 26,
+    height: 26,
   },
   resultText: {
     flex: 1,
