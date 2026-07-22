@@ -15,6 +15,7 @@ import {
   setInspirationViewer,
   WebGraph,
   WebNode,
+  WebEdge,
   WebNodeArt,
 } from '../api/inspiration';
 import Spinner from '../components/Spinner';
@@ -23,27 +24,23 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 // The content plane is a large fixed square; node positions (centered on 0,0)
-// are offset by CANVAS_HALF into it, and the plane starts translated so the
-// focus sits mid-screen.
+// are offset by CANVAS_HALF into it. Scale is about the plane's center, so to
+// put a layout point p at screen center at scale s:
+//   translate = SCREEN/2 - CANVAS_HALF - p*s
 const CANVAS = 4000;
 const CANVAS_HALF = CANVAS / 2;
+const PIECE_SCALE = 1; // zoom when centered on a single piece
+const MIN_SCALE = 0.2;
+const MAX_SCALE = 2.5;
 
 type Pos = { x: number; y: number };
 
-// Static force layout — run the simulation to rest, read positions. In
-// focused mode the focus is pinned at the origin (centered); in whole-web
-// mode nothing is pinned so disconnected clusters settle where they land and
-// the centroid stays centered.
-function layoutGraph(g: WebGraph, pinFocus: boolean): Map<string, Pos> {
-  type SimNode = { id: string; x?: number; y?: number; fx?: number | null; fy?: number | null };
+// Static force layout — run the simulation to rest, read positions. Nothing
+// is pinned: the whole web (all clusters) settles naturally with its centroid
+// at the origin, and the camera decides what to frame.
+function layoutGraph(g: WebGraph): Map<string, Pos> {
+  type SimNode = { id: string; x?: number; y?: number };
   const nodes: SimNode[] = g.nodes.map((n) => ({ id: n.id }));
-  if (pinFocus) {
-    const focus = nodes.find((n) => n.id === g.focusId);
-    if (focus) {
-      focus.fx = 0;
-      focus.fy = 0;
-    }
-  }
   const links = g.edges.map((e) => ({ source: e.from, target: e.to }));
   const sim = forceSimulation(nodes as any)
     .force('link', forceLink(links as any).id((d: any) => d.id).distance(150))
@@ -55,15 +52,15 @@ function layoutGraph(g: WebGraph, pinFocus: boolean): Map<string, Pos> {
   return new Map(nodes.map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
 }
 
-// Hop distance from the focus over the returned edges (for node sizing).
-function hopMap(g: WebGraph): Map<string, number> {
-  const hops = new Map<string, number>([[g.focusId, 0]]);
-  let frontier = [g.focusId];
+// Hop distance from a focus node over the edges (drives node sizing).
+function hopMap(edges: WebEdge[], focusId: string): Map<string, number> {
+  const hops = new Map<string, number>([[focusId, 0]]);
+  let frontier = [focusId];
   let hop = 0;
   while (frontier.length) {
     hop += 1;
     const next: string[] = [];
-    for (const e of g.edges) {
+    for (const e of edges) {
       if (hops.has(e.from) && !hops.has(e.to)) {
         hops.set(e.to, hop);
         next.push(e.to);
@@ -84,21 +81,28 @@ function nodeSize(hop: number | undefined): number {
   return 64;
 }
 
-// Ink thread between two node centers; arrowhead points at the inspired
-// piece (`a` = edge.from).
-function Thread({ a, b }: { a: Pos; b: Pos }) {
+// Ink thread between two nodes, trimmed to the circle rims so it's never
+// hidden behind a node, with the arrowhead sitting just outside the inspired
+// piece's rim (`a` = edge.from) pointing into it.
+function Thread({ a, b, ra, rb }: { a: Pos; b: Pos; ra: number; rb: number }) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const gap = 3;
+  const sx = a.x + ux * (ra + gap);
+  const sy = a.y + uy * (ra + gap);
+  const seg = Math.max(1, len - ra - rb - gap * 2);
   const ang = Math.atan2(dy, dx);
   return (
     <View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: a.x + CANVAS_HALF,
-        top: a.y + CANVAS_HALF,
-        width: len,
+        left: sx + CANVAS_HALF,
+        top: sy + CANVAS_HALF,
+        width: seg,
         height: 2,
         backgroundColor: '#222',
         opacity: 0.7,
@@ -106,10 +110,12 @@ function Thread({ a, b }: { a: Pos; b: Pos }) {
         transformOrigin: 'left center',
       }}
     >
+      {/* Arrowhead at the start (the inspired piece's rim), tip pointing back
+          into that piece. */}
       <View
         style={{
           position: 'absolute',
-          left: len * 0.4,
+          left: 0,
           top: -4,
           width: 0,
           height: 0,
@@ -125,29 +131,22 @@ function Thread({ a, b }: { a: Pos; b: Pos }) {
   );
 }
 
-// What fills a node's circle: image thumbs for visual/external art, the
-// inked page/note glyphs for written and audio pieces (their content has no
-// visual thumbnail).
+// What fills a node's circle: image thumbs for visual/external art, the inked
+// writing-lines glyph for written pieces and the music-note glyph for audio
+// (their content has no visual thumbnail). The writing glyph is deliberately
+// NOT the dog-eared page, which already means saved/bookmark.
 function NodeFace({ n }: { n: WebNode }) {
   if (n.kind === 'art' && n.artKind === 'written') {
     return (
       <View style={styles.nodeGlyphWrap}>
-        <Image
-          source={require('../../assets/imgs/bookmark.png')}
-          style={styles.nodeGlyph}
-          contentFit="contain"
-        />
+        <Image source={require('../../assets/imgs/writing.png')} style={styles.nodeGlyph} contentFit="contain" />
       </View>
     );
   }
   if (n.kind === 'art' && n.artKind === 'audio') {
     return (
       <View style={styles.nodeGlyphWrap}>
-        <Image
-          source={require('../../assets/imgs/music.png')}
-          style={styles.nodeGlyph}
-          contentFit="contain"
-        />
+        <Image source={require('../../assets/imgs/music.png')} style={styles.nodeGlyph} contentFit="contain" />
       </View>
     );
   }
@@ -168,54 +167,115 @@ export default function WebScreen() {
   const { currentUser } = useAuth();
   const entryArtId: string = route.params?.artId;
 
+  // One graph — the whole web plus the entry piece (guaranteed present even
+  // if it has no connections yet). The camera starts zoomed onto the entry
+  // piece; panning/zooming out reveals the rest of the constellation.
   const [graph, setGraph] = useState<WebGraph | null>(null);
   const [positions, setPositions] = useState<Map<string, Pos>>(new Map());
+  const [focusId, setFocusId] = useState<string>(entryArtId);
+  const [zoomedOut, setZoomedOut] = useState(false);
   const [linkFrom, setLinkFrom] = useState<WebNodeArt | null>(null);
-  const [mode, setMode] = useState<'focused' | 'full'>('focused');
 
-  // Canvas pan/zoom.
+  // Canvas camera (plane transform).
   const txv = useSharedValue(SCREEN_W / 2 - CANVAS_HALF);
   const tyv = useSharedValue(SCREEN_H / 2 - CANVAS_HALF);
   const scalev = useSharedValue(1);
   const startTx = useSharedValue(0);
   const startTy = useSharedValue(0);
   const startScale = useSharedValue(1);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
 
   useEffect(() => {
     setInspirationViewer(currentUser);
   }, [currentUser]);
 
-  // Lay a graph out and recentre the plane on the origin (pinned focus in
-  // focused mode, centroid in whole-web mode). Whole-web starts zoomed out so
-  // more of the constellation is in frame.
-  const applyGraph = useCallback((g: WebGraph, pin: boolean) => {
-    setGraph(g);
-    setPositions(layoutGraph(g, pin));
-    txv.value = withTiming(SCREEN_W / 2 - CANVAS_HALF, { duration: 240 });
-    tyv.value = withTiming(SCREEN_H / 2 - CANVAS_HALF, { duration: 240 });
-    scalev.value = withTiming(pin ? 1 : 0.55, { duration: 240 });
+  // Point the camera at a layout position (scale about the plane center).
+  const centerOnPos = useCallback((p: Pos, s: number, animate: boolean) => {
+    const tx = SCREEN_W / 2 - CANVAS_HALF - p.x * s;
+    const ty = SCREEN_H / 2 - CANVAS_HALF - p.y * s;
+    if (animate) {
+      txv.value = withTiming(tx, { duration: 300 });
+      tyv.value = withTiming(ty, { duration: 300 });
+      scalev.value = withTiming(s, { duration: 300 });
+    } else {
+      txv.value = tx;
+      tyv.value = ty;
+      scalev.value = s;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const focusNode = useCallback((id: string) => {
-    setMode('focused');
-    getWeb(id)
-      .then((g) => applyGraph(g, true))
-      .catch(() => {});
-  }, [applyGraph]);
+  // Frame the entire layout (bounding box + margin).
+  const fitAll = useCallback((pos: Map<string, Pos>, animate: boolean) => {
+    const pts = [...pos.values()];
+    if (!pts.length) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const spanX = maxX - minX + 240;
+    const spanY = maxY - minY + 340;
+    const s = Math.max(MIN_SCALE, Math.min(1, Math.min(SCREEN_W / spanX, SCREEN_H / spanY)));
+    centerOnPos({ x: cx, y: cy }, s, animate);
+  }, [centerOnPos]);
 
-  const showFullWeb = useCallback(() => {
-    setMode('full');
-    getFullWeb()
-      .then((g) => applyGraph(g, false))
+  // Fetch the whole web ∪ the entry/center piece, lay it out, and frame it.
+  const loadWeb = useCallback((centerId: string, out: boolean) => {
+    Promise.all([getFullWeb(), getWeb(centerId)])
+      .then(([full, one]) => {
+        const nodeMap = new Map<string, WebNode>();
+        [...full.nodes, ...one.nodes].forEach((n) => nodeMap.set(n.id, n));
+        const edgeMap = new Map<string, WebEdge>();
+        [...full.edges, ...one.edges].forEach((e) => edgeMap.set(e.id, e));
+        const merged: WebGraph = { focusId: centerId, nodes: [...nodeMap.values()], edges: [...edgeMap.values()] };
+        const pos = layoutGraph(merged);
+        setGraph(merged);
+        setPositions(pos);
+        setFocusId(centerId);
+        setZoomedOut(out);
+        if (out) fitAll(pos, false);
+        else centerOnPos(pos.get(centerId) ?? { x: 0, y: 0 }, PIECE_SCALE, false);
+      })
       .catch(() => {});
-  }, [applyGraph]);
+  }, [centerOnPos, fitAll]);
 
   useEffect(() => {
-    if (entryArtId) focusNode(entryArtId);
-  }, [entryArtId, focusNode]);
+    if (entryArtId) loadWeb(entryArtId, false);
+  }, [entryArtId, loadWeb]);
+
+  // Tap a node → glide the camera onto it (no refetch; positions are stable).
+  const tapNode = useCallback((id: string) => {
+    setFocusId(id);
+    setZoomedOut(false);
+    const p = positions.get(id);
+    if (p) centerOnPos(p, PIECE_SCALE, true);
+  }, [positions, centerOnPos]);
+
+  const toggleWhole = useCallback(() => {
+    if (zoomedOut) {
+      setZoomedOut(false);
+      const p = positions.get(focusId);
+      if (p) centerOnPos(p, PIECE_SCALE, true);
+    } else {
+      setZoomedOut(true);
+      fitAll(positions, true);
+    }
+  }, [zoomedOut, positions, focusId, centerOnPos, fitAll]);
+
+  // After linking/unlinking, refetch so new nodes/edges enter the layout.
+  const refresh = useCallback(() => loadWeb(focusId, zoomedOut), [loadWeb, focusId, zoomedOut]);
 
   const pan = Gesture.Pan()
+    .maxPointers(1)
     .onStart(() => {
       startTx.value = txv.value;
       startTy.value = tyv.value;
@@ -224,16 +284,30 @@ export default function WebScreen() {
       txv.value = startTx.value + e.translationX;
       tyv.value = startTy.value + e.translationY;
     });
+  // Focal-anchored pinch: the point under your fingers stays put while the
+  // canvas scales around it.
   const pinch = Gesture.Pinch()
-    .onStart(() => {
+    .onStart((e) => {
       startScale.value = scalev.value;
+      startTx.value = txv.value;
+      startTy.value = tyv.value;
+      focalX.value = e.focalX;
+      focalY.value = e.focalY;
     })
     .onUpdate((e) => {
-      scalev.value = Math.min(2.5, Math.max(0.4, startScale.value * e.scale));
+      const s = Math.min(MAX_SCALE, Math.max(MIN_SCALE, startScale.value * e.scale));
+      const cx = startTx.value + CANVAS_HALF;
+      const cy = startTy.value + CANVAS_HALF;
+      const ratio = s / startScale.value;
+      const cx2 = focalX.value - (focalX.value - cx) * ratio;
+      const cy2 = focalY.value - (focalY.value - cy) * ratio;
+      scalev.value = s;
+      txv.value = cx2 - CANVAS_HALF;
+      tyv.value = cy2 - CANVAS_HALF;
     });
   const gestures = Gesture.Simultaneous(pan, pinch);
 
-  // Web dev preview: ctrl+wheel zooms the canvas.
+  // Web dev preview: ctrl+wheel = pinch, anchored at the cursor.
   const rootRef = useRef<any>(null);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -242,7 +316,16 @@ export default function WebScreen() {
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      scalev.value = Math.min(2.5, Math.max(0.4, scalev.value * (1 - e.deltaY / 300)));
+      const s0 = scalev.value;
+      const s = Math.min(MAX_SCALE, Math.max(MIN_SCALE, s0 * (1 - e.deltaY / 300)));
+      const cx = txv.value + CANVAS_HALF;
+      const cy = tyv.value + CANVAS_HALF;
+      const ratio = s / s0;
+      const cx2 = e.clientX - (e.clientX - cx) * ratio;
+      const cy2 = e.clientY - (e.clientY - cy) * ratio;
+      scalev.value = s;
+      txv.value = cx2 - CANVAS_HALF;
+      tyv.value = cy2 - CANVAS_HALF;
     };
     node.addEventListener('wheel', onWheel, { passive: false });
     return () => node.removeEventListener('wheel', onWheel);
@@ -250,33 +333,23 @@ export default function WebScreen() {
   }, []);
 
   const planeStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: txv.value },
-      { translateY: tyv.value },
-      { scale: scalev.value },
-    ],
+    transform: [{ translateX: txv.value }, { translateY: tyv.value }, { scale: scalev.value }],
   }));
 
-  const hops = useMemo(() => (graph ? hopMap(graph) : new Map<string, number>()), [graph]);
-  const focused = graph?.nodes.find((n) => n.id === graph.focusId) ?? null;
+  const hops = useMemo(
+    () => (graph ? hopMap(graph.edges, focusId) : new Map<string, number>()),
+    [graph, focusId],
+  );
+  const focused = graph?.nodes.find((n) => n.id === focusId) ?? null;
 
-  // The focused piece's own outgoing threads (for the caption's delete chips)
-  // and everything already linked (filtered out of the connect pane).
   const focusedOutgoing = useMemo(() => {
-    if (!graph) return [] as { edge: { id: string; from: string; to: string }; target: WebNode }[];
+    if (!graph) return [] as { edge: WebEdge; target: WebNode }[];
     return graph.edges
-      .filter((e) => e.from === graph.focusId)
+      .filter((e) => e.from === focusId)
       .map((edge) => ({ edge, target: graph.nodes.find((n) => n.id === edge.to)! }))
       .filter((x) => !!x.target);
-  }, [graph]);
-  const linkedIds = useMemo(
-    () => new Set(focusedOutgoing.map((x) => x.target.id)),
-    [focusedOutgoing],
-  );
-
-  const refresh = useCallback(() => {
-    if (graph) focusNode(graph.focusId);
-  }, [graph, focusNode]);
+  }, [graph, focusId]);
+  const linkedIds = useMemo(() => new Set(focusedOutgoing.map((x) => x.target.id)), [focusedOutgoing]);
 
   const openLinker = useCallback((n: WebNode) => {
     if (n.kind !== 'art' || !n.mine) return;
@@ -293,7 +366,9 @@ export default function WebScreen() {
               const a = positions.get(e.from);
               const b = positions.get(e.to);
               if (!a || !b) return null;
-              return <Thread key={e.id} a={a} b={b} />;
+              const ra = nodeSize(hops.get(e.from)) / 2;
+              const rb = nodeSize(hops.get(e.to)) / 2;
+              return <Thread key={e.id} a={a} b={b} ra={ra} rb={rb} />;
             })}
           {graph &&
             graph.nodes.map((n) => {
@@ -303,7 +378,7 @@ export default function WebScreen() {
               return (
                 <Pressable
                   key={n.id}
-                  onPress={() => n.id !== graph.focusId && focusNode(n.id)}
+                  onPress={() => n.id !== focusId && tapNode(n.id)}
                   onLongPress={() => openLinker(n)}
                   delayLongPress={450}
                   style={[
@@ -323,7 +398,7 @@ export default function WebScreen() {
                     style={[
                       styles.nodeCircle,
                       { borderRadius: size / 2 },
-                      n.id === graph.focusId && styles.nodeFocused,
+                      n.id === focusId && styles.nodeFocused,
                     ]}
                   >
                     <NodeFace n={n} />
@@ -350,24 +425,26 @@ export default function WebScreen() {
       </Pressable>
 
       <Pressable
-        style={[styles.toggleBtn, mode === 'full' && styles.toggleBtnActive]}
-        onPress={() => (mode === 'full' ? focusNode(entryArtId) : showFullWeb())}
+        style={[styles.toggleBtn, zoomedOut && styles.toggleBtnActive]}
+        onPress={toggleWhole}
         hitSlop={8}
       >
         <Image source={require('../../assets/imgs/web.png')} style={styles.toggleIcon} contentFit="contain" />
-        <Text style={styles.toggleText}>{mode === 'full' ? 'this piece' : 'whole web'}</Text>
+        <Text style={styles.toggleText}>{zoomedOut ? 'this piece' : 'whole web'}</Text>
       </Pressable>
 
-      {mode === 'full' && graph && (
+      {zoomedOut && graph && (
         <View style={styles.caption} pointerEvents="none">
           <Text style={styles.captionTitle}>whole web</Text>
           <Text style={styles.captionByline}>
-            {graph.nodes.length} connected {graph.nodes.length === 1 ? 'piece' : 'pieces'} · tap one to focus
+            {graph.edges.length > 0
+              ? `${new Set(graph.edges.flatMap((e) => [e.from, e.to])).size} connected pieces · tap one to focus`
+              : 'no connections yet'}
           </Text>
         </View>
       )}
 
-      {mode === 'focused' && focused && (
+      {!zoomedOut && focused && (
         <View style={styles.caption} pointerEvents="box-none">
           <View style={styles.captionRow}>
             <View style={styles.captionText}>
@@ -375,9 +452,7 @@ export default function WebScreen() {
                 {focused.title || 'untitled'}
               </Text>
               <Text style={styles.captionByline} numberOfLines={1}>
-                {focused.kind === 'art'
-                  ? `${focused.creator} · ${focused.medium}`
-                  : focused.artist}
+                {focused.kind === 'art' ? `${focused.creator} · ${focused.medium}` : focused.artist}
               </Text>
             </View>
             {focused.kind === 'art' && focused.mine && (
@@ -393,12 +468,7 @@ export default function WebScreen() {
                   <Text style={styles.chipText} numberOfLines={1}>
                     {target.kind === 'art' ? target.title || 'untitled' : target.artist}
                   </Text>
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => {
-                      removeInspiration(edge.id).then(refresh).catch(() => {});
-                    }}
-                  >
+                  <Pressable hitSlop={8} onPress={() => removeInspiration(edge.id).then(refresh).catch(() => {})}>
                     <Text style={styles.chipX}>×</Text>
                   </Pressable>
                 </View>

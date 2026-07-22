@@ -125,7 +125,7 @@ export default function ConnectCreateDialog({ fromArt, linkedIds, onLinked, onCl
                         <Image
                           source={
                             item.artKind === 'written'
-                              ? require('../../assets/imgs/bookmark.png')
+                              ? require('../../assets/imgs/writing.png')
                               : require('../../assets/imgs/music.png')
                           }
                           style={styles.resultGlyph}
