@@ -399,19 +399,26 @@ export default function WebScreen() {
                   {/* Circular frame: threads meet the rim instead of hiding
                       behind square image corners. The clipping circle is a
                       child so the artist label below isn't clipped. */}
-                  <View
-                    style={[
-                      styles.nodeCircle,
-                      { borderRadius: size / 2 },
-                      n.id === focusId && styles.nodeFocused,
-                      // Outside-the-club pieces wear a slightly wider pale-red
-                      // ring instead of a name label (the caption names the
-                      // artist when you focus them).
-                      n.kind === 'external' && styles.nodeExternal,
-                    ]}
-                  >
-                    <NodeFace n={n} />
-                  </View>
+                  {n.kind === 'external' ? (
+                    // Outside-the-club pieces: a thick gold ring with a thin
+                    // black outline around it (no name label — the caption
+                    // names the artist on focus).
+                    <View style={[styles.nodeOuterBlack, { borderRadius: size / 2 }]}>
+                      <View style={[styles.nodeGoldRing, { borderRadius: size / 2 }]}>
+                        <NodeFace n={n} />
+                      </View>
+                    </View>
+                  ) : (
+                    <View
+                      style={[
+                        styles.nodeCircle,
+                        { borderRadius: size / 2 },
+                        n.id === focusId && styles.nodeFocused,
+                      ]}
+                    >
+                      <NodeFace n={n} />
+                    </View>
+                  )}
                 </Pressable>
               );
             })}
@@ -537,10 +544,20 @@ const styles = StyleSheet.create({
   nodeFocused: {
     borderWidth: 3,
   },
-  // External (non-club) pieces: a soft, slightly wider red ring.
-  nodeExternal: {
-    borderColor: Colors.redCoral,
-    borderWidth: 4,
+  // External (non-club) pieces: thin black outline around a thick gold ring.
+  nodeOuterBlack: {
+    width: '100%',
+    height: '100%',
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  nodeGoldRing: {
+    width: '100%',
+    height: '100%',
+    borderWidth: 6,
+    borderColor: Colors.primaryGold,
+    backgroundColor: Colors.artCardBg,
+    overflow: 'hidden',
   },
   nodeImage: {
     width: '100%',
