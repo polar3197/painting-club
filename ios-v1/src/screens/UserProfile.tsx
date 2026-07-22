@@ -285,10 +285,14 @@ function Visual2DPiece({
                     // span the full art-element width with the same edge inset
                     // on both sides.
                     <Pressable
-                      style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnStretch]}
+                      style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnStretch, styles.commentsBtnIconWrap]}
                       onPress={() => setShowComments(true)}
                     >
-                      <Text style={styles.artBtnText}>comments</Text>
+                      <Image
+                        source={require('../../assets/imgs/comment-bubble.png')}
+                        style={styles.commentsBtnIcon}
+                        contentFit="contain"
+                      />
                     </Pressable>
                   )}
                   <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
@@ -301,10 +305,14 @@ function Visual2DPiece({
                   // the full row width so it reads as the primary (only) action,
                   // matching the visual weight of the owner-side three-button row.
                   <Pressable
-                    style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnFull]}
+                    style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnFull, styles.commentsBtnIconWrap]}
                     onPress={() => setShowComments(true)}
                   >
-                    <Text style={styles.artBtnText}>comments</Text>
+                    <Image
+                      source={require('../../assets/imgs/comment-bubble.png')}
+                      style={styles.commentsBtnIcon}
+                      contentFit="contain"
+                    />
                   </Pressable>
                 )
               )}
@@ -1752,6 +1760,16 @@ const styles = StyleSheet.create({
   },
   commentsBtn: {
     backgroundColor: Colors.secondary,
+  },
+  // Icon variant of the comments button (Charlie's hand-drawn bubble).
+  commentsBtnIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  commentsBtnIcon: {
+    width: 26,
+    height: 22,
   },
   commentsBtnFull: {
     alignSelf: 'stretch',

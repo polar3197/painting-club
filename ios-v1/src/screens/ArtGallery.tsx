@@ -612,12 +612,13 @@ const styles = StyleSheet.create({
   },
   // Feed (1 per row): profile-page-style art element — bordered card with a
   // framed true-ratio artwork, details block, and comments/bookmark footer.
+  // White fill matches the profile art elements' default card color.
   feedElement: {
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#000',
     padding: 12,
-    backgroundColor: Colors.artCardBg,
+    backgroundColor: Colors.white,
   },
   feedVisual: {
     width: '100%',

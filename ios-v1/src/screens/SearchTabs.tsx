@@ -18,8 +18,11 @@ import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ArtGallery from './ArtGallery';
 import People from './People';
+import * as SecureStore from 'expo-secure-store';
 import { Colors, Fonts } from '../constants/theme';
 import PinchHint, { markPinchHintSeen } from '../components/PinchHint';
+
+const GRID_COLUMNS_KEY = 'grid_columns';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HALF = SCREEN_WIDTH / 2;
@@ -82,9 +85,20 @@ export default function SearchTabs() {
   // Posts-per-row target (1..4), driven by the pinch gesture: 1 is the
   // full-width feed with details, 4 the dense gallery. Each grid still caps
   // this with its count-based formula. Replaces the old density slider.
+  // Persisted so the grid greets you at whatever density you left it.
   const [columns, setColumns] = useState(4);
   const columnsRef = useRef(columns);
   columnsRef.current = columns;
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    SecureStore.getItemAsync(GRID_COLUMNS_KEY)
+      .then((v) => {
+        const c = v ? parseInt(v, 10) : NaN;
+        // Don't clobber a pinch that happened before the read resolved.
+        if (!restoredRef.current && c >= 1 && c <= 4) setColumns(c);
+      })
+      .catch(() => {});
+  }, []);
   const [keyboardUp, setKeyboardUp] = useState(false);
 
   // The grids animate the column swap themselves (dim-crossfade around the
@@ -92,6 +106,8 @@ export default function SearchTabs() {
   // what made the swap flash.
   const handleColumnsChange = useCallback((c: number) => {
     markPinchHintSeen();
+    restoredRef.current = true;
+    SecureStore.setItemAsync(GRID_COLUMNS_KEY, String(c)).catch(() => {});
     setColumns(c);
   }, []);
 

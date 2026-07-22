@@ -261,16 +261,26 @@ export default function WebScreen() {
                       width: size,
                       height: size,
                     },
-                    n.id === graph.focusId && styles.nodeFocused,
                   ]}
                 >
-                  <Image
-                    source={nodeImageSource(n)}
-                    style={styles.nodeImage}
-                    contentFit="cover"
-                    transition={Platform.OS === 'web' ? 0 : 150}
-                    cachePolicy="memory-disk"
-                  />
+                  {/* Circular frame: threads meet the rim instead of hiding
+                      behind square image corners. The clipping circle is a
+                      child so the artist label below isn't clipped. */}
+                  <View
+                    style={[
+                      styles.nodeCircle,
+                      { borderRadius: size / 2 },
+                      n.id === graph.focusId && styles.nodeFocused,
+                    ]}
+                  >
+                    <Image
+                      source={nodeImageSource(n)}
+                      style={styles.nodeImage}
+                      contentFit="cover"
+                      transition={Platform.OS === 'web' ? 0 : 150}
+                      cachePolicy="memory-disk"
+                    />
+                  </View>
                   {n.kind === 'external' && (
                     <Text style={styles.nodeArtist} numberOfLines={1}>
                       {n.artist}
@@ -358,9 +368,14 @@ const styles = StyleSheet.create({
   },
   node: {
     position: 'absolute',
+  },
+  nodeCircle: {
+    width: '100%',
+    height: '100%',
     borderWidth: 2,
     borderColor: '#000',
     backgroundColor: Colors.artCardBg,
+    overflow: 'hidden',
   },
   nodeFocused: {
     borderWidth: 3,
