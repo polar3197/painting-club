@@ -212,8 +212,6 @@ export default function RootNavigator() {
       />
       <RootStack.Screen name="Ethos" component={Ethos} />
       <RootStack.Screen name="Web" component={WebScreen} />
-      {/* Reachable from the Web screen's caption (tap a piece → its page). */}
-      <RootStack.Screen name="WebUserProfile" component={UserProfile} />
       <RootStack.Screen name="Settings" component={Settings} />
       <RootStack.Screen name="UserStats" component={UserStats} />
       <RootStack.Screen name="InfraStats" component={InfraStats} />

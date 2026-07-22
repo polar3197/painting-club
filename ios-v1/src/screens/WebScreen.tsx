@@ -459,10 +459,15 @@ export default function WebScreen() {
               disabled={focused.kind !== 'art'}
               onPress={() => {
                 if (focused.kind !== 'art') return;
-                navigation.navigate('WebUserProfile', {
-                  username: focused.creator,
-                  artId: focused.id,
-                  medium: focused.medium,
+                // Route into the Search tab's profile so the bottom tab bar
+                // stays (the Web screen sits above the tabs on the root stack;
+                // a root-level profile would come up chromeless).
+                navigation.navigate('Main', {
+                  screen: 'SearchTab',
+                  params: {
+                    screen: 'UserProfile',
+                    params: { username: focused.creator, artId: focused.id, medium: focused.medium },
+                  },
                 });
               }}
             >
