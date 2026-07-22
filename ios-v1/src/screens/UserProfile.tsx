@@ -143,6 +143,9 @@ function Visual2DPiece({
 }) {
   const { token, currentUser } = useAuth();
   const webNav = useNavigation<any>();
+  const webRoute = useRoute<any>();
+  // Whose profile this piece renders on — the Me tab has no route param.
+  const profileUsername = piece.username || webRoute.params?.username || currentUser || '';
   const [showComments, setShowComments] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   // Start from the server-provided ratio captured at upload, but override it
@@ -315,8 +318,11 @@ function Visual2DPiece({
                   kind: 'art',
                   id: piece.id,
                   title: piece.title,
-                  creator: piece.username,
-                  medium: piece.medium,
+                  // Per-member endpoints leave username/medium implicit in the
+                  // URL, so the piece rows may not carry them — fall back to
+                  // the profile context.
+                  creator: profileUsername,
+                  medium: piece.medium || '',
                   file_path: piece.file_path,
                   aspect_ratio: piece.aspect_ratio,
                   mine: isOwner,

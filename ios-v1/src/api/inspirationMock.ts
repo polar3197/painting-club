@@ -26,8 +26,20 @@ export function setViewer(username: string | null) {
 export function registerArt(node: WebNodeArt) {
   const existing = nodes.get(node.id);
   if (existing && existing.kind === 'art') {
-    // Keep any seed data, refresh ownership against the current viewer.
-    existing.mine = existing.creator === viewer;
+    // Merge, preferring defined incoming fields — an entry point with partial
+    // info (e.g. the profile page) must not clobber seeded data, and seeding
+    // must be able to fill blanks left by an early partial registration.
+    const merged: WebNodeArt = {
+      ...existing,
+      title: node.title ?? existing.title,
+      creator: node.creator ?? existing.creator,
+      medium: node.medium ?? existing.medium,
+      file_path: node.file_path ?? existing.file_path,
+      aspect_ratio: node.aspect_ratio ?? existing.aspect_ratio,
+      mine: false,
+    };
+    merged.mine = merged.creator === viewer;
+    nodes.set(node.id, merged);
     return;
   }
   nodes.set(node.id, { ...node, mine: node.creator === viewer });
