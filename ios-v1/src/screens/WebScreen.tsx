@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force';
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
 import { useAuth } from '../context/AuthContext';
 import { thumbSource } from '../api';
 import * as Haptics from 'expo-haptics';
@@ -47,6 +47,11 @@ function layoutGraph(g: WebGraph): Map<string, Pos> {
     .force('charge', forceManyBody().strength(-420))
     .force('center', forceCenter(0, 0))
     .force('collide', forceCollide(72))
+    // Gentle pull toward the origin so disconnected clusters gather near the
+    // pack instead of drifting off on the charge force alone. Connected nodes
+    // resist it through their links; lone clusters yield and close the gap.
+    .force('x', forceX(0).strength(0.06))
+    .force('y', forceY(0).strength(0.06))
     .stop();
   for (let i = 0; i < 300; i++) sim.tick();
   return new Map(nodes.map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
