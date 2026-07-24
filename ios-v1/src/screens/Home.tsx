@@ -154,7 +154,7 @@ const REST_DAMPING = 0.7;       // per-second exponential velocity decay (light)
 const MIN_SPEED = 24;           // px/s below which the ball is treated as at rest
 
 const PROMPT_RED = '#E30022';
-const RING_THICKNESS = 6;      // matches styles.ball's borderWidth
+const RING_THICKNESS = 10;     // chunkier than the ball's 6px border so the day gauge reads at a glance
 const PROMPT_LIFESPAN_DAYS = 7;
 
 // Fraction of the prompt's 7-day life still left, 1 → 0. Null when the backend
@@ -232,7 +232,8 @@ function PromptLifespanRing({ remaining }: { remaining: number }) {
           }}
         />
       </View>
-      {/* Day dividers: a thin spoke per chunk boundary, drawn before the
+      {/* Day dividers: a black spoke per chunk boundary (black so it reads on
+          both the red fill and the spent white band), drawn before the
           punch-out so only the piece crossing the band survives. */}
       {Array.from({ length: PROMPT_LIFESPAN_DAYS }, (_, k) => (
         <View
@@ -240,7 +241,7 @@ function PromptLifespanRing({ remaining }: { remaining: number }) {
           style={{
             position: 'absolute', left: S / 2 - 1, top: 0,
             width: 2, height: S / 2,
-            backgroundColor: Colors.secondary,
+            backgroundColor: '#000',
             transformOrigin: 'center bottom',
             transform: [{ rotate: `${(k * 360) / PROMPT_LIFESPAN_DAYS}deg` }],
           }}
@@ -429,14 +430,15 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
     const maxX = W.value - BALL_SIZE;
     const maxY = H.value - BALL_SIZE;
 
-    // Lazy init: drop both balls at well-separated (non-overlapping) spots at
-    // REST — the big vertical gap keeps their centers > BALL_SIZE apart on any
-    // screen; the collision pass below is a safety net regardless.
+    // Lazy init: drop both balls at REST in the lower half of the arena —
+    // thumb-reachable — roughly centered as a pair, with enough diagonal gap
+    // to keep their centers apart; the collision pass below is a safety net
+    // on cramped screens regardless.
     if (!inited.value) {
-      p0x.value = maxX * 0.16;
-      p0y.value = maxY * 0.06;
-      p1x.value = maxX * 0.64;
-      p1y.value = maxY * 0.78;
+      p0x.value = maxX * 0.18;
+      p0y.value = maxY * 0.48;
+      p1x.value = maxX * 0.62;
+      p1y.value = maxY * 0.84;
       inited.value = true;
     }
 
