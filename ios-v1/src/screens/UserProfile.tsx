@@ -476,20 +476,23 @@ export default function UserProfile() {
   }, [profile, selectedMedium]);
 
   const pickAndUploadProfilePic = async () => {
-    if (!profile) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-      // Square crop so the pic fills the profile's 1:1 avatar box as framed.
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
-    const name = asset.uri.split('/').pop() || 'pic.jpg';
-    const type = asset.mimeType || 'image/jpeg';
+    // Busy from the very first tap: the system picker takes a beat to present,
+    // and with no reaction people tap again (queueing duplicate pickers) — the
+    // spinner shows instantly and the guard swallows re-taps.
+    if (!profile || picBusy) return;
     setPicBusy(true);
     try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        // Square crop so the pic fills the profile's 1:1 avatar box as framed.
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const name = asset.uri.split('/').pop() || 'pic.jpg';
+      const type = asset.mimeType || 'image/jpeg';
       const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
       // The upload endpoint returns an UNSIGNED /static/profile path. Under the
       // member-only lockdown nginx rejects unsigned /static/profile URLs (403), so

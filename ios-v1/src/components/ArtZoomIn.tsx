@@ -433,8 +433,13 @@ export default function ArtZoomIn({
               flip/zoom mechanics stay isolated to the picture itself. */}
           {isOwner && onChangePic && (
             <Pressable
-              style={[styles.changePicBelow, { width: cappedWidth }]}
+              style={({ pressed }) => [
+                styles.changePicBelow,
+                { width: cappedWidth },
+                pressed && { opacity: 0.4 },
+              ]}
               onPress={onChangePic}
+              disabled={busy}
             >
               <Text style={styles.changePicBelowText}>change pic</Text>
             </Pressable>
