@@ -26,7 +26,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { resolveImageUrl, stableCacheKey, thumbSource, block_user, unblock_user } from '../api';
+import { resolveImageUrl, stableCacheKey, thumbSource, displaySource, block_user, unblock_user } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
@@ -244,6 +244,7 @@ export default function ArtCarousel({ pieces, elements, initialPieceIndex, initi
                       // it paints instantly as a placeholder — swiping shows the
                       // soft thumb and sharpens to full-res instead of blank→pop.
                       thumb={thumbSource(el.piece.id, el.piece.file_path)}
+                      display={displaySource(el.piece.id, el.piece.file_path)}
                       width={screenW}
                       height={screenH}
                       topInset={imgTopInset}
@@ -376,6 +377,7 @@ export default function ArtCarousel({ pieces, elements, initialPieceIndex, initi
 function ZoomablePage({
   uri,
   thumb,
+  display,
   width,
   height,
   topInset = 0,
@@ -385,6 +387,11 @@ function ZoomablePage({
 }: {
   uri: string;
   thumb?: { uri: string; headers?: Record<string, string>; cacheKey?: string };
+  // Mid-res (~1600px) display derivative — preferred over the original `uri`
+  // for normal viewing since it lands 50-100x faster. On load error (backend
+  // predates the route, gen failed) we fall back to the original, so callers
+  // can pass it unconditionally regardless of backend version.
+  display?: { uri: string; headers?: Record<string, string>; cacheKey?: string };
   width: number;
   height: number;
   topInset?: number;
@@ -394,6 +401,8 @@ function ZoomablePage({
 }) {
   const ref = useRef<ScrollView>(null);
   const wasZoomed = useRef(false);
+  const [displayFailed, setDisplayFailed] = useState(false);
+  const useDisplay = !!display && !displayFailed;
 
   // When this page scrolls offscreen, snap it back to 1x.
   React.useEffect(() => {
@@ -430,13 +439,14 @@ function ZoomablePage({
       }}
     >
       <Image
-        source={{ uri, cacheKey: stableCacheKey(uri) }}
-        // Cached 512px thumb shows immediately under the loading full-res, and
+        source={useDisplay ? display : { uri, cacheKey: stableCacheKey(uri) }}
+        // Cached 512px thumb shows immediately under the loading image, and
         // the crossfade (slower than the grid's) reads as a sharpen rather than a
-        // snap when the original finally lands.
+        // snap when the display derivative (or fallback original) lands.
         placeholder={thumb}
         placeholderContentFit="contain"
         transition={450}
+        onError={useDisplay ? () => setDisplayFailed(true) : undefined}
         // Inset from the screen edges so wide pieces don't run full-bleed.
         // contentFit="contain" keeps every piece's own proportions; the page
         // itself stays screen-width so paging still snaps cleanly. Height is the
@@ -520,6 +530,7 @@ function CollectionPage({
             key={p.id}
             uri={resolveImageUrl(p.file_path)}
             thumb={thumbSource(p.id, p.file_path)}
+            display={displaySource(p.id, p.file_path)}
             width={width}
             height={height}
             active={active && i === sub}

@@ -24,10 +24,6 @@ import {
   get_active_prompt,
   PromptSuggestionOut,
   PromptOut,
-  get_admin_members,
-  set_member_role,
-  AdminMemberOut,
-  MemberRole,
 } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -74,39 +70,6 @@ function PromptSuggestionRow({
           </Pressable>
         </View>
       )}
-    </View>
-  );
-}
-
-const ROLE_TIERS: MemberRole[] = ['member', 'contributor', 'admin'];
-
-function MemberRoleRow({
-  m,
-  onSetRole,
-}: {
-  m: AdminMemberOut;
-  onSetRole: (username: string, role: MemberRole) => void;
-}) {
-  const name = [m.firstname, m.lastname].filter(Boolean).join(' ');
-  return (
-    <View style={styles.memberRow}>
-      <Text style={styles.memberName}>
-        @{m.username}
-        {name ? `  ·  ${name}` : ''}
-      </Text>
-      <View style={styles.roleChips}>
-        {ROLE_TIERS.map((r) => (
-          <Pressable
-            key={r}
-            style={[styles.roleChip, m.role === r && styles.roleChipOn]}
-            onPress={() => m.role !== r && onSetRole(m.username, r)}
-          >
-            <Text style={[styles.roleChipText, m.role === r && styles.roleChipTextOn]}>
-              {r}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
     </View>
   );
 }
@@ -715,40 +678,6 @@ const styles = StyleSheet.create({
   promptBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
-  },
-  memberRow: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.white,
-    padding: 12,
-    marginBottom: 8,
-    gap: 8,
-  },
-  memberName: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-  },
-  roleChips: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  roleChip: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.secondary,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  roleChipOn: {
-    backgroundColor: Colors.primaryGold,
-  },
-  roleChipText: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    color: Colors.textSecondary,
-  },
-  roleChipTextOn: {
-    color: '#000',
   },
   row: {
     flexDirection: 'row',

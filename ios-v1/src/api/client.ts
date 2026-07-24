@@ -139,6 +139,29 @@ export function thumbSource(
   };
 }
 
+export function displayUrl(artId: string): string {
+  return `${API_BASE}/art/${artId}/display`;
+}
+
+/** expo-image source for the (auth-gated) ~1600px display route — the main
+ *  viewer (profile art elements + zoom carousel) loads this instead of the
+ *  multi-MB original. Same version/cacheKey scheme as thumbSource. 404s on a
+ *  backend that predates the route, so callers must fall back to the original
+ *  (imageSource) on error. */
+export function displaySource(
+  artId: string,
+  version?: string | null,
+): { uri: string; headers?: Record<string, string>; cacheKey?: string } {
+  const v = version ? stableCacheKey(version) : undefined;
+  const headers = defaultAuthToken ? { Authorization: `Bearer ${defaultAuthToken}` } : undefined;
+  if (!v) return { uri: displayUrl(artId), headers };
+  return {
+    uri: `${displayUrl(artId)}?v=${encodeURIComponent(v)}`,
+    headers,
+    cacheKey: `art-display:${artId}:${v}`,
+  };
+}
+
 /** Small JPEG placeholder for a member's profile pic. Served directly from nginx. */
 export function profileThumbUrl(memberId: string): string {
   return `${SERVER_ORIGIN}/static/profile-thumbs/${memberId}.jpg`;

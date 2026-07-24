@@ -672,6 +672,29 @@ clobbering each other:
 
 # Image delivery — kill the "linger then snap" on the main art display
 
+> **Stream IMG+FIX status (2026-07-24): Track 3 backend DEPLOYED ✅** (merged to
+> main `5e98db8` + `77a1a17`, Pi pulled, nginx restarted; smoke: display route
+> 401-gated, raw `/static/display/` 403, `/static/external/` 404 — that last one
+> because the deploy also ported Stream WEB's external lockdown into
+> `nginx.conf.template`; their blocks were only in the inert legacy
+> `nginx.conf`, which the container never reads). FE (below) rides the next OTA.
+> Backend detail: `generate_display`
+> + eager gen at both upload callsites, gated `GET /art/{art_id}/display`,
+> display unlink on delete/replace/account-delete, nginx `/static/display/`
+> block (template only — needs `docker restart nginx` on deploy). 8 new tests in
+> `tests/test_display.py`, full suite 30 passed (1 pre-existing unrelated fail).
+> FE wired in the shared tree (branch `stream-b-events-obs`): `displayUrl`/
+> `displaySource` in `client.ts`, profile `Visual2DPiece` + carousel
+> `ZoomablePage` prefer the display with `onError` → original fallback (safe to
+> OTA before or after the backend deploys); dropped the now-redundant
+> `RNImage.getSize` thumb-measuring effect (aspect backfill is live). Also
+> retired Admin.tsx's dead role-management leftovers (`MemberRoleRow` etc. —
+> the members tab itself was already gone). `npx tsc --noEmit` clean (known
+> Home.tsx Reanimated noise only). **Track 2 skipped** (redundant per spec).
+> Handoff items #1 (media-tab ORDER BY), #2 (backfill), #4 (dup-email 409) were
+> already implemented + deployed before this stream started — verified, no work
+> needed. Awaiting Charlie's go-ahead to commit/merge/deploy + OTA.
+
 **Problem:** the profile art elements + zoom carousel fetch the **full multi-MB
 original** straight from the RPi. A soft 512px thumb placeholder lingers for the
 whole (slow) download, then the sharp original crossfades in — a big resolution
