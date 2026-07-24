@@ -12,6 +12,16 @@ from db.models import UsageEvent, Member
 
 VALID_KINDS = {"login", "screen"}
 
+# Usernames whose activity is EXCLUDED from the stats rollups (dogfooding
+# accounts muddy the signal). Their events still record — they're filtered at
+# report time, so past activity disappears from the summaries too. Override via
+# env as a comma-separated list.
+STATS_EXCLUDED_USERNAMES = {
+    u.strip().lower()
+    for u in os.environ.get("STATS_EXCLUDED_USERNAMES", "charlie").split(",")
+    if u.strip()
+}
+
 # Calendar rollups (per-day buckets and "today") use this display timezone
 # rather than UTC, so contributors see days that match local wall-clock. The
 # club runs on PT; override via the REPORT_TZ env var. The UTC->local conversion
@@ -86,11 +96,27 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
     # Bucket by local (REPORT_TZ) calendar day, not UTC.
     day = cast(_local_ts(UsageEvent.created_at), Date)
 
+    # Member ids hidden from the rollups (see STATS_EXCLUDED_USERNAMES).
+    excluded_ids = (
+        (
+            await db.execute(
+                select(Member.id).filter(func.lower(Member.username).in_(STATS_EXCLUDED_USERNAMES))
+            )
+        ).scalars().all()
+        if STATS_EXCLUDED_USERNAMES
+        else []
+    )
+
+    def _visible(q):
+        return q.filter(UsageEvent.member_id.notin_(excluded_ids)) if excluded_ids else q
+
     # Distinct active members per day (any event kind).
     active_rows = (
         await db.execute(
-            select(day.label("d"), func.count(func.distinct(UsageEvent.member_id)).label("n"))
-            .filter(UsageEvent.created_at >= since)
+            _visible(
+                select(day.label("d"), func.count(func.distinct(UsageEvent.member_id)).label("n"))
+                .filter(UsageEvent.created_at >= since)
+            )
             .group_by(day)
             .order_by(day)
         )
@@ -99,11 +125,13 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
     # Most-visited screens.
     screen_rows = (
         await db.execute(
-            select(UsageEvent.screen, func.count().label("n"))
-            .filter(
-                UsageEvent.created_at >= since,
-                UsageEvent.kind == "screen",
-                UsageEvent.screen.isnot(None),
+            _visible(
+                select(UsageEvent.screen, func.count().label("n"))
+                .filter(
+                    UsageEvent.created_at >= since,
+                    UsageEvent.kind == "screen",
+                    UsageEvent.screen.isnot(None),
+                )
             )
             .group_by(UsageEvent.screen)
             .order_by(func.count().desc())
@@ -114,8 +142,10 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
     # Visits per day, by sessionizing each member's event stream on gaps.
     ev_rows = (
         await db.execute(
-            select(UsageEvent.member_id, _local_ts(UsageEvent.created_at))
-            .filter(UsageEvent.created_at >= since)
+            _visible(
+                select(UsageEvent.member_id, _local_ts(UsageEvent.created_at))
+                .filter(UsageEvent.created_at >= since)
+            )
             .order_by(UsageEvent.member_id, UsageEvent.created_at)
         )
     ).all()
@@ -135,18 +165,23 @@ async def db_usage_summary(db: AsyncSession, days: int = 14) -> dict:
 
     # Who was active today (local day), distinct members with any event today.
     local_today = cast(func.timezone(REPORT_TZ, func.now()), Date)
-    active_today_rows = (
-        await db.execute(
-            select(Member.username, Member.firstname)
-            .join(UsageEvent, UsageEvent.member_id == Member.id)
-            .filter(cast(_local_ts(UsageEvent.created_at), Date) == local_today)
-            .distinct()
-            .order_by(Member.username)
+    active_today_q = (
+        select(Member.username, Member.firstname)
+        .join(UsageEvent, UsageEvent.member_id == Member.id)
+        .filter(cast(_local_ts(UsageEvent.created_at), Date) == local_today)
+        .distinct()
+        .order_by(Member.username)
+    )
+    if STATS_EXCLUDED_USERNAMES:
+        active_today_q = active_today_q.filter(
+            func.lower(Member.username).notin_(STATS_EXCLUDED_USERNAMES)
         )
-    ).all()
+    active_today_rows = (await db.execute(active_today_q)).all()
 
     total_events = (
-        await db.execute(select(func.count()).select_from(UsageEvent).filter(UsageEvent.created_at >= since))
+        await db.execute(
+            _visible(select(func.count()).select_from(UsageEvent).filter(UsageEvent.created_at >= since))
+        )
     ).scalar_one()
 
     return {
