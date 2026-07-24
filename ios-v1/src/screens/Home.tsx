@@ -523,7 +523,7 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
       />
       <Ball
         label="events"
-        accent="#1E73BE"
+        accent={PROMPT_RED}
         onOpen={onOpenEvent}
         W={W} H={H}
         posX={p1x} posY={p1y} velX={v1x} velY={v1y} dragging={d1}
