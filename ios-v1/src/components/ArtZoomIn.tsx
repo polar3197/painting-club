@@ -126,6 +126,17 @@ export default function ArtZoomIn({
 
   const uri = resolveImageUrl(imgPath);
 
+  // Load-then-swap when imgPath changes while open (owner replacing their
+  // profile pic from this view): keep the outgoing image as the placeholder so
+  // the old one holds until the new bytes arrive, then crossfade — no blank
+  // frame, no need to close and reopen. The ref updates after render, so during
+  // the render where `uri` changes it still holds the previous uri.
+  const prevUriRef = useRef<string | null>(null);
+  const placeholderUri = prevUriRef.current !== uri ? prevUriRef.current : null;
+  useEffect(() => {
+    prevUriRef.current = uri;
+  }, [uri]);
+
   const contentWidth = screenW * 0.9;
   const contentHeight = aspectRatio ? contentWidth / aspectRatio : screenH * 0.85;
   const cappedHeight = Math.min(contentHeight, screenH * 0.85);
@@ -352,6 +363,9 @@ export default function ArtZoomIn({
               >
                 <Image
                   source={{ uri, cacheKey: stableCacheKey(uri) }}
+                  placeholder={placeholderUri ? { uri: placeholderUri, cacheKey: stableCacheKey(placeholderUri) } : undefined}
+                  placeholderContentFit="contain"
+                  transition={250}
                   style={{ width: '100%', height: '100%' }}
                   contentFit="contain"
                   onLoad={(e) => {

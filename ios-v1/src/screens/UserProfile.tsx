@@ -477,6 +477,9 @@ export default function UserProfile() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
+      // Square crop so the pic fills the profile's 1:1 avatar box as framed.
+      allowsEditing: true,
+      aspect: [1, 1],
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
@@ -488,9 +491,10 @@ export default function UserProfile() {
     // showing that path directly fails — refetch the profile to get a SIGNED URL.
     // The signed URL drops the ?v=<mtime> tag, so grab the version here and pass
     // it as a cache-bust (see profilePicSource) or the old photo stays cached.
+    // The zoom (if open) stays open: ArtZoomIn holds the old image until the
+    // new one loads, then swaps in place.
     setPicBust(res.profile_pic_path?.match(/[?&]v=(\d+)/)?.[1] ?? String(Date.now()));
     await refetchProfile();
-    setProfileZoom(false);
   };
 
   const scrollRef = useRef<ScrollView>(null);
