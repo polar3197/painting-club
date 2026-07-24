@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useAdminPending } from '../hooks';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -16,6 +17,8 @@ export default function Settings() {
   const navigation = useNavigation<any>();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // Red dot per admin row with pending work (and the gear dot upstream).
+  const adminPending = useAdminPending();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
@@ -98,12 +101,14 @@ export default function Settings() {
             onPress={() => navigation.navigate('Admin', { initialTab: 'applications' })}
           >
             <Text style={styles.actionBtnText}>applications</Text>
+            {adminPending.applications > 0 && <View style={styles.pendingDot} />}
           </Pressable>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
             onPress={() => navigation.navigate('Admin', { initialTab: 'media-requests' })}
           >
             <Text style={styles.actionBtnText}>media requests</Text>
+            {adminPending.media > 0 && <View style={styles.pendingDot} />}
           </Pressable>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
@@ -116,6 +121,7 @@ export default function Settings() {
             onPress={() => navigation.navigate('Admin', { initialTab: 'prompts' })}
           >
             <Text style={styles.actionBtnText}>prompts</Text>
+            {adminPending.prompts > 0 && <View style={styles.pendingDot} />}
           </Pressable>
         </>
       )}
@@ -172,6 +178,17 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     padding: 14,
     marginBottom: 10,
+  },
+  pendingDot: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.redBright,
   },
   actionBtnText: {
     fontFamily: Fonts.serif,
