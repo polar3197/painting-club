@@ -154,7 +154,7 @@ const REST_DAMPING = 0.7;       // per-second exponential velocity decay (light)
 const MIN_SPEED = 24;           // px/s below which the ball is treated as at rest
 
 const PROMPT_RED = '#E30022';
-const RING_THICKNESS = 10;     // chunkier than the ball's 6px border so the day gauge reads at a glance
+const RING_THICKNESS = 6;      // matches styles.ball's borderWidth
 const PROMPT_LIFESPAN_DAYS = 7;
 
 // Fraction of the prompt's 7-day life still left, 1 → 0. Null when the backend
@@ -176,11 +176,9 @@ function litDayChunks(remaining: number): number {
   return Math.max(1, Math.min(PROMPT_LIFESPAN_DAYS, Math.ceil(remaining * PROMPT_LIFESPAN_DAYS)));
 }
 
-// The prompt ball's ring as a depleting 7-day gauge, segmented into one chunk
-// per day: a day's chunk stays solid red until that day is fully spent, so the
-// fill only ever moves in whole-day steps (ceil of the remaining days). Spent
-// chunks leave a white band outlined in hairline red; thin ticks in the ball's
-// background color divide the seven chunks.
+// The prompt ball's ring as a depleting 7-day gauge: the fill moves in
+// whole-day steps (ceil of the remaining days), drawn as one solid red arc
+// from 12 o'clock. Spent days leave a white band outlined in hairline red.
 //
 // Drawn with plain Views because the project has no react-native-svg, and adding
 // it would mean a native rebuild (no OTA). The arc is the standard two-half-disc
@@ -232,21 +230,6 @@ function PromptLifespanRing({ remaining }: { remaining: number }) {
           }}
         />
       </View>
-      {/* Day dividers: a black spoke per chunk boundary (black so it reads on
-          both the red fill and the spent white band), drawn before the
-          punch-out so only the piece crossing the band survives. */}
-      {Array.from({ length: PROMPT_LIFESPAN_DAYS }, (_, k) => (
-        <View
-          key={k}
-          style={{
-            position: 'absolute', left: S / 2 - 1, top: 0,
-            width: 2, height: S / 2,
-            backgroundColor: '#000',
-            transformOrigin: 'center bottom',
-            transform: [{ rotate: `${(k * 360) / PROMPT_LIFESPAN_DAYS}deg` }],
-          }}
-        />
-      ))}
       {/* Punch the pie's middle out so only the ring band survives. */}
       <View
         style={{
