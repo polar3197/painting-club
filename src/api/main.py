@@ -534,6 +534,7 @@ async def delete_my_account(
     for aid in art_ids:
         try:
             thumb_file(aid).unlink(missing_ok=True)
+            display_file(aid).unlink(missing_ok=True)
         except Exception:
             pass
     try:
@@ -739,6 +740,7 @@ AUDIO_EXTS = {"m4a", "mp3", "wav", "aac"}
 # Container default; overridable so the API can run outside Docker (tests).
 STATIC_ROOT = Path(os.environ.get("STATIC_ROOT", "/app"))
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
+DISPLAY_SIZE = 1600  # mid-res "display" derivative for the main viewer — phones can't show more
 
 def abs_path(rel: str) -> Path:
     # rel is an absolute-looking web path like "/static/foo.jpg" — anchor it under STATIC_ROOT
@@ -777,6 +779,28 @@ def generate_thumbnail(art_id: str, src_abs: Path) -> Path | None:
         print(f"[thumb] generation failed for {art_id}: {type(e).__name__}: {e}")
         if thumb_path.exists():
             thumb_path.unlink(missing_ok=True)
+        return None
+
+def display_file(art_id: str) -> Path:
+    return STATIC_ROOT / "static" / "display" / f"{art_id}.jpg"
+
+def generate_display(art_id: str, src_abs: Path) -> Path | None:
+    """Render a ~DISPLAY_SIZE JPEG for the main viewer (profile art elements +
+    zoom carousel) so normal viewing never downloads the multi-MB original.
+    Mirrors generate_thumbnail. Returns the path, or None on failure."""
+    out = display_file(art_id)
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            img.draft("RGB", (DISPLAY_SIZE, DISPLAY_SIZE))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((DISPLAY_SIZE, DISPLAY_SIZE * 4), Image.LANCZOS)
+            img.save(out, format="JPEG", quality=88, optimize=True)
+        return out
+    except Exception as e:
+        print(f"[display] generation failed for {art_id}: {type(e).__name__}: {e}")
+        out.unlink(missing_ok=True)
         return None
 
 def sanitize_path_segment(value: str) -> str:
@@ -998,9 +1022,10 @@ async def upload_visual_2d(
         path.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail=str(e))
 
-    # eager thumbnail generation for images (PDFs skip — no preview thumb)
+    # eager thumbnail + display generation for images (PDFs skip — no preview thumb)
     if path.suffix.lower() != ".pdf":
         generate_thumbnail(str(art_id), path)
+        generate_display(str(art_id), path)
 
     return {"file_path": file_path}
 
@@ -1133,8 +1158,10 @@ async def update_visual_2d(
         # Regenerate the thumb at the same art-id path so collections / grids refresh.
         # PDFs have no cached thumb file; drop the stale one if it exists.
         thumb_file(art_id).unlink(missing_ok=True)
+        display_file(art_id).unlink(missing_ok=True)
         if written_path.suffix.lower() != ".pdf":
             generate_thumbnail(str(art_id), written_path)
+            generate_display(str(art_id), written_path)
 
     return {"ok": True, "file_path": new_file_path}
 
@@ -1144,6 +1171,7 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
     if file_path:
         abs_path(file_path).unlink(missing_ok=True)
     thumb_file(art_id).unlink(missing_ok=True)
+    display_file(art_id).unlink(missing_ok=True)
     return
 
 
@@ -2169,6 +2197,35 @@ async def get_art_thumb(art_id: str, db: AsyncSession = Depends(get_db), _: Memb
             return FileResponse(src_abs, headers=cache_headers)
 
     return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
+
+
+@app.get("/art/{art_id}/display")
+async def get_art_display(art_id: str, db: AsyncSession = Depends(get_db), _: Member = Depends(get_current_member)):
+    """~1600px JPEG for the main viewer (profile art elements + zoom carousel) —
+    lands 50-100x faster than a multi-MB original, so the thumb placeholder barely
+    lingers. Lazy-generates for art uploaded before eager display gen; falls back
+    to the original. The original is only fetched on pinch-zoom."""
+    result = await db.execute(select(Art.file_path).filter(Art.id == art_id))
+    file_path = result.scalar_one_or_none()
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Art not found")
+
+    src_abs = abs_path(file_path)
+    if not src_abs.exists():
+        raise HTTPException(status_code=404, detail="Source file missing")
+
+    cache_headers = {"Cache-Control": "private, max-age=3600"}
+
+    # PDFs have no display derivative — serve the original
+    if src_abs.suffix.lower() == ".pdf":
+        return FileResponse(src_abs, headers=cache_headers)
+
+    display_path = display_file(art_id)
+    if not display_path.exists():
+        if generate_display(art_id, src_abs) is None:
+            return FileResponse(src_abs, headers=cache_headers)
+
+    return FileResponse(display_path, headers=cache_headers, media_type="image/jpeg")
 
 
 @app.get("/members/{member_id}/pic/thumb")
