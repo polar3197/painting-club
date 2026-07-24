@@ -436,6 +436,9 @@ export default function UserProfile() {
   // stable) cache key so a change shows immediately. Null until this session's
   // first upload; a natural refetch keeps whatever the server last returned.
   const [picBust, setPicBust] = useState<string | null>(null);
+  // True from "picked a new profile pic" until the refetched profile lands —
+  // drives the spinner in the zoom (and the page overlay when zoom is closed).
+  const [picBusy, setPicBusy] = useState(false);
   // Index into filteredArt of the piece shown in the zoom viewer (null = closed).
   // Held here (not per-tile) so the viewer can swipe across the whole gallery.
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
@@ -485,16 +488,23 @@ export default function UserProfile() {
     const asset = result.assets[0];
     const name = asset.uri.split('/').pop() || 'pic.jpg';
     const type = asset.mimeType || 'image/jpeg';
-    const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
-    // The upload endpoint returns an UNSIGNED /static/profile path. Under the
-    // member-only lockdown nginx rejects unsigned /static/profile URLs (403), so
-    // showing that path directly fails — refetch the profile to get a SIGNED URL.
-    // The signed URL drops the ?v=<mtime> tag, so grab the version here and pass
-    // it as a cache-bust (see profilePicSource) or the old photo stays cached.
-    // The zoom (if open) stays open: ArtZoomIn holds the old image until the
-    // new one loads, then swaps in place.
-    setPicBust(res.profile_pic_path?.match(/[?&]v=(\d+)/)?.[1] ?? String(Date.now()));
-    await refetchProfile();
+    setPicBusy(true);
+    try {
+      const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
+      // The upload endpoint returns an UNSIGNED /static/profile path. Under the
+      // member-only lockdown nginx rejects unsigned /static/profile URLs (403), so
+      // showing that path directly fails — refetch the profile to get a SIGNED URL.
+      // The signed URL drops the ?v=<mtime> tag, so grab the version here and pass
+      // it as a cache-bust (see profilePicSource) or the old photo stays cached.
+      // The zoom (if open) stays open: ArtZoomIn holds the old image until the
+      // new one loads, then swaps in place.
+      setPicBust(res.profile_pic_path?.match(/[?&]v=(\d+)/)?.[1] ?? String(Date.now()));
+      await refetchProfile();
+    } catch (err: any) {
+      appAlert('Upload failed', err?.message || 'Try again');
+    } finally {
+      setPicBusy(false);
+    }
   };
 
   const scrollRef = useRef<ScrollView>(null);
@@ -854,7 +864,7 @@ export default function UserProfile() {
         />
       }
     >
-      {refreshing && (
+      {(refreshing || picBusy) && (
         <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
           <Spinner size={48} />
         </View>
@@ -867,6 +877,7 @@ export default function UserProfile() {
           onClose={() => setProfileZoom(false)}
           onChangePic={profile.is_owner ? pickAndUploadProfilePic : undefined}
           blockableUsername={!profile.is_owner ? profile.username : undefined}
+          busy={picBusy}
         />
       )}
 

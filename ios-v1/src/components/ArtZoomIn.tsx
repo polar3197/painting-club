@@ -29,6 +29,7 @@ import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
 import ContextPopup from './ContextPopup';
 import DeleteAccountDialog from './DeleteAccountDialog';
+import Spinner from './Spinner';
 import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
@@ -44,6 +45,9 @@ interface ArtZoomInProps {
   // owner/report/block UI is suppressed and this node is rendered instead.
   // Used by the weekly-prompt grid to show creator + title on the back.
   backContent?: React.ReactNode;
+  // External in-flight work on this image (e.g. a profile-pic upload before the
+  // new imgPath arrives) — shows the spinner while true.
+  busy?: boolean;
 }
 
 const MIN_SCALE = 1;
@@ -57,6 +61,7 @@ export default function ArtZoomIn({
   reportArtId,
   blockableUsername,
   backContent,
+  busy = false,
 }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
@@ -133,7 +138,12 @@ export default function ArtZoomIn({
   // the render where `uri` changes it still holds the previous uri.
   const prevUriRef = useRef<string | null>(null);
   const placeholderUri = prevUriRef.current !== uri ? prevUriRef.current : null;
+  // Spinner from the moment the uri swaps until the incoming image is on
+  // screen (onLoad/onError below) — the old image alone reads as "nothing
+  // happened" while the new bytes download.
+  const [swapLoading, setSwapLoading] = useState(false);
   useEffect(() => {
+    if (prevUriRef.current && prevUriRef.current !== uri) setSwapLoading(true);
     prevUriRef.current = uri;
   }, [uri]);
 
@@ -335,6 +345,12 @@ export default function ArtZoomIn({
           </View>
         </GestureDetector>
 
+        {(busy || swapLoading) && (
+          <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="none">
+            <Spinner size={48} />
+          </View>
+        )}
+
         <View style={styles.imageWrapper} pointerEvents="box-none">
           <GestureDetector gesture={composed}>
             <Animated.View
@@ -369,10 +385,12 @@ export default function ArtZoomIn({
                   style={{ width: '100%', height: '100%' }}
                   contentFit="contain"
                   onLoad={(e) => {
+                    setSwapLoading(false);
                     const w = (e as any)?.source?.width;
                     const h = (e as any)?.source?.height;
                     if (w && h) setAspectRatio(w / h);
                   }}
+                  onError={() => setSwapLoading(false)}
                 />
               </RNAnimated.View>
               <RNAnimated.View
