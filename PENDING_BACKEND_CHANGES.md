@@ -677,7 +677,8 @@ clobbering each other:
 > 401-gated, raw `/static/display/` 403, `/static/external/` 404 — that last one
 > because the deploy also ported Stream WEB's external lockdown into
 > `nginx.conf.template`; their blocks were only in the inert legacy
-> `nginx.conf`, which the container never reads). FE (below) rides the next OTA.
+> `nginx.conf`, which the container never reads). **FE OTA published ✅**
+> (branch `production`, runtime 1.0.5, update group `98742af9`, commit `0d85cb7`).
 > Backend detail: `generate_display`
 > + eager gen at both upload callsites, gated `GET /art/{art_id}/display`,
 > display unlink on delete/replace/account-delete, nginx `/static/display/`
