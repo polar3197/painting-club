@@ -494,3 +494,47 @@ class DeviceEvent(Base):
     detail = Column(Text)
     occurred_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+# --- Inspiration web -------------------------------------------------------------
+
+class ExternalArt(Base):
+    """Outside-the-club pieces cited as inspirations (a Klimt, an album cover).
+    Club-shared catalog: any member can add one and anyone can link to it.
+
+    Brand-new table — create_all builds it (paper trail:
+    migrations/025_inspiration_web.sql)."""
+    __tablename__ = "external_art"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    artist = Column(String(255), nullable=False)
+    title = Column(String(300))
+    # /static/external/{id}.{jpg|png} — raw path blocked at nginx; members
+    # reach it through the gated GET /external-art/{id}/image route.
+    image_path = Column(String(500), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='SET NULL'))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Inspiration(Base):
+    """A directed edge in the inspiration web: `from` is the inspired club
+    piece, `to` is its inspiration — either another club piece or an external
+    one. Exactly one of the two targets is set (CHECK below); only the owner
+    of the `from` piece may add/remove the edge (enforced in the route)."""
+    __tablename__ = "inspiration"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    from_art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), nullable=False, index=True)
+    to_art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), index=True)
+    to_external_id = Column(UUID(as_uuid=True), ForeignKey('external_art.id', ondelete='CASCADE'), index=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='SET NULL'))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "(to_art_id IS NULL) != (to_external_id IS NULL)",
+            name="inspiration_exactly_one_target",
+        ),
+        UniqueConstraint("from_art_id", "to_art_id", name="inspiration_unique_art_target"),
+        UniqueConstraint("from_art_id", "to_external_id", name="inspiration_unique_external_target"),
+    )

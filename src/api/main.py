@@ -280,6 +280,17 @@ from db.db_ops.comments import (
     db_get_comments_received,
     db_touch_comments_viewed,
 )
+
+from db.db_ops.inspirations import (
+    db_get_web,
+    db_get_full_web,
+    db_add_inspiration,
+    db_remove_inspiration,
+    db_search_targets,
+    db_create_external_art,
+    db_get_external_art,
+)
+from api.models import InspirationIn
     
 from db.session import get_db, AsyncSessionLocal
 from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
@@ -3315,3 +3326,169 @@ async def infra_health(_: Member = Depends(get_contributor_member)):
     disk_path = os.environ.get("INFRA_DISK_PATH", "/src")
     content_path = os.environ.get("INFRA_CONTENT_PATH", "/app/static")
     return InfraHealthOut(**await read_host_health(disk_path, content_path))
+
+
+# ====================== INSPIRATION WEB (#10) =========================
+
+EXTERNAL_ART_MIMES = {"image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif"}
+
+
+def external_file(ext_id: str, ext: str) -> Path:
+    return STATIC_ROOT / "static" / "external" / f"{ext_id}.{ext}"
+
+
+def external_thumb_file(ext_id: str) -> Path:
+    return STATIC_ROOT / "static" / "external-thumbs" / f"{ext_id}.jpg"
+
+
+def generate_external_thumb(ext_id: str, src_abs: Path) -> Path | None:
+    """512px JPEG for an external piece's web node — mirrors generate_thumbnail
+    (separate dir so external ids can never collide with art thumb files)."""
+    thumb_path = external_thumb_file(ext_id)
+    try:
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            img.draft("RGB", (THUMB_SIZE * 2, THUMB_SIZE * 2))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((THUMB_SIZE, THUMB_SIZE * 4), Image.LANCZOS)
+            img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+        return thumb_path
+    except Exception as e:
+        print(f"[external-thumb] generation failed for {ext_id}: {type(e).__name__}: {e}")
+        if thumb_path.exists():
+            thumb_path.unlink(missing_ok=True)
+        return None
+
+
+@app.get("/art/{art_id}/web")
+async def get_art_web(
+    art_id: str,
+    depth: int = 2,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """Neighborhood subgraph around a piece, `depth` hops in both directions.
+    Always includes the focus node itself, even if it has no connections."""
+    try:
+        return await db_get_web(db, art_id, depth, current_member.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/inspirations/web")
+async def get_full_inspiration_web(
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """The entire web at once: every piece with at least one connection
+    (singletons excluded), across all disconnected clusters."""
+    return await db_get_full_web(db, current_member.id)
+
+
+@app.get("/inspirations/search-targets")
+async def search_inspiration_targets(
+    q: str = "",
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """The connect pane's combined search: club art across all mediums + the
+    shared external catalog. Empty q -> a small recent sample."""
+    return await db_search_targets(db, q, current_member.id)
+
+
+@app.post("/inspirations")
+async def add_inspiration(
+    payload: InspirationIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """Link the caller's own piece to its inspiration. Idempotent: re-linking
+    an existing pair returns the existing edge."""
+    try:
+        return await db_add_inspiration(
+            db, current_member.id, payload.from_art_id, payload.to_art_id,
+            payload.to_external_id, payload.to_node_id,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        code = 404 if "not found" in str(e).lower() else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
+@app.delete("/inspirations/{inspiration_id}", status_code=204)
+async def remove_inspiration(
+    inspiration_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        await db_remove_inspiration(
+            db, current_member.id, inspiration_id, moderator=_is_contributor(current_member)
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/external-art")
+async def create_external_art(
+    artist: str = Form(...),
+    title: str | None = Form(None),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """Add an outside-the-club piece to the shared catalog (upload pipeline
+    mirrors event images: 20MB cap, magic-byte check, HEIC -> JPEG)."""
+    if not artist.strip():
+        raise HTTPException(status_code=400, detail="artist is required")
+
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+    mime = magic.from_buffer(contents, mime=True)
+    if mime not in EXTERNAL_ART_MIMES:
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+    if mime in HEIC_MIMES:
+        contents = heic_to_jpeg_bytes(contents)
+        mime = "image/jpeg"
+
+    ext_id = uuid.uuid4()
+    ext = "png" if mime == "image/png" else "jpg"
+    file_path = f"/static/external/{ext_id}.{ext}"
+    path = abs_path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
+    generate_external_thumb(str(ext_id), path)
+
+    return await db_create_external_art(
+        db, ext_id, artist.strip(), (title or "").strip() or None, file_path, current_member.id
+    )
+
+
+@app.get("/external-art/{ext_id}/image")
+async def get_external_art_image(
+    ext_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    """Member-gated serve route for external-art images (the raw
+    /static/external* paths are blocked at nginx). Serves the 512px thumb —
+    web nodes never render larger — lazy-generating it for rows that predate
+    eager gen, and falling back to the original."""
+    row = await db_get_external_art(db, ext_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="External art not found")
+    src_abs = abs_path(row.image_path)
+    if not src_abs.exists():
+        raise HTTPException(status_code=404, detail="Source file missing")
+
+    cache_headers = {"Cache-Control": "private, max-age=21600"}
+    thumb_path = external_thumb_file(ext_id)
+    if not thumb_path.exists():
+        if generate_external_thumb(ext_id, src_abs) is None:
+            return FileResponse(src_abs, headers=cache_headers)
+    return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
