@@ -169,9 +169,18 @@ function promptRemaining(activatedAt: string | null | undefined): number | null 
   return Math.max(0, Math.min(1, 1 - elapsedDays / PROMPT_LIFESPAN_DAYS));
 }
 
-// The prompt ball's ring as a depleting 7-day gauge: the remaining fraction is
-// a solid red arc sweeping clockwise from 12 o'clock; spent days leave a white
-// band outlined in hairline red.
+// Whole-day chunks still lit, floored at 1: as long as the prompt is active it
+// keeps its last chunk (and reads "1 day left"), even if it has outlived the
+// nominal 7 days — an active prompt never shows a dead-empty ring.
+function litDayChunks(remaining: number): number {
+  return Math.max(1, Math.min(PROMPT_LIFESPAN_DAYS, Math.ceil(remaining * PROMPT_LIFESPAN_DAYS)));
+}
+
+// The prompt ball's ring as a depleting 7-day gauge, segmented into one chunk
+// per day: a day's chunk stays solid red until that day is fully spent, so the
+// fill only ever moves in whole-day steps (ceil of the remaining days). Spent
+// chunks leave a white band outlined in hairline red; thin ticks in the ball's
+// background color divide the seven chunks.
 //
 // Drawn with plain Views because the project has no react-native-svg, and adding
 // it would mean a native rebuild (no OTA). The arc is the standard two-half-disc
@@ -181,7 +190,8 @@ function promptRemaining(activatedAt: string | null | undefined): number | null 
 // annulus. Purely decorative — pointerEvents none keeps the slingshot grabbable.
 function PromptLifespanRing({ remaining }: { remaining: number }) {
   const S = BALL_SIZE;
-  const deg = remaining * 360;
+  const lit = litDayChunks(remaining);
+  const deg = (lit / PROMPT_LIFESPAN_DAYS) * 360;
   // Right window shows 0–180°, left shows 180–360°. Each half-disc sits flush
   // against the circle's center and rotates about it, so its trailing edge lands
   // exactly on `deg` and the window clips away everything past its own half.
@@ -222,6 +232,20 @@ function PromptLifespanRing({ remaining }: { remaining: number }) {
           }}
         />
       </View>
+      {/* Day dividers: a thin spoke per chunk boundary, drawn before the
+          punch-out so only the piece crossing the band survives. */}
+      {Array.from({ length: PROMPT_LIFESPAN_DAYS }, (_, k) => (
+        <View
+          key={k}
+          style={{
+            position: 'absolute', left: S / 2 - 1, top: 0,
+            width: 2, height: S / 2,
+            backgroundColor: Colors.secondary,
+            transformOrigin: 'center bottom',
+            transform: [{ rotate: `${(k * 360) / PROMPT_LIFESPAN_DAYS}deg` }],
+          }}
+        />
+      ))}
       {/* Punch the pie's middle out so only the ring band survives. */}
       <View
         style={{
@@ -357,6 +381,11 @@ function Ball({ label, sublabel, accent, lifespanRemaining, onOpen, W, H, posX, 
         {hasRing ? <PromptLifespanRing remaining={lifespanRemaining!} /> : null}
         <Text style={styles.diamondHeading}>{label}</Text>
         {sublabel ? <Text style={styles.diamondSub} numberOfLines={2}>{sublabel}</Text> : null}
+        {hasRing ? (
+          <Text style={styles.ballDaysLeft}>
+            ({litDayChunks(lifespanRemaining!)} day{litDayChunks(lifespanRemaining!) === 1 ? '' : 's'} left)
+          </Text>
+        ) : null}
       </Reanimated.View>
     </GestureDetector>
   );
@@ -944,6 +973,13 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     textAlign: 'center',
     marginTop: 4,
+  },
+  ballDaysLeft: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: PROMPT_RED,
+    textAlign: 'center',
+    marginTop: 3,
   },
   diamondMuted: {
     fontFamily: Fonts.mono,

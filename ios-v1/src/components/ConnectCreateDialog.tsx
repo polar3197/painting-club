@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, Pressable, FlatList, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, FlatList, StyleSheet, Keyboard, Platform, useWindowDimensions } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { TextInput } from './AppTextInput';
@@ -27,6 +28,24 @@ export default function ConnectCreateDialog({ fromArt, linkedIds, onLinked, onCl
   onClose: () => void;
 }) {
   const [pane, setPane] = useState<'connect' | 'create'>('connect');
+
+  // Fixed card height so the dialog doesn't shrink as the search narrows and
+  // both panes are the same size. Capped to the space left above the keyboard
+  // (kbHeight drives the discrete cap; the animated paddingBottom below welds
+  // the card to the keyboard frame — same recipe as AddArtDialog) so the tap
+  // targets — result rows, "add & link" — never sink under the keyboard.
+  const { height: winH } = useWindowDimensions();
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+  const keyboard = useAnimatedKeyboard();
+  const backdropStyle = useAnimatedStyle(() => ({ paddingBottom: keyboard.height.value }));
+  const cardHeight = Math.min(winH * 0.62, winH - kbHeight - 24);
 
   // connect pane
   const [q, setQ] = useState('');
@@ -83,9 +102,9 @@ export default function ConnectCreateDialog({ fromArt, linkedIds, onLinked, onCl
 
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <Reanimated.View style={[styles.backdrop, backdropStyle]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.card}>
+        <View style={[styles.card, { height: cardHeight }]}>
           <Text style={styles.heading} numberOfLines={1}>
             inspiration for “{fromArt.title || 'untitled'}”
           </Text>
@@ -184,7 +203,7 @@ export default function ConnectCreateDialog({ fromArt, linkedIds, onLinked, onCl
             </View>
           )}
         </View>
-      </View>
+      </Reanimated.View>
     </Modal>
   );
 }
@@ -197,8 +216,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
+    // Height is fixed inline (see cardHeight) so filtering results down never
+    // shrinks the dialog and connect/create are the same size.
     width: '86%',
-    maxHeight: '70%',
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.mainBg,
@@ -239,7 +259,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   results: {
-    flexGrow: 0,
+    flex: 1,
   },
   result: {
     flexDirection: 'row',
@@ -276,6 +296,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   createPane: {
+    flex: 1,
     gap: 2,
   },
   pickBtn: {
@@ -298,6 +319,9 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   submitBtn: {
+    // Pinned to the card's bottom edge so it stays visible however the pane
+    // above it lays out (and however little room the keyboard leaves).
+    marginTop: 'auto',
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.primaryGold,
