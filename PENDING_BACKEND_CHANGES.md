@@ -1,6 +1,7 @@
 # Pending backend changes (apply when RPi access is available)
 
-> **NEXT PULL — three things ride together (2026-07-16..18): READY, NOT DEPLOYED.**
+> **NEXT PULL — three things ride together (2026-07-16..18): DEPLOYED ✅ 2026-07-24**
+> (Pi pulled to `c2dd08c`, nginx restarted, migrations ran clean, routes smoke-tested).
 > Run on the Pi (`quentin@192.168.86.92`, must be on the home LAN):
 > ```
 > cd ~/painting-club && git pull && docker restart nginx
@@ -59,8 +60,8 @@
 > with no broken intermediate state. Until item 3 deploys, the roster simply
 > keeps loading full pics as it does today (no bandwidth win yet, no breakage).
 
-> **Bookmarks → series fields (2026-07-19): READY, NOT DEPLOYED. api-only,
-> hot-reloads on `git pull` (no nginx/db/migration).** `GET /members/me/bookmarks`
+> **Bookmarks → series fields (2026-07-19): DEPLOYED ✅ 2026-07-24. api-only,
+> hot-reloaded on `git pull` (no nginx/db/migration).** `GET /members/me/bookmarks`
 > now returns `series_id` + `series_name` per saved piece so the iOS "saved" page
 > can regroup bookmarked pieces into their collection/album as one tile.
 > - `src/db/db_ops/bookmarks.py` `db_list_bookmarks`: added `Art.series_id` +
@@ -88,7 +89,8 @@
 > `UserProfile.tsx` so the server order shows), written-cover + prompt-queue
 > FE after Stream B lands.
 
-> **Stream A round 2 (2026-07-14): READY, NOT DEPLOYED.** Contributor role +
+> **Stream A round 2 (2026-07-14): DEPLOYED ✅** (on the Pi as of the 2026-07-24
+> pull at the latest; role-inversion follow-up was already live). Contributor role +
 > announcements + editable docs. Role tier is now member<contributor<admin
 > (admin implies contributor); new `get_contributor_member` dep. **New tables:**
 > `announcement` + `announcement_comment` (guarded in `db_manager`, paper trail
@@ -438,6 +440,198 @@ Nullable FK to `media` (not a stored medium string) keeps it normalized;
   suggestion into the live `weekly_prompt` row (ties the queue into the active
   prompt rotation).
 
+## 10. Inspiration web — real backend + dummy-setup teardown
+
+> **Status (2026-07-23): BUILT + VERIFIED, NOT DEPLOYED (uncommitted, Stream
+> WEB working tree).** Backend: models + migration 025 + `db_ops/inspirations.py`
+> + all routes below + nginx block — 39-check smoke green against a throwaway
+> `postgres:16` + local uvicorn (edge CRUD, ownership 403s, CHECK/unique
+> constraints, BFS depth, singleton exclusion, artKind mapping, external
+> upload/eager-thumb/gated serve, idempotent re-POST, moderator delete);
+> app restart re-ran migrations cleanly. One contract addition vs. the spec:
+> `POST /inspirations` also accepts an untyped **`to_node_id`** (server
+> resolves art vs external) because the client's frozen
+> `addInspiration(from, to)` signature doesn't carry the node kind.
+> Seed script (`scripts/seed_inspiration_web.py`) exercised end-to-end against
+> the throwaway rig (fake charlie + curated titles): 5 externals + 4 edges
+> created, second run fully idempotent — it resolves pieces via
+> `search-targets`, NOT `/art/search` (which is visual-only + hides
+> profile-hidden media). FE Phase-1 teardown also done: `inspiration.ts`
+> rewritten to real fetches (signatures frozen; `registerArt`/
+> `setInspirationViewer` now no-ops), `inspirationMock.ts` deleted (fuse.js
+> stays — used elsewhere), demo-state key wiped at module load, external
+> images use the gated route + bearer; `npx tsc --noEmit` clean except the 2
+> known Home.tsx Reanimated errors. **Deploy order:** commit/push → Pi pull +
+> `docker restart nginx` → run the seed script (laptop, as charlie) → THEN the
+> OTA (the mock is gone from the bundle, so the OTA must not precede the pull).
+
+**Context:** the inspiration web UI is fully shipped and working on-device
+(`ios-v1/src/screens/WebScreen.tsx` force-directed graph + zoom/pan camera,
+`ios-v1/src/components/ConnectCreateDialog.tsx` connect/create popup, entry
+points in `ArtGallery.tsx` + `UserProfile.tsx`). But it runs entirely on a
+**Phase-0 mock** (`ios-v1/src/api/inspirationMock.ts`): curated seed links are
+hard-coded in the bundle, member-made links persist only on the device that
+made them (SecureStore `inspiration_demo_state_v1`), and nothing is shared
+between phones. Phase 1 = real backend + tear the mock down.
+
+**The contract is already frozen** — `ios-v1/src/api/inspiration.ts` is the
+permanent interface (types + signatures must not change; WebScreen and the
+dialog are built against it). Its header names the intended endpoints. The
+graph model: nodes are club art (any medium — visual/written/audio all live in
+the `art` base table) or **external art** (outside-the-club pieces: artist,
+optional title, image). Edges are directed: `from` = the inspired club piece,
+`to` = its inspiration (club art or external). Only the owner of the `from`
+piece may add/remove its edges (`mine` gates the UI).
+
+**Schema (3NF; migration `025_inspiration_web.sql` + guarded idempotent
+`CREATE TABLE IF NOT EXISTS` in `run_migrations()` + `create_all`):**
+```
+external_art
+  id          UUID PK
+  artist      VARCHAR(255) NOT NULL
+  title       VARCHAR(300) NULL
+  image_path  VARCHAR(500) NOT NULL     -- /static/external/{id}.{jpg|png}
+  created_by  UUID FK member(id)
+  created_at  TIMESTAMP DEFAULT now()
+
+inspiration
+  id              UUID PK
+  from_art_id     UUID FK art(id)          ON DELETE CASCADE NOT NULL
+  to_art_id       UUID FK art(id)          ON DELETE CASCADE NULL
+  to_external_id  UUID FK external_art(id) ON DELETE CASCADE NULL
+  created_by      UUID FK member(id)
+  created_at      TIMESTAMP DEFAULT now()
+  CHECK ((to_art_id IS NULL) != (to_external_id IS NULL))   -- exactly one target
+  UNIQUE (from_art_id, to_art_id)
+  UNIQUE (from_art_id, to_external_id)
+```
+Two nullable FKs + CHECK (not a stored kind string) keeps referential
+integrity and gives cascade-on-art-delete for free.
+
+**API** (`src/db/db_ops/inspirations.py` + routes in `main.py`, all
+member-gated):
+- `GET /art/{art_id}/web?depth=2` — BFS both directions from the focus,
+  return `{focusId, nodes, edges}`. **Must include the focus node itself even
+  if it has no edges** (this is what lets the client's `registerArt` become a
+  no-op). Art nodes carry `id, title, creator (username), medium (name),
+  file_path, aspect_ratio, artKind` (map `art.type`:
+  `visual_2d→visual, written_form→written, audio→audio`) + `mine` computed
+  from the bearer; external nodes carry `id, artist, title, image_path`.
+- `GET /inspirations/web` — the whole web: every node touched by ≥1 edge
+  (singletons excluded), all clusters, `focusId: ""`.
+- `POST /inspirations` `{from_art_id, to_art_id? | to_external_id?}` — 403
+  unless the caller owns the `from` piece; idempotent (existing edge → return
+  it, not a 409).
+- `DELETE /inspirations/{id}` — owner of the `from` piece (contributor
+  override optional, mirrors comment moderation).
+- `GET /inspirations/search-targets?q=` — the connect pane's combined search:
+  club art across **all three mediums** (query the `Art` base table directly —
+  this finally covers written/audio without the client fan-out, superseding
+  item #3 for this pane) + `external_art` (ILIKE on artist/title). Empty `q`
+  → a small recents sample. Return the same node shape as the web routes.
+- `POST /external-art` (multipart: `artist`, `title?`, `image`) — mirror
+  `upload_event_image` exactly (20MB cap, magic-byte check, HEIC→JPEG, store
+  at `/static/external/{id}.{ext}`, drop other-ext sibling).
+- `GET /external-art/{id}/image` — member-gated serve route mirroring
+  `get_art_thumb` (`main.py:2144`): lazy-generate a 512px thumb at
+  `/static/external-thumbs/{id}.jpg`, fall back to the original.
+  The node circles are ≤132px, so the thumb is all the UI ever shows.
+- **nginx:** block raw `/static/external/` + `/static/external-thumbs/` like
+  `/static/thumbs` (the gated route is the only way in). Needs
+  `docker restart nginx` on deploy.
+
+**Seed (bake Charlie's authored web into prod):** one-time idempotent script
+(`scripts/seed_inspiration_web.py`, run from a laptop against the prod API as
+charlie — the images live in the app repo, not on the Pi):
+1. `POST /external-art` for the 5 bundled pieces (files:
+   `ios-v1/assets/imgs/externals/{hodler-kien-valley,avery-dune-and-sea-ii,porter-plane-tree,manet-the-railway}.jpg`
+   + `ios-v1/assets/imgs/klimpt.png` = Gustav Klimt "Litzlberg am Attersee";
+   artist/title strings in `inspirationMock.ts` `BUNDLED_EXTERNALS`). Skip any
+   (artist, title) that already exists.
+2. The 4 curated edges (from `inspirationMock.ts` seed block), resolving club
+   pieces by creator+title via `/art/search`:
+   charlie "bernal hill"→Hodler, "the beach"→Avery,
+   "wippets on the couch"→Porter AND →Manet. `POST /inspirations` is
+   idempotent, so re-runs are safe. (Klimt gets no edge — catalog-only.)
+
+**Frontend teardown (Phase 1, OTA after the backend deploys):**
+- Rewrite `inspiration.ts` bodies as real fetches (signatures unchanged):
+  `getWeb`/`getFullWeb`/`addInspiration`/`removeInspiration`/
+  `searchLinkTargets`/`createExternalArt` → the routes above.
+  `setInspirationViewer` + `registerArt` become no-ops (backend computes
+  `mine` from the bearer; the web route always includes the focus node) —
+  keep the exported functions so call sites don't churn.
+- External node images become `{ uri: <gated image route>, headers: bearer }`
+  — same pattern as `thumbSource` (`client.ts:122`). The
+  `image: number | { uri }` type widens to allow headers; that's additive.
+- Delete `inspirationMock.ts` + the `fuse.js` usage (check it's not imported
+  elsewhere before dropping the dep). Keep the bundled asset images for now
+  (they're referenced nowhere else after the mock dies — can drop from the
+  bundle in a later cleanup to save OTA weight).
+- One-time cleanup on launch: `SecureStore.deleteItemAsync('inspiration_demo_state_v1')`.
+  Member-made demo links on other people's devices are lost **by design** —
+  only Charlie's authored web was baked, and that's what the seed restores.
+- **Ordering is NOT free here** (unlike most items): the OTA deletes the mock,
+  so it must ship **after** the Pi pull + nginx restart. Until the OTA, old
+  clients keep running the mock harmlessly.
+
+**Work split:** this whole item (backend + seed + FE teardown) is Stream WEB —
+see "Work split (2026-07-23)" below.
+
+---
+
+# Work split (2026-07-23) — ALL remaining work, two parallel Claudes
+
+Everything above that is READY just needs the consolidated Pi pull (one
+person, one event — see the NEXT PULL block at the top; the new work below
+adds a second pull + `docker restart nginx` when it lands). The still-to-BUILD
+work is split **by feature** — each stream owns its features end-to-end
+(schema → routes → nginx → client → OTA), so nobody waits on the other's
+half.
+
+**Stream WEB (Claude 1, this session) — #10 inspiration web, end-to-end:**
+- Backend: migration 025, `external_art` + `inspiration` tables,
+  `db_ops/inspirations.py`, all routes, nginx block for `/static/external*`,
+  throwaway-postgres smoke test.
+- Seed script baking Charlie's authored web into prod.
+- FE Phase-1 teardown: rewrite `inspiration.ts` bodies as real fetches, no-op
+  `registerArt`/`setInspirationViewer`, delete `inspirationMock.ts` + Fuse
+  usage, wipe `inspiration_demo_state_v1`, bearer-header external images.
+  **OTA only after the Pi deploy** (the mock is deleted, so ordering matters).
+- #3 stays skipped — this stream's `search-targets` covers the connect pane
+  across all mediums; revisit only if the gallery fan-out feels slow.
+
+**Stream IMG+FIX (Claude 2) — image delivery + the standing fixes,
+end-to-end:**
+- **Track 3 display derivative**: `generate_display` + eager-gen at upload +
+  `GET /art/{art_id}/display` + delete/replace cleanup + nginx block for
+  `/static/display`; then the FE wiring — `displayUrl`/`displaySource` in
+  `client.ts`, profile `Visual2DPiece` + carousel swap, expo-image `onError` →
+  original fallback (fallback makes the FE safe to ship in either order).
+  (Track 2 skipped — redundant once Track 3 lands.)
+- **#1 stable media-tab order**: `ORDER BY` in `db_get_profile` + drop the
+  client-side alphabetical sort in `UserProfile.tsx` after deploy.
+- **#2 aspect-ratio backfill**: `lifespan` startup hook + remove the
+  now-redundant `RNImage.getSize` effect in `UserProfile.tsx` after deploy.
+- **#4 duplicate-email approve**: 409 + orphan `pending_setup` reuse (backend
+  only — the iOS alert already surfaces whatever the server returns).
+- **Cleanup rider:** retire the superseded Admin.tsx members-tab "save role"
+  (role-model inversion note above).
+
+**Collision rules (both streams touch the same hotspot files):**
+- Separate branches off `main`; never edit the shared `ios-v1` working tree
+  live (a third parallel session may be in it — coordinate before OTAs, the
+  EAS channel is shared and OTAs from these trees target runtime 1.0.5).
+- `src/api/main.py` + `src/nginx/nginx.conf`: append-only blocks, one per
+  stream — merges stay trivial.
+- Migration numbers: only WEB needs one (**025**); IMG+FIX ships no DDL. If
+  IMG+FIX ends up needing a migration after all, it takes **026+**.
+- `ios-v1` file ownership: WEB owns `src/api/inspiration*.ts`; IMG+FIX owns
+  `src/api/client.ts`, `UserProfile.tsx`, the carousel, `Admin.tsx`. Neither
+  edits the other's files; shared helpers go in your own file, not `client.ts`
+  (WEB) / not `inspiration.ts` (IMG+FIX).
+- WEB owns this doc's status updates; IMG+FIX appends its own status lines.
+
 ---
 
 # Work split — two parallel Claudes
@@ -463,8 +657,9 @@ clobbering each other:
 
 > **Stream B status (2026-07-13):** #9, #8, #4, #2 all implemented + locally
 > verified (41 scenario checks green); #3 skipped per the doc (optional).
-> Committed on branch `stream-b` (`1ff60b0`), migrations 016–017 used.
-> **Awaiting push approval + Pi pull** — see STREAM_B_qs.md at the repo root.
+> Committed on branch `stream-b` (`1ff60b0`), migrations 016–017 used
+> (renumbered 017–018 in `40ff670`). **DEPLOYED ✅ 2026-07-24** (merged to main,
+> on the Pi; aspect_ratio backfill ran with 0 remaining NULL rows).
 
 **Stream B — prompts, covers & fixes:**
 - #9 Weekly-prompt suggestions + admin queue

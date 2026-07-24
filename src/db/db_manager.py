@@ -426,4 +426,39 @@ async def run_migrations():
             "WHERE c.id = wp.id AND wp.activated_at IS NULL "
             "  AND (wp.is_active = TRUE OR wp.archived_at IS NOT NULL)"
         ))
+        # 025: inspiration web — external-art catalog + directed "inspired by"
+        # edges. create_all builds these on fresh DBs; guards cover prod.
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS external_art ("
+            "  id UUID PRIMARY KEY,"
+            "  artist VARCHAR(255) NOT NULL,"
+            "  title VARCHAR(300),"
+            "  image_path VARCHAR(500) NOT NULL,"
+            "  created_by UUID REFERENCES member(id) ON DELETE SET NULL,"
+            "  created_at TIMESTAMP DEFAULT now()"
+            ")"
+        ))
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS inspiration ("
+            "  id UUID PRIMARY KEY,"
+            "  from_art_id UUID NOT NULL REFERENCES art(id) ON DELETE CASCADE,"
+            "  to_art_id UUID REFERENCES art(id) ON DELETE CASCADE,"
+            "  to_external_id UUID REFERENCES external_art(id) ON DELETE CASCADE,"
+            "  created_by UUID REFERENCES member(id) ON DELETE SET NULL,"
+            "  created_at TIMESTAMP DEFAULT now(),"
+            "  CONSTRAINT inspiration_exactly_one_target"
+            "    CHECK ((to_art_id IS NULL) != (to_external_id IS NULL)),"
+            "  CONSTRAINT inspiration_unique_art_target UNIQUE (from_art_id, to_art_id),"
+            "  CONSTRAINT inspiration_unique_external_target UNIQUE (from_art_id, to_external_id)"
+            ")"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_inspiration_from ON inspiration (from_art_id)"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_inspiration_to_art ON inspiration (to_art_id)"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_inspiration_to_external ON inspiration (to_external_id)"
+        ))
     print("Migrations applied.")
