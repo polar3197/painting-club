@@ -72,6 +72,11 @@ http {
             return 403;
         }
 
+        # Display derivatives likewise only via the gated /art/{id}/display route.
+        location /static/display/ {
+            return 403;
+        }
+
         # Other static (event images, etc.) stays public for now.
         location /static/ {
             alias /app/static/;
