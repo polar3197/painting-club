@@ -736,3 +736,15 @@ class DeviceEventIn(BaseModel):
 
 class DeviceBatchIn(BaseModel):
     events: List[DeviceEventIn]
+
+
+class InspirationIn(BaseModel):
+    """One edge for the inspiration web: from = the caller's own piece,
+    to = exactly one of a club piece / an external-catalog piece.
+    to_node_id is the untyped alternative — the server resolves which table
+    it lives in (the client's frozen addInspiration(from, to) signature
+    doesn't carry the node kind)."""
+    from_art_id: str
+    to_art_id: str | None = None
+    to_external_id: str | None = None
+    to_node_id: str | None = None
