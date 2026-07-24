@@ -101,14 +101,26 @@ export default function Settings() {
             onPress={() => navigation.navigate('Admin', { initialTab: 'applications' })}
           >
             <Text style={styles.actionBtnText}>applications</Text>
-            {adminPending.applications > 0 && <View style={styles.pendingDot} />}
+            {adminPending.applications > 0 && (
+              <View style={styles.pendingBadgeWrap} pointerEvents="none">
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingBadgeText}>{adminPending.applications}</Text>
+                </View>
+              </View>
+            )}
           </Pressable>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
             onPress={() => navigation.navigate('Admin', { initialTab: 'media-requests' })}
           >
             <Text style={styles.actionBtnText}>media requests</Text>
-            {adminPending.media > 0 && <View style={styles.pendingDot} />}
+            {adminPending.media > 0 && (
+              <View style={styles.pendingBadgeWrap} pointerEvents="none">
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingBadgeText}>{adminPending.media}</Text>
+                </View>
+              </View>
+            )}
           </Pressable>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
@@ -121,7 +133,13 @@ export default function Settings() {
             onPress={() => navigation.navigate('Admin', { initialTab: 'prompts' })}
           >
             <Text style={styles.actionBtnText}>prompts</Text>
-            {adminPending.prompts > 0 && <View style={styles.pendingDot} />}
+            {adminPending.prompts > 0 && (
+              <View style={styles.pendingBadgeWrap} pointerEvents="none">
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingBadgeText}>{adminPending.prompts}</Text>
+                </View>
+              </View>
+            )}
           </Pressable>
         </>
       )}
@@ -179,16 +197,31 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
   },
-  pendingDot: {
+  // Full-height right-edge anchor so the count badge centers vertically in
+  // the row regardless of the row's padding.
+  pendingBadgeWrap: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  pendingBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.redBright,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFF',
   },
   actionBtnText: {
     fontFamily: Fonts.serif,
