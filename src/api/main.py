@@ -3551,13 +3551,15 @@ async def create_external_art(
 @app.get("/external-art/{ext_id}/image")
 async def get_external_art_image(
     ext_id: str,
+    full: bool = False,
     db: AsyncSession = Depends(get_db),
     _: Member = Depends(get_current_member),
 ):
     """Member-gated serve route for external-art images (the raw
     /static/external* paths are blocked at nginx). Serves the 512px thumb —
     web nodes never render larger — lazy-generating it for rows that predate
-    eager gen, and falling back to the original."""
+    eager gen, and falling back to the original. `?full=1` serves the
+    original instead (the caption-tap zoom view)."""
     row = await db_get_external_art(db, ext_id)
     if row is None:
         raise HTTPException(status_code=404, detail="External art not found")
@@ -3566,6 +3568,8 @@ async def get_external_art_image(
         raise HTTPException(status_code=404, detail="Source file missing")
 
     cache_headers = {"Cache-Control": "private, max-age=21600"}
+    if full:
+        return FileResponse(src_abs, headers=cache_headers)
     thumb_path = external_thumb_file(ext_id)
     if not thumb_path.exists():
         if generate_external_thumb(ext_id, src_abs) is None:
