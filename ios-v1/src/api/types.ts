@@ -191,6 +191,8 @@ export interface WrittenFormIn {
   keywords?: string;
   comments_enabled?: boolean;
   series_name?: string;
+  // Weekly-prompt submission target (art.collection_id).
+  collection_id?: string | null;
   // Provide exactly one of file or text.
   file?: { uri: string; name: string; type: string };
   text?: string;
@@ -233,6 +235,8 @@ export interface AudioIn {
   duration_seconds?: number | null;
   // Album name — the audio flavour of a series (created server-side on demand).
   series_name?: string;
+  // Weekly-prompt submission target (art.collection_id).
+  collection_id?: string | null;
   file: { uri: string; name: string; type: string };
 }
 

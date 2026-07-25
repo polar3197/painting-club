@@ -20,12 +20,22 @@ import {
   list_prompts,
   activate_prompt,
   add_new_visual_2d,
+  add_new_written_form,
+  add_new_audio,
   get_members_visual_2d,
+  get_members_written_form,
+  get_members_audio,
+  get_media,
   thumbSource,
   PromptDetailOut,
   PromptSummary,
   Visual2DIn,
   Visual2DOut,
+  WrittenFormIn,
+  WrittenFormOut,
+  AudioIn,
+  AudioOut,
+  MediaType,
 } from '../api';
 import AddArtDialog from '../components/AddArtDialog';
 import ProposePromptDialog from '../components/ProposePromptDialog';
@@ -69,9 +79,17 @@ export default function WeeklyPromptDetail() {
   const [showPromptList, setShowPromptList] = useState(false);
   const [allPrompts, setAllPrompts] = useState<PromptSummary[]>([]);
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
-  // When the viewer has already submitted, eagerly fetch their Visual2DOut so
-  // tapping "edit your submission" opens the dialog pre-populated.
+  // When the viewer has already submitted, eagerly fetch their piece so
+  // tapping "edit your submission" opens the dialog pre-populated. Which of
+  // the three is set follows the submission's art_type.
   const [viewerPiece, setViewerPiece] = useState<Visual2DOut | null>(null);
+  const [viewerWritten, setViewerWritten] = useState<WrittenFormOut | null>(null);
+  const [viewerAudio, setViewerAudio] = useState<AudioOut | null>(null);
+  // Any-medium prompts: the submitter picks a medium (and thereby which upload
+  // form) before the dialog opens.
+  const [showMediumChoice, setShowMediumChoice] = useState(false);
+  const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+  const [chosenMedium, setChosenMedium] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     get_prompt(promptId, token)
@@ -85,23 +103,39 @@ export default function WeeklyPromptDetail() {
   useEffect(() => {
     if (!prompt?.viewer_submission_id || !currentUser) {
       setViewerPiece(null);
+      setViewerWritten(null);
+      setViewerAudio(null);
       return;
     }
     let cancelled = false;
     // An any-medium prompt has no media_name, and the viewer's existing piece
-    // could be filed under any 2D medium — read it off the submission itself so
-    // the edit dialog opens the right pane and finds the piece.
-    const existingMedium =
-      prompt.submissions.find((s) => s.id === prompt.viewer_submission_id)?.medium
-      ?? prompt.media_name
-      ?? DEFAULT_ANY_MEDIUM;
-    get_members_visual_2d(currentUser, existingMedium)
-      .then((list) => {
-        if (cancelled) return;
-        const found = list.find((p) => p.id === prompt.viewer_submission_id) ?? null;
-        setViewerPiece(found);
-      })
-      .catch(() => { if (!cancelled) setViewerPiece(null); });
+    // could be filed under any medium/form — read both off the submission
+    // itself so the edit dialog opens the right pane and finds the piece.
+    const sub = prompt.submissions.find((s) => s.id === prompt.viewer_submission_id);
+    const existingMedium = sub?.medium ?? prompt.media_name ?? DEFAULT_ANY_MEDIUM;
+    const kind = sub?.art_type ?? 'visual_2d';
+    if (kind === 'written_form') {
+      get_members_written_form(currentUser, existingMedium)
+        .then((list) => {
+          if (cancelled) return;
+          setViewerWritten(list.find((p) => p.id === prompt.viewer_submission_id) ?? null);
+        })
+        .catch(() => { if (!cancelled) setViewerWritten(null); });
+    } else if (kind === 'audio') {
+      get_members_audio(currentUser, existingMedium)
+        .then((list) => {
+          if (cancelled) return;
+          setViewerAudio(list.find((p) => p.id === prompt.viewer_submission_id) ?? null);
+        })
+        .catch(() => { if (!cancelled) setViewerAudio(null); });
+    } else {
+      get_members_visual_2d(currentUser, existingMedium)
+        .then((list) => {
+          if (cancelled) return;
+          setViewerPiece(list.find((p) => p.id === prompt.viewer_submission_id) ?? null);
+        })
+        .catch(() => { if (!cancelled) setViewerPiece(null); });
+    }
     return () => { cancelled = true; };
   }, [prompt?.viewer_submission_id, prompt?.media_name, currentUser]);
 
@@ -131,6 +165,33 @@ export default function WeeklyPromptDetail() {
       .catch((err: any) => appAlert('Error', err?.message || 'Could not submit'));
   };
 
+  const onCreateWrittenSubmission = (payload: WrittenFormIn) => {
+    if (!prompt) return;
+    add_new_written_form(token, { ...payload, collection_id: prompt.id })
+      .then(() => { setShowDialog(false); refresh(); })
+      .catch((err: any) => appAlert('Error', err?.message || 'Could not submit'));
+  };
+
+  const onCreateAudioSubmission = (payload: AudioIn) => {
+    if (!prompt) return;
+    add_new_audio(token, { ...payload, collection_id: prompt.id })
+      .then(() => { setShowDialog(false); refresh(); })
+      .catch((err: any) => appAlert('Error', err?.message || 'Could not submit'));
+  };
+
+  // "add your art": an existing submission or a medium-specific prompt goes
+  // straight to the dialog; a fresh submission to an any-medium prompt picks
+  // the medium (and upload form) first.
+  const openSubmitFlow = () => {
+    if (!prompt) return;
+    if (prompt.viewer_submission_id || prompt.media_name) {
+      setShowDialog(true);
+      return;
+    }
+    if (allMedia.length === 0) get_media().then(setAllMedia).catch(() => {});
+    setShowMediumChoice(true);
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -154,7 +215,11 @@ export default function WeeklyPromptDetail() {
   const dialogMedium =
     submissions.find((s) => s.id === prompt.viewer_submission_id)?.medium
     ?? prompt.media_name
+    ?? chosenMedium
     ?? DEFAULT_ANY_MEDIUM;
+  // The zoom carousel is image-only; written/audio submissions render glyph
+  // tiles that open on the creator's profile instead.
+  const visualSubs = submissions.filter((s) => !s.art_type || s.art_type === 'visual_2d');
   const numColumns = columnsFor(submissions.length);
   const cellSize = (GRID_INNER_W - GRID_GAP * (numColumns - 1)) / numColumns;
 
@@ -186,19 +251,45 @@ export default function WeeklyPromptDetail() {
               columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
               contentContainerStyle={styles.gridContent}
               showsVerticalScrollIndicator={false}
-              renderItem={({ item, index }) => (
+              renderItem={({ item }) => (
                 <Pressable
                   style={({ pressed }) => [styles.cell, { width: cellSize, height: cellSize }, pressed && styles.pressed]}
-                  onPress={() => setZoomIndex(index)}
+                  onPress={() => {
+                    if (item.art_type === 'written_form' || item.art_type === 'audio') {
+                      // No image to zoom — open the piece on its creator's
+                      // profile (same as the web captions).
+                      (navigation as any).navigate('SearchTab', {
+                        screen: 'UserProfile',
+                        params: { username: item.creator_username, artId: item.id, medium: item.medium },
+                      });
+                      return;
+                    }
+                    setZoomIndex(visualSubs.findIndex((v) => v.id === item.id));
+                  }}
                 >
-                  {/* 512px thumbnail, not the full-res original — the grid cell
-                      is small; full-res loads in the zoom viewer on tap. */}
-                  <Image
-                    source={thumbSource(item.id, item.file_path)}
-                    transition={200}
-                    style={styles.cellImage}
-                    contentFit="cover"
-                  />
+                  {item.art_type === 'written_form' || item.art_type === 'audio' ? (
+                    // Written/audio have no visual thumb — inked glyphs.
+                    <View style={styles.glyphCell}>
+                      <Image
+                        source={
+                          item.art_type === 'written_form'
+                            ? require('../../assets/imgs/writing.png')
+                            : require('../../assets/imgs/music.png')
+                        }
+                        style={styles.glyphImg}
+                        contentFit="contain"
+                      />
+                    </View>
+                  ) : (
+                    // 512px thumbnail, not the full-res original — the grid cell
+                    // is small; full-res loads in the zoom viewer on tap.
+                    <Image
+                      source={thumbSource(item.id, item.file_path)}
+                      transition={200}
+                      style={styles.cellImage}
+                      contentFit="cover"
+                    />
+                  )}
                 </Pressable>
               )}
             />
@@ -209,7 +300,7 @@ export default function WeeklyPromptDetail() {
           <>
             <Pressable
               style={({ pressed }) => [styles.dropFrame, pressed && styles.dropFramePressed]}
-              onPress={() => setShowDialog(true)}
+              onPress={openSubmitFlow}
             >
               <Text style={styles.dropFrameText}>
                 {prompt.viewer_submission_id ? 'edit your submission' : 'add your art'}
@@ -236,21 +327,57 @@ export default function WeeklyPromptDetail() {
           selectedMedium={dialogMedium}
           username={currentUser}
           piece={viewerPiece ?? undefined}
+          writtenPiece={viewerWritten ?? undefined}
+          audioPiece={viewerAudio ?? undefined}
           minimal
           dropboxPlaceholder={`share your ${prompt.title}`}
           onSuccess={refresh}
-          onClose={() => setShowDialog(false)}
+          onClose={() => { setShowDialog(false); setChosenMedium(null); }}
           onCreate={onCreateSubmission}
+          onCreateWritten={onCreateWrittenSubmission}
+          onCreateAudio={onCreateAudioSubmission}
         />
       )}
 
-      {zoomIndex !== null && submissions[zoomIndex] && (
+      {/* Any-medium prompts: pick the medium (and upload form) before the
+          submit dialog opens. */}
+      <Modal
+        transparent
+        visible={showMediumChoice}
+        animationType="fade"
+        onRequestClose={() => setShowMediumChoice(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowMediumChoice(false)}>
+          <View style={styles.modalCard} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalHeader}>pick your medium</Text>
+            <FlatList
+              data={allMedia}
+              keyExtractor={(m) => m.name}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={({ pressed }) => [styles.promptRow, pressed && styles.pressed]}
+                  onPress={() => {
+                    setChosenMedium(item.name);
+                    setShowMediumChoice(false);
+                    setShowDialog(true);
+                  }}
+                >
+                  <Text style={styles.promptRowTitle} numberOfLines={1}>{item.name}</Text>
+                </Pressable>
+              )}
+              ListEmptyComponent={<Text style={styles.modalEmpty}>loading…</Text>}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+
+      {zoomIndex !== null && visualSubs[zoomIndex] && (
         <ArtCarousel
-          pieces={submissions}
+          pieces={visualSubs}
           initialIndex={zoomIndex}
           isOwner={false}
           creatorUsername=""
-          captions={submissions.map((s) => ({ title: s.title, creator: s.creator_username }))}
+          captions={visualSubs.map((s) => ({ title: s.title, creator: s.creator_username }))}
           hideKebab
           onClose={() => setZoomIndex(null)}
         />
@@ -380,6 +507,17 @@ const styles = StyleSheet.create({
   cellImage: {
     width: '100%',
     height: '100%',
+  },
+  glyphCell: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.secondary,
+  },
+  glyphImg: {
+    width: '45%',
+    height: '45%',
   },
   emptyText: {
     fontFamily: Fonts.mono,

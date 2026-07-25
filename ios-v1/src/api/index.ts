@@ -354,6 +354,7 @@ export function add_new_written_form(token: string | null, payload: WrittenFormI
   if (payload.keywords != null) fd.append('keywords', String(payload.keywords));
   if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
   if (payload.series_name) fd.append('series_name', payload.series_name);
+  if (payload.collection_id) fd.append('collection_id', payload.collection_id);
   if (payload.file) {
     fd.append('file', {
       uri: payload.file.uri,
@@ -420,6 +421,7 @@ export function add_new_audio(token: string | null, payload: AudioIn) {
   if (payload.artist) fd.append('artist', payload.artist);
   if (payload.duration_seconds != null) fd.append('duration_seconds', String(payload.duration_seconds));
   if (payload.series_name) fd.append('series_name', payload.series_name);
+  if (payload.collection_id) fd.append('collection_id', payload.collection_id);
   fd.append('file', {
     uri: payload.file.uri,
     name: payload.file.name,
