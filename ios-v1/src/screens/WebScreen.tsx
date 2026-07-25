@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force';
 import { useAuth } from '../context/AuthContext';
 import { thumbSource, authHeaders } from '../api';
 import * as Haptics from 'expo-haptics';
@@ -38,26 +38,116 @@ const MAX_SCALE = 2.5;
 
 type Pos = { x: number; y: number };
 
-// Static force layout — run the simulation to rest, read positions. Nothing
-// is pinned: the whole web (all clusters) settles naturally with its centroid
-// at the origin, and the camera decides what to frame.
+// Static force layout with GUARANTEED cluster separation: each connected
+// component gets its own simulation, is wrapped in a bounding circle, and the
+// circles are packed with padding. Disjoint circles mean a thread can never
+// reach into another cluster's region, so disparate sub-webs cannot overlap
+// (the old single-simulation layout let clusters interleave).
 function layoutGraph(g: WebGraph): Map<string, Pos> {
   type SimNode = { id: string; x?: number; y?: number };
-  const nodes: SimNode[] = g.nodes.map((n) => ({ id: n.id }));
-  const links = g.edges.map((e) => ({ source: e.from, target: e.to }));
-  const sim = forceSimulation(nodes as any)
-    .force('link', forceLink(links as any).id((d: any) => d.id).distance(150))
-    .force('charge', forceManyBody().strength(-420))
-    .force('center', forceCenter(0, 0))
-    .force('collide', forceCollide(72))
-    // Gentle pull toward the origin so disconnected clusters gather near the
-    // pack instead of drifting off on the charge force alone. Connected nodes
-    // resist it through their links; lone clusters yield and close the gap.
-    .force('x', forceX(0).strength(0.06))
-    .force('y', forceY(0).strength(0.06))
-    .stop();
-  for (let i = 0; i < 300; i++) sim.tick();
-  return new Map(nodes.map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
+
+  // Connected components over the edges (isolated nodes — e.g. an entry piece
+  // with no links yet — are their own component).
+  const adj = new Map<string, string[]>();
+  for (const e of g.edges) {
+    (adj.get(e.from) ?? adj.set(e.from, []).get(e.from)!).push(e.to);
+    (adj.get(e.to) ?? adj.set(e.to, []).get(e.to)!).push(e.from);
+  }
+  const seen = new Set<string>();
+  const components: string[][] = [];
+  for (const n of g.nodes) {
+    if (seen.has(n.id)) continue;
+    const comp: string[] = [];
+    const stack = [n.id];
+    seen.add(n.id);
+    while (stack.length) {
+      const id = stack.pop()!;
+      comp.push(id);
+      for (const nb of adj.get(id) ?? []) {
+        if (!seen.has(nb)) {
+          seen.add(nb);
+          stack.push(nb);
+        }
+      }
+    }
+    components.push(comp);
+  }
+
+  // Lay each component out around its own origin.
+  const clusters = components.map((ids) => {
+    const inComp = new Set(ids);
+    const nodes: SimNode[] = ids.map((id) => ({ id }));
+    const links = g.edges
+      .filter((e) => inComp.has(e.from) && inComp.has(e.to))
+      .map((e) => ({ source: e.from, target: e.to }));
+    const sim = forceSimulation(nodes as any)
+      .force('link', forceLink(links as any).id((d: any) => d.id).distance(150))
+      .force('charge', forceManyBody().strength(-420))
+      .force('center', forceCenter(0, 0))
+      .force('collide', forceCollide(72))
+      .stop();
+    for (let i = 0; i < 300; i++) sim.tick();
+    // Center on the centroid and measure the bounding radius (+ node size
+    // margin so the circle contains whole node faces, not just centers).
+    let cx = 0;
+    let cy = 0;
+    for (const nd of nodes) {
+      cx += nd.x ?? 0;
+      cy += nd.y ?? 0;
+    }
+    cx /= nodes.length;
+    cy /= nodes.length;
+    let r = 0;
+    const pos = new Map<string, Pos>();
+    for (const nd of nodes) {
+      const x = (nd.x ?? 0) - cx;
+      const y = (nd.y ?? 0) - cy;
+      pos.set(nd.id, { x, y });
+      r = Math.max(r, Math.sqrt(x * x + y * y));
+    }
+    return { pos, r: r + 90 };
+  });
+
+  // Pack the cluster circles: biggest at the origin, the rest walked along a
+  // golden-angle spiral to the first spot clear of everything already placed.
+  clusters.sort((a, b) => b.r - a.r);
+  const PAD = 70;
+  const placed: { x: number; y: number; r: number }[] = [];
+  const out = new Map<string, Pos>();
+  for (const c of clusters) {
+    let px = 0;
+    let py = 0;
+    if (placed.length) {
+      for (let i = 1; ; i++) {
+        const d = 40 * Math.sqrt(i);
+        const th = i * 2.39996; // golden angle — dense, even spiral coverage
+        px = d * Math.cos(th);
+        py = d * Math.sin(th);
+        const clear = placed.every(
+          (p) => Math.hypot(px - p.x, py - p.y) >= p.r + c.r + PAD,
+        );
+        if (clear) break;
+      }
+    }
+    placed.push({ x: px, y: py, r: c.r });
+    for (const [id, p] of c.pos) out.set(id, { x: p.x + px, y: p.y + py });
+  }
+
+  // Recenter the whole arrangement so the camera math keeps its origin.
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of out.values()) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const ox = (minX + maxX) / 2;
+  const oy = (minY + maxY) / 2;
+  for (const [id, p] of out) out.set(id, { x: p.x - ox, y: p.y - oy });
+  return out;
 }
 
 // Hop distance from a focus node over the edges (drives node sizing).
