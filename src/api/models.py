@@ -252,6 +252,9 @@ class ArtResult(BaseModel):
     creator_username: str
     creator_city: str | None
     aspect_ratio: float | None = None
+    # Art subtype discriminator (visual_2d | written_form | audio) so mixed
+    # result sets (any-medium prompt submissions) can render per-form.
+    art_type: str | None = None
 
     @field_serializer("file_path")
     def _sign_file_path(self, v):

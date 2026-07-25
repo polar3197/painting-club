@@ -54,37 +54,44 @@ async def db_get_prompt(db: AsyncSession, prompt_id):
 
 
 async def db_list_prompt_submissions(db: AsyncSession, prompt_id):
-    """Returns a list of dicts shaped for the ArtResult Pydantic model. Only
-    Visual2D for now — written-form submissions can be added when prompts target
-    that subtype."""
+    """Returns a list of dicts shaped for the ArtResult Pydantic model. Covers
+    all subtypes (visual/written/audio) — an any-medium prompt accepts them all.
+    The visual_2d columns are joined as a raw table (not the Visual2D entity, which
+    would re-join the art base) and come back NULL for non-visual rows."""
+    v2d = Visual2D.__table__
     rows = (
         await db.execute(
             select(
-                Visual2D,
+                Art,
+                v2d.c.song,
+                v2d.c.location,
+                v2d.c.aspect_ratio,
                 Media.name.label("medium_name"),
                 Member.username,
                 Member.city,
             )
-            .join(Media, Media.id == Visual2D.media_id)
-            .join(Member, Member.id == Visual2D.creator_id)
-            .filter(Visual2D.collection_id == prompt_id)
-            .order_by(Visual2D.created_at.desc())
+            .join(Media, Media.id == Art.media_id)
+            .join(Member, Member.id == Art.creator_id)
+            .outerjoin(v2d, v2d.c.id == Art.id)
+            .filter(Art.collection_id == prompt_id)
+            .order_by(Art.created_at.desc())
         )
     ).all()
     submissions = []
-    for art, medium_name, username, city in rows:
+    for art, song, location, aspect_ratio, medium_name, username, city in rows:
         submissions.append({
             "id": str(art.id),
             "title": art.title,
             "medium": medium_name,
             "keywords": [],
-            "song": art.song,
+            "song": song,
             "file_path": art.file_path,
             "date": art.date.isoformat() if art.date else None,
-            "location": art.location,
+            "location": location,
             "creator_username": username,
             "creator_city": city,
-            "aspect_ratio": float(art.aspect_ratio) if art.aspect_ratio is not None else None,
+            "aspect_ratio": float(aspect_ratio) if aspect_ratio is not None else None,
+            "art_type": art.type,
         })
     return submissions
 

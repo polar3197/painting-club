@@ -1195,6 +1195,7 @@ async def upload_written_form(
     keywords: str | None = Form(None),
     comments_enabled: bool = Form(False),
     series_name: str | None = Form(None),
+    collection_id: str | None = Form(None),
     file: UploadFile | None = File(None),
     # Plaintext alternative to uploading a file. When set, the server writes
     # the contents as a .txt under the user's written-form medium. Lets users
@@ -1208,6 +1209,15 @@ async def upload_written_form(
 ):
     if current_member.username != username:
         raise HTTPException(status_code=403, detail="Cannot upload for another user")
+
+    # When submitting to a prompt: enforce medium match + one-per-user
+    # (mirrors upload_visual_2d — any-medium prompts accept every real medium).
+    if collection_id:
+        if not await db_validate_submission_medium(db, collection_id, medium):
+            raise HTTPException(status_code=400, detail="Medium does not match the prompt's required medium")
+        existing = await db_get_user_submission(db, collection_id, current_member.id)
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="You already submitted to this prompt; edit your existing piece")
 
     if file is None and not text:
         raise HTTPException(status_code=400, detail="Provide either a file or pasted text")
@@ -1279,6 +1289,7 @@ async def upload_written_form(
             comments_enabled=comments_enabled,
             series_name=series_name,
             cover_image_path=cover_image_path,
+            collection_id=collection_id,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)
@@ -2009,12 +2020,22 @@ async def upload_audio(
     artist: str | None = Form(None),
     duration_seconds: float | None = Form(None),
     series_name: str | None = Form(None),
+    collection_id: str | None = Form(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_member: Member = Depends(get_current_member),
 ):
     if current_member.username != username:
         raise HTTPException(status_code=403, detail="Cannot upload for another user")
+
+    # When submitting to a prompt: enforce medium match + one-per-user
+    # (mirrors upload_visual_2d — any-medium prompts accept every real medium).
+    if collection_id:
+        if not await db_validate_submission_medium(db, collection_id, medium):
+            raise HTTPException(status_code=400, detail="Medium does not match the prompt's required medium")
+        existing = await db_get_user_submission(db, collection_id, current_member.id)
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="You already submitted to this prompt; edit your existing piece")
 
     contents = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(contents) > MAX_UPLOAD_BYTES:
@@ -2047,6 +2068,7 @@ async def upload_audio(
             file_path=file_path,
             comments_enabled=comments_enabled,
             series_name=series_name,
+            collection_id=collection_id,
         )
     except ValueError as e:
         path.unlink(missing_ok=True)

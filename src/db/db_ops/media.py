@@ -380,6 +380,7 @@ async def db_add_written_form(
         comments_enabled: bool = False,
         series_name: str | None = None,
         cover_image_path: str | None = None,
+        collection_id=None,
     ) -> str:
     username = username.lower()
     member_result = await db.execute(select(Member.id).filter(Member.username==username))
@@ -403,6 +404,7 @@ async def db_add_written_form(
         date=date,
         creator_id=member_id,
         media_id=media_id,
+        collection_id=collection_id,
         series_id=series_id,
         file_path=file_path,
         comments_enabled=comments_enabled,
@@ -581,6 +583,7 @@ async def db_add_audio(
         keywords: list[str] | None = None,
         comments_enabled: bool = False,
         series_name: str | None = None,
+        collection_id=None,
     ) -> str:
     username = username.lower()
     member_result = await db.execute(select(Member.id).filter(Member.username == username))
@@ -618,6 +621,7 @@ async def db_add_audio(
         date=date,
         creator_id=member_id,
         media_id=media_id,
+        collection_id=collection_id,
         series_id=series_id,
         file_path=file_path,
         comments_enabled=comments_enabled,
