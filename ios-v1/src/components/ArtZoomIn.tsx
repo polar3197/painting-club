@@ -48,6 +48,9 @@ interface ArtZoomInProps {
   // External in-flight work on this image (e.g. a profile-pic upload before the
   // new imgPath arrives) — shows the spinner while true.
   busy?: boolean;
+  // Extra request headers for the image fetch — auth-gated routes (e.g. the
+  // inspiration web's external-art images) need the bearer attached.
+  headers?: Record<string, string>;
 }
 
 const MIN_SCALE = 1;
@@ -62,6 +65,7 @@ export default function ArtZoomIn({
   blockableUsername,
   backContent,
   busy = false,
+  headers,
 }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
@@ -378,8 +382,8 @@ export default function ArtZoomIn({
                 ]}
               >
                 <Image
-                  source={{ uri, cacheKey: stableCacheKey(uri) }}
-                  placeholder={placeholderUri ? { uri: placeholderUri, cacheKey: stableCacheKey(placeholderUri) } : undefined}
+                  source={{ uri, cacheKey: stableCacheKey(uri), headers }}
+                  placeholder={placeholderUri ? { uri: placeholderUri, cacheKey: stableCacheKey(placeholderUri), headers } : undefined}
                   placeholderContentFit="contain"
                   transition={250}
                   style={{ width: '100%', height: '100%' }}

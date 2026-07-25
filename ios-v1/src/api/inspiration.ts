@@ -60,8 +60,15 @@ type ServerNode =
     }
   | { kind: 'external'; id: string; artist: string; title: string | null; image_path: string };
 
+/** URL of an external piece's gated image route — thumb by default, the
+ *  full-size original with `full` (the caption-tap zoom view). Callers must
+ *  attach `authHeaders()`. */
+export function externalImageUrl(id: string, full: boolean = false): string {
+  return `${API_BASE}/external-art/${id}/image${full ? '?full=1' : ''}`;
+}
+
 function externalImageSource(id: string): { uri: string; headers?: Record<string, string> } {
-  return { uri: `${API_BASE}/external-art/${id}/image`, headers: authHeaders() };
+  return { uri: externalImageUrl(id), headers: authHeaders() };
 }
 
 function toNode(n: ServerNode): WebNode {

@@ -6,19 +6,22 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
 import { useAuth } from '../context/AuthContext';
-import { thumbSource } from '../api';
+import { thumbSource, authHeaders } from '../api';
 import * as Haptics from 'expo-haptics';
 import {
   getWeb,
   getFullWeb,
   removeInspiration,
   setInspirationViewer,
+  externalImageUrl,
   WebGraph,
   WebNode,
   WebEdge,
   WebNodeArt,
+  WebNodeExternal,
 } from '../api/inspiration';
 import Spinner from '../components/Spinner';
+import ArtZoomIn from '../components/ArtZoomIn';
 import ConnectCreateDialog from '../components/ConnectCreateDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -180,6 +183,8 @@ export default function WebScreen() {
   const [focusId, setFocusId] = useState<string>(entryArtId);
   const [zoomedOut, setZoomedOut] = useState(false);
   const [linkFrom, setLinkFrom] = useState<WebNodeArt | null>(null);
+  // Full-image zoom for a focused EXTERNAL piece (tap its caption card).
+  const [zoomExt, setZoomExt] = useState<WebNodeExternal | null>(null);
 
   // Canvas camera (plane transform).
   const txv = useSharedValue(SCREEN_W / 2 - CANVAS_HALF);
@@ -188,17 +193,46 @@ export default function WebScreen() {
   const startTx = useSharedValue(0);
   const startTy = useSharedValue(0);
   const startScale = useSharedValue(1);
-  const focalX = useSharedValue(0);
-  const focalY = useSharedValue(0);
+  // The camera translate is SPLIT: pan writes txv/tyv, pinch writes its own
+  // compX/compY (plus scale), and the plane renders their sum. Neither
+  // gesture ever touches the other's values, so simultaneous pan+pinch can't
+  // fight over the camera (the old glitch/jump bug).
+  const compX = useSharedValue(0);
+  const compY = useSharedValue(0);
+  // Layout point under the fingers at pinch start — the zoom's anchor.
+  const pfX = useSharedValue(0);
+  const pfY = useSharedValue(0);
+  // Content bounding box in layout coords (updated when positions change),
+  // so the camera can be clamped and the web can't slide off-screen.
+  const boundMinX = useSharedValue(0);
+  const boundMaxX = useSharedValue(0);
+  const boundMinY = useSharedValue(0);
+  const boundMaxY = useSharedValue(0);
+
+  // Clamp a total translate so at least a margin of content stays on screen;
+  // when the content is smaller than the screen (zoomed way out), center it.
+  const clampCam = (tx: number, ty: number, s: number): [number, number] => {
+    'worklet';
+    const M = 80;
+    const loX = M - CANVAS_HALF - boundMaxX.value * s;
+    const hiX = SCREEN_W - M - CANVAS_HALF - boundMinX.value * s;
+    const loY = M - CANVAS_HALF - boundMaxY.value * s;
+    const hiY = SCREEN_H - M - CANVAS_HALF - boundMinY.value * s;
+    const cx = loX > hiX ? (loX + hiX) / 2 : Math.min(hiX, Math.max(loX, tx));
+    const cy = loY > hiY ? (loY + hiY) / 2 : Math.min(hiY, Math.max(loY, ty));
+    return [cx, cy];
+  };
 
   useEffect(() => {
     setInspirationViewer(currentUser);
   }, [currentUser]);
 
   // Point the camera at a layout position (scale about the plane center).
+  // Targets subtract the pinch's comp offset so the rendered sum lands on the
+  // requested point (comp is only ever changed by an active pinch).
   const centerOnPos = useCallback((p: Pos, s: number, animate: boolean) => {
-    const tx = SCREEN_W / 2 - CANVAS_HALF - p.x * s;
-    const ty = SCREEN_H / 2 - CANVAS_HALF - p.y * s;
+    const tx = SCREEN_W / 2 - CANVAS_HALF - p.x * s - compX.value;
+    const ty = SCREEN_H / 2 - CANVAS_HALF - p.y * s - compY.value;
     if (animate) {
       txv.value = withTiming(tx, { duration: 300 });
       tyv.value = withTiming(ty, { duration: 300 });
@@ -257,6 +291,27 @@ export default function WebScreen() {
     if (entryArtId) loadWeb(entryArtId, false);
   }, [entryArtId, loadWeb]);
 
+  // Feed the camera clamp the content's bounding box whenever layout changes.
+  useEffect(() => {
+    const pts = [...positions.values()];
+    if (!pts.length) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    boundMinX.value = minX;
+    boundMaxX.value = maxX;
+    boundMinY.value = minY;
+    boundMaxY.value = maxY;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positions]);
+
   // Tap a node → glide the camera onto it (no refetch; positions are stable).
   const tapNode = useCallback((id: string) => {
     setFocusId(id);
@@ -279,36 +334,47 @@ export default function WebScreen() {
   // After linking/unlinking, refetch so new nodes/edges enter the layout.
   const refresh = useCallback(() => loadWeb(focusId, zoomedOut), [loadWeb, focusId, zoomedOut]);
 
+  // One- or two-finger pan, following the finger centroid. averageTouches
+  // keeps the translation continuous when a finger lands or lifts, so there's
+  // no jump at pointer-count changes. Writes ONLY txv/tyv.
   const pan = Gesture.Pan()
-    .maxPointers(1)
+    .minPointers(1)
+    .maxPointers(2)
+    .averageTouches(true)
     .onStart(() => {
       startTx.value = txv.value;
       startTy.value = tyv.value;
     })
     .onUpdate((e) => {
-      txv.value = startTx.value + e.translationX;
-      tyv.value = startTy.value + e.translationY;
+      const [cx, cy] = clampCam(
+        startTx.value + e.translationX + compX.value,
+        startTy.value + e.translationY + compY.value,
+        scalev.value,
+      );
+      txv.value = cx - compX.value;
+      tyv.value = cy - compY.value;
     });
-  // Focal-anchored pinch: the point under your fingers stays put while the
-  // canvas scales around it.
+  // Pinch: scale about the layout point grabbed at pinch start, keeping it
+  // glued under the live focal. Writes ONLY scalev + compX/compY — comp is
+  // "whatever translate the anchor needs beyond the pan's", so the pan's
+  // simultaneous writes pass through instead of fighting. comp persists after
+  // the pinch (camera animations subtract it from their targets).
   const pinch = Gesture.Pinch()
     .onStart((e) => {
       startScale.value = scalev.value;
-      startTx.value = txv.value;
-      startTy.value = tyv.value;
-      focalX.value = e.focalX;
-      focalY.value = e.focalY;
+      pfX.value = (e.focalX - (txv.value + compX.value) - CANVAS_HALF) / scalev.value;
+      pfY.value = (e.focalY - (tyv.value + compY.value) - CANVAS_HALF) / scalev.value;
     })
     .onUpdate((e) => {
       const s = Math.min(MAX_SCALE, Math.max(MIN_SCALE, startScale.value * e.scale));
-      const cx = startTx.value + CANVAS_HALF;
-      const cy = startTy.value + CANVAS_HALF;
-      const ratio = s / startScale.value;
-      const cx2 = focalX.value - (focalX.value - cx) * ratio;
-      const cy2 = focalY.value - (focalY.value - cy) * ratio;
+      const [cx, cy] = clampCam(
+        e.focalX - CANVAS_HALF - pfX.value * s,
+        e.focalY - CANVAS_HALF - pfY.value * s,
+        s,
+      );
       scalev.value = s;
-      txv.value = cx2 - CANVAS_HALF;
-      tyv.value = cy2 - CANVAS_HALF;
+      compX.value = cx - txv.value;
+      compY.value = cy - tyv.value;
     });
   const gestures = Gesture.Simultaneous(pan, pinch);
 
@@ -323,14 +389,17 @@ export default function WebScreen() {
       e.preventDefault();
       const s0 = scalev.value;
       const s = Math.min(MAX_SCALE, Math.max(MIN_SCALE, s0 * (1 - e.deltaY / 300)));
-      const cx = txv.value + CANVAS_HALF;
-      const cy = tyv.value + CANVAS_HALF;
+      const cx = txv.value + compX.value + CANVAS_HALF;
+      const cy = tyv.value + compY.value + CANVAS_HALF;
       const ratio = s / s0;
-      const cx2 = e.clientX - (e.clientX - cx) * ratio;
-      const cy2 = e.clientY - (e.clientY - cy) * ratio;
+      const [cx2, cy2] = clampCam(
+        e.clientX - (e.clientX - cx) * ratio - CANVAS_HALF,
+        e.clientY - (e.clientY - cy) * ratio - CANVAS_HALF,
+        s,
+      );
       scalev.value = s;
-      txv.value = cx2 - CANVAS_HALF;
-      tyv.value = cy2 - CANVAS_HALF;
+      txv.value = cx2 - compX.value;
+      tyv.value = cy2 - compY.value;
     };
     node.addEventListener('wheel', onWheel, { passive: false });
     return () => node.removeEventListener('wheel', onWheel);
@@ -338,7 +407,11 @@ export default function WebScreen() {
   }, []);
 
   const planeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: txv.value }, { translateY: tyv.value }, { scale: scalev.value }],
+    transform: [
+      { translateX: txv.value + compX.value },
+      { translateY: tyv.value + compY.value },
+      { scale: scalev.value },
+    ],
   }));
 
   const hops = useMemo(
@@ -364,8 +437,16 @@ export default function WebScreen() {
 
   return (
     <View style={styles.container} ref={rootRef}>
+      {/* The detector MUST sit on a static view: gesture coordinates are
+          reported in the attached view's coordinate space, so attaching to
+          the transformed plane inverse-warps focal/translation by the live
+          camera (the native-only glitch/jump/slide bug — web measures page
+          coords and never showed it). This wrapper is untransformed, so
+          events arrive in stable screen coords, which is what the camera
+          math expects. */}
       <GestureDetector gesture={gestures}>
-        <Reanimated.View style={[styles.plane, planeStyle]}>
+        <View style={StyleSheet.absoluteFill} collapsable={false}>
+          <Reanimated.View style={[styles.plane, planeStyle]}>
           {graph &&
             graph.edges.map((e) => {
               const a = positions.get(e.from);
@@ -422,7 +503,8 @@ export default function WebScreen() {
                 </Pressable>
               );
             })}
-        </Reanimated.View>
+          </Reanimated.View>
+        </View>
       </GestureDetector>
 
       {!graph && (
@@ -461,10 +543,12 @@ export default function WebScreen() {
             <Pressable
               style={styles.captionText}
               // In-app pieces open on the creator's profile, scrolled to the
-              // piece; external art has no page, so its caption isn't tappable.
-              disabled={focused.kind !== 'art'}
+              // piece; external art opens a full-image zoom (it has no page).
               onPress={() => {
-                if (focused.kind !== 'art') return;
+                if (focused.kind !== 'art') {
+                  setZoomExt(focused as WebNodeExternal);
+                  return;
+                }
                 // Route into the Search tab's profile so the bottom tab bar
                 // stays (the Web screen sits above the tabs on the root stack;
                 // a root-level profile would come up chromeless).
@@ -513,6 +597,21 @@ export default function WebScreen() {
           linkedIds={linkedIds}
           onLinked={() => refresh()}
           onClose={() => setLinkFrom(null)}
+        />
+      )}
+
+      {zoomExt && (
+        <ArtZoomIn
+          isOwner={false}
+          imgPath={externalImageUrl(zoomExt.id, true)}
+          headers={authHeaders()}
+          onClose={() => setZoomExt(null)}
+          backContent={
+            <View style={styles.zoomBack}>
+              <Text style={styles.captionTitle}>{zoomExt.title || 'untitled'}</Text>
+              <Text style={styles.captionByline}>{zoomExt.artist}</Text>
+            </View>
+          }
         />
       )}
     </View>
@@ -685,5 +784,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.sm,
     lineHeight: 18,
+  },
+  zoomBack: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    padding: 16,
   },
 });
