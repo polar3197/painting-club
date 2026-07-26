@@ -38,11 +38,94 @@ const MAX_SCALE = 2.5;
 
 type Pos = { x: number; y: number };
 
+// --- Hull geometry for cluster packing -------------------------------------
+
+// Andrew monotone chain. 1–2 points pass through (degenerate hulls are fine —
+// the distance functions treat them as points/segments).
+function convexHull(pts: Pos[]): Pos[] {
+  if (pts.length <= 2) return [...pts];
+  const s = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: Pos, a: Pos, b: Pos) =>
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: Pos[] = [];
+  for (const p of s) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Pos[] = [];
+  for (let i = s.length - 1; i >= 0; i--) {
+    const p = s[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+function ptSegDist(p: Pos, a: Pos, b: Pos): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function segsIntersect(a1: Pos, a2: Pos, b1: Pos, b2: Pos): boolean {
+  const d = (o: Pos, a: Pos, b: Pos) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const d1 = d(b1, b2, a1);
+  const d2 = d(b1, b2, a2);
+  const d3 = d(a1, a2, b1);
+  const d4 = d(a1, a2, b2);
+  return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+}
+
+function segSegDist(a1: Pos, a2: Pos, b1: Pos, b2: Pos): number {
+  if (segsIntersect(a1, a2, b1, b2)) return 0;
+  return Math.min(
+    ptSegDist(a1, b1, b2),
+    ptSegDist(a2, b1, b2),
+    ptSegDist(b1, a1, a2),
+    ptSegDist(b2, a1, a2),
+  );
+}
+
+function pointInHull(p: Pos, hull: Pos[]): boolean {
+  if (hull.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = hull.length - 1; i < hull.length; j = i++) {
+    const a = hull[i];
+    const b = hull[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// Min distance between two hulls (0 when they touch or one contains the
+// other). Iterates edge pairs; degenerate hulls fall out naturally.
+function hullsDist(A: Pos[], B: Pos[]): number {
+  if (A.length && B.length && (pointInHull(A[0], B) || pointInHull(B[0], A))) return 0;
+  let best = Infinity;
+  for (let i = 0; i < A.length; i++) {
+    const a1 = A[i];
+    const a2 = A[(i + 1) % A.length];
+    for (let j = 0; j < B.length; j++) {
+      best = Math.min(best, segSegDist(a1, a2, B[j], B[(j + 1) % B.length]));
+      if (best === 0) return 0;
+    }
+  }
+  return best;
+}
+
 // Static force layout with GUARANTEED cluster separation: each connected
-// component gets its own simulation, is wrapped in a bounding circle, and the
-// circles are packed with padding. Disjoint circles mean a thread can never
-// reach into another cluster's region, so disparate sub-webs cannot overlap
-// (the old single-simulation layout let clusters interleave).
+// component gets its own simulation and is wrapped in its CONVEX HULL, and
+// the hulls are packed to a minimum mutual distance. Both endpoints of any
+// thread are in their cluster's hull, so by convexity the whole thread is
+// too — disjoint hulls mean threads of disparate sub-webs cannot cross.
+// Hulls (unlike the earlier bounding circles) hug elongated and irregular
+// clusters, so the packing nests organically instead of as spaced blobs.
 function layoutGraph(g: WebGraph): Map<string, Pos> {
   type SimNode = { id: string; x?: number; y?: number };
 
@@ -105,34 +188,31 @@ function layoutGraph(g: WebGraph): Map<string, Pos> {
       pos.set(nd.id, { x, y });
       r = Math.max(r, Math.sqrt(x * x + y * y));
     }
-    // Margin covers the node face at the rim (biggest node is 132/2 = 66)
-    // with a hair of breathing room — big enough to stay disjoint, small
-    // enough that clusters read as neighbors, not islands.
-    return { pos, r: r + 75 };
+    return { pos, r, hull: convexHull([...pos.values()]) };
   });
 
-  // Pack the cluster circles: biggest at the origin, the rest walked along a
-  // golden-angle spiral to the first spot clear of everything already placed.
+  // Pack the cluster hulls: biggest at the origin, the rest walked along a
+  // golden-angle spiral to the first spot whose hull keeps SEP from every
+  // hull already placed. SEP matches the intra-cluster link distance, so a
+  // neighboring cluster sits about as far away as a linked node does.
   clusters.sort((a, b) => b.r - a.r);
-  const PAD = 36;
-  const placed: { x: number; y: number; r: number }[] = [];
+  const SEP = 150;
+  const placedHulls: Pos[][] = [];
   const out = new Map<string, Pos>();
   for (const c of clusters) {
     let px = 0;
     let py = 0;
-    if (placed.length) {
+    if (placedHulls.length) {
       for (let i = 1; ; i++) {
-        const d = 40 * Math.sqrt(i);
+        const d = 24 * Math.sqrt(i);
         const th = i * 2.39996; // golden angle — dense, even spiral coverage
         px = d * Math.cos(th);
         py = d * Math.sin(th);
-        const clear = placed.every(
-          (p) => Math.hypot(px - p.x, py - p.y) >= p.r + c.r + PAD,
-        );
-        if (clear) break;
+        const at = c.hull.map((p) => ({ x: p.x + px, y: p.y + py }));
+        if (placedHulls.every((h) => hullsDist(at, h) >= SEP)) break;
       }
     }
-    placed.push({ x: px, y: py, r: c.r });
+    placedHulls.push(c.hull.map((p) => ({ x: p.x + px, y: p.y + py })));
     for (const [id, p] of c.pos) out.set(id, { x: p.x + px, y: p.y + py });
   }
 
