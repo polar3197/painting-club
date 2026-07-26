@@ -105,13 +105,16 @@ function layoutGraph(g: WebGraph): Map<string, Pos> {
       pos.set(nd.id, { x, y });
       r = Math.max(r, Math.sqrt(x * x + y * y));
     }
-    return { pos, r: r + 90 };
+    // Margin covers the node face at the rim (biggest node is 132/2 = 66)
+    // with a hair of breathing room — big enough to stay disjoint, small
+    // enough that clusters read as neighbors, not islands.
+    return { pos, r: r + 75 };
   });
 
   // Pack the cluster circles: biggest at the origin, the rest walked along a
   // golden-angle spiral to the first spot clear of everything already placed.
   clusters.sort((a, b) => b.r - a.r);
-  const PAD = 70;
+  const PAD = 36;
   const placed: { x: number; y: number; r: number }[] = [];
   const out = new Map<string, Pos>();
   for (const c of clusters) {
