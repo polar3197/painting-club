@@ -87,11 +87,40 @@ http {
             return 404;
         }
 
+        # Public portfolio derivatives are served ONLY via the api's
+        # visibility-gated /p/img/ route; block raw file access so flipping a
+        # piece private is instant revocation.
+        location /static/public/ {
+            return 403;
+        }
+
         # Other static (event images, etc.) stays public for now.
         location /static/ {
             alias /app/static/;
             expires 1d;
             add_header Cache-Control "public, immutable";
+        }
+
+        # Public portfolio pages + images (no auth — the api gates on
+        # portfolio.published / art.visibility). Kept off /api/ so public URLs
+        # carry no hint of the app behind them.
+        location /p/ {
+            proxy_pass http://backend/p/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location = /robots.txt {
+            default_type text/plain;
+            # nginx does NOT unescape \n in return strings — the literal
+            # multi-line quoted string below is the correct way to emit newlines.
+            return 200 "User-agent: *
+Disallow: /api/
+Disallow: /static/
+Allow: /p/
+";
         }
 
         # API requests
