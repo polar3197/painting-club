@@ -3751,7 +3751,9 @@ async def public_portfolio_page(slug: str, request: Request, pv: str | None = No
     if payload is None:
         raise HTTPException(status_code=404, detail="Not found")
     first_piece = next((pc for b in payload["blocks"] for pc in b["pieces"]), None)
-    og_image = f"{PUBLIC_SITE_ORIGIN}/p/img/{first_piece['id']}" if first_piece else None
+    scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
+    origin = f"{scheme}://{request.url.netloc}"
+    og_image = f"{origin}/p/img/{first_piece['id']}" if first_piece else None
     resp = _templates.TemplateResponse(request, "portfolio_page.html", {"p": payload, "og_image": og_image})
     resp.headers["Cache-Control"] = "no-store" if previewing else "public, max-age=300"
     return resp

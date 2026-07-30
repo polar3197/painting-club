@@ -28,7 +28,6 @@ def pub_client(tmp_static, monkeypatch):
     async def fake_payload(db, slug, include_unpublished=False):
         return dict(PUB) if slug == "jane" or include_unpublished else None
     monkeypatch.setattr(main_mod, "db_public_portfolio_payload", fake_payload)
-    monkeypatch.setattr(main_mod, "PUBLIC_SITE_ORIGIN", "https://portfolio.example.com")
     app.dependency_overrides[get_db] = fake_get_db
     c = TestClient(app)
     try:
@@ -45,6 +44,8 @@ def test_public_page_renders_without_auth(pub_client):
     assert 'property="og:title"' in html
     # invisibility: the page must never mention the club
     assert "paint club" not in html.lower() and "paintingclub" not in html.lower()
+    # og:image derives origin from request, not hardcoded PUBLIC_SITE_ORIGIN
+    assert 'content="http://testserver/p/img/' in html
 
 
 def test_unknown_or_unpublished_404(pub_client):
