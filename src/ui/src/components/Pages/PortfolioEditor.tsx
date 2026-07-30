@@ -141,15 +141,30 @@ export default function PortfolioEditor() {
                       }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={async (e) => {
+                        e.preventDefault();
                         e.stopPropagation();
+                        if (!token) return;
                         const data = e.dataTransfer.getData("text/reorder");
-                        if (!data || !token) return;
-                        const [srcBlock, srcIdxStr] = data.split(":");
-                        if (srcBlock !== block.id) return;
-                        const ids = [...block.piece_ids];
-                        const [moved] = ids.splice(Number(srcIdxStr), 1);
-                        ids.splice(idx, 0, moved);
-                        reload(await set_portfolio_block_pieces(token, block.id, ids));
+                        if (data) {
+                          const [srcBlock, srcIdxStr] = data.split(":");
+                          if (srcBlock !== block.id) return;
+                          const ids = [...block.piece_ids];
+                          const [moved] = ids.splice(Number(srcIdxStr), 1);
+                          ids.splice(idx, 0, moved);
+                          reload(await set_portfolio_block_pieces(token, block.id, ids));
+                          return;
+                        }
+                        const artId = e.dataTransfer.getData("text/art-id");
+                        if (artId && !block.piece_ids.includes(artId)) {
+                          const piece = pieces.find((p) => p.id === artId);
+                          if (piece && piece.visibility !== "public") {
+                            await set_art_visibility(token, artId, "public");
+                            setPieces((ps) => ps.map((p) => (p.id === artId ? { ...p, visibility: "public" } : p)));
+                          }
+                          const ids = [...block.piece_ids];
+                          ids.splice(idx, 0, artId);
+                          reload(await set_portfolio_block_pieces(token, block.id, ids));
+                        }
                       }}
                     >
                       {piece?.file_path && <img src={piece.file_path} alt={piece?.title ?? ""} />}
