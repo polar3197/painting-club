@@ -561,6 +561,7 @@ async def delete_my_account(
         try:
             thumb_file(aid).unlink(missing_ok=True)
             display_file(aid).unlink(missing_ok=True)
+            public_file(aid).unlink(missing_ok=True)
         except Exception:
             pass
     try:
@@ -765,6 +766,7 @@ AUDIO_EXTS = {"m4a", "mp3", "wav", "aac"}
 STATIC_ROOT = Path(os.environ.get("STATIC_ROOT", "/app"))
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 DISPLAY_SIZE = 1600  # mid-res "display" derivative for the main viewer — phones can't show more
+PUBLIC_SIZE = 1600  # public pages never receive original bytes — this is the ceiling
 
 def abs_path(rel: str) -> Path:
     # rel is an absolute-looking web path like "/static/foo.jpg" — anchor it under STATIC_ROOT
@@ -824,6 +826,28 @@ def generate_display(art_id: str, src_abs: Path) -> Path | None:
         return out
     except Exception as e:
         print(f"[display] generation failed for {art_id}: {type(e).__name__}: {e}")
+        out.unlink(missing_ok=True)
+        return None
+
+def public_file(art_id: str) -> Path:
+    return STATIC_ROOT / "static" / "public" / f"{art_id}.jpg"
+
+
+def generate_public_image(art_id: str, src_abs: Path) -> Path | None:
+    """Downscaled, EXIF-stripped JPEG served to ANONYMOUS portfolio visitors.
+    Saving a fresh RGB image via Pillow drops all metadata (EXIF/GPS/etc.)."""
+    out = public_file(art_id)
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            img.draft("RGB", (PUBLIC_SIZE, PUBLIC_SIZE))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((PUBLIC_SIZE, PUBLIC_SIZE * 4), Image.LANCZOS)
+            img.save(out, format="JPEG", quality=82, optimize=True)
+        return out
+    except Exception as e:
+        print(f"[public] gen failed for {art_id}: {type(e).__name__}: {e}")
         out.unlink(missing_ok=True)
         return None
 
@@ -1183,6 +1207,7 @@ async def update_visual_2d(
         # PDFs have no cached thumb file; drop the stale one if it exists.
         thumb_file(art_id).unlink(missing_ok=True)
         display_file(art_id).unlink(missing_ok=True)
+        public_file(art_id).unlink(missing_ok=True)
         if written_path.suffix.lower() != ".pdf":
             generate_thumbnail(str(art_id), written_path)
             generate_display(str(art_id), written_path)
@@ -1196,6 +1221,7 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
         abs_path(file_path).unlink(missing_ok=True)
     thumb_file(art_id).unlink(missing_ok=True)
     display_file(art_id).unlink(missing_ok=True)
+    public_file(art_id).unlink(missing_ok=True)
     return
 
 
@@ -3666,3 +3692,21 @@ async def list_my_portfolio_pieces(db: AsyncSession = Depends(get_db),
     rows = await db_list_my_visual_pieces(db, current_user.id)
     return [PortfolioPieceOut(id=str(r.id), title=r.title, file_path=r.file_path,
                               visibility=r.visibility, aspect_ratio=r.aspect_ratio) for r in rows]
+
+
+@app.patch("/art/{art_id}/visibility")
+async def set_art_visibility(art_id: str, payload: ArtVisibilityIn, db: AsyncSession = Depends(get_db),
+                             current_user: Member = Depends(get_current_member)):
+    try:
+        file_path = await db_set_art_visibility(db, current_user.id, art_id, payload.visibility)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404 if "not found" in str(e).lower() else 400, detail=str(e))
+    if payload.visibility == "public":
+        src = abs_path(file_path) if file_path else None
+        if src is not None and src.exists() and src.suffix.lower() != ".pdf":
+            generate_public_image(art_id, src)
+    else:
+        public_file(art_id).unlink(missing_ok=True)
+    return {"art_id": art_id, "visibility": payload.visibility}
