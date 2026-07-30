@@ -618,7 +618,6 @@ async def get_visual_2d(
             order_index=visual_2d_row.series_order_index,
         )
         visual_2ds.append(visual_2d)
-    print(visual_2ds)
     return visual_2ds
 
 @app.get("/members")
