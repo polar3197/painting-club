@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
-from db.models import Art, Bookmark, Media, Member, Series, Visual2D
+from db.models import Art, Bookmark, Media, Member, Series, Visual2D, WrittenForm
 
 
 async def db_add_bookmark(db: AsyncSession, member_id, art_id) -> None:
@@ -33,6 +33,7 @@ async def db_list_bookmarks(db: AsyncSession, member_id):
     aspect_ratio comes from the visual_2d subtype via LEFT JOIN — NULL for
     written/audio pieces, which is what clients already expect."""
     visual = Visual2D.__table__
+    written = WrittenForm.__table__
     result = await db.execute(
         select(
             Art.id,
@@ -44,6 +45,9 @@ async def db_list_bookmarks(db: AsyncSession, member_id):
             Member.username.label("creator_username"),
             Bookmark.created_at.label("bookmarked_at"),
             visual.c.aspect_ratio,
+            # Cover image for written pieces — the saved card shows it instead
+            # of the text snippet. NULL for other mediums / cover-less pieces.
+            written.c.cover_image_path,
             # series_id groups saved pieces into their collection/album on the
             # client; series_name labels it. NULL for standalone pieces.
             Art.series_id,
@@ -54,6 +58,7 @@ async def db_list_bookmarks(db: AsyncSession, member_id):
         .join(Media, Media.id == Art.media_id)
         .join(Member, Member.id == Art.creator_id)
         .outerjoin(visual, visual.c.id == Art.id)
+        .outerjoin(written, written.c.id == Art.id)
         .outerjoin(Series, Series.id == Art.series_id)
         .filter(Bookmark.member_id == member_id)
         .order_by(desc(Bookmark.created_at))

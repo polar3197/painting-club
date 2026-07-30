@@ -3097,6 +3097,7 @@ async def list_my_bookmarks(
             date=r.date,
             creator_username=r.creator_username,
             aspect_ratio=r.aspect_ratio,
+            cover_image_path=r.cover_image_path,
             series_id=r.series_id,
             series_name=r.series_name,
             bookmarked_at=r.bookmarked_at,

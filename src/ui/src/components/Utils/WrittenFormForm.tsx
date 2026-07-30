@@ -22,6 +22,7 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
         comments_enabled: boolean;
         files: File | null;
         text: string;
+        cover: File | null;
     }>({
         title: initialData?.title ?? "",
         date: initialData?.date ?? "",
@@ -30,8 +31,10 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
         comments_enabled: initialData?.comments_enabled ?? false,
         files: null,
         text: "",
+        cover: null,
     });
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const coverInputRef = useRef<HTMLInputElement>(null);
     const [snippet, setSnippet] = useState<string | null>(null);
 
     const update = (patch: Record<string, any>) => {
@@ -115,6 +118,44 @@ const WrittenFormForm = ({ onDataChange, initialData }: { onDataChange: (data: R
                     onChange={(e) => update({ text: e.target.value })}
                 />
             )}
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, marginTop: 8 }}>
+                <input
+                    type="file"
+                    ref={coverInputRef}
+                    style={{ display: "none" }}
+                    accept="image/*"
+                    onChange={(e) => update({ cover: e.target.files?.[0] ?? null })}
+                />
+                <div
+                    onClick={() => coverInputRef.current?.click()}
+                    style={{
+                        width: 56, height: 56, border: "1px solid #000", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+                    }}
+                >
+                    {form.cover ? (
+                        <img
+                            src={URL.createObjectURL(form.cover)}
+                            alt="cover"
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                    ) : (
+                        <span style={{ fontSize: 11, opacity: 0.6 }}>cover</span>
+                    )}
+                </div>
+                {form.cover && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            update({ cover: null });
+                            if (coverInputRef.current) coverInputRef.current.value = "";
+                        }}
+                        style={{ width: 20, height: 20, lineHeight: "16px", padding: 0 }}
+                    >
+                        ×
+                    </button>
+                )}
+            </div>
         </div>
         <div className="painting-title">
             <input
