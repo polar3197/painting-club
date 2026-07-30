@@ -644,3 +644,87 @@ export function update_report_status(
     body: JSON.stringify({ status }),
   }) as Promise<ReportOut>;
 }
+
+// Portfolio interfaces and API functions
+export interface PortfolioBlock {
+  id: string;
+  kind: "statement" | "gallery" | "spotlight";
+  position: number;
+  config: Record<string, any>;
+  piece_ids: string[];
+}
+
+export interface Portfolio {
+  id: string;
+  slug: string;
+  title: string | null;
+  published: boolean;
+  theme: Record<string, any>;
+  blocks: PortfolioBlock[];
+  public_url: string;
+}
+
+export interface PortfolioPiece {
+  id: string;
+  title: string | null;
+  file_path: string | null;
+  visibility: "club" | "public";
+  aspect_ratio: number | null;
+}
+
+export const get_my_portfolio = (token: string) =>
+  request("/portfolio/mine", { headers: { Authorization: `Bearer ${token}` } }) as Promise<Portfolio>;
+
+export const update_my_portfolio = (
+  token: string,
+  payload: { slug?: string; title?: string; published?: boolean; theme?: Record<string, any> },
+) =>
+  request("/portfolio/mine", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }) as Promise<Portfolio>;
+
+export const add_portfolio_block = (token: string, kind: PortfolioBlock["kind"], position?: number) =>
+  request("/portfolio/blocks", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ kind, position }),
+  }) as Promise<Portfolio>;
+
+export const update_portfolio_block = (
+  token: string,
+  blockId: string,
+  payload: { config?: Record<string, any>; position?: number },
+) =>
+  request(`/portfolio/blocks/${blockId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }) as Promise<Portfolio>;
+
+export const delete_portfolio_block = (token: string, blockId: string) =>
+  request(`/portfolio/blocks/${blockId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<Portfolio>;
+
+export const set_portfolio_block_pieces = (token: string, blockId: string, artIds: string[]) =>
+  request(`/portfolio/blocks/${blockId}/pieces`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ art_ids: artIds }),
+  }) as Promise<Portfolio>;
+
+export const get_my_portfolio_pieces = (token: string) =>
+  request("/portfolio/my-pieces", { headers: { Authorization: `Bearer ${token}` } }) as Promise<PortfolioPiece[]>;
+
+export const set_art_visibility = (token: string, artId: string, visibility: "club" | "public") =>
+  request(`/art/${artId}/visibility`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ visibility }),
+  }) as Promise<{ art_id: string; visibility: string }>;
+
+export const get_portfolio_preview_link = (token: string) =>
+  request("/portfolio/preview-link", { headers: { Authorization: `Bearer ${token}` } }) as Promise<{ url: string }>;
