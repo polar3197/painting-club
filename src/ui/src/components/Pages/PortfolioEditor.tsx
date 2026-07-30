@@ -264,9 +264,14 @@ export default function PortfolioEditor() {
           >preview</button>
           <button
             className={portfolio.published ? "pe-live" : ""}
-            onClick={async () =>
-              token && reload(await update_my_portfolio(token, { published: !portfolio.published }))
-            }
+            onClick={async () => {
+              if (!token) return;
+              try {
+                reload(await update_my_portfolio(token, { published: !portfolio.published }));
+              } catch {
+                alert("could not update");
+              }
+            }}
           >{portfolio.published ? "unpublish" : "publish"}</button>
         </div>
         {portfolio.published && (

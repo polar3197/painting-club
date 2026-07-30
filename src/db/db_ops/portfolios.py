@@ -222,6 +222,7 @@ async def db_public_portfolio_payload(db: AsyncSession, slug: str, include_unpub
         blocks_out.append({"kind": b.kind, "config": b.config or {}, "pieces": pieces})
     artist_name = " ".join(x for x in (m.firstname, m.lastname) if x) or m.username
     return {
+        "id": str(p.id), "published": p.published,
         "slug": p.slug, "title": p.title or artist_name, "artist_name": artist_name,
         "statement": m.bio, "theme": p.theme or {}, "blocks": blocks_out,
     }
@@ -246,6 +247,8 @@ async def db_set_art_visibility(db: AsyncSession, member_id, art_id, visibility:
         raise PermissionError("Not your piece")
     if art.type != "visual_2d":
         raise ValueError("only visual pieces can be made public in v1")
+    if visibility == "public" and art.file_path and art.file_path.lower().endswith(".pdf"):
+        raise ValueError("pdf pieces cannot be made public")
     art.visibility = visibility
     await db.commit()
     return art.file_path

@@ -3701,6 +3701,10 @@ async def list_my_portfolio_pieces(db: AsyncSession = Depends(get_db),
 async def set_art_visibility(art_id: str, payload: ArtVisibilityIn, db: AsyncSession = Depends(get_db),
                              current_user: Member = Depends(get_current_member)):
     try:
+        art_id = str(uuid.UUID(art_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found")
+    try:
         file_path = await db_set_art_visibility(db, current_user.id, art_id, payload.visibility)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
@@ -3718,18 +3722,18 @@ async def set_art_visibility(art_id: str, payload: ArtVisibilityIn, db: AsyncSes
 _templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
-def mint_preview_sig(slug: str, exp: int) -> str:
-    return hmac.new(JWT_SECRET.encode(), f"{slug}:{exp}".encode(), "sha256").hexdigest()
+def mint_preview_sig(key: str, exp: int) -> str:
+    return hmac.new(JWT_SECRET.encode(), f"{key}:{exp}".encode(), "sha256").hexdigest()
 
 
-def check_preview_sig(slug: str, sig: str, exp) -> bool:
+def check_preview_sig(key: str, sig: str, exp) -> bool:
     try:
         exp = int(exp)
     except (TypeError, ValueError):
         return False
     if exp < time_mod.time():
         return False
-    return hmac.compare_digest(mint_preview_sig(slug, exp), sig or "")
+    return hmac.compare_digest(mint_preview_sig(key, exp).encode(), (sig or "").encode())
 
 
 @app.get("/portfolio/preview-link")
@@ -3737,18 +3741,20 @@ async def get_portfolio_preview_link(db: AsyncSession = Depends(get_db),
                                      current_user: Member = Depends(get_current_member)):
     p = await db_get_or_create_my_portfolio(db, current_user)
     exp = int(time_mod.time()) + 3600
-    return {"url": f"{PUBLIC_SITE_ORIGIN}/p/{p.slug}?pv={mint_preview_sig(p.slug, exp)}&exp={exp}"}
+    return {"url": f"{PUBLIC_SITE_ORIGIN}/p/{p.slug}?pv={mint_preview_sig(str(p.id), exp)}&exp={exp}"}
 
 
 @app.get("/p/{slug}", response_class=HTMLResponse)
 async def public_portfolio_page(slug: str, request: Request, pv: str | None = None, exp: str | None = None,
                                 db: AsyncSession = Depends(get_db)):
     """The public portfolio site. NO auth — but only published portfolios render
-    (a valid preview signature admits the owner's unpublished draft). The page
-    contains zero club references."""
-    previewing = bool(pv) and check_preview_sig(slug, pv, exp)
-    payload = await db_public_portfolio_payload(db, slug, include_unpublished=previewing)
+    (a valid preview signature, bound to the portfolio's id, admits the owner's
+    unpublished draft). The page contains zero club references."""
+    payload = await db_public_portfolio_payload(db, slug, include_unpublished=True)
     if payload is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    previewing = bool(pv) and check_preview_sig(payload["id"], pv, exp)
+    if not payload["published"] and not previewing:
         raise HTTPException(status_code=404, detail="Not found")
     first_piece = next((pc for b in payload["blocks"] for pc in b["pieces"]), None)
     scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
@@ -3763,6 +3769,10 @@ async def public_portfolio_page(slug: str, request: Request, pv: str | None = No
 async def public_portfolio_image(art_id: str, db: AsyncSession = Depends(get_db)):
     """Public derivative ONLY — never original bytes. 404 unless the piece is
     visibility='public'; flipping a piece back to club 404s this immediately."""
+    try:
+        art_id = str(uuid.UUID(art_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found")
     file_path = await db_public_art_file_path(db, art_id)
     if not file_path:
         raise HTTPException(status_code=404, detail="Not found")
