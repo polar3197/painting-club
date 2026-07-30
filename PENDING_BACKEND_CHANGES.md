@@ -11,7 +11,12 @@
 > Client half: AddMediaDialog offers written (short form)/(long form), admin
 > request rows show + classify the format, contributor short/long pill in
 > hide/show, reader branches on the tab's format (missing → long, so either
-> deploy order is safe). Deploy status recorded below once pulled.
+> deploy order is safe). **Backend DEPLOYED ✅ 2026-07-30** (cherry-pick
+> `17a450f` on main `105985a`, Pi pulled + hot-reloaded, migration ran —
+> prod backfill verified: poetry/thoughts → short, text art/writing → long,
+> non-written untouched; `/media` serves the field, PATCH 401s unauth).
+> OTA publish pending (blocked in-session; run from ios-v1:
+> `npx eas-cli update --branch production --message "written short/long form"`).
 
 > **Bookmarks written-cover (2026-07-29): DEPLOYED ✅** (`e1fb755` cherry-picked
 > to main, Pi pulled + hot-reloaded, query exercised against the prod DB — 40
