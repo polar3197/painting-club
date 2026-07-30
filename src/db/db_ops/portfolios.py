@@ -136,13 +136,13 @@ async def db_set_block_pieces(db: AsyncSession, member_id, block_id, art_ids: li
     the member's own PUBLIC visual_2d piece — the editor flips visibility first."""
     b = await _get_owned_block(db, member_id, block_id)
     if art_ids:
-        ok = {row[0] for row in (await db.execute(
+        ok = {str(row[0]) for row in (await db.execute(
             select(Art.id).filter(
                 Art.id.in_(art_ids), Art.creator_id == member_id,
                 Art.type == "visual_2d", Art.visibility == "public",
             )
         )).all()}
-        bad = [str(a) for a in art_ids if a not in ok]
+        bad = [str(a) for a in art_ids if str(a) not in ok]
         if bad:
             raise ValueError(f"not your public visual pieces: {', '.join(bad)}")
     await db.execute(delete(PortfolioBlockPiece).where(PortfolioBlockPiece.block_id == b.id))
@@ -183,7 +183,7 @@ async def db_my_portfolio_payload(db: AsyncSession, member) -> dict:
 async def db_list_my_visual_pieces(db: AsyncSession, member_id):
     """The member's own visual pieces for the editor palette, newest first."""
     return (await db.execute(
-        select(Art.id, Art.title, Art.file_path, Art.visibility, Visual2D.aspect_ratio)
+        select(Art.id, Art.title, Art.file_path, Visual2D.aspect_ratio, Art.visibility)
         .join(Visual2D, Visual2D.id == Art.id)
         .filter(Art.creator_id == member_id)
         .order_by(Art.created_at.desc())
