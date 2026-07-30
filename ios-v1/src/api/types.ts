@@ -357,10 +357,16 @@ export interface CommentsReceivedPage {
   previous_view_at: string | null;
 }
 
+// Written media split: short form (poetry/thoughts — the reader scrolls) vs
+// long form (stories/essays — the reader pages).
+export type WrittenFormat = 'short' | 'long';
+
 export interface MediaType {
   id: string;
   name: string;
   type?: string | null;
+  // Written media only; null/absent (incl. older backends) reads as long form.
+  written_format?: WrittenFormat | null;
 }
 
 // The three medium categories a piece can belong to. Used when a requester
@@ -446,6 +452,9 @@ export interface MediaRequest {
   // What the requester picked at submission ("visual_2d" | "written_form" |
   // "audio"). Null on rows created before requesters chose their own type.
   requested_type: string | null;
+  // Written requests only: the requester's short/long pick (absent on older
+  // backends and non-written requests).
+  requested_format?: WrittenFormat | null;
   resolved_type: string | null;
   created_at: string;
 }

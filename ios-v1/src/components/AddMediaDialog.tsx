@@ -19,7 +19,7 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
-import { get_media, submit_media_request, set_media_visibility, reorder_media, MediaType, MediaTypeKind } from '../api';
+import { get_media, submit_media_request, set_media_visibility, set_media_format, reorder_media, MediaType, MediaTypeKind, WrittenFormat } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
@@ -41,10 +41,13 @@ type Tab = 'hide-show' | 'new';
 
 // The requester classifies their proposed media form so the admin doesn't have
 // to. Labels are the human-facing names; values match the backend discriminator.
-const TYPE_OPTIONS: { value: MediaTypeKind; label: string }[] = [
+// Written splits into short form (poetry/thoughts — scroll reader) and long
+// form (stories/essays — paged reader); the format rides along on the request.
+const TYPE_OPTIONS: { value: MediaTypeKind; format?: WrittenFormat; label: string }[] = [
   { value: 'visual_2d', label: '2d-visual' },
-  { value: 'written_form', label: 'written-form' },
   { value: 'audio', label: 'audio' },
+  { value: 'written_form', format: 'short', label: 'written (short form)' },
+  { value: 'written_form', format: 'long', label: 'written (long form)' },
 ];
 
 export default function AddMediaDialog({
@@ -56,13 +59,15 @@ export default function AddMediaDialog({
   onReorder,
   onlyNew = false,
 }: AddMediaDialogProps) {
-  const { token } = useAuth();
+  const { token, currentRole } = useAuth();
   const [tab, setTab] = useState<Tab>(onlyNew ? 'new' : 'hide-show');
   const [media, setMedia] = useState<MediaType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestName, setRequestName] = useState('');
-  const [requestType, setRequestType] = useState<MediaTypeKind | null>(null);
+  const [requestOption, setRequestOption] = useState<(typeof TYPE_OPTIONS)[number] | null>(null);
   const [requestSent, setRequestSent] = useState(false);
+  // Local short/long overrides so a contributor's flip shows immediately.
+  const [formatOverrides, setFormatOverrides] = useState<Record<string, WrittenFormat>>({});
 
   // Row order, seeded from the server's (position, name) ordering at mount.
   // Toggling hide/show doesn't reshuffle it; hold-and-drag rewrites it.
@@ -167,15 +172,37 @@ export default function AddMediaDialog({
 
   const handleRequest = async () => {
     const name = requestName.trim();
-    if (!name || !requestType) return;
+    if (!name || !requestOption) return;
     try {
-      await submit_media_request(name, requestType, token);
+      await submit_media_request(name, requestOption.value, token, requestOption.format);
       setRequestName('');
-      setRequestType(null);
+      setRequestOption(null);
       setRequestSent(true);
       setTimeout(() => setRequestSent(false), 2000);
     } catch (err: any) {
       appAlert('Error', err.message || 'request failed');
+    }
+  };
+
+  // Contributor-only: written media are shared rows, so flipping short/long is
+  // a curation action rather than a per-profile setting.
+  const isContributor = currentRole === 'contributor';
+  const formatFor = (name: string): WrittenFormat | null => {
+    const m = (media ?? []).find((x) => x.name === name);
+    if (!m || m.type !== 'written_form') return null;
+    return formatOverrides[name] ?? m.written_format ?? 'long';
+  };
+  const flipFormat = async (name: string) => {
+    const next: WrittenFormat = formatFor(name) === 'short' ? 'long' : 'short';
+    setFormatOverrides((prev) => ({ ...prev, [name]: next }));
+    try {
+      await set_media_format(name, next, token);
+    } catch (err: any) {
+      setFormatOverrides((prev) => {
+        const { [name]: _, ...rest } = prev;
+        return rest;
+      });
+      appAlert('Error', err?.message || 'failed to change format');
     }
   };
 
@@ -255,6 +282,8 @@ export default function AddMediaDialog({
                               hidden={isHidden}
                               positionNumber={shownRank}
                               dragging={draggingName === name}
+                              writtenFormat={isContributor ? formatFor(name) : null}
+                              onFlipFormat={() => flipFormat(name)}
                               onHeight={(h) => heightsRef.current.set(name, h)}
                               onToggle={() => toggle(name, !hiddenSet.has(name))}
                             />
@@ -305,21 +334,21 @@ export default function AddMediaDialog({
                       onChangeText={setRequestName}
                     />
                     <Pressable
-                      style={[styles.requestBtn, (!requestName.trim() || !requestType) && styles.requestBtnDisabled]}
+                      style={[styles.requestBtn, (!requestName.trim() || !requestOption) && styles.requestBtnDisabled]}
                       onPress={handleRequest}
-                      disabled={!requestName.trim() || !requestType}
+                      disabled={!requestName.trim() || !requestOption}
                     >
                       <Text style={styles.requestBtnText}>request</Text>
                     </Pressable>
                   </View>
                   <View style={styles.typeRow}>
                     {TYPE_OPTIONS.map((opt) => {
-                      const selected = requestType === opt.value;
+                      const selected = requestOption?.label === opt.label;
                       return (
                         <Pressable
-                          key={opt.value}
+                          key={opt.label}
                           style={[styles.typeChip, selected && styles.typeChipSelected]}
-                          onPress={() => setRequestType(opt.value)}
+                          onPress={() => setRequestOption(opt)}
                         >
                           <Text style={styles.typeChipText}>
                             {opt.label}
@@ -358,6 +387,8 @@ function ToggleRow({
   hidden,
   positionNumber,
   dragging,
+  writtenFormat,
+  onFlipFormat,
   onHeight,
   onToggle,
 }: {
@@ -366,6 +397,9 @@ function ToggleRow({
   // 1-based tab position among the shown (green) rows, or null when hidden.
   positionNumber: number | null;
   dragging: boolean;
+  // Contributor-only short/long pill on written media (null hides it).
+  writtenFormat: WrittenFormat | null;
+  onFlipFormat: () => void;
   onHeight: (h: number) => void;
   onToggle: () => void;
 }) {
@@ -411,6 +445,13 @@ function ToggleRow({
           renumbering live as rows are dragged or toggled. */}
       {positionNumber != null && (
         <Text style={styles.positionBadge}>{positionNumber}</Text>
+      )}
+      {/* Contributor-only: written media's short/long form. Shown rows only —
+          on hidden rows the name chip slides over this spot. */}
+      {writtenFormat != null && !hidden && (
+        <Pressable style={styles.formatPill} onPress={onFlipFormat} hitSlop={6}>
+          <Text style={styles.formatPillText}>{writtenFormat} form</Text>
+        </Pressable>
       )}
       {rowWidth > 0 && (
         <Animated.View
@@ -542,11 +583,15 @@ const styles = StyleSheet.create({
   },
   typeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 8,
   },
   typeChip: {
-    flex: 1,
+    // Four options now (written splits into short/long) — 2×2 grid instead of
+    // one cramped row.
+    flexGrow: 1,
+    flexBasis: '47%',
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.white,
@@ -617,6 +662,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#000',
     zIndex: 1,
+  },
+  formatPill: {
+    position: 'absolute',
+    right: 36,
+    top: 8,
+    bottom: 8,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 8,
+    zIndex: 1,
+  },
+  formatPillText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
   },
   toggleChip: {
     position: 'absolute',

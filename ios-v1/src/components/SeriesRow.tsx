@@ -7,7 +7,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { WrittenFormOut, imageSource } from '../api';
+import { WrittenFormOut, WrittenFormat, imageSource } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import SeriesZoomIn from './SeriesZoomIn';
 import BookmarkButton from './BookmarkButton';
@@ -41,6 +41,8 @@ interface SeriesRowProps {
   // edit sheet) — these props are what the dialog needs to function.
   selectedMedium: string;
   username: string;
+  // The tab's short/long form, forwarded through the gallery to the reader.
+  writtenFormat?: WrittenFormat | null;
   onRefresh: () => void;
   onMediumMove?: (newMedium: string) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
@@ -57,6 +59,7 @@ export default function SeriesRow({
   seriesName,
   selectedMedium,
   username,
+  writtenFormat,
   onRefresh,
   onMediumMove,
   onLayout,
@@ -95,6 +98,7 @@ export default function SeriesRow({
           pieces={ordered}
           selectedMedium={selectedMedium}
           username={username}
+          writtenFormat={writtenFormat}
           onClose={() => setIsZoomedIn(false)}
           onRefresh={onRefresh}
           onMediumMove={onMediumMove}

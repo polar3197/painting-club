@@ -27,6 +27,7 @@ import type {
   BookmarkedArtOut,
   MediaType,
   MediaTypeKind,
+  WrittenFormat,
   MediaRequest,
   FeatureRequestOut,
   FeatureRequestVoteOut,
@@ -231,12 +232,26 @@ export function submit_media_request(
   name: string,
   type: MediaTypeKind,
   token: string | null,
+  format?: WrittenFormat,
 ): Promise<MediaRequest> {
   return request('/media-requests', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name, type }),
+    body: JSON.stringify({ name, type, format }),
   }) as Promise<MediaRequest>;
+}
+
+// Contributor-only: flip a shared written medium between short and long form.
+export function set_media_format(
+  medium: string,
+  written_format: WrittenFormat,
+  token: string | null,
+): Promise<MediaType> {
+  return request(`/media/${encodeURIComponent(medium)}/format`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ written_format }),
+  }) as Promise<MediaType>;
 }
 
 export function get_media_requests(token: string | null): Promise<MediaRequest[]> {
@@ -251,11 +266,12 @@ export function update_media_request(
   type: string | null,
   token: string | null,
   name: string | null = null,
+  format: WrittenFormat | null = null,
 ): Promise<MediaRequest> {
   return request(`/admin/media-requests/${id}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status, type, name }),
+    body: JSON.stringify({ status, type, name, format }),
   }) as Promise<MediaRequest>;
 }
 

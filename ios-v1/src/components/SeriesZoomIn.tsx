@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { Image } from 'expo-image';
-import { remove_written_form, imageSource, WrittenFormOut } from '../api';
+import { remove_written_form, imageSource, WrittenFormOut, WrittenFormat } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
 import AddArtDialog from './AddArtDialog';
@@ -89,6 +89,8 @@ interface SeriesZoomInProps {
   // edits initiated from the profile screen.
   selectedMedium: string;
   username: string;
+  // The tab's short/long form, forwarded to the in-gallery reader.
+  writtenFormat?: WrittenFormat | null;
   onClose: () => void;
   // Signal to the parent to refetch written-form pieces (after add/edit/remove).
   // The fresh pieces flow back down via the `pieces` prop, so the gallery
@@ -105,6 +107,7 @@ export default function SeriesZoomIn({
   pieces,
   selectedMedium,
   username,
+  writtenFormat,
   onClose,
   onRefresh,
   onMediumMove,
@@ -147,6 +150,7 @@ export default function SeriesZoomIn({
         <WrittenFormZoomIn
           title={focused.title}
           filePath={focused.file_path}
+          format={writtenFormat}
           onClose={() => setFocused(null)}
         />
       )}

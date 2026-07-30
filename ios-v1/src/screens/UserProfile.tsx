@@ -605,6 +605,10 @@ export default function UserProfile() {
   const isV2d = selectedMediumType === 'visual_2d';
   const isWritten = selectedMediumType === 'written_form';
   const isAudio = selectedMediumType === 'audio';
+  // Short/long form of the active written tab (null → reader defaults long).
+  const writtenFormat = isWritten
+    ? allMedia.find((m) => m.name === selectedMedium)?.written_format ?? null
+    : null;
 
   // Keep the medium tab in sync when navigated here with a medium param — e.g.
   // landing from the Add flow on the piece's medium, even if this profile was
@@ -1270,6 +1274,7 @@ export default function UserProfile() {
                   key={row.piece.id}
                   isOwner={profile.is_owner}
                   piece={row.piece}
+                  writtenFormat={writtenFormat}
                   onRemove={() => setRefresh((r) => r + 1)}
                   onEdit={() => setEditingWritten(row.piece)}
                   onLayout={(e) => handleArtLayout(row.piece.id, e)}
@@ -1283,6 +1288,7 @@ export default function UserProfile() {
                   pieces={row.pieces}
                   selectedMedium={selectedMedium!}
                   username={username}
+                  writtenFormat={writtenFormat}
                   onRefresh={() => setRefresh((r) => r + 1)}
                   onMediumMove={(newMedium) => {
                     setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));

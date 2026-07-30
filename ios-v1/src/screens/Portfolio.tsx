@@ -54,6 +54,10 @@ export default function Portfolio() {
   const mediumType = medium ? allMedia.find((m) => m.name === medium)?.type ?? null : null;
   const isV2d = mediumType === 'visual_2d';
   const isWritten = mediumType === 'written_form';
+  // Short/long form of this written tab (null → reader defaults long).
+  const writtenFormat = isWritten
+    ? allMedia.find((m) => m.name === medium)?.written_format ?? null
+    : null;
 
   useEffect(() => {
     if (!username || !medium || !mediumType) return;
@@ -199,6 +203,7 @@ export default function Portfolio() {
                 key={row.piece.id}
                 isOwner={false}
                 piece={row.piece}
+                writtenFormat={writtenFormat}
                 onRemove={() => {}}
                 onEdit={() => {}}
               />
@@ -213,6 +218,7 @@ export default function Portfolio() {
                 // never opens — selectedMedium/username/onRefresh are no-ops.
                 selectedMedium={medium ?? ''}
                 username={username ?? ''}
+                writtenFormat={writtenFormat}
                 onRefresh={() => {}}
               />
             )

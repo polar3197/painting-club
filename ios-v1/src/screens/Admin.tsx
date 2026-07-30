@@ -15,6 +15,7 @@ import {
   get_media_requests,
   update_media_request,
   MediaRequest,
+  WrittenFormat,
   get_reports,
   update_report_status,
   ReportOut,
@@ -172,7 +173,13 @@ function MediaRequestRow({
   onResolve,
 }: {
   req: MediaRequest;
-  onResolve: (id: string, status: 'approved' | 'rejected', type: string | null, name: string | null) => void;
+  onResolve: (
+    id: string,
+    status: 'approved' | 'rejected',
+    type: string | null,
+    name: string | null,
+    format?: WrittenFormat | null,
+  ) => void;
 }) {
   // The requester now picks the type, so the admin just confirms. Entering
   // `confirming` reveals an editable name (admin may rename before approving).
@@ -190,8 +197,13 @@ function MediaRequestRow({
     return n && n !== req.requested_name ? n : null;
   };
 
-  // Requester's chosen type (pending), or the type it was approved with (resolved).
-  const typeLabel = req.resolved_type ?? req.requested_type;
+  // Requester's chosen type (pending), or the type it was approved with
+  // (resolved) — plus the short/long pick on written requests.
+  const baseType = req.resolved_type ?? req.requested_type;
+  const typeLabel =
+    baseType === 'written_form' && req.requested_format
+      ? `${baseType} · ${req.requested_format} form`
+      : baseType;
 
   return (
     <View style={styles.row}>
@@ -251,16 +263,24 @@ function MediaRequestRow({
           </View>
         )}
         {/* Legacy fallback: requests submitted before requesters picked their
-            own type carry no requested_type, so the admin classifies them. */}
+            own type carry no requested_type, so the admin classifies them —
+            written splits into its short/long form here too. */}
         {req.status === 'pending' && confirming && !req.requested_type && (
           <View style={styles.actionBtns}>
-            {(['visual_2d', 'written_form', 'audio'] as const).map((t) => (
+            {(
+              [
+                { type: 'visual_2d', format: null, label: 'visual_2d' },
+                { type: 'audio', format: null, label: 'audio' },
+                { type: 'written_form', format: 'short', label: 'written · short' },
+                { type: 'written_form', format: 'long', label: 'written · long' },
+              ] as const
+            ).map((opt) => (
               <Pressable
-                key={t}
+                key={opt.label}
                 style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-                onPress={() => onResolve(req.id, 'approved', t, finalName())}
+                onPress={() => onResolve(req.id, 'approved', opt.type, finalName(), opt.format)}
               >
-                <Text style={styles.actionBtnText}>{t}</Text>
+                <Text style={styles.actionBtnText}>{opt.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -427,9 +447,10 @@ export default function Admin() {
     status: 'approved' | 'rejected',
     type: string | null,
     name: string | null = null,
+    format: WrittenFormat | null = null,
   ) => {
     try {
-      await update_media_request(id, status, type, token, name);
+      await update_media_request(id, status, type, token, name, format);
       fetchRequests();
     } catch {
       // ignore

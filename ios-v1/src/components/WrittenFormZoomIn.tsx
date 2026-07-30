@@ -3,6 +3,7 @@ import {
   View,
   Modal,
   Pressable,
+  ScrollView,
   Text,
   StyleSheet,
   Linking,
@@ -11,7 +12,7 @@ import {
 import * as WebViewModule from 'react-native-webview';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { resolveImageUrl, imageSource } from '../api';
+import { resolveImageUrl, imageSource, WrittenFormat } from '../api';
 import { extFromPath, isTextExt, useWrittenFormTextState } from '../hooks';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -31,6 +32,10 @@ const TRAVEL = TRACK_WIDTH - THUMB_SIZE;
 interface WrittenFormZoomInProps {
   title: string;
   filePath: string;
+  // The tab's short/long form: 'short' (poetry/thoughts) reads in a native
+  // vertical scroller with line breaks intact; 'long' (default — also for
+  // callers without tab context or older backends) keeps the paged reader.
+  format?: WrittenFormat | null;
   onClose: () => void;
 }
 
@@ -219,10 +224,11 @@ function buildHtml(text: string, initialFontPx: number, bg: string): string {
 </html>`;
 }
 
-export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenFormZoomInProps) {
+export default function WrittenFormZoomIn({ title, filePath, format, onClose }: WrittenFormZoomInProps) {
   const insets = useSafeAreaInsets();
   const ext = extFromPath(filePath);
   const previewable = isTextExt(ext);
+  const shortForm = format === 'short';
   // WKWebView renders PDFs natively (paged, pinch-zoom) — view them in-app on
   // builds with the real WebView; stub builds keep the "open file" fallback.
   const pdfInApp = ext === 'pdf' && !WEBVIEW_IS_STUB;
@@ -349,6 +355,19 @@ export default function WrittenFormZoomIn({ title, filePath, onClose }: WrittenF
           <View style={styles.fallback}>
             <Text style={styles.loadingText}>loading…</Text>
           </View>
+        ) : shortForm ? (
+          // Short form (poetry/thoughts): native vertical scroller, no WebView.
+          // Text renders exactly as written — no columns, no hyphenation, no
+          // pagination — and the font slider drives the size directly.
+          <ScrollView
+            style={styles.readerWrap}
+            contentContainerStyle={styles.shortFormContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={[styles.shortFormText, { fontSize, lineHeight: Math.round(fontSize * 1.5) }]}>
+              {text}
+            </Text>
+          </ScrollView>
         ) : (
           <View style={styles.readerWrap}>
             <WebView
@@ -430,6 +449,14 @@ const styles = StyleSheet.create({
   readerWrap: {
     flex: 1,
     marginTop: 10,
+  },
+  shortFormContent: {
+    paddingHorizontal: 4,
+    paddingBottom: 48,
+  },
+  shortFormText: {
+    fontFamily: Fonts.serif,
+    color: Colors.black,
   },
   webview: {
     flex: 1,

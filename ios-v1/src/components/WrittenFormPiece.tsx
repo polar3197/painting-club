@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useAuth } from '../context/AuthContext';
-import { remove_written_form, imageSource, WrittenFormOut } from '../api';
+import { remove_written_form, imageSource, WrittenFormOut, WrittenFormat } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
 import BookmarkButton from './BookmarkButton';
@@ -25,6 +25,8 @@ function previewSnippet(text: string | null): string {
 interface WrittenFormPieceProps {
   isOwner: boolean;
   piece: WrittenFormOut;
+  // The tab's short/long form, forwarded to the reader (null → long).
+  writtenFormat?: WrittenFormat | null;
   onRemove: () => void;
   onEdit: () => void;
   onLayout?: (e: LayoutChangeEvent) => void;
@@ -33,6 +35,7 @@ interface WrittenFormPieceProps {
 export default function WrittenFormPiece({
   isOwner,
   piece,
+  writtenFormat,
   onRemove,
   onEdit,
   onLayout,
@@ -70,6 +73,7 @@ export default function WrittenFormPiece({
         <WrittenFormZoomIn
           title={piece.title}
           filePath={piece.file_path}
+          format={writtenFormat}
           onClose={() => setIsZoomedIn(false)}
         />
       )}
