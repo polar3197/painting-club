@@ -116,6 +116,9 @@ class MediaOut(BaseModel):
     id: uuid.UUID
     name: str
     type: str | None = None
+    # Written media only: 'short' | 'long' (NULL elsewhere; clients treat a
+    # missing value as long form).
+    written_format: str | None = None
 
 class MediaIn(BaseModel):
     name: str
@@ -124,6 +127,8 @@ class MediaRequestIn(BaseModel):
     name: str
     # Medium type chosen by the requester: "visual_2d" | "written_form" | "audio".
     type: str | None = None
+    # Written requests only: 'short' | 'long'.
+    format: str | None = None
 
 class MediaRequestOut(BaseModel):
     id: uuid.UUID
@@ -132,6 +137,7 @@ class MediaRequestOut(BaseModel):
     requested_name: str
     status: str
     requested_type: str | None = None
+    requested_format: str | None = None
     resolved_type: str | None = None
     created_at: datetime
 
@@ -139,6 +145,14 @@ class MediaRequestUpdate(BaseModel):
     status: str
     type: str | None = None
     name: str | None = None  # admin may rename before approving
+    # Written media: 'short' | 'long' — used when the admin classifies a
+    # legacy type-less request; otherwise the requester's pick applies.
+    format: str | None = None
+
+
+class MediaFormatUpdate(BaseModel):
+    # 'short' | 'long' — validated at the route.
+    written_format: str
 
 
 class FeatureRequestIn(BaseModel):
@@ -593,14 +607,17 @@ class BookmarkedArtOut(BaseModel):
     # Populated for visual pieces (NULL for written/audio — clients already
     # handle a missing ratio by measuring).
     aspect_ratio: float | None = None
+    # Cover image for written pieces — the saved card renders it instead of the
+    # text snippet. NULL for other mediums / cover-less pieces.
+    cover_image_path: str | None = None
     # Set when the piece belongs to a collection/album/series, so the client can
     # regroup saved pieces into one tile. NULL for standalone pieces.
     series_id: uuid.UUID | None = None
     series_name: str | None = None
     bookmarked_at: datetime
 
-    @field_serializer("file_path")
-    def _sign_file_path(self, v):
+    @field_serializer("file_path", "cover_image_path")
+    def _sign_paths(self, v):
         return sign_path(v)
 
 

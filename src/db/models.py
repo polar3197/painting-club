@@ -46,6 +46,10 @@ class Media(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(300), nullable=False)
     type = Column(String(50), nullable=True)
+    # Written media only: 'short' (poetry/thoughts — reader scrolls) or 'long'
+    # (stories/essays — reader pages). Shared by every member on the medium;
+    # NULL on non-written media and legacy rows (clients fall back to long).
+    written_format = Column(String(10), nullable=True)
 
 
 class Media_Members(Base):
@@ -364,6 +368,9 @@ class MediaRequest(Base):
     # "written_form" | "audio"). Nullable for rows predating this field; the
     # admin can still override it at approval time.
     requested_type = Column(String(50), nullable=True)
+    # Written requests only: the short/long form the requester picked (rides
+    # through approval into media.written_format). NULL otherwise.
+    requested_format = Column(String(10), nullable=True)
     resolved_type = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

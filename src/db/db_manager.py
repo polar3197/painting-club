@@ -461,8 +461,31 @@ async def run_migrations():
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_inspiration_to_external ON inspiration (to_external_id)"
         ))
-        # 026: public artist portfolios — visibility controls + portfolio hierarchy.
+        # 026: written media split into short form (poetry/thoughts — the
+        # reader scrolls) vs long form (stories/essays — the reader pages).
+        # Format lives on the shared media row; NULL on non-written media
+        # (clients treat NULL as long form). The backfill guesses from the tab
+        # name; the 'long' sweep runs second so it only stamps written media
+        # the name pass left NULL. Both touch NULLs only, so an explicit
+        # format set later is never overwritten on reboot.
+        await conn.execute(text(
+            "ALTER TABLE media ADD COLUMN IF NOT EXISTS written_format VARCHAR(10)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE media_request ADD COLUMN IF NOT EXISTS requested_format VARCHAR(10)"
+        ))
+        await conn.execute(text(
+            "UPDATE media SET written_format = 'short' "
+            "WHERE type = 'written_form' AND written_format IS NULL "
+            "  AND name ~* '(poem|poetry|thought|haiku)'"
+        ))
+        await conn.execute(text(
+            "UPDATE media SET written_format = 'long' "
+            "WHERE type = 'written_form' AND written_format IS NULL"
+        ))
+        # 027: public artist portfolios — visibility controls + portfolio hierarchy.
         # create_all builds these on fresh DBs; guards cover existing prod DBs.
+        # (Was drafted as 026; renumbered — written_format claimed 026 on main.)
         await conn.execute(text(
             "ALTER TABLE art ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) NOT NULL DEFAULT 'club'"
         ))

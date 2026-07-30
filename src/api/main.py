@@ -39,6 +39,7 @@ from api.models import (
     MediaRequestIn,
     MediaRequestOut,
     MediaRequestUpdate,
+    MediaFormatUpdate,
     FeatureRequestIn,
     FeatureRequestOut,
     FeatureRequestVoteIn,
@@ -222,6 +223,7 @@ from db.db_ops.media import (
     db_add_medium,
     db_list_media,
     db_create_media,
+    db_set_media_format,
     db_set_media_visibility,
     db_reorder_member_media,
     db_add_visual_2d,
@@ -684,7 +686,10 @@ async def search_members(
 @app.get("/media", response_model=list[MediaOut])
 async def list_media(db: AsyncSession = Depends(get_db)):
     rows = await db_list_media(db)
-    return [MediaOut(id=r.id, name=r.name, type=r.type) for r in rows]
+    return [
+        MediaOut(id=r.id, name=r.name, type=r.type, written_format=r.written_format)
+        for r in rows
+    ]
 
 
 @app.post("/media", response_model=MediaOut)
@@ -699,7 +704,26 @@ async def create_media(
     if not name:
         raise HTTPException(status_code=400, detail="name required")
     row = await db_create_media(db, name)
-    return MediaOut(id=row.id, name=row.name, type=row.type)
+    return MediaOut(id=row.id, name=row.name, type=row.type, written_format=row.written_format)
+
+
+@app.patch("/media/{medium}/format", response_model=MediaOut)
+async def set_media_format(
+    medium: str,
+    payload: MediaFormatUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_contributor_member),
+):
+    # Media rows are shared club-wide (everyone's "poetry" tab is one row), so
+    # nobody owns them — flipping short/long is contributor-only.
+    if payload.written_format not in {"short", "long"}:
+        raise HTTPException(status_code=422, detail="written_format must be 'short' or 'long'")
+    try:
+        row = await db_set_media_format(db, medium, payload.written_format)
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "not found" in msg else 422, detail=msg)
+    return MediaOut(id=row.id, name=row.name, type=row.type, written_format=row.written_format)
 
 
 @app.post("/members/addmedia")
@@ -2539,7 +2563,9 @@ async def submit_media_request(
         raise HTTPException(status_code=400, detail="name required")
     try:
         row = await db_create_media_request(
-            db, current_member.id, name, requested_type=payload.type,
+            db, current_member.id, name,
+            requested_type=payload.type,
+            requested_format=payload.format,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -2550,6 +2576,7 @@ async def submit_media_request(
         requested_name=row.requested_name,
         status=row.status,
         requested_type=row.requested_type,
+        requested_format=row.requested_format,
         resolved_type=row.resolved_type,
         created_at=row.created_at,
     )
@@ -2569,6 +2596,7 @@ async def get_media_requests(
             requested_name=req.requested_name,
             status=req.status,
             requested_type=req.requested_type,
+            requested_format=req.requested_format,
             resolved_type=req.resolved_type,
             created_at=req.created_at,
         )
@@ -2589,7 +2617,9 @@ async def resolve_media_request(
     # ("type must be one of ...") from that helper.
     try:
         row = await db_resolve_media_request(
-            db, request_id, payload.status, payload.type, name_override=payload.name,
+            db, request_id, payload.status, payload.type,
+            name_override=payload.name,
+            format_override=payload.format,
         )
     except ValueError as e:
         msg = str(e)
@@ -2611,6 +2641,7 @@ async def resolve_media_request(
         requested_name=row.requested_name,
         status=row.status,
         requested_type=row.requested_type,
+        requested_format=row.requested_format,
         resolved_type=row.resolved_type,
         created_at=row.created_at,
     )
@@ -3108,6 +3139,7 @@ async def list_my_bookmarks(
             date=r.date,
             creator_username=r.creator_username,
             aspect_ratio=r.aspect_ratio,
+            cover_image_path=r.cover_image_path,
             series_id=r.series_id,
             series_name=r.series_name,
             bookmarked_at=r.bookmarked_at,

@@ -98,6 +98,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
                 series_name: (formData.series ?? "").trim() || undefined,
                 comments_enabled: formData.comments_enabled,
                 ...(formData.files ? { file: formData.files } : { text: pastedText }),
+                ...(formData.cover ? { cover: formData.cover } : {}),
             };
             setShowDialog(false);
             onCreateWrittenForm?.(createPayload);

@@ -1,4 +1,4 @@
--- 026: public artist portfolios — visibility controls and portfolio table hierarchy.
+-- 027: public artist portfolios — visibility controls and portfolio table hierarchy.
 -- Paper trail only: create_all builds these on fresh DBs and run_migrations()
 -- carries the idempotent guards for prod.
 

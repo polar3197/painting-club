@@ -16,12 +16,22 @@ const ThumbCell = ({ piece, onClick }: { piece: WrittenFormOut; onClick: () => v
     const snippet = previewSnippet(text);
     return (
         <div className="collection-zoom-cell" onClick={onClick}>
-            <div className="written-form-tile collection-zoom-tile">
-                <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
-                {isTextExt(ext) && snippet ? (
-                    <pre className="written-form-tile-snippet">{snippet}</pre>
+            <div className="written-form-tile collection-zoom-tile" style={piece.cover_image_path ? { position: "relative", padding: 0 } : undefined}>
+                {piece.cover_image_path ? (
+                    <img
+                        src={piece.cover_image_path}
+                        alt={piece.title}
+                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                    />
                 ) : (
-                    <div className="written-form-tile-title">{piece.title}</div>
+                    <>
+                        <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
+                        {isTextExt(ext) && snippet ? (
+                            <pre className="written-form-tile-snippet">{snippet}</pre>
+                        ) : (
+                            <div className="written-form-tile-title">{piece.title}</div>
+                        )}
+                    </>
                 )}
             </div>
             <div className="collection-zoom-cell-title">{piece.title}</div>
