@@ -53,12 +53,22 @@ const WrittenFormPiece = ({
         }
         <div id={`art-${piece.id}`} className="art-element written-form clickable" onClick={() => setIsZoomedIn(true)}>
             <div className="art-visual">
-                <div className="written-form-tile">
-                    <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
-                    {isTextExt(ext) && snippet ? (
-                        <pre className="written-form-tile-snippet">{snippet}</pre>
+                <div className="written-form-tile" style={piece.cover_image_path ? { position: "relative", padding: 0 } : undefined}>
+                    {piece.cover_image_path ? (
+                        <img
+                            src={piece.cover_image_path}
+                            alt={piece.title}
+                            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                        />
                     ) : (
-                        <div className="written-form-tile-title">{piece.title}</div>
+                        <>
+                            <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
+                            {isTextExt(ext) && snippet ? (
+                                <pre className="written-form-tile-snippet">{snippet}</pre>
+                            ) : (
+                                <div className="written-form-tile-title">{piece.title}</div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

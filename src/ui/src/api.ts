@@ -449,6 +449,8 @@ export interface WrittenFormIn {
   // Provide exactly one of file or text.
   file?: File;
   text?: string;
+  // Optional cover image shown on the piece's card instead of the text snippet.
+  cover?: File;
 }
 
 export interface WrittenFormOut {
@@ -461,6 +463,8 @@ export interface WrittenFormOut {
   series_id: string | null;
   series_name: string | null;
   order_index: number | null;
+  // Optional image rendered as the piece's card instead of the text snippet.
+  cover_image_path?: string | null;
 }
 
 export function add_new_written_form(token: string | null, payload: WrittenFormIn) {
@@ -474,6 +478,7 @@ export function add_new_written_form(token: string | null, payload: WrittenFormI
   if (payload.series_name) fd.append("series_name", payload.series_name);
   if (payload.file) fd.append("file", payload.file);
   if (payload.text) fd.append("text", payload.text);
+  if (payload.cover) fd.append("cover", payload.cover);
 
   return request("/art/upload/written-form", {
     method: "POST",

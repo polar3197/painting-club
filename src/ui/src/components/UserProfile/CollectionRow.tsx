@@ -95,12 +95,22 @@ const CollectionRow = ({
                             />
                         );
                     })}
-                    <div className="written-form-tile written-form-stack-top">
-                        <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
-                        {isTextExt(ext) && snippet ? (
-                            <pre className="written-form-tile-snippet">{snippet}</pre>
+                    <div className="written-form-tile written-form-stack-top" style={topPiece.cover_image_path ? { position: "relative", padding: 0 } : undefined}>
+                        {topPiece.cover_image_path ? (
+                            <img
+                                src={topPiece.cover_image_path}
+                                alt={topPiece.title}
+                                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                            />
                         ) : (
-                            <div className="written-form-tile-title">{topPiece.title}</div>
+                            <>
+                                <div className="written-form-tile-badge">{ext.toUpperCase()}</div>
+                                {isTextExt(ext) && snippet ? (
+                                    <pre className="written-form-tile-snippet">{snippet}</pre>
+                                ) : (
+                                    <div className="written-form-tile-title">{topPiece.title}</div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
