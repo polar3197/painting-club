@@ -22,7 +22,9 @@ import {
   AudioUpdatePayload,
   get_media,
   MediaType,
+  thumbSource,
 } from '../api';
+import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import PaintingForm from './PaintingForm';
 import WrittenFormForm from './WrittenFormForm';
 import AudioForm from './AudioForm';
@@ -151,8 +153,22 @@ export default function AddArtDialog({
   // Written-form-only: choose between picking a file and pasting text. Pasted
   // text exists so users can pull from Notes / Google Docs / anywhere a file
   // picker can't reach.
-  const [writeMode, setWriteMode] = useState<'file' | 'text'>('file');
+  // Editing a text-backed piece opens on the text tab, prefilled below — the
+  // "edit text" tab is a lie otherwise (it showed an empty paste box).
+  const [writeMode, setWriteMode] = useState<'file' | 'text'>(
+    writtenPiece && isTextExt(extFromPath(writtenPiece.file_path)) ? 'text' : 'file'
+  );
   const [pastedText, setPastedText] = useState('');
+  // The piece's current text (null for pdf/docx or while fetching). Prefills
+  // the edit box once; the original is kept so an untouched box doesn't send a
+  // pointless rewrite on update (which would also convert .md → .txt).
+  const existingText = useWrittenFormText(writtenPiece?.file_path ?? '');
+  const originalTextRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (existingText == null || originalTextRef.current != null) return;
+    originalTextRef.current = existingText;
+    setPastedText((prev) => (prev === '' ? existingText : prev));
+  }, [existingText]);
 
   // Track the keyboard height so the panel can shrink (rather than being
   // pushed off the top of the screen by KeyboardAvoidingView's padding hack).
@@ -385,7 +401,10 @@ export default function AddArtDialog({
       const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
       const trimmedText = pastedText.trim();
       const replacingFile = writeMode === 'file' && pickedFile != null;
-      const replacingText = writeMode === 'text' && !!trimmedText;
+      const replacingText =
+        writeMode === 'text' &&
+        !!trimmedText &&
+        trimmedText !== (originalTextRef.current ?? '').trim();
       const updatePayload: WrittenFormUpdatePayload = {
         title: formData.title,
         date: formData.date || null,
@@ -547,6 +566,15 @@ export default function AddArtDialog({
                         </View>
                       )}
                     </>
+                  ) : piece ? (
+                    // Editing with nothing newly picked: show the piece's
+                    // current image (cached thumb — instant) so the edit view
+                    // reflects what's there; picking still replaces it.
+                    <Image
+                      source={thumbSource(piece.id, piece.file_path)}
+                      style={styles.dropboxImage}
+                      contentFit="contain"
+                    />
                   ) : (
                     <Text style={styles.dropboxText}>{dropboxPlaceholder ?? 'tap to select art'}</Text>
                   )}
@@ -557,13 +585,13 @@ export default function AddArtDialog({
               <View style={styles.modeTabs}>
                 <Pressable
                   style={[styles.modeTab, writeMode === 'file' && styles.modeTabActive]}
-                  onPress={() => { setWriteMode('file'); setPastedText(''); Keyboard.dismiss(); }}
+                  onPress={() => { setWriteMode('file'); Keyboard.dismiss(); }}
                 >
                   <Text style={styles.modeTabText}>{writtenPiece ? 'replace file' : 'upload .txt'}</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.modeTab, writeMode === 'text' && styles.modeTabActive]}
-                  onPress={() => { setWriteMode('text'); setPickedFile(null); }}
+                  onPress={() => setWriteMode('text')}
                 >
                   <Text style={styles.modeTabText}>{writtenPiece ? 'edit text' : 'paste text'}</Text>
                 </Pressable>
@@ -580,6 +608,15 @@ export default function AddArtDialog({
                         </Text>
                       </View>
                       <Text style={styles.docFilename} numberOfLines={2}>{pickedFile.name}</Text>
+                    </View>
+                  ) : writtenPiece ? (
+                    <View style={styles.docPreview}>
+                      <View style={styles.docBadge}>
+                        <Text style={styles.docBadgeText}>
+                          {extFromPath(writtenPiece.file_path).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.docFilename} numberOfLines={2}>{writtenPiece.title}</Text>
                     </View>
                   ) : (
                     <Text style={styles.dropboxText}>tap to select writing</Text>
