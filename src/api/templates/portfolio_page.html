@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ p.title }}</title>
+<meta property="og:title" content="{{ p.title }}">
+<meta property="og:type" content="website">
+{% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
+{% if p.theme.get('noindex') %}<meta name="robots" content="noindex">{% endif %}
+<style>
+  :root {
+    --bg: {{ p.theme.get('bg', '#ffffff') }};
+    --text: {{ p.theme.get('text', '#1a1a1a') }};
+    --accent: {{ p.theme.get('accent', '#8a6d3b') }};
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: {{ "Georgia, 'Times New Roman', serif" if p.theme.get('font', 'serif') == 'serif' else "-apple-system, 'Helvetica Neue', Arial, sans-serif" }};
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 4rem 1.5rem; }
+  header h1 { font-size: 2.2rem; font-weight: normal; letter-spacing: 0.02em; }
+  header .rule { width: 3rem; border-bottom: 2px solid var(--accent); margin: 1.2rem 0 3rem; }
+  .statement { max-width: 42rem; font-size: 1.05rem; margin: 0 0 3.5rem; white-space: pre-wrap; }
+  .gallery { display: grid; gap: 1.5rem; margin-bottom: 3.5rem; }
+  .gallery.grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .gallery.single { grid-template-columns: 1fr; max-width: 48rem; }
+  figure img {
+    width: 100%; height: auto; display: block;
+    {% if p.theme.get('frame', 'line') == 'line' %}border: 1px solid var(--text);{% endif %}
+  }
+  figcaption { font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.75; }
+  .spotlight { margin: 0 0 3.5rem; }
+  .spotlight img { width: 100%; height: auto; display: block; }
+  .spotlight figcaption { font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>{{ p.artist_name }}</h1>
+    <div class="rule"></div>
+  </header>
+  {% for b in p.blocks %}
+    {% if b.kind == 'statement' %}
+      <p class="statement">{{ b.config.get('text') or p.statement or '' }}</p>
+    {% elif b.kind == 'gallery' %}
+      <div class="gallery {{ 'single' if b.config.get('layout') == 'single' else 'grid' }}">
+        {% for piece in b.pieces %}
+        <figure>
+          <img src="/p/img/{{ piece.id }}" alt="{{ piece.title or '' }}" loading="lazy"
+               {% if piece.aspect_ratio %}style="aspect-ratio: {{ piece.aspect_ratio }};"{% endif %}>
+          {% if piece.title %}<figcaption>{{ piece.title }}{% if piece.date %}, {{ piece.date.year }}{% endif %}</figcaption>{% endif %}
+        </figure>
+        {% endfor %}
+      </div>
+    {% elif b.kind == 'spotlight' %}
+      {% for piece in b.pieces[:1] %}
+      <figure class="spotlight">
+        <img src="/p/img/{{ piece.id }}" alt="{{ piece.title or '' }}">
+        {% if b.config.get('caption') or piece.title %}<figcaption>{{ b.config.get('caption') or piece.title }}</figcaption>{% endif %}
+      </figure>
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+</div>
+</body>
+</html>

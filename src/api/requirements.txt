@@ -27,6 +27,7 @@ pydantic-settings==2.12.0
 pydantic_core==2.41.5
 Pygments==2.19.2
 pytest==9.0.2
+jinja2
 python-dotenv==1.2.1
 Pillow
 pillow-heif
