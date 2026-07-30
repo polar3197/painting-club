@@ -1,0 +1,11 @@
+.pe-root { display: grid; grid-template-columns: 260px 1fr 240px; gap: 1rem; padding: 1rem; }
+.pe-palette, .pe-side { border: 1px solid black; padding: 0.75rem; overflow-y: auto; max-height: calc(100vh - 4rem); }
+.pe-palette h3, .pe-side h3 { font-weight: normal; margin-bottom: 0.75rem; }
+.pe-palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.pe-piece { position: relative; cursor: grab; border: 1px solid #999; }
+.pe-piece-public { border: 2px solid rgb(238, 190, 100); }
+.pe-piece img { width: 100%; height: auto; display: block; }
+.pe-vis-toggle { width: 100%; font-size: 0.7rem; border: none; border-top: 1px solid #999; background: white; cursor: pointer; padding: 2px; }
+.pe-piece-public .pe-vis-toggle { background: rgb(238, 190, 100); }
+.pe-canvas { min-height: 60vh; }
+.pe-error, .pe-loading { padding: 2rem; }
