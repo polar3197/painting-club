@@ -196,6 +196,8 @@ export interface WrittenFormIn {
   // Provide exactly one of file or text.
   file?: { uri: string; name: string; type: string };
   text?: string;
+  // Optional cover image shown on the piece's card instead of the text snippet.
+  cover?: { uri: string; name: string; type: string };
 }
 
 export interface WrittenFormOut {
@@ -207,6 +209,8 @@ export interface WrittenFormOut {
   comments_enabled: boolean;
   series_id: string | null;
   series_name: string | null;
+  // Optional image rendered as the piece's card instead of the text snippet.
+  cover_image_path?: string | null;
 }
 
 export interface WrittenFormUpdatePayload {
@@ -220,6 +224,9 @@ export interface WrittenFormUpdatePayload {
   // Optional file replacement (mutually exclusive with text).
   file?: { uri: string; name: string; type: string } | null;
   text?: string | null;
+  // Cover image: send `cover` to set/replace, or clear_cover to remove.
+  cover?: { uri: string; name: string; type: string } | null;
+  clear_cover?: boolean;
 }
 
 export interface AudioIn {
@@ -294,6 +301,8 @@ export interface ArtResult {
   creator_username: string;
   creator_city: string | null;
   aspect_ratio: number | null;
+  // Written pieces: optional card cover image (rendered instead of the snippet).
+  cover_image_path?: string | null;
 }
 
 // A member's saved piece (any medium), shaped like a gallery card. Mirrors the
@@ -314,6 +323,9 @@ export interface BookmarkedArtOut {
   // regroup pieces into one collection tile.
   series_id?: string | null;
   series_name?: string | null;
+  // Written pieces: optional card cover (absent on older backends until the
+  // bookmarks cover change deploys — cards fall back to the snippet).
+  cover_image_path?: string | null;
   bookmarked_at: string;
 }
 

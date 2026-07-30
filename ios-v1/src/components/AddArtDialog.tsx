@@ -23,6 +23,7 @@ import {
   get_media,
   MediaType,
   thumbSource,
+  imageSource,
 } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import PaintingForm from './PaintingForm';
@@ -169,6 +170,32 @@ export default function AddArtDialog({
     originalTextRef.current = existingText;
     setPastedText((prev) => (prev === '' ? existingText : prev));
   }, [existingText]);
+
+  // Optional cover image for written pieces — shown on the card instead of the
+  // text snippet. `coverCleared` marks an existing cover for removal on save.
+  const [coverFile, setCoverFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [coverCleared, setCoverCleared] = useState(false);
+  const existingCoverPath = writtenPiece?.cover_image_path ?? null;
+  const shownCover = coverFile
+    ? { uri: coverFile.uri }
+    : existingCoverPath && !coverCleared
+    ? imageSource(existingCoverPath)
+    : null;
+  const pickCover = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setCoverFile({
+      uri: asset.uri,
+      name: asset.uri.split('/').pop() || 'cover.jpg',
+      type: asset.mimeType || 'image/jpeg',
+    });
+    setCoverCleared(false);
+  };
+  const removeCover = () => {
+    setCoverFile(null);
+    if (existingCoverPath) setCoverCleared(true);
+  };
 
   // Track the keyboard height so the panel can shrink (rather than being
   // pushed off the top of the screen by KeyboardAvoidingView's padding hack).
@@ -421,6 +448,11 @@ export default function AddArtDialog({
         clear_series: !formData.series && !!writtenPiece.series_name,
         ...(replacingFile ? { file: pickedFile } : {}),
         ...(replacingText ? { text: trimmedText } : {}),
+        ...(coverFile
+          ? { cover: coverFile }
+          : coverCleared && existingCoverPath
+          ? { clear_cover: true }
+          : {}),
       };
       onClose();
       update_written_form(writtenPiece.id, token, updatePayload)
@@ -455,6 +487,7 @@ export default function AddArtDialog({
         comments_enabled: formData.comments_enabled,
         series_name: formData.series || undefined,
         ...(writeMode === 'file' && pickedFile ? { file: pickedFile } : { text: trimmedText }),
+        ...(coverFile ? { cover: coverFile } : {}),
       };
       onClose();
       onCreateWritten?.(createPayload);
@@ -622,6 +655,22 @@ export default function AddArtDialog({
                     <Text style={styles.dropboxText}>tap to select writing</Text>
                   )}
                 </Pressable>
+              </View>
+            )}
+            {isWrittenForm && (
+              <View style={styles.coverRow}>
+                <Pressable style={styles.coverSlot} onPress={pickCover}>
+                  {shownCover ? (
+                    <Image source={shownCover} style={styles.coverImg} contentFit="cover" />
+                  ) : (
+                    <Text style={styles.coverSlotText}>cover</Text>
+                  )}
+                </Pressable>
+                {!!shownCover && (
+                  <Pressable style={styles.coverRemove} onPress={removeCover} hitSlop={6}>
+                    <Text style={styles.coverRemoveText}>×</Text>
+                  </Pressable>
+                )}
               </View>
             )}
             {isAudio && (
@@ -979,5 +1028,45 @@ const styles = StyleSheet.create({
   },
   moveToDropdown: {
     flex: 1,
+  },
+  coverRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    marginTop: 8,
+  },
+  coverSlot: {
+    width: 56,
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  coverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  coverSlotText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.textTertiary,
+  },
+  coverRemove: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverRemoveText: {
+    fontFamily: Fonts.serif,
+    fontSize: 13,
+    lineHeight: 15,
+    color: Colors.black,
   },
 });

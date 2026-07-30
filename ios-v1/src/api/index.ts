@@ -363,6 +363,13 @@ export function add_new_written_form(token: string | null, payload: WrittenFormI
     } as any);
   }
   if (payload.text) fd.append('text', payload.text);
+  if (payload.cover) {
+    fd.append('cover', {
+      uri: payload.cover.uri,
+      name: payload.cover.name,
+      type: payload.cover.type,
+    } as any);
+  }
 
   return request('/art/upload/written-form', {
     method: 'POST',
@@ -395,6 +402,14 @@ export function update_written_form(id: string, token: string | null, payload: W
     } as any);
   }
   if (payload.text) fd.append('text', payload.text);
+  if (payload.cover) {
+    fd.append('cover', {
+      uri: payload.cover.uri,
+      name: payload.cover.name,
+      type: payload.cover.type,
+    } as any);
+  }
+  if (payload.clear_cover) fd.append('clear_cover', 'true');
 
   return request(`/art/written-form/${id}`, {
     method: 'PATCH',

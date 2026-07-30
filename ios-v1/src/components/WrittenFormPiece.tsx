@@ -6,8 +6,9 @@ import {
   StyleSheet,
   LayoutChangeEvent,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useAuth } from '../context/AuthContext';
-import { remove_written_form, WrittenFormOut } from '../api';
+import { remove_written_form, imageSource, WrittenFormOut } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
 import BookmarkButton from './BookmarkButton';
@@ -78,7 +79,13 @@ export default function WrittenFormPiece({
             style={({ pressed }) => [styles.thumb, pressed && { opacity: 0.92 }]}
             onPress={() => setIsZoomedIn(true)}
           >
-            {isText && snippet ? (
+            {piece.cover_image_path ? (
+              <Image
+                source={imageSource(piece.cover_image_path)}
+                style={styles.thumbCover}
+                contentFit="cover"
+              />
+            ) : isText && snippet ? (
               <Text style={styles.thumbSnippet} numberOfLines={THUMB_PREVIEW_LINES}>{snippet}</Text>
             ) : null}
           </Pressable>
@@ -155,6 +162,14 @@ const styles = StyleSheet.create({
     fontSize: 8,
     lineHeight: 10,
     color: Colors.black,
+  },
+  // Cover image fills the page frame edge-to-edge (cancel the thumb padding).
+  thumbCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   details: {
     flex: 1,

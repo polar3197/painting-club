@@ -18,6 +18,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   list_my_bookmarks,
   thumbSource,
+  imageSource,
   BookmarkedArtOut,
 } from '../api';
 import { useWrittenFormText, extFromPath, isTextExt } from '../hooks';
@@ -111,11 +112,17 @@ function WrittenTile({ item }: { item: BookmarkedArtOut }) {
   const snippet = snippetOf(text);
   return (
     <View style={[styles.tile, styles.tilePage]}>
-      {isText && !!snippet && (
+      {item.cover_image_path ? (
+        <Image
+          source={imageSource(item.cover_image_path)}
+          style={styles.tilePageCover}
+          contentFit="cover"
+        />
+      ) : isText && !!snippet ? (
         <Text style={styles.tilePageSnippet} numberOfLines={SNIPPET_LINES}>
           {snippet}
         </Text>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -436,6 +443,14 @@ const styles = StyleSheet.create({
     fontSize: 8,
     lineHeight: 10,
     color: Colors.black,
+  },
+  // Cover image fills the page frame edge-to-edge (cancel the page padding).
+  tilePageCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   tileAudio: {
     alignItems: 'center',

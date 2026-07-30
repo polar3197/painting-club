@@ -6,7 +6,8 @@ import {
   StyleSheet,
   LayoutChangeEvent,
 } from 'react-native';
-import { WrittenFormOut } from '../api';
+import { Image } from 'expo-image';
+import { WrittenFormOut, imageSource } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import SeriesZoomIn from './SeriesZoomIn';
 import BookmarkButton from './BookmarkButton';
@@ -119,7 +120,13 @@ export default function SeriesRow({
               );
             })}
             <View style={styles.stackTop}>
-              {isText && snippet ? (
+              {topPiece.cover_image_path ? (
+                <Image
+                  source={imageSource(topPiece.cover_image_path)}
+                  style={styles.thumbCover}
+                  contentFit="cover"
+                />
+              ) : isText && snippet ? (
                 <Text style={styles.thumbSnippet} numberOfLines={THUMB_PREVIEW_LINES}>
                   {snippet}
                 </Text>
@@ -192,6 +199,14 @@ const styles = StyleSheet.create({
     fontSize: 8,
     lineHeight: 10,
     color: Colors.black,
+  },
+  // Cover image fills the page frame edge-to-edge (cancel the top padding).
+  thumbCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   details: {
     flex: 1,

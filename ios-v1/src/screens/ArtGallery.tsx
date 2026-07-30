@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated, Platform } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import {
   get_members_visual_2d,
   get_members_written_form,
   thumbSource,
+  imageSource,
   ArtResult,
   MediaType,
   Profile,
@@ -21,9 +22,7 @@ import ArtComments from '../components/ArtComments';
 import { appAlert } from '../components/AppAlert';
 import BookmarkButton from '../components/BookmarkButton';
 import { useDebouncedValue, useWrittenFormText, extFromPath, isTextExt } from '../hooks';
-import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
-import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
-import { showArtZoom, hideArtZoom, ArtZoomConfig } from '../components/ArtZoomOverlay';
+import ArtCarousel from '../components/ArtCarousel';
 import { registerArt } from '../api/inspiration';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -77,6 +76,7 @@ async function fetchWrittenArt(token: string | null): Promise<ArtResult[]> {
               creator_username: member.username,
               creator_city: member.city ?? null,
               aspect_ratio: null,
+              cover_image_path: p.cover_image_path ?? null,
             })),
           )
           .catch(() => [] as ArtResult[]),
@@ -136,9 +136,11 @@ function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth:
       onPress={onPress}
     >
       <View style={[styles.cardPage, { height: cardWidth }]}>
-        {isText && !!snippet && (
+        {item.cover_image_path ? (
+          <Image source={imageSource(item.cover_image_path)} style={styles.cardPageCover} contentFit="cover" />
+        ) : isText && !!snippet ? (
           <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
-        )}
+        ) : null}
       </View>
     </Pressable>
   );
@@ -148,135 +150,19 @@ function WrittenCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth:
 // your fingers (following the focal drift), spring back on release. The
 // zoomed copy renders in the root-level ArtZoomOverlayHost so it floats over
 // EVERYTHING (header, nav bar); the inline art hides while a zoom is live.
-// Runs simultaneously with the grid's density pinch — the two split by
-// direction in feed mode: spreading magnifies the art (density already
-// clamps at 1 column), pinching-in re-grids (this scale clamps at 1, so no
-// visual fight). In gallery mode this handler isn't mounted at all.
-function ZoomableArt({ children, source, densityPinchRef }: {
-  children: React.ReactNode;
-  source: ArtZoomConfig['source'];
-  densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
-}) {
-  const scale = useSharedValue(1);
-  const tx = useSharedValue(0);
-  const ty = useSharedValue(0);
-  const startX = useSharedValue(0);
-  const startY = useSharedValue(0);
-  const hidden = useSharedValue(0);
-  const wrapRef = useRef<any>(null);
-
-  // Measure the framed art in window coordinates and hand the zoom to the
-  // root overlay; the inline copy goes invisible so only the floating one
-  // moves. (JS side — called from the gesture via runOnJS.)
-  const beginZoom = useCallback(() => {
-    const node = wrapRef.current as any;
-    const show = (x: number, y: number, width: number, height: number) => {
-      showArtZoom({ source, x, y, width, height, scale, tx, ty, startX, startY });
-      hidden.value = 1;
-    };
-    if (Platform.OS === 'web') {
-      const r = node?.getBoundingClientRect?.();
-      if (r) show(r.left, r.top, r.width, r.height);
-    } else if (node?.measureInWindow) {
-      node.measureInWindow((x: number, y: number, w: number, h: number) => show(x, y, w, h));
-    }
-  }, [source, scale, tx, ty, hidden, startX, startY]);
-
-  const finishZoom = useCallback(() => {
-    hideArtZoom();
-    hidden.value = 0;
-  }, [hidden]);
-
-  let pinch = Gesture.Pinch()
-    .onStart((e) => {
-      startX.value = e.focalX;
-      startY.value = e.focalY;
-      runOnJS(beginZoom)();
-    })
-    .onUpdate((e) => {
-      scale.value = Math.min(4, Math.max(1, e.scale));
-      tx.value = e.focalX - startX.value;
-      ty.value = e.focalY - startY.value;
-    })
-    .onEnd(() => {
-      scale.value = withTiming(1, { duration: 220 });
-      tx.value = withTiming(0, { duration: 220 });
-      ty.value = withTiming(0, { duration: 220 }, (finished) => {
-        if (finished) runOnJS(finishZoom)();
-      });
-    });
-  if (densityPinchRef) pinch = pinch.simultaneousWithExternalGesture(densityPinchRef);
-
-  // Web (dev preview): trackpad pinch arrives as ctrl+wheel, which RNGH's
-  // touch pinch never sees. When the cursor is over this art, zoom it here
-  // and stop the event before SearchTabs' window-level density listener gets
-  // it; no gesture end exists, so spring back after a beat of inactivity.
-  const zoomingRef = useRef(false);
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const node = wrapRef.current as unknown as HTMLElement | null;
-    if (!node || !node.addEventListener) return;
-    let resetTimer: ReturnType<typeof setTimeout> | undefined;
-    const springBack = () => {
-      scale.value = withTiming(1, { duration: 220 });
-      tx.value = withTiming(0, { duration: 220 });
-      ty.value = withTiming(0, { duration: 220 });
-      setTimeout(() => {
-        zoomingRef.current = false;
-        finishZoom();
-      }, 240);
-    };
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (!zoomingRef.current) {
-        zoomingRef.current = true;
-        // Anchor the zoom at the cursor (web's stand-in for the finger
-        // midpoint), in element coordinates.
-        const r = node.getBoundingClientRect?.();
-        if (r) {
-          startX.value = e.clientX - r.left;
-          startY.value = e.clientY - r.top;
-        }
-        beginZoom();
-      }
-      scale.value = Math.min(4, Math.max(1, scale.value * (1 - e.deltaY / 200)));
-      if (resetTimer) clearTimeout(resetTimer);
-      // Trackpad pinch streams events every ~10-20ms, so a short idle gap is
-      // enough to call it released — 400ms read as a stall.
-      resetTimer = setTimeout(springBack, 140);
-    };
-    node.addEventListener('wheel', onWheel, { passive: false });
-    return () => {
-      if (resetTimer) clearTimeout(resetTimer);
-      node.removeEventListener('wheel', onWheel);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const inlineStyle = useAnimatedStyle(() => ({
-    opacity: hidden.value ? 0 : 1,
-  }));
-
-  return (
-    <GestureDetector gesture={pinch}>
-      <Reanimated.View ref={wrapRef} style={inlineStyle}>{children}</Reanimated.View>
-    </GestureDetector>
-  );
-}
-
 // Feed (1-per-row) card, modeled on the profile page's art element: bordered
 // card, framed art at true aspect ratio, then title + date badge, creator ·
 // medium, location/song detail rows, and a comments + bookmark footer.
 // Renders the 512px thumb (not the full-res original) — a feed of every
 // piece can't afford profile-page bandwidth.
-function FeedArtCard({ item, onPress, onComment, onWeb, densityPinchRef }: {
+// Tapping the CARD opens the creator's profile; tapping the ART opens the
+// full-screen carousel viewer (same one the profile art elements use).
+function FeedArtCard({ item, onPress, onZoom, onComment, onWeb }: {
   item: ArtResult;
   onPress: () => void;
+  onZoom?: () => void;
   onComment?: () => void;
   onWeb: () => void;
-  densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
 }) {
   const isWritten = item.art_type === 'written_form';
   const isText = isTextExt(extFromPath(item.file_path));
@@ -284,35 +170,35 @@ function FeedArtCard({ item, onPress, onComment, onWeb, densityPinchRef }: {
   const text = useWrittenFormText(item.file_path);
   const snippet = snippetOf(text);
   return (
-    <View style={styles.feedElement}>
+    <Pressable style={styles.feedElement} onPress={onPress}>
       {isWritten ? (
         <Pressable
           style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
           onPress={onPress}
         >
           <View style={[styles.cardPage, styles.feedPage]}>
-            {isText && !!snippet && (
+            {item.cover_image_path ? (
+              <Image source={imageSource(item.cover_image_path)} style={styles.cardPageCover} contentFit="cover" />
+            ) : isText && !!snippet ? (
               <Text style={styles.cardPageSnippet} numberOfLines={SNIPPET_LINES}>{snippet}</Text>
-            )}
+            ) : null}
           </View>
         </Pressable>
       ) : (
-        <ZoomableArt source={thumbSource(item.id, item.file_path)} densityPinchRef={densityPinchRef}>
-          <Pressable
-            style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
-            onPress={onPress}
-          >
-            <View style={{ width: '100%', aspectRatio: item.aspect_ratio || 1 }}>
-              <Image
-                source={thumbSource(item.id, item.file_path)}
-                transition={Platform.OS === 'web' ? 0 : 200}
-                cachePolicy="memory-disk"
-                style={styles.feedImage}
-                contentFit="contain"
-              />
-            </View>
-          </Pressable>
-        </ZoomableArt>
+        <Pressable
+          style={({ pressed }) => [styles.feedVisual, pressed && { opacity: 0.9 }]}
+          onPress={onZoom ?? onPress}
+        >
+          <View style={{ width: '100%', aspectRatio: item.aspect_ratio || 1 }}>
+            <Image
+              source={thumbSource(item.id, item.file_path)}
+              transition={Platform.OS === 'web' ? 0 : 200}
+              cachePolicy="memory-disk"
+              style={styles.feedImage}
+              contentFit="contain"
+            />
+          </View>
+        </Pressable>
       )}
       <View style={styles.feedDetails}>
         <View style={styles.feedTitleRow}>
@@ -372,7 +258,7 @@ function FeedArtCard({ item, onPress, onComment, onWeb, densityPinchRef }: {
           )}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -387,15 +273,9 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
-  // Posts-per-row target (1..4) from the pinch gesture; the per-count
-  // formula still caps it. 1 renders the full-width feed cards.
-  columns: number;
-  // The grid-density pinch's ref (SearchTabs) so feed photos' own pinch-zoom
-  // can block it when a gesture starts on the art.
-  densityPinchRef?: React.MutableRefObject<GestureType | undefined>;
 }
 
-export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll, columns, densityPinchRef }: Props) {
+export default function ArtGallery({ query, onResetFilters, onListScroll, onVerticalScroll }: Props) {
   const navigation = useNavigation<Nav>();
   const { token, currentUser } = useAuth();
   // Visual paints immediately; written fans out and merges in when ready.
@@ -435,43 +315,12 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
     return fuse.search(debouncedQuery).map((r) => r.item);
   }, [art, fuse, debouncedQuery]);
 
-  // FlatList must remount to change numColumns (it throws otherwise), and a bare
-  // remount makes every photo vanish + reappear. So we decouple the target
-  // column count (from the slider) from the one actually rendered, and crossfade:
-  // fade the grid out, swap columns while it's invisible, fade back in.
-  const targetColumns = Math.min(columns, columnsFor(filtered.length));
-  const [renderedColumns, setRenderedColumns] = useState(targetColumns);
-  const gridOpacity = useRef(new Animated.Value(1)).current;
-  const transitioning = useRef(false);
-  useEffect(() => {
-    // Behind the initial-load spinner nothing is visible — snap columns
-    // silently so the first paint starts at the right count.
-    if (!loaded) {
-      if (targetColumns !== renderedColumns) setRenderedColumns(targetColumns);
-      return;
-    }
-    if (targetColumns === renderedColumns) {
-      if (transitioning.current) {
-        transitioning.current = false;
-        Animated.timing(gridOpacity, { toValue: 1, duration: 110, useNativeDriver: true }).start();
-      }
-      return;
-    }
-    transitioning.current = true;
-    let cancelled = false;
-    // Dip to a dim floor (not 0) so content is always on screen — no blank
-    // "pause" while the list remounts, just a brief dim as it swaps columns.
-    Animated.timing(gridOpacity, { toValue: 0.4, duration: 55, useNativeDriver: true }).start(({ finished }) => {
-      if (cancelled || !finished) return;
-      setRenderedColumns(targetColumns);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loaded, targetColumns, renderedColumns, gridOpacity]);
-
-  const numColumns = renderedColumns;
+  // Cards per row from the result count alone (columnsFor: ~√n, capped at 4)
+  // — the full gallery is 4-up, a narrowed search gets fewer, larger cards,
+  // and a single result renders as the full-width feed card.
+  const numColumns = columnsFor(filtered.length);
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
+  const feed = numColumns === 1;
 
   // Comments open straight from the feed. ArtResult is a slim search row, so
   // fetch the full piece (comments_enabled etc.) on demand.
@@ -491,14 +340,34 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
     }
   }, []);
 
-  const feed = numColumns === 1;
-  const renderCard = ({ item }: { item: ArtResult }) => {
-    const onPress = () =>
+  const openProfile = useCallback(
+    (item: ArtResult) =>
       navigation.navigate('UserProfile', {
         username: item.creator_username,
         artId: item.id,
         medium: item.medium,
-      });
+      }),
+    [navigation],
+  );
+
+  // Tap on a feed photo → the same full-screen swipe-through carousel the
+  // profile art elements open, spanning every VISUAL piece in the current
+  // (filtered) feed. Written pieces keep their page-tap → profile.
+  const visualFeed = useMemo(
+    () => filtered.filter((a) => a.art_type !== 'written_form'),
+    [filtered],
+  );
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
+  const openZoom = useCallback(
+    (item: ArtResult) => {
+      const idx = visualFeed.findIndex((a) => a.id === item.id);
+      if (idx >= 0) setZoomIndex(idx);
+    },
+    [visualFeed],
+  );
+
+  const renderCard = ({ item }: { item: ArtResult }) => {
+    const onPress = () => openProfile(item);
     if (feed) {
       const onWeb = () => {
         registerArt({
@@ -518,9 +387,9 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
         <FeedArtCard
           item={item}
           onPress={onPress}
+          onZoom={item.art_type === 'written_form' ? undefined : () => openZoom(item)}
           onComment={item.art_type === 'written_form' ? undefined : () => openComments(item)}
           onWeb={onWeb}
-          densityPinchRef={densityPinchRef}
         />
       );
     }
@@ -541,19 +410,18 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
 
   return (
     <View style={styles.container}>
-      <Animated.View style={{ flex: 1, opacity: gridOpacity }}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderCard}
         // FlatList REQUIRES a key change when numColumns changes (it throws
-        // otherwise). The remount flash is softened by the opacity crossfade
-        // around this list (see gridOpacity / renderedColumns).
+        // otherwise). Columns only move when a search narrows the count, so
+        // the remount happens behind active typing, not mid-browse.
         key={numColumns}
         numColumns={numColumns}
-        // Solo cards are viewport-width squares, so rows cross the
-        // virtualization boundary constantly — keep more of them mounted to
-        // avoid remount churn while scrolling.
+        // Solo cards are viewport-width, so rows cross the virtualization
+        // boundary constantly — keep more of them mounted to avoid remount
+        // churn while scrolling.
         windowSize={numColumns === 1 ? 41 : 21}
         columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
         contentContainerStyle={styles.list}
@@ -571,7 +439,6 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
           />
         }
       />
-      </Animated.View>
       {refreshing && (
         <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
           <Spinner size={48} />
@@ -579,6 +446,23 @@ export default function ArtGallery({ query, onResetFilters, onListScroll, onVert
       )}
       {commentPiece && (
         <ArtComments piece={commentPiece} onClose={() => setCommentPiece(null)} />
+      )}
+      {/* Full-screen viewer over the feed — swipe sideways to the next piece,
+          pinch to zoom, drag down to dismiss: identical to the profile's. Mixed
+          creators, so captions carry the per-piece title + name. */}
+      {zoomIndex !== null && visualFeed[zoomIndex] && (
+        <ArtCarousel
+          pieces={visualFeed}
+          initialIndex={zoomIndex}
+          isOwner={false}
+          creatorUsername=""
+          captions={visualFeed.map((a) => ({
+            title: a.title,
+            creator: a.creator_username,
+            aspectRatio: a.aspect_ratio ?? undefined,
+          }))}
+          onClose={() => setZoomIndex(null)}
+        />
       )}
     </View>
   );
@@ -742,6 +626,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.secondary,
     padding: 8,
     overflow: 'hidden',
+  },
+  // Cover image fills the page frame edge-to-edge (cancel the page padding).
+  cardPageCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   cardPageSnippet: {
     fontFamily: Fonts.serif,

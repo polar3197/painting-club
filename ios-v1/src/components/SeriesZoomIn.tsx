@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { remove_written_form, WrittenFormOut } from '../api';
+import { Image } from 'expo-image';
+import { remove_written_form, imageSource, WrittenFormOut } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
 import AddArtDialog from './AddArtDialog';
@@ -50,7 +51,13 @@ function ThumbCell({ piece, cellW, cellH, isOwner, onOpen, onEdit, onRemove }: T
         style={({ pressed }) => [styles.tile, { width: cellW, height: cellH }, pressed && { opacity: 0.92 }]}
         onPress={onOpen}
       >
-        {isText && snippet ? (
+        {piece.cover_image_path ? (
+          <Image
+            source={imageSource(piece.cover_image_path)}
+            style={styles.tileCover}
+            contentFit="cover"
+          />
+        ) : isText && snippet ? (
           <Text style={styles.tileSnippet} numberOfLines={THUMB_PREVIEW_LINES}>{snippet}</Text>
         ) : (
           <Text style={styles.tileTitleFallback} numberOfLines={4}>{piece.title}</Text>
@@ -265,6 +272,14 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 11,
     color: Colors.black,
+  },
+  // Cover image fills the tile frame edge-to-edge (cancel the tile padding).
+  tileCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   tileTitleFallback: {
     fontFamily: Fonts.serif,
