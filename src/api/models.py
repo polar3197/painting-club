@@ -593,14 +593,17 @@ class BookmarkedArtOut(BaseModel):
     # Populated for visual pieces (NULL for written/audio — clients already
     # handle a missing ratio by measuring).
     aspect_ratio: float | None = None
+    # Cover image for written pieces — the saved card renders it instead of the
+    # text snippet. NULL for other mediums / cover-less pieces.
+    cover_image_path: str | None = None
     # Set when the piece belongs to a collection/album/series, so the client can
     # regroup saved pieces into one tile. NULL for standalone pieces.
     series_id: uuid.UUID | None = None
     series_name: str | None = None
     bookmarked_at: datetime
 
-    @field_serializer("file_path")
-    def _sign_file_path(self, v):
+    @field_serializer("file_path", "cover_image_path")
+    def _sign_paths(self, v):
         return sign_path(v)
 
 
