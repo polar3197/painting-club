@@ -99,6 +99,14 @@ from api.models import (
     EventOut,
     UsageBatchIn,
     DeviceBatchIn,
+    PortfolioBlockOut,
+    PortfolioOut,
+    PortfolioUpdateIn,
+    BlockCreateIn,
+    BlockUpdateIn,
+    BlockPiecesIn,
+    ArtVisibilityIn,
+    PortfolioPieceOut,
 )
 
 from db.db_ops.bookmarks import (
@@ -291,7 +299,14 @@ from db.db_ops.inspirations import (
     db_get_external_art,
 )
 from api.models import InspirationIn
-    
+
+from db.db_ops.portfolios import (
+    db_get_or_create_my_portfolio, db_update_portfolio, db_add_block,
+    db_update_block, db_delete_block, db_set_block_pieces,
+    db_my_portfolio_payload, db_list_my_visual_pieces,
+    db_public_portfolio_payload, db_public_art_file_path, db_set_art_visibility,
+)
+
 from db.session import get_db, AsyncSessionLocal
 from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
 from db.models import Member, Media, Media_Members, Art, Comment, Visual2D, WrittenForm, WeeklyPrompt
@@ -3573,3 +3588,81 @@ async def get_external_art_image(
         if generate_external_thumb(ext_id, src_abs) is None:
             return FileResponse(src_abs, headers=cache_headers)
     return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
+
+
+# --- Public portfolios (editor API; public serving is in the same block) -----
+PUBLIC_SITE_ORIGIN = os.environ.get("PUBLIC_SITE_ORIGIN", "https://paintingclub.art")
+
+
+def _portfolio_out(payload: dict) -> PortfolioOut:
+    return PortfolioOut(**payload, public_url=f"{PUBLIC_SITE_ORIGIN}/p/{payload['slug']}")
+
+
+@app.get("/portfolio/mine", response_model=PortfolioOut)
+async def get_my_portfolio(db: AsyncSession = Depends(get_db), current_user: Member = Depends(get_current_member)):
+    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
+
+
+@app.patch("/portfolio/mine", response_model=PortfolioOut)
+async def update_my_portfolio(payload: PortfolioUpdateIn, db: AsyncSession = Depends(get_db),
+                              current_user: Member = Depends(get_current_member)):
+    try:
+        await db_update_portfolio(db, current_user.id, slug=payload.slug, title=payload.title,
+                                  published=payload.published, theme=payload.theme)
+    except ValueError as e:
+        raise HTTPException(status_code=409 if "taken" in str(e) else 400, detail=str(e))
+    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
+
+
+@app.post("/portfolio/blocks", response_model=PortfolioOut)
+async def add_portfolio_block(payload: BlockCreateIn, db: AsyncSession = Depends(get_db),
+                              current_user: Member = Depends(get_current_member)):
+    try:
+        await db_add_block(db, current_user.id, payload.kind, payload.position, payload.config)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
+
+
+@app.patch("/portfolio/blocks/{block_id}", response_model=PortfolioOut)
+async def update_portfolio_block(block_id: str, payload: BlockUpdateIn, db: AsyncSession = Depends(get_db),
+                                 current_user: Member = Depends(get_current_member)):
+    try:
+        await db_update_block(db, current_user.id, block_id, config=payload.config, position=payload.position)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
+
+
+@app.delete("/portfolio/blocks/{block_id}", response_model=PortfolioOut)
+async def delete_portfolio_block(block_id: str, db: AsyncSession = Depends(get_db),
+                                 current_user: Member = Depends(get_current_member)):
+    try:
+        await db_delete_block(db, current_user.id, block_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
+
+
+@app.put("/portfolio/blocks/{block_id}/pieces", response_model=PortfolioOut)
+async def set_portfolio_block_pieces(block_id: str, payload: BlockPiecesIn, db: AsyncSession = Depends(get_db),
+                                     current_user: Member = Depends(get_current_member)):
+    try:
+        await db_set_block_pieces(db, current_user.id, block_id, payload.art_ids)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
+
+
+@app.get("/portfolio/my-pieces", response_model=List[PortfolioPieceOut])
+async def list_my_portfolio_pieces(db: AsyncSession = Depends(get_db),
+                                   current_user: Member = Depends(get_current_member)):
+    rows = await db_list_my_visual_pieces(db, current_user.id)
+    return [PortfolioPieceOut(id=str(r.id), title=r.title, file_path=r.file_path,
+                              visibility=r.visibility, aspect_ratio=r.aspect_ratio) for r in rows]
