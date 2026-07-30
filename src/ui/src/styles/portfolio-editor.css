@@ -22,3 +22,10 @@
 .pe-block-empty { padding: 1.5rem; opacity: 0.5; font-size: 0.85rem; }
 .pe-add-block { display: flex; gap: 0.5rem; }
 .pe-add-block button { border: 1px solid black; background: white; padding: 0.35rem 0.75rem; cursor: pointer; }
+.pe-field { display: block; font-size: 0.85rem; margin-bottom: 0.75rem; }
+.pe-field input, .pe-field select { width: 100%; font: inherit; border: 1px solid black; padding: 0.25rem; margin-top: 0.2rem; }
+.pe-color input { height: 2rem; padding: 0; }
+.pe-actions { display: flex; gap: 0.5rem; margin: 1rem 0 0.75rem; }
+.pe-actions button { flex: 1; border: 1px solid black; background: white; padding: 0.4rem; cursor: pointer; }
+.pe-actions .pe-live { background: rgb(238, 190, 100); }
+.pe-copy { width: 100%; border: 1px dashed black; background: white; padding: 0.35rem; cursor: pointer; font-size: 0.8rem; overflow-wrap: anywhere; }

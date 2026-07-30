@@ -4,6 +4,7 @@ import {
   Portfolio, PortfolioPiece,
   get_my_portfolio, get_my_portfolio_pieces, set_art_visibility,
   add_portfolio_block, update_portfolio_block, delete_portfolio_block, set_portfolio_block_pieces,
+  update_my_portfolio, get_portfolio_preview_link,
 } from "../../api";
 import "../../styles/portfolio-editor.css";
 
@@ -191,7 +192,90 @@ export default function PortfolioEditor() {
           ))}
         </div>
       </main>
-      <aside className="pe-side">{/* Task 11: theme + publish */}</aside>
+      <aside className="pe-side">
+        <h3>site</h3>
+        <label className="pe-field">
+          address
+          <input
+            defaultValue={portfolio.slug}
+            onBlur={async (e) => {
+              if (!token || e.target.value === portfolio.slug) return;
+              try {
+                reload(await update_my_portfolio(token, { slug: e.target.value }));
+              } catch {
+                alert("that address is taken or invalid");
+                e.target.value = portfolio.slug;
+              }
+            }}
+          />
+        </label>
+        <label className="pe-field">
+          title
+          <input
+            defaultValue={portfolio.title ?? ""}
+            onBlur={async (e) => token && reload(await update_my_portfolio(token, { title: e.target.value }))}
+          />
+        </label>
+        {(["bg", "text", "accent"] as const).map((key) => (
+          <label className="pe-field pe-color" key={key}>
+            {key === "bg" ? "background" : key}
+            <input
+              type="color"
+              value={portfolio.theme[key] ?? { bg: "#ffffff", text: "#1a1a1a", accent: "#8a6d3b" }[key]}
+              onChange={async (e) =>
+                token && reload(await update_my_portfolio(token, {
+                  theme: { ...portfolio.theme, [key]: e.target.value },
+                }))
+              }
+            />
+          </label>
+        ))}
+        <label className="pe-field">
+          type
+          <select
+            value={portfolio.theme.font ?? "serif"}
+            onChange={async (e) =>
+              token && reload(await update_my_portfolio(token, { theme: { ...portfolio.theme, font: e.target.value } }))
+            }
+          >
+            <option value="serif">serif</option>
+            <option value="sans">sans</option>
+          </select>
+        </label>
+        <label className="pe-field">
+          frames
+          <select
+            value={portfolio.theme.frame ?? "line"}
+            onChange={async (e) =>
+              token && reload(await update_my_portfolio(token, { theme: { ...portfolio.theme, frame: e.target.value } }))
+            }
+          >
+            <option value="line">line</option>
+            <option value="none">none</option>
+          </select>
+        </label>
+        <div className="pe-actions">
+          <button
+            onClick={async () => {
+              if (!token) return;
+              const { url } = await get_portfolio_preview_link(token);
+              window.open(url, "_blank");
+            }}
+          >preview</button>
+          <button
+            className={portfolio.published ? "pe-live" : ""}
+            onClick={async () =>
+              token && reload(await update_my_portfolio(token, { published: !portfolio.published }))
+            }
+          >{portfolio.published ? "unpublish" : "publish"}</button>
+        </div>
+        {portfolio.published && (
+          <button
+            className="pe-copy"
+            onClick={() => navigator.clipboard.writeText(portfolio.public_url)}
+          >{portfolio.public_url.replace(/^https?:\/\//, "")}</button>
+        )}
+      </aside>
     </div>
   );
 }
