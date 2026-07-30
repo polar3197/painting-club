@@ -52,3 +52,45 @@ def test_patch_mine_slug_conflict(pclient):
 def test_routes_require_auth():
     c = TestClient(app)
     assert c.get("/portfolio/mine").status_code in (401, 403)
+
+
+def test_patch_block_config_validation_error(fake_member, monkeypatch):
+    """PATCH /portfolio/blocks/{block_id} maps validation errors (not "not found") to 400."""
+    async def fake_get_db():
+        yield None
+    async def fake_payload(db, member):
+        return dict(PAYLOAD)
+    async def fake_update_block(db, member_id, block_id, **kw):
+        raise ValueError("config must be an object")
+
+    monkeypatch.setattr(main_mod, "db_my_portfolio_payload", fake_payload)
+    monkeypatch.setattr(main_mod, "db_update_block", fake_update_block)
+    app.dependency_overrides[get_current_member] = lambda: fake_member
+    app.dependency_overrides[get_db] = fake_get_db
+    c = TestClient(app)
+    try:
+        r = c.patch("/portfolio/blocks/test-block-id", json={"config": {}})
+        assert r.status_code == 400
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_put_block_pieces_not_found_error(fake_member, monkeypatch):
+    """PUT /portfolio/blocks/{block_id}/pieces maps 'not found' errors to 404."""
+    async def fake_get_db():
+        yield None
+    async def fake_payload(db, member):
+        return dict(PAYLOAD)
+    async def fake_set_pieces(db, member_id, block_id, art_ids):
+        raise ValueError("Block not found")
+
+    monkeypatch.setattr(main_mod, "db_my_portfolio_payload", fake_payload)
+    monkeypatch.setattr(main_mod, "db_set_block_pieces", fake_set_pieces)
+    app.dependency_overrides[get_current_member] = lambda: fake_member
+    app.dependency_overrides[get_db] = fake_get_db
+    c = TestClient(app)
+    try:
+        r = c.put("/portfolio/blocks/test-block-id/pieces", json={"art_ids": []})
+        assert r.status_code == 404
+    finally:
+        app.dependency_overrides.clear()

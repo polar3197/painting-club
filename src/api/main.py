@@ -3632,7 +3632,7 @@ async def update_portfolio_block(block_id: str, payload: BlockUpdateIn, db: Asyn
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404 if "not found" in str(e).lower() else 400, detail=str(e))
     return _portfolio_out(await db_my_portfolio_payload(db, current_user))
 
 
@@ -3656,7 +3656,7 @@ async def set_portfolio_block_pieces(block_id: str, payload: BlockPiecesIn, db: 
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=404 if "not found" in str(e).lower() else 400, detail=str(e))
     return _portfolio_out(await db_my_portfolio_payload(db, current_user))
 
 
