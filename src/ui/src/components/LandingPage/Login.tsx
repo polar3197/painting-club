@@ -102,7 +102,6 @@ export default function Login(
         )}
         {!member && (
           <div className="non-member">
-            <button onClick={() => navigate("/members")}>view artists profiles</button>
             <button onClick={() => setShowApplication(true)}>request account</button>
           </div>
         )}

@@ -9,10 +9,7 @@ export function useMembers(city: string , username: string ): [Profile[] | [], E
 
   useEffect(() => {
     const fetchMembers = async () => {
-      console.log("username: ", username, "city: ", city);
-      
       const token = localStorage.getItem("token");
-      console.log(token);
       try {
         const data = await get_members(city, username, token);
         setMembers(data);

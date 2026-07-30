@@ -626,7 +626,7 @@ async def search_members(
     city: str = None,
     uname: str = None,
     db: AsyncSession = Depends(get_db),
-    current_member: Optional[Member] = Depends(get_optional_member)
+    current_member: Member = Depends(get_current_member)
 ) -> List[Profile]:
 
     results = await db_search_members(
@@ -639,7 +639,7 @@ async def search_members(
 
     profiles = []
     for member_row in results:
-        is_owner = current_member is not None and (member_row.username == current_member.username)
+        is_owner = member_row.username == current_member.username
         media_result = await db.execute(
             select(Media.name)
             .join(Media_Members, Media.id == Media_Members.media_id)
@@ -660,7 +660,6 @@ async def search_members(
             profile_pic_path=versioned_pic_path(member_row.profile_pic_path),
         )
         profiles.append(profile)
-    print(profiles)
     return profiles
     
 
