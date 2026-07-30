@@ -86,6 +86,9 @@ export default function AddArt() {
   // stub builds (1.0.3) are pinned to text.
   const [writeMode, setWriteMode] = useState<'file' | 'text'>(PICKER_IS_STUB ? 'text' : 'file');
   const [pastedText, setPastedText] = useState('');
+  // Optional cover image for written pieces — shown on the card instead of the
+  // text snippet.
+  const [coverFile, setCoverFile] = useState<{ uri: string; name: string; type: string } | null>(null);
   // Measured length of a picked audio file (via the preview player) — sent as
   // duration_seconds so tiles can show a duration without loading the file.
   const [pickedDuration, setPickedDuration] = useState<number | null>(null);
@@ -188,6 +191,13 @@ export default function AddArt() {
     setPickedFile({ uri: asset.uri, name, type: asset.mimeType || mimeByExt[ext] || 'application/octet-stream' });
   };
 
+  const pickCover = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const a = result.assets[0];
+    setCoverFile({ uri: a.uri, name: a.uri.split('/').pop() || 'cover.jpg', type: a.mimeType || 'image/jpeg' });
+  };
+
   // When everything required for the current medium is present, the user can
   // advance past the details step.
   const detailsReady = useMemo(() => {
@@ -204,6 +214,7 @@ export default function AddArt() {
     setFormData(null);
     setPickedFile(null);
     setPastedText('');
+    setCoverFile(null);
     setWriteMode(PICKER_IS_STUB ? 'text' : 'file');
     setPickedDuration(null);
     setStep(1);
@@ -310,6 +321,7 @@ export default function AddArt() {
           series_name: formData.series || undefined,
           // Exactly one of file / text, per the API contract.
           ...(useFile ? { file: pickedFile! } : { text: trimmedText }),
+          ...(coverFile ? { cover: coverFile } : {}),
         };
         startWrittenUpload(payload);
       } else if (isAudio) {
@@ -436,6 +448,22 @@ export default function AddArt() {
                 multiline
                 textAlignVertical="top"
               />
+            )}
+            {isWritten && (
+              <View style={styles.coverRow}>
+                <Pressable style={styles.coverSlot} onPress={pickCover}>
+                  {coverFile ? (
+                    <Image source={{ uri: coverFile.uri }} style={styles.coverImg} contentFit="cover" />
+                  ) : (
+                    <Text style={styles.coverSlotText}>cover</Text>
+                  )}
+                </Pressable>
+                {!!coverFile && (
+                  <Pressable style={styles.coverRemove} onPress={() => setCoverFile(null)} hitSlop={6}>
+                    <Text style={styles.coverRemoveText}>×</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
             {isAudio && (
               <>
@@ -807,5 +835,45 @@ const styles = StyleSheet.create({
   guardBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
+  },
+  coverRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    marginTop: 8,
+  },
+  coverSlot: {
+    width: 56,
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  coverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  coverSlotText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.textTertiary,
+  },
+  coverRemove: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverRemoveText: {
+    fontFamily: Fonts.serif,
+    fontSize: 13,
+    lineHeight: 15,
+    color: Colors.black,
   },
 });
