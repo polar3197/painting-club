@@ -1067,3 +1067,13 @@ export function get_infra_health(token: string | null): Promise<InfraHealthOut> 
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<InfraHealthOut>;
 }
+
+// --- Portfolio (public artist site) --------------------------------------------
+
+export type MyPortfolio = { slug: string; published: boolean; public_url: string };
+
+export function getMyPortfolio(token: string | null): Promise<MyPortfolio> {
+  return request('/portfolio/mine', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MyPortfolio>;
+}

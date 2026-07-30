@@ -12,15 +12,18 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useProfile } from '../hooks';
+import { useAuth } from '../context/AuthContext';
 import {
   get_members_visual_2d,
   get_members_written_form,
   get_media,
   getPortfolioUrl,
+  getMyPortfolio,
   thumbSource,
   Visual2DOut,
   WrittenFormOut,
   MediaType,
+  MyPortfolio,
 } from '../api';
 import ArtZoomIn from '../components/ArtZoomIn';
 import WrittenFormPiece from '../components/WrittenFormPiece';
@@ -40,16 +43,37 @@ export default function Portfolio() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { username, medium, keywords } = route.params || {};
+  const { currentUser, token } = useAuth();
   const [profile] = useProfile(username);
   const [cells, setCells] = useState<CellData[]>([]);
   const [writtenCells, setWrittenCells] = useState<WrittenFormOut[]>([]);
   const [zoomPiece, setZoomPiece] = useState<Visual2DOut | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+  const [ownPortfolio, setOwnPortfolio] = useState<MyPortfolio | null>(null);
 
   useEffect(() => {
     get_media().then(setAllMedia).catch(() => {});
   }, []);
+
+  // Viewing your own gallery: fetch your public-portfolio publish state so the
+  // share button can point at the real public site URL instead of the
+  // club-internal (member-gated) one. Viewing someone else's gallery keeps the
+  // existing getPortfolioUrl() behavior untouched — getMyPortfolio is scoped to
+  // the logged-in member, not the profile on screen, so it would be meaningless
+  // (and leak the wrong link) for anyone else's page.
+  const isOwnGallery = !!username && username === currentUser;
+  useEffect(() => {
+    if (!isOwnGallery) {
+      setOwnPortfolio(null);
+      return;
+    }
+    let live = true;
+    getMyPortfolio(token)
+      .then((p) => { if (live) setOwnPortfolio(p); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [isOwnGallery, token]);
 
   const mediumType = medium ? allMedia.find((m) => m.name === medium)?.type ?? null : null;
   const isV2d = mediumType === 'visual_2d';
@@ -181,15 +205,19 @@ export default function Portfolio() {
             {[medium, ...(keywords || [])].filter(Boolean).join(' / ')}
           </Text>
         </View>
-        <Pressable
-          style={styles.shareBtn}
-          onPress={() => {
-            const url = getPortfolioUrl(username, medium, keywords);
-            Share.share({ url, message: url });
-          }}
-        >
-          <Text style={styles.shareBtnText}>share</Text>
-        </Pressable>
+        {(!isOwnGallery || ownPortfolio?.published) && (
+          <Pressable
+            style={styles.shareBtn}
+            onPress={() => {
+              const url = isOwnGallery && ownPortfolio
+                ? ownPortfolio.public_url
+                : getPortfolioUrl(username, medium, keywords);
+              Share.share({ url, message: url });
+            }}
+          >
+            <Text style={styles.shareBtnText}>share</Text>
+          </Pressable>
+        )}
         <Pressable style={styles.profileBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.profileBtnText}>profile view</Text>
         </Pressable>
