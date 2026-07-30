@@ -57,21 +57,47 @@ async def db_reorder_member_media(
     await db.commit()
 
 
-async def db_create_media(db: AsyncSession, name: str, type_: str | None = None) -> Media:
+async def db_create_media(
+    db: AsyncSession,
+    name: str,
+    type_: str | None = None,
+    written_format: str | None = None,
+) -> Media:
     existing = await db.execute(select(Media).filter(Media.name == name))
     row = existing.scalars().first()
     if row:
-        # Stamp the type if not set yet; don't overwrite an existing type.
+        # Stamp type/format if not set yet; don't overwrite existing values.
+        changed = False
         if type_ is not None and row.type is None:
             row.type = type_
+            changed = True
+        if written_format is not None and row.written_format is None:
+            row.written_format = written_format
+            changed = True
+        if changed:
             await db.commit()
             await db.refresh(row)
         return row
-    new_medium = Media(name=name, type=type_)
+    new_medium = Media(name=name, type=type_, written_format=written_format)
     db.add(new_medium)
     await db.commit()
     await db.refresh(new_medium)
     return new_medium
+
+
+async def db_set_media_format(db: AsyncSession, name: str, written_format: str) -> Media:
+    """Contributor override for a shared written medium's short/long format."""
+    row = (
+        await db.execute(select(Media).filter(Media.name == name))
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError(f"Medium '{name}' not found")
+    if row.type != "written_form":
+        raise ValueError(f"Medium '{name}' is not a written medium")
+    row.written_format = written_format
+    await db.commit()
+    await db.refresh(row)
+    return row
 
 
 async def db_add_medium(db: AsyncSession, username: str, medium: str) -> bool:

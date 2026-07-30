@@ -1,5 +1,26 @@
 # Pending backend changes (apply when RPi access is available)
 
+> **Written short/long form (2026-07-30):** written media split into
+> `written_format` 'short' (poetry/thoughts — native scroll reader) vs 'long'
+> (stories/essays — the existing paged reader). Backend: `media.written_format`
+> + `media_request.requested_format` (migration 026, idempotent guards + one-time
+> name backfill: poem/poetry/thought/haiku → short, other written → long),
+> format on `GET /media` + request submit/approve passthrough, contributor-only
+> `PATCH /media/{name}/format`. api-only, no nginx restart. Smoked green against
+> a throwaway postgres:16 (backfill, idempotence, explicit-format preservation).
+> Client half: AddMediaDialog offers written (short form)/(long form), admin
+> request rows show + classify the format, contributor short/long pill in
+> hide/show, reader branches on the tab's format (missing → long, so either
+> deploy order is safe). Deploy status recorded below once pulled.
+
+> **Bookmarks written-cover (2026-07-29): DEPLOYED ✅** (`e1fb755` cherry-picked
+> to main, Pi pulled + hot-reloaded, query exercised against the prod DB — 40
+> members / 11 bookmark rows, clean). `GET /members/me/bookmarks` now returns
+> `cover_image_path` (signed) for written pieces, joining the `written_form`
+> subtype. Client half (cover picker + card rendering everywhere) shipped in
+> `9dce273` on `stream-b-events-obs`. Tailscale to the Pi works again:
+> `ssh quentin@100.114.160.63`.
+
 > **NEXT PULL — three things ride together (2026-07-16..18): DEPLOYED ✅ 2026-07-24**
 > (Pi pulled to `c2dd08c`, nginx restarted, migrations ran clean, routes smoke-tested).
 > Run on the Pi (`quentin@192.168.86.92`, must be on the home LAN):
@@ -442,8 +463,17 @@ Nullable FK to `media` (not a stored medium string) keeps it normalized;
 
 ## 10. Inspiration web — real backend + dummy-setup teardown
 
-> **Status (2026-07-23): BUILT + VERIFIED, NOT DEPLOYED (uncommitted, Stream
-> WEB working tree).** Backend: models + migration 025 + `db_ops/inspirations.py`
+> **Status (2026-07-23): DEPLOYED ✅ except the seed.** Backend on the Pi
+> (main `13ca85f` via PR #1 — backend-only cherry-pick `755f871`, so the
+> paused webapp-parity WIP on `stream-b-events-obs` stayed off main), nginx
+> restarted, routes verified live (401 unauth on `/inspirations/*`, 404 on raw
+> `/static/external*`). FE Phase-1 OTA published to `production`, runtime
+> 1.0.5, update group `0ef2dfae` (mock deleted — pre-OTA clients keep the old
+> bundled demo harmlessly). **REMAINING: run the seed script as charlie**
+> (`.venv/bin/python scripts/seed_inspiration_web.py --base
+> http://192.168.86.92/api` — prompts for password; until then the club web
+> starts empty and every prior demo link exists only in the retired mock).
+> Original build notes: Backend: models + migration 025 + `db_ops/inspirations.py`
 > + all routes below + nginx block — 39-check smoke green against a throwaway
 > `postgres:16` + local uvicorn (edge CRUD, ownership 403s, CHECK/unique
 > constraints, BFS depth, singleton exclusion, artKind mapping, external
