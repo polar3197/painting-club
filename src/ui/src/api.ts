@@ -29,10 +29,15 @@ interface RequestOptions extends RequestInit {
 
 async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const isFormData = options.body instanceof FormData;
+  // Attach the session token by default — the backend lockdown member-gated
+  // routes this client still called bare (e.g. the per-medium art lists), and
+  // any 401 below nukes the session. Explicit headers still win via spread.
+  const token = localStorage.getItem("token");
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
         ...(!isFormData && { "Content-Type": "application/json" }),
+        ...(token && { Authorization: `Bearer ${token}` }),
         ...(options.headers || {}),
     },
   });
