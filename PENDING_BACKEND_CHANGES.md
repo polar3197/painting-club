@@ -15,8 +15,9 @@
 > `17a450f` on main `105985a`, Pi pulled + hot-reloaded, migration ran —
 > prod backfill verified: poetry/thoughts → short, text art/writing → long,
 > non-written untouched; `/media` serves the field, PATCH 401s unauth).
-> OTA publish pending (blocked in-session; run from ios-v1:
-> `npx eas-cli update --branch production --message "written short/long form"`).
+> **OTA published ✅ 2026-07-30** (branch `production`, runtime 1.0.5, update
+> group `ca11ae85-f36a-4094-bb02-1ff13effc27b`, published from the shared
+> working tree per standing practice). Feature fully live end-to-end.
 
 > **Bookmarks written-cover (2026-07-29): DEPLOYED ✅** (`e1fb755` cherry-picked
 > to main, Pi pulled + hot-reloaded, query exercised against the prod DB — 40
