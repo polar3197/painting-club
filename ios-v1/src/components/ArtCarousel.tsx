@@ -43,7 +43,7 @@ const IMAGE_H_PAD = 18;
 const TITLE_BAND = 80;
 const NAME_BAND = 56;
 
-export type CarouselPiece = { id: string; file_path: string };
+export type CarouselPiece = { id: string; file_path: string; aspect_ratio?: number | null };
 // A horizontal slot in the viewer: a single piece, or a collection you scroll
 // through vertically. Legacy callers pass `pieces` (all solo); the profile passes
 // `elements` so its series collapse into one vertical-scroll slot.
@@ -173,6 +173,22 @@ export default function ArtCarousel({ pieces, elements, initialPieceIndex, initi
       if (success) runOnJS(dismiss)();
     });
 
+  // Double-tap zooms the ACTIVE page (the page registers its zoom toggle in
+  // this shared ref while active — see ZoomablePage). Exclusive() makes the
+  // single-tap dismiss wait for the double-tap to fail first, so the first
+  // tap of a double can't close the carousel.
+  const zoomApiRef = useRef<{ toggle: (x: number, y: number) => void } | null>(null);
+  const handlePageDoubleTap = (x: number, y: number) => {
+    zoomApiRef.current?.toggle(x, y);
+  };
+  const zoomDoubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDelay(280)
+    .onEnd((e, success) => {
+      if (success) runOnJS(handlePageDoubleTap)(e.x, e.y);
+    });
+  const tapGestures = Gesture.Exclusive(zoomDoubleTap, dismissTap);
+
   const contentStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: dragY.value }],
   }));
@@ -214,7 +230,7 @@ export default function ArtCarousel({ pieces, elements, initialPieceIndex, initi
 
         <GestureDetector gesture={dismissPan}>
           <Animated.View style={[styles.root, contentStyle]}>
-            <GestureDetector gesture={dismissTap}>
+            <GestureDetector gesture={tapGestures}>
               <ScrollView
                 ref={outerRef}
                 horizontal
@@ -249,6 +265,8 @@ export default function ArtCarousel({ pieces, elements, initialPieceIndex, initi
                       height={screenH}
                       topInset={imgTopInset}
                       bottomInset={imgBottomInset}
+                      aspect={el.piece.aspect_ratio ?? undefined}
+                      zoomApiRef={zoomApiRef}
                       active={i === index}
                       onZoomChange={setZoomed}
                     />
@@ -384,6 +402,8 @@ function ZoomablePage({
   bottomInset = 0,
   active,
   onZoomChange,
+  aspect,
+  zoomApiRef,
 }: {
   uri: string;
   thumb?: { uri: string; headers?: Record<string, string>; cacheKey?: string };
@@ -398,6 +418,14 @@ function ZoomablePage({
   bottomInset?: number;
   active: boolean;
   onZoomChange: (zoomed: boolean) => void;
+  // Piece aspect ratio (w/h) — sizes the double-tap zoom so the painted image
+  // spans the full page width. Optional: without it the zoom assumes the image
+  // is width-bound.
+  aspect?: number;
+  // Shared with the carousel's double-tap gesture: while active, this page
+  // registers its zoom toggle here (tap coords are page-content coords at 1x,
+  // which equal the viewport coords the outer gesture reports).
+  zoomApiRef?: React.MutableRefObject<{ toggle: (x: number, y: number) => void } | null>;
 }) {
   const ref = useRef<ScrollView>(null);
   const wasZoomed = useRef(false);
@@ -412,6 +440,34 @@ function ZoomablePage({
       onZoomChange(false);
     }
   }, [active, width, height, onZoomChange]);
+
+  // Register this page's double-tap zoom toggle while it's the active page.
+  React.useEffect(() => {
+    if (!active || !zoomApiRef) return;
+    zoomApiRef.current = {
+      toggle: (x: number, y: number) => {
+        if (wasZoomed.current) {
+          ref.current?.scrollResponderZoomTo?.({ x: 0, y: 0, width, height, animated: true });
+          return;
+        }
+        // Zoom so the painted image fills the full page width (≥1.8x so wide
+        // pieces still get a real zoom; capped at the pinch maximum), centered
+        // on the tap point, clamped inside the content bounds.
+        const imgW = width - IMAGE_H_PAD * 2;
+        const imgH = height - topInset - bottomInset;
+        const paintedW = aspect ? Math.min(imgW, imgH * aspect) : imgW;
+        const targetScale = Math.min(4, Math.max(1.8, width / paintedW));
+        const w2 = width / targetScale;
+        const h2 = height / targetScale;
+        const x2 = Math.min(Math.max(x - w2 / 2, 0), width - w2);
+        const y2 = Math.min(Math.max(y - h2 / 2, 0), height - h2);
+        ref.current?.scrollResponderZoomTo?.({ x: x2, y: y2, width: w2, height: h2, animated: true });
+      },
+    };
+    return () => {
+      if (zoomApiRef.current) zoomApiRef.current = null;
+    };
+  }, [active, zoomApiRef, width, height, topInset, bottomInset, aspect]);
 
   return (
     <ScrollView

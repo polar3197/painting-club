@@ -301,13 +301,37 @@ export default function ArtZoomIn({
         savedTranslationX.value = 0;
         savedTranslationY.value = 0;
       } else {
-        // At identity: flip the card (owner's "change pic" affordance).
-        runOnJS(handleFlip)();
+        // At identity: zoom until the piece spans the full screen width (never
+        // less than 2x, so wide pieces still get a real zoom), keeping the
+        // tapped point under the finger. Same transform model as pinch:
+        // screenX = center + imageX·scale + translation.
+        const target = Math.max(screenW / (wrapperW.value || 1), 2);
+        const imageX = e.x - wrapperW.value / 2;
+        const imageY = e.y - wrapperH.value / 2;
+        const maxX = Math.max(0, (wrapperW.value * target - wrapperW.value) / 2);
+        const maxY = Math.max(0, (wrapperH.value * target - wrapperH.value) / 2);
+        const tx = Math.min(maxX, Math.max(-maxX, imageX * (1 - target)));
+        const ty = Math.min(maxY, Math.max(-maxY, imageY * (1 - target)));
+        scale.value = withTiming(target, { duration: 220 });
+        translationX.value = withTiming(tx, { duration: 220 });
+        translationY.value = withTiming(ty, { duration: 220 });
+        savedScale.value = target;
+        savedTranslationX.value = tx;
+        savedTranslationY.value = ty;
       }
     });
 
+  // Flip (back face: change-pic / kebab) moved off double-tap — that now means
+  // zoom. Long-press is the flip gesture; the owner's explicit "change pic"
+  // button below the card is unaffected.
+  const longPressFlip = Gesture.LongPress()
+    .minDuration(400)
+    .onStart(() => {
+      runOnJS(handleFlip)();
+    });
+
   // Pinch and pan must coexist. Double-tap races both; it wins if it completes first.
-  const composed = Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
+  const composed = Gesture.Race(doubleTap, longPressFlip, Gesture.Simultaneous(pinch, pan));
 
   // Tap anywhere outside the artwork to close. Gesture-handler tap (not a RN
   // Pressable) so it can't be starved by the card's composed gestures.
