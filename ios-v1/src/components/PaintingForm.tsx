@@ -13,9 +13,11 @@ interface PaintingFormProps {
   // Optional node rendered on the right side of the comments-toggle row.
   // AddArtDialog uses this to inline the submit button next to the toggle.
   rightSlot?: React.ReactNode;
+  // The dialog renders toggles + submit in its pinned footer instead.
+  hideToggles?: boolean;
 }
 
-export default function PaintingForm({ onDataChange, initialData, initialSeries, rightSlot }: PaintingFormProps) {
+export default function PaintingForm({ onDataChange, initialData, initialSeries, rightSlot, hideToggles }: PaintingFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
     location: initialData?.location ?? '',
@@ -102,14 +104,9 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
         autoCapitalize="none"
         onChangeText={(v) => update({ song: v })}
       />
-      <TextInput
-        style={styles.input}
-        value={form.song_artist}
-        placeholder="artist"
-        placeholderTextColor={Colors.textMuted}
-        autoCapitalize="none"
-        onChangeText={(v) => update({ song_artist: v })}
-      />
+      {/* song_artist stays in form state (existing values survive edits) but
+          the input is gone — "artist" on a visual piece read as the artwork's
+          artist and confused people. */}
       <TextInput
         style={styles.input}
         value={form.width != null ? String(form.width) : ''}
@@ -139,7 +136,7 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
       )}
 
       {/* Marking WIP is an edit-time action — new pieces start finished. */}
-      {initialData != null && (
+      {!hideToggles && initialData != null && (
         <View style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>wip</Text>
           <Pressable
@@ -154,19 +151,21 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
         </View>
       )}
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>comments</Text>
-        <Pressable
-          style={[
-            styles.toggleTrack,
-            { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
-          ]}
-          onPress={toggleComments}
-        >
-          <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
-        </Pressable>
-        {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
-      </View>
+      {!hideToggles && (
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>comments</Text>
+          <Pressable
+            style={[
+              styles.toggleTrack,
+              { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
+            ]}
+            onPress={toggleComments}
+          >
+            <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
+          </Pressable>
+          {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
+        </View>
+      )}
     </View>
   );
 }

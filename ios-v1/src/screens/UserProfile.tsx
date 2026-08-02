@@ -129,6 +129,7 @@ function Visual2DPiece({
   onEdit,
   onZoom,
   onRefresh,
+  wipHistory,
   onLayout,
 }: {
   isOwner: boolean;
@@ -143,6 +144,8 @@ function Visual2DPiece({
   onZoom: () => void;
   // Refetch the piece list (used after posting a WIP update).
   onRefresh: () => void;
+  // The piece's archived WIP images, oldest first (empty for non-WIP pieces).
+  wipHistory: WipUpdateOut[];
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const { token, currentUser } = useAuth();
@@ -168,34 +171,17 @@ function Visual2DPiece({
   // to ship before OR after the backend deploys.
   const [displayFailed, setDisplayFailed] = useState(false);
 
-  // WIP: superseded images, oldest first (the current image is the last page
-  // of the in-frame pager). Fetched lazily, only for WIP pieces; re-keyed on
-  // file_path so posting an update refreshes the history.
-  const [wipHistory, setWipHistory] = useState<WipUpdateOut[]>([]);
-  const [wipIndex, setWipIndex] = useState(0);
+  // WIP: superseded images (oldest first), fetched at the screen level so the
+  // carousel's vertical collection and this in-frame pager share one source.
+  const [wipIndex, setWipIndex] = useState(wipHistory.length);
   const [frameW, setFrameW] = useState(0);
-  // A history image opened standalone — its own one-image viewer, independent
-  // of the profile's shared carousel (which only ever shows the latest).
-  const [soloZoom, setSoloZoom] = useState<WipUpdateOut | null>(null);
   const [postingUpdate, setPostingUpdate] = useState(false);
   const wipPages = wipHistory.length + 1;
   const showWipPager = !!piece.is_wip && wipHistory.length > 0 && frameW > 0;
-
   useEffect(() => {
-    if (!piece.is_wip) {
-      setWipHistory([]);
-      return;
-    }
-    let cancelled = false;
-    get_wip_updates(piece.id)
-      .then((rows) => {
-        if (cancelled) return;
-        setWipHistory(rows);
-        setWipIndex(rows.length); // land on the current image
-      })
-      .catch(() => { if (!cancelled) setWipHistory([]); });
-    return () => { cancelled = true; };
-  }, [piece.id, piece.is_wip, piece.file_path]);
+    // Land on the current image whenever the history set changes.
+    setWipIndex(wipHistory.length);
+  }, [wipHistory.length]);
 
   const postWipUpdate = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
@@ -239,23 +225,6 @@ function Visual2DPiece({
       {showComments && (
         <ArtComments piece={piece} onClose={() => setShowComments(false)} />
       )}
-      {soloZoom && (
-        // A history image viewed on its own — one-image viewer, independent of
-        // the profile carousel (which only ever pages the latest images).
-        <ArtCarousel
-          pieces={[{ id: soloZoom.id, file_path: soloZoom.file_path }]}
-          initialIndex={0}
-          isOwner={false}
-          creatorUsername={profileUsername}
-          onClose={() => setSoloZoom(null)}
-          hideKebab
-          captions={[{
-            title: piece.title,
-            creator: profileUsername,
-            aspectRatio: soloZoom.aspect_ratio ?? undefined,
-          }]}
-        />
-      )}
       <View style={[styles.artElement, { backgroundColor: cardBg }]} onLayout={onLayout}>
         {showWipPager ? (
           // WIP: the frame itself pages through the piece's history — older
@@ -279,7 +248,7 @@ function Visual2DPiece({
                   <Pressable
                     key={upd.id}
                     style={[styles.wipPage, { width: frameW }]}
-                    onPress={() => setSoloZoom(upd)}
+                    onPress={onZoom}
                   >
                     <Image
                       source={imageSource(upd.file_path)}
@@ -897,23 +866,56 @@ export default function UserProfile() {
   // so swiping left/right in the viewer matches the grid. A series becomes one
   // vertical-scroll slot; its pieces are ordered like PaintingSeriesRow (explicit
   // order_index first, then fetch order).
+  // WIP histories, keyed by art id — fetched once per piece-list refresh and
+  // shared by the card pagers and the carousel's vertical collections.
+  const [wipMap, setWipMap] = useState<Record<string, WipUpdateOut[]>>({});
+  useEffect(() => {
+    const wips = visualRows
+      .flatMap((r) => (r.kind === 'piece' ? [r.piece] : r.pieces))
+      .filter((p) => p.is_wip);
+    if (wips.length === 0) { setWipMap({}); return; }
+    let cancelled = false;
+    Promise.all(
+      wips.map((p) =>
+        get_wip_updates(p.id)
+          .then((rows) => [p.id, rows] as const)
+          .catch(() => [p.id, [] as WipUpdateOut[]] as const),
+      ),
+    ).then((entries) => { if (!cancelled) setWipMap(Object.fromEntries(entries)); });
+    return () => { cancelled = true; };
+  }, [visualRows]);
+
   const visualElements = useMemo<CarouselElement[]>(
     () =>
-      visualRows.map((row) =>
-        row.kind === 'piece'
-          ? { kind: 'piece', piece: { id: row.piece.id, file_path: row.piece.file_path } }
-          : {
-              kind: 'collection',
-              pieces: [...row.pieces]
-                .sort(
-                  (a, b) =>
-                    (a.order_index ?? Number.MAX_SAFE_INTEGER) -
-                    (b.order_index ?? Number.MAX_SAFE_INTEGER),
-                )
-                .map((p) => ({ id: p.id, file_path: p.file_path })),
-            },
-      ),
-    [visualRows],
+      visualRows.map((row) => {
+        if (row.kind !== 'piece') {
+          return {
+            kind: 'collection' as const,
+            pieces: [...row.pieces]
+              .sort(
+                (a, b) =>
+                  (a.order_index ?? Number.MAX_SAFE_INTEGER) -
+                  (b.order_index ?? Number.MAX_SAFE_INTEGER),
+              )
+              .map((p) => ({ id: p.id, file_path: p.file_path })),
+          };
+        }
+        const history = row.piece.is_wip ? wipMap[row.piece.id] ?? [] : [];
+        if (history.length > 0) {
+          // WIP piece: a vertical collection — current image first (the slot's
+          // face), then the archive newest-to-oldest, so scrolling down walks
+          // back in time. Horizontal swipes still move to adjacent pieces.
+          return {
+            kind: 'collection' as const,
+            pieces: [
+              { id: row.piece.id, file_path: row.piece.file_path },
+              ...[...history].reverse().map((u) => ({ id: u.id, file_path: u.file_path })),
+            ],
+          };
+        }
+        return { kind: 'piece' as const, piece: { id: row.piece.id, file_path: row.piece.file_path } };
+      }),
+    [visualRows, wipMap],
   );
 
   // ...and for audio — an album shows as one tracklist tile.
@@ -1372,6 +1374,7 @@ export default function UserProfile() {
                   onRemove={() => setRefresh((r) => r + 1)}
                   onEdit={() => setEditingPiece(row.piece)}
                   onRefresh={() => setRefresh((r) => r + 1)}
+                  wipHistory={row.piece.is_wip ? wipMap[row.piece.id] ?? [] : []}
                   // Open the zoom viewer at this slot; it swipes across all
                   // visualElements (collapsed like the grid).
                   onZoom={() => setZoomIndex(ri)}

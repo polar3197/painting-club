@@ -24,6 +24,9 @@ import {
   MediaType,
   thumbSource,
   imageSource,
+  get_wip_updates,
+  remove_wip_update,
+  WipUpdateOut,
 } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import PaintingForm from './PaintingForm';
@@ -197,6 +200,53 @@ export default function AddArtDialog({
     if (existingCoverPath) setCoverCleared(true);
   };
 
+  // Toggles live in the pinned footer (not inside the scrolling forms), so the
+  // dialog owns their state; the forms' internal copies are hidden and the
+  // submit paths read these instead.
+  const [commentsEnabled, setCommentsEnabled] = useState<boolean>(
+    editingPiece?.comments_enabled ?? true
+  );
+  const [isWipToggle, setIsWipToggle] = useState<boolean>(piece?.is_wip ?? false);
+  const commentsThumb = useRef(new Animated.Value((editingPiece?.comments_enabled ?? true) ? 18 : 0)).current;
+  const wipThumb = useRef(new Animated.Value(piece?.is_wip ? 18 : 0)).current;
+  const toggleComments = () => {
+    const next = !commentsEnabled;
+    Animated.timing(commentsThumb, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
+    setCommentsEnabled(next);
+  };
+  const toggleWip = () => {
+    const next = !isWipToggle;
+    Animated.timing(wipThumb, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
+    setIsWipToggle(next);
+  };
+
+  // WIP history management (visual edit only): the archived images render as a
+  // strip of thumbs, each removable. Removing is two-tap — the × arms first
+  // (turns red) so a stray touch can't delete an image irreversibly.
+  const [wipRows, setWipRows] = useState<WipUpdateOut[]>([]);
+  const [armedWipRemove, setArmedWipRemove] = useState<string | null>(null);
+  useEffect(() => {
+    if (!piece?.is_wip) return;
+    let cancelled = false;
+    get_wip_updates(piece.id)
+      .then((rows) => { if (!cancelled) setWipRows(rows); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [piece?.id, piece?.is_wip]);
+  const removeWipRow = (updateId: string) => {
+    if (armedWipRemove !== updateId) {
+      setArmedWipRemove(updateId);
+      return;
+    }
+    setArmedWipRemove(null);
+    remove_wip_update(piece!.id, updateId, token)
+      .then(() => {
+        setWipRows((rows) => rows.filter((r) => r.id !== updateId));
+        onSuccess();
+      })
+      .catch((err: any) => appAlert('Error', err?.message || 'Something went wrong'));
+  };
+
   // Track the keyboard height so the panel can shrink (rather than being
   // pushed off the top of the screen by KeyboardAvoidingView's padding hack).
   // We anchor the panel above the keyboard via modalRoot's paddingBottom and
@@ -365,12 +415,12 @@ export default function AddArtDialog({
               .map((k: string) => k.trim())
               .filter(Boolean)
           : null,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         medium: moving,
         series_name: formData.series ? formData.series : null,
         // Clear the series if the field was emptied while editing.
         clear_series: !formData.series && !!piece.series_name,
-        is_wip: formData.is_wip,
+        is_wip: isWipToggle,
         file: pickedFile,
       };
       onClose();
@@ -411,7 +461,7 @@ export default function AddArtDialog({
         width: formData.width,
         height: formData.height,
         keywords: formData.keywords,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         series_name: (formData.series || '').trim() || undefined,
       };
       onClose();
@@ -442,7 +492,7 @@ export default function AddArtDialog({
               .map((k: string) => k.trim())
               .filter(Boolean)
           : null,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         medium: moving,
         series_name: formData.series ? formData.series : null,
         // Clear the series if the field was emptied while editing.
@@ -485,7 +535,7 @@ export default function AddArtDialog({
         title,
         date: formData.date || undefined,
         keywords: formData.keywords,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         series_name: formData.series || undefined,
         ...(writeMode === 'file' && pickedFile ? { file: pickedFile } : { text: trimmedText }),
         ...(coverFile ? { cover: coverFile } : {}),
@@ -504,7 +554,7 @@ export default function AddArtDialog({
               .map((k: string) => k.trim())
               .filter(Boolean)
           : null,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         medium: moving,
         series_name: formData.series ? formData.series : null,
         clear_series: !formData.series && !!audioPiece.series_name,
@@ -538,7 +588,7 @@ export default function AddArtDialog({
         artist: formData.artist || undefined,
         date: formData.date || undefined,
         keywords: formData.keywords,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         duration_seconds: pickedDuration ?? undefined,
         series_name: formData.series || undefined,
         file: pickedFile,
@@ -614,6 +664,28 @@ export default function AddArtDialog({
                   )}
                 </Pressable>
               </View>
+            )}
+            {isVisual2D && !!piece?.is_wip && wipRows.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.wipStrip}
+                contentContainerStyle={styles.wipStripContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {wipRows.map((r) => (
+                  <View key={r.id} style={styles.wipThumbWrap}>
+                    <Image source={imageSource(r.file_path)} style={styles.wipThumb} contentFit="cover" />
+                    <Pressable
+                      style={[styles.wipThumbRemove, armedWipRemove === r.id && styles.wipThumbRemoveArmed]}
+                      onPress={() => removeWipRow(r.id)}
+                      hitSlop={6}
+                    >
+                      <Text style={styles.wipThumbRemoveText}>×</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
             )}
             {isWrittenForm && (
               <View style={styles.modeTabs}>
@@ -718,10 +790,7 @@ export default function AddArtDialog({
                 taps on Pressables register without first dismissing the keyboard. */}
             <ScrollView
               style={styles.scrollArea}
-              contentContainerStyle={[
-                styles.formContent,
-                moveToReserve ? { paddingBottom: 20 + moveToReserve } : null,
-              ]}
+              contentContainerStyle={styles.formContent}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
@@ -773,22 +842,14 @@ export default function AddArtDialog({
                   onDataChange={setFormData}
                   initialData={piece}
                   initialSeries={initialSeries}
-                  rightSlot={
-                    <Pressable style={styles.submitBtn} onPress={submit}>
-                      <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
-                    </Pressable>
-                  }
+                  hideToggles
                 />
               )}
               {isWrittenForm && (
                 <WrittenFormForm
                   onDataChange={setFormData}
                   initialData={writtenPiece}
-                  rightSlot={
-                    <Pressable style={styles.submitBtn} onPress={submit}>
-                      <Text style={styles.submitBtnText}>{writtenPiece ? 'update' : 'submit'}</Text>
-                    </Pressable>
-                  }
+                  hideToggles
                 />
               )}
               {isAudio && (
@@ -796,26 +857,58 @@ export default function AddArtDialog({
                   onDataChange={setFormData}
                   initialData={audioPiece}
                   initialSeries={initialSeries}
-                  rightSlot={
-                    <Pressable style={styles.submitBtn} onPress={submit}>
-                      <Text style={styles.submitBtnText}>{audioPiece ? 'update' : 'submit'}</Text>
-                    </Pressable>
-                  }
+                  hideToggles
                 />
               )}
-              {moveToVisible && (
-                <View style={styles.moveToRow}>
-                  <Text style={styles.moveToLabel}>move to:</Text>
-                  <View style={styles.moveToDropdown}>
-                    <Dropdown
-                      placeholder={newMedium ?? selectedMedium}
-                      options={compatibleMedia}
-                      onSelect={setNewMedium}
-                    />
-                  </View>
-                </View>
-              )}
             </ScrollView>
+            {!minimal && (
+              <View style={styles.footerBar}>
+                {moveToVisible && (
+                  <View style={styles.moveToRow}>
+                    <Text style={styles.moveToLabel}>move to:</Text>
+                    <View style={styles.moveToDropdown}>
+                      <Dropdown
+                        placeholder={newMedium ?? selectedMedium}
+                        options={compatibleMedia}
+                        onSelect={setNewMedium}
+                        openUp
+                      />
+                    </View>
+                  </View>
+                )}
+                <View style={styles.footerActions}>
+                  {isVisual2D && !!piece && (
+                    <View style={styles.footerToggle}>
+                      <Text style={styles.footerToggleLabel}>wip</Text>
+                      <Pressable
+                        style={[
+                          styles.toggleTrack,
+                          { backgroundColor: isWipToggle ? Colors.greenBright : Colors.redLight },
+                        ]}
+                        onPress={toggleWip}
+                      >
+                        <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: wipThumb }] }]} />
+                      </Pressable>
+                    </View>
+                  )}
+                  <View style={styles.footerToggle}>
+                    <Text style={styles.footerToggleLabel}>comments</Text>
+                    <Pressable
+                      style={[
+                        styles.toggleTrack,
+                        { backgroundColor: commentsEnabled ? Colors.greenBright : Colors.redLight },
+                      ]}
+                      onPress={toggleComments}
+                    >
+                      <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: commentsThumb }] }]} />
+                    </Pressable>
+                  </View>
+                  <Pressable style={[styles.submitBtn, styles.footerSubmit]} onPress={submit}>
+                    <Text style={styles.submitBtnText}>{editingPiece ? 'update' : 'submit'}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
         </Animated.View>
       </Reanimated.View>
     </Modal>
@@ -1068,6 +1161,88 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: 13,
     lineHeight: 15,
+    color: Colors.black,
+  },
+  // Pinned footer: move-to + toggles + update stay visible while the form
+  // scrolls above them.
+  footerBar: {
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 10,
+  },
+  footerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  footerToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  footerToggleLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+  },
+  toggleTrack: {
+    width: 36,
+    height: 18,
+    borderWidth: 1,
+    borderColor: '#000',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleThumb: {
+    width: 12,
+    height: 12,
+    backgroundColor: Colors.accentGolden,
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  footerSubmit: {
+    marginLeft: 'auto',
+  },
+  // Strip of a WIP piece's archived images (edit mode) — each removable.
+  wipStrip: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    flexGrow: 0,
+  },
+  wipStripContent: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  wipThumbWrap: {
+    width: 48,
+    height: 48,
+  },
+  wipThumb: {
+    width: '100%',
+    height: '100%',
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  wipThumbRemove: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wipThumbRemoveArmed: {
+    backgroundColor: Colors.redLight,
+  },
+  wipThumbRemoveText: {
+    fontFamily: Fonts.serif,
+    fontSize: 11,
+    lineHeight: 12,
     color: Colors.black,
   },
 });

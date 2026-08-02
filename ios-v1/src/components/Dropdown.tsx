@@ -11,6 +11,9 @@ interface DropdownProps {
   onSelect: (value: string) => void;
   onInputChange?: (value: string) => void;
   onFocus?: () => void;
+  // Open the option list ABOVE the input — for dropdowns pinned near the
+  // bottom of a sheet, where a downward list would clip off-panel.
+  openUp?: boolean;
 }
 
 export interface DropdownHandle {
@@ -18,7 +21,7 @@ export interface DropdownHandle {
 }
 
 const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
-  { placeholder, options, onSelect, onInputChange, onFocus },
+  { placeholder, options, onSelect, onInputChange, onFocus, openUp },
   ref,
 ) {
   const [query, setQuery] = useState('');
@@ -79,7 +82,11 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
         onBlur={() => setTimeout(() => setShowList(false), 150)}
       />
       {showList && filtered.length > 0 && (
-        <ScrollView style={styles.list} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+        <ScrollView
+          style={[styles.list, openUp ? styles.listUp : styles.listDown]}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        >
           {filtered.map((item, i) => (
             <Pressable key={`${item}-${i}`} style={styles.item} onPress={() => handleSelect(item)}>
               <Text style={styles.itemText}>{item}</Text>
@@ -108,7 +115,6 @@ const styles = StyleSheet.create({
   },
   list: {
     position: 'absolute',
-    top: 31,
     left: 0,
     right: 0,
     maxHeight: 200,
@@ -117,6 +123,8 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     zIndex: 20,
   },
+  listDown: { top: 31 },
+  listUp: { bottom: 31 },
   item: {
     backgroundColor: Colors.white,
     borderWidth: 1,

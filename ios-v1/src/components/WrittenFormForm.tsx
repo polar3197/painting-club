@@ -9,9 +9,11 @@ interface WrittenFormFormProps {
   onDataChange: (data: Record<string, any>) => void;
   initialData?: WrittenFormOut;
   rightSlot?: React.ReactNode;
+  // The dialog renders toggles + submit in its pinned footer instead.
+  hideToggles?: boolean;
 }
 
-export default function WrittenFormForm({ onDataChange, initialData, rightSlot }: WrittenFormFormProps) {
+export default function WrittenFormForm({ onDataChange, initialData, rightSlot, hideToggles }: WrittenFormFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
     date: initialData ? initialData.date ?? '' : todayLocalISO(),
@@ -72,19 +74,21 @@ export default function WrittenFormForm({ onDataChange, initialData, rightSlot }
         onChangeText={(v) => update({ series: v })}
       />
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>comments</Text>
-        <Pressable
-          style={[
-            styles.toggleTrack,
-            { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
-          ]}
-          onPress={toggleComments}
-        >
-          <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
-        </Pressable>
-        {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
-      </View>
+      {!hideToggles && (
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>comments</Text>
+          <Pressable
+            style={[
+              styles.toggleTrack,
+              { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
+            ]}
+            onPress={toggleComments}
+          >
+            <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
+          </Pressable>
+          {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
+        </View>
+      )}
     </View>
   );
 }

@@ -374,6 +374,14 @@ export function get_wip_updates(artId: string): Promise<WipUpdateOut[]> {
   return request(`/art/${artId}/wip-updates`) as Promise<WipUpdateOut[]>;
 }
 
+/** Remove one archived image from a WIP piece's history (owner only). */
+export function remove_wip_update(artId: string, updateId: string, token: string | null) {
+  return request(`/art/${artId}/wip-updates/${updateId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function remove_visual_2d(id: string, token: string | null) {
   return request(`/art/${id}`, {
     method: 'DELETE',
