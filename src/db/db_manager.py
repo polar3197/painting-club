@@ -518,4 +518,22 @@ async def run_migrations():
             "  PRIMARY KEY (block_id, art_id)"
             ")"
         ))
+        # 028: WIP interface for visual pieces. is_wip flags the piece; each
+        # "add update" archives the superseded image into wip_update while
+        # file_path keeps pointing at the latest (so nothing downstream changes).
+        await conn.execute(text(
+            "ALTER TABLE visual_2d ADD COLUMN IF NOT EXISTS is_wip BOOLEAN NOT NULL DEFAULT false"
+        ))
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS wip_update ("
+            " id UUID PRIMARY KEY,"
+            " art_id UUID NOT NULL REFERENCES visual_2d(id) ON DELETE CASCADE,"
+            " file_path VARCHAR(500) NOT NULL,"
+            " aspect_ratio FLOAT,"
+            " created_at TIMESTAMP DEFAULT now()"
+            ")"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_wip_update_art ON wip_update (art_id)"
+        ))
     print("Migrations applied.")

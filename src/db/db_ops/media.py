@@ -271,6 +271,7 @@ async def db_update_visual_2d(
     update_file: bool = False,
     series_name: str | None = None,
     clear_series: bool = False,
+    is_wip: bool | None = None,
 ):
     result = await db.execute(select(Visual2D).filter(Visual2D.id == art_id))
     piece = result.scalar_one_or_none()
@@ -314,6 +315,9 @@ async def db_update_visual_2d(
     piece.width = width
     piece.height = height
     piece.comments_enabled = comments_enabled
+    # None = leave the WIP mark untouched (payloads that predate the field).
+    if is_wip is not None:
+        piece.is_wip = is_wip
     if update_file and file_path is not None:
         piece.file_path = file_path
         piece.aspect_ratio = aspect_ratio
