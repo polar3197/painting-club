@@ -907,6 +907,7 @@ export default function UserProfile() {
           // back in time. Horizontal swipes still move to adjacent pieces.
           return {
             kind: 'collection' as const,
+            reverseIndex: true,
             pieces: [
               { id: row.piece.id, file_path: row.piece.file_path },
               ...[...history].reverse().map((u) => ({ id: u.id, file_path: u.file_path })),
