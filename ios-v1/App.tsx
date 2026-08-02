@@ -18,7 +18,6 @@ import RootNavigator from './src/navigation';
 import UpdateBanner from './src/components/UpdateBanner';
 import { AppAlertHost } from './src/components/AppAlert';
 import { ToastHost } from './src/components/Toast';
-import ArtZoomOverlayHost from './src/components/ArtZoomOverlay';
 
 const navTheme = {
   ...DefaultTheme,
@@ -105,9 +104,6 @@ export default function App() {
             >
               <AuthExpiryBridge />
               <RootNavigator />
-              {/* Above RootNavigator so a pinch-zoomed feed photo floats over
-                  the header and tab bar too. */}
-              <ArtZoomOverlayHost />
               <UpdateBanner />
               <AppAlertHost />
               <ToastHost />

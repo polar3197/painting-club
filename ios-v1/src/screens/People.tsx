@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Animated, Platform } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Dimensions, RefreshControl, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -54,12 +54,9 @@ interface Props {
   // Reports the grid's vertical scroll offset so SearchTabs can minimize the
   // toggle bar as you scroll down.
   onVerticalScroll: (offsetY: number) => void;
-  // Posts-per-row target (1..4) from the pinch gesture; the per-count
-  // formula still caps it.
-  columns: number;
 }
 
-export default function People({ query, onResetFilters, onListScroll, onVerticalScroll, columns }: Props) {
+export default function People({ query, onResetFilters, onListScroll, onVerticalScroll }: Props) {
   const navigation = useNavigation<Nav>();
   // `loading` is true only for the initial fetch — while it runs the member
   // count is 0, which would paint a 1-column grid that reflows once the
@@ -86,41 +83,9 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
     return fuse.search(debouncedQuery).map((r) => r.item);
   }, [members, fuse, debouncedQuery]);
 
-  // Decouple the slider's target column count from the rendered one and
-  // crossfade the change: FlatList must remount to change numColumns, so we fade
-  // the grid out, swap columns while invisible, then fade back in (no vanish).
-  const targetColumns = Math.min(columns, columnsFor(filtered.length));
-  const [renderedColumns, setRenderedColumns] = useState(targetColumns);
-  const gridOpacity = useRef(new Animated.Value(1)).current;
-  const transitioning = useRef(false);
-  useEffect(() => {
-    // Behind the initial-load spinner nothing is visible — snap columns
-    // silently so the first paint starts at the right count.
-    if (loading) {
-      if (targetColumns !== renderedColumns) setRenderedColumns(targetColumns);
-      return;
-    }
-    if (targetColumns === renderedColumns) {
-      if (transitioning.current) {
-        transitioning.current = false;
-        Animated.timing(gridOpacity, { toValue: 1, duration: 110, useNativeDriver: true }).start();
-      }
-      return;
-    }
-    transitioning.current = true;
-    let cancelled = false;
-    // Dip to a dim floor (not 0) so content never fully leaves the screen — no
-    // blank "pause" while the list remounts, just a brief dim during the swap.
-    Animated.timing(gridOpacity, { toValue: 0.4, duration: 55, useNativeDriver: true }).start(({ finished }) => {
-      if (cancelled || !finished) return;
-      setRenderedColumns(targetColumns);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, targetColumns, renderedColumns, gridOpacity]);
-
-  const numColumns = renderedColumns;
+  // Cards per row from the result count alone (columnsFor: ~√n, capped at 4)
+  // — a full roster is 4-up, a narrowed search gets fewer, larger cards.
+  const numColumns = columnsFor(filtered.length);
   const cardWidth = (SCREEN_WIDTH - LIST_PAD * 2 - COLUMN_GAP * (numColumns - 1)) / numColumns;
 
   const renderCard = ({ item }: { item: Profile }) => (
@@ -152,20 +117,15 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
 
   return (
     <View style={styles.container}>
-      <Animated.View style={{ flex: 1, opacity: gridOpacity }}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.username}
         renderItem={renderCard}
         // FlatList requires a key change when numColumns changes (throws
-        // otherwise). Remount flash is softened by the opacity crossfade around
-        // the list (see gridOpacity / renderedColumns).
+        // otherwise). Columns only move when a search narrows the count, so
+        // the remount happens behind active typing, not mid-browse.
         key={numColumns}
         numColumns={numColumns}
-        // Solo cards are viewport-width squares, so rows cross the
-        // virtualization boundary constantly — keep more of them mounted to
-        // avoid remount churn while scrolling.
-        windowSize={numColumns === 1 ? 41 : 21}
         columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
         contentContainerStyle={styles.list}
         keyboardDismissMode="on-drag"
@@ -182,7 +142,6 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
           />
         }
       />
-      </Animated.View>
       {refreshing && (
         <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
           <Spinner size={48} />

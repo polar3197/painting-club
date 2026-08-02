@@ -11,18 +11,13 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import Reanimated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
-import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
+import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ArtGallery from './ArtGallery';
 import People from './People';
-import * as SecureStore from 'expo-secure-store';
 import { Colors, Fonts } from '../constants/theme';
-import PinchHint, { markPinchHintSeen } from '../components/PinchHint';
-
-const GRID_COLUMNS_KEY = 'grid_columns';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HALF = SCREEN_WIDTH / 2;
@@ -82,98 +77,7 @@ export default function SearchTabs() {
   // lists swipe — typing live-filters whichever half is showing, and only the
   // placeholder changes when you swipe across.
   const [query, setQuery] = useState('');
-  // Posts-per-row target (1..4), driven by the pinch gesture: 1 is the
-  // full-width feed with details, 4 the dense gallery. Each grid still caps
-  // this with its count-based formula. Replaces the old density slider.
-  // Persisted so the grid greets you at whatever density you left it.
-  const [columns, setColumns] = useState(4);
-  const columnsRef = useRef(columns);
-  columnsRef.current = columns;
-  const restoredRef = useRef(false);
-  useEffect(() => {
-    SecureStore.getItemAsync(GRID_COLUMNS_KEY)
-      .then((v) => {
-        const c = v ? parseInt(v, 10) : NaN;
-        // Don't clobber a pinch that happened before the read resolved.
-        if (!restoredRef.current && c >= 1 && c <= 4) setColumns(c);
-      })
-      .catch(() => {});
-  }, []);
   const [keyboardUp, setKeyboardUp] = useState(false);
-
-  // The grids animate the column swap themselves (dim-crossfade around the
-  // FlatList remount) — no LayoutAnimation here, the two systems fighting is
-  // what made the swap flash.
-  const handleColumnsChange = useCallback((c: number) => {
-    markPinchHintSeen();
-    restoredRef.current = true;
-    SecureStore.setItemAsync(GRID_COLUMNS_KEY, String(c)).catch(() => {});
-    setColumns(c);
-  }, []);
-
-  // Pinch-to-zoom steps through every density: spread to go 4 → 3 → 2 → 1
-  // (bigger cards), pinch to go back. Columns change live as the gesture
-  // crosses each step; the grid nudges under the fingers for feedback.
-  // Steps are rate-limited so each crossfade can finish — committing every
-  // frame mid-gesture remounted the list repeatedly and looked jerky.
-  const pinchScale = useSharedValue(1);
-  const pinchBase = useSharedValue(4);
-  const lastStepAt = useRef(0);
-  // Handed to the feed cards so an image's own pinch-zoom can block this
-  // density pinch when the gesture starts on a photo (Instagram-style zoom
-  // and grid zoom coexist without fighting).
-  const densityPinchRef = useRef<GestureType | undefined>(undefined);
-  const stepTo = useCallback((c: number) => {
-    if (c === columnsRef.current) return;
-    const now = Date.now();
-    if (now - lastStepAt.current < 350) return;
-    lastStepAt.current = now;
-    handleColumnsChange(c);
-  }, [handleColumnsChange]);
-  const pinch = Gesture.Pinch()
-    .withRef(densityPinchRef)
-    .onStart(() => {
-      pinchBase.value = columnsRef.current;
-    })
-    .onUpdate((e) => {
-      // Spreading at 1 column can't zoom further in — that direction belongs
-      // to the feed photo's own pinch-zoom, so skip the nudge too.
-      const inert = pinchBase.value === 1 && e.scale > 1;
-      // Damp the raw scale so the grid nudges rather than balloons.
-      pinchScale.value = inert ? 1 : 1 + (e.scale - 1) * 0.08;
-      if (inert) return;
-      // Every ~1.35x of spread is one column step; log keeps in/out symmetric.
-      const steps = Math.round(Math.log(e.scale) / Math.log(1.35));
-      const target = Math.min(4, Math.max(1, pinchBase.value - steps));
-      runOnJS(stepTo)(target);
-    })
-    .onEnd(() => {
-      pinchScale.value = withTiming(1, { duration: 160 });
-    });
-  const pinchStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pinchScale.value }],
-  }));
-
-  // Browsers encode trackpad pinch as ctrl+wheel; each notch of accumulated
-  // delta is one column step. Dev-preview convenience; native never runs this.
-  const wheelAcc = useRef(0);
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return;
-      e.preventDefault();
-      wheelAcc.current += e.deltaY;
-      if (wheelAcc.current < -60) {
-        wheelAcc.current = 0;
-        stepTo(Math.max(1, columnsRef.current - 1));
-      } else if (wheelAcc.current > 60) {
-        wheelAcc.current = 0;
-        stepTo(Math.min(4, columnsRef.current + 1));
-      }
-    };
-    window.addEventListener('wheel', onWheel, { passive: false });
-    return () => window.removeEventListener('wheel', onWheel);
-  }, [stepTo]);
 
   // Keyboard-driven animation. `kb` (native driver) shrinks the toggle-bar
   // icons and `kbH` (JS driver) animates its layout height as the keyboard
@@ -315,8 +219,6 @@ export default function SearchTabs() {
         style={styles.pager}
         onLayout={(e) => setPageHeight(e.nativeEvent.layout.height)}
       >
-        <GestureDetector gesture={pinch}>
-        <Reanimated.View style={[{ flex: 1 }, pinchStyle]}>
         <Animated.ScrollView
           ref={scrollRef}
           horizontal
@@ -336,8 +238,6 @@ export default function SearchTabs() {
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
-              columns={columns}
-              densityPinchRef={densityPinchRef}
             />
           </View>
           <View style={[styles.page, { height: pageHeight }]}>
@@ -346,13 +246,9 @@ export default function SearchTabs() {
               onResetFilters={resetFilters}
               onListScroll={dismissKeyboard}
               onVerticalScroll={onListVerticalScroll}
-              columns={columns}
             />
           </View>
         </Animated.ScrollView>
-        <PinchHint />
-        </Reanimated.View>
-        </GestureDetector>
       </View>
 
       {/* Search bar lives at the bottom (thumb zone) and rises to sit on top of
