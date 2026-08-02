@@ -181,10 +181,17 @@ async def db_my_portfolio_payload(db: AsyncSession, member) -> dict:
 
 
 async def db_list_my_visual_pieces(db: AsyncSession, member_id):
-    """The member's own visual pieces for the editor palette, newest first."""
+    """The member's own visual pieces for the editor palette, newest first.
+
+    Joins the raw visual_2d TABLE, not the Visual2D entity — in joined-table
+    inheritance the entity's `id` resolves to the base art.id column, which
+    degenerates the onclause to art.id = art.id (a cross join that duplicated
+    every piece once per visual piece in the club). Same pattern as
+    db_list_bookmarks."""
+    visual = Visual2D.__table__
     return (await db.execute(
-        select(Art.id, Art.title, Art.file_path, Visual2D.aspect_ratio, Art.visibility)
-        .join(Visual2D, Visual2D.id == Art.id)
+        select(Art.id, Art.title, Art.file_path, visual.c.aspect_ratio, Art.visibility)
+        .join(visual, visual.c.id == Art.id)
         .filter(Art.creator_id == member_id)
         .order_by(Art.created_at.desc())
     )).all()
@@ -208,9 +215,10 @@ async def db_public_portfolio_payload(db: AsyncSession, slug: str, include_unpub
     for b, ids in await _blocks_with_piece_ids(db, p.id):
         pieces = []
         if ids:
+            visual = Visual2D.__table__
             rows = (await db.execute(
-                select(Art.id, Art.title, Art.date, Visual2D.aspect_ratio)
-                .join(Visual2D, Visual2D.id == Art.id)
+                select(Art.id, Art.title, Art.date, visual.c.aspect_ratio)
+                .join(visual, visual.c.id == Art.id)
                 .filter(Art.id.in_(ids), Art.visibility == "public")
             )).all()
             by_id = {str(r.id): r for r in rows}
