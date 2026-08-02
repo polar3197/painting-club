@@ -1310,9 +1310,15 @@ async def add_wip_update(
         path.unlink(missing_ok=True)
         raise HTTPException(status_code=403, detail=str(e))
 
-    # New face → new thumbnail (same art-id path the grids key on).
+    # New face → regenerate every art-id-keyed derivative. The display (and
+    # public) jpegs would otherwise keep serving the SUPERSEDED image — the
+    # profile viewer loads /art/{id}/display, so a stale one makes a WIP update
+    # look like it never happened.
     thumb_file(art_id).unlink(missing_ok=True)
+    display_file(art_id).unlink(missing_ok=True)
+    public_file(art_id).unlink(missing_ok=True)
     generate_thumbnail(str(art_id), path)
+    generate_display(str(art_id), path)
 
     return {"ok": True, "file_path": sign_path(new_file_path)}
 
