@@ -382,6 +382,15 @@ export function remove_wip_update(artId: string, updateId: string, token: string
   });
 }
 
+/** Remove a WIP piece's CURRENT image — the newest archived state becomes the
+ *  face everywhere. Rejected (404) when there's no archive to fall back to. */
+export function remove_wip_current(artId: string, token: string | null): Promise<{ ok: boolean; file_path: string }> {
+  return request(`/art/${artId}/wip-current`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean; file_path: string }>;
+}
+
 export function remove_visual_2d(id: string, token: string | null) {
   return request(`/art/${id}`, {
     method: 'DELETE',

@@ -26,6 +26,7 @@ import {
   imageSource,
   get_wip_updates,
   remove_wip_update,
+  remove_wip_current,
   add_wip_update,
   WipUpdateOut,
 } from '../api';
@@ -247,6 +248,17 @@ export default function AddArtDialog({
       })
       .catch((err: any) => appAlert('Error', err?.message || 'Something went wrong'));
   };
+  const removeWipCurrent = () => {
+    remove_wip_current(piece!.id, token)
+      .then((resp) => {
+        if (resp?.file_path) setWipCurrentPath(resp.file_path);
+        // The promoted image left the archive — refetch for truth.
+        return get_wip_updates(piece!.id).then(setWipRows);
+      })
+      .then(() => onSuccess())
+      .catch((err: any) => appAlert('Error', err?.message || 'Something went wrong'));
+  };
+
   const addWipPiece = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (result.canceled || !result.assets[0]) return;
@@ -707,9 +719,16 @@ export default function AddArtDialog({
                     </Pressable>
                   </View>
                 ))}
-                {/* The current image — the piece itself, so no ×; + supersedes it. */}
+                {/* The current image. Its × pops it — the newest archived state
+                    is promoted to be the face. Hidden when it's the only image
+                    (a piece can't have none). */}
                 <View style={styles.wipCard}>
                   <Image source={imageSource(wipCurrentPath)} style={styles.wipCardImg} contentFit="cover" />
+                  {wipRows.length > 0 && (
+                    <Pressable style={styles.wipCardRemove} onPress={removeWipCurrent} hitSlop={6}>
+                      <Text style={styles.wipCardRemoveText}>×</Text>
+                    </Pressable>
+                  )}
                 </View>
                 <Pressable
                   style={[styles.wipAddBtn, wipPosting && { opacity: 0.5 }]}
