@@ -301,11 +301,10 @@ export default function ArtZoomIn({
         savedTranslationX.value = 0;
         savedTranslationY.value = 0;
       } else {
-        // At identity: zoom until the piece spans the full screen width (never
-        // less than 2x, so wide pieces still get a real zoom), keeping the
+        // At identity: zoom all the way to the pinch maximum, keeping the
         // tapped point under the finger. Same transform model as pinch:
         // screenX = center + imageX·scale + translation.
-        const target = Math.max(screenW / (wrapperW.value || 1), 2);
+        const target = MAX_SCALE;
         const imageX = e.x - wrapperW.value / 2;
         const imageY = e.y - wrapperH.value / 2;
         const maxX = Math.max(0, (wrapperW.value * target - wrapperW.value) / 2);
