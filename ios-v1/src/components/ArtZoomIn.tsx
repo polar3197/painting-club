@@ -151,7 +151,7 @@ export default function ArtZoomIn({
     prevUriRef.current = uri;
   }, [uri]);
 
-  const contentWidth = screenW * 0.9;
+  const contentWidth = screenW;  // full-bleed: the piece spans the screen edge-to-edge at rest
   const contentHeight = aspectRatio ? contentWidth / aspectRatio : screenH * 0.85;
   const cappedHeight = Math.min(contentHeight, screenH * 0.85);
   const cappedWidth = aspectRatio ? Math.min(contentWidth, cappedHeight * aspectRatio) : contentWidth;

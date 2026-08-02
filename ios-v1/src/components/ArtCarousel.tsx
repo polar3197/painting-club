@@ -33,9 +33,10 @@ import ConfirmDialog from './ConfirmDialog';
 import ContextPopup from './ContextPopup';
 import { Colors, Fonts } from '../constants/theme';
 
-// Horizontal inset of the artwork from each screen edge (per side). Bump for
-// more margin; the page stays full-width so paging snap is unaffected.
-const IMAGE_H_PAD = 18;
+// Horizontal inset of the artwork from each screen edge (per side). 0 = the
+// piece spans the full screen width at rest (per Charlie); the page stays
+// full-width so paging snap is unaffected.
+const IMAGE_H_PAD = 0;
 
 // Vertical bands reserved (below the safe-area insets) for the caption boxes so
 // the image never reaches into them. The image is contained in the space left
@@ -49,7 +50,14 @@ export type CarouselPiece = { id: string; file_path: string };
 // `elements` so its series collapse into one vertical-scroll slot.
 export type CarouselElement =
   | { kind: 'piece'; piece: CarouselPiece }
-  | { kind: 'collection'; pieces: CarouselPiece[] };
+  | {
+      kind: 'collection';
+      pieces: CarouselPiece[];
+      // Number the sub-index marker chronologically from the bottom (WIP
+      // progressions put the CURRENT image on top — it should read n/n, with
+      // scrolling down counting back through time, not 1/n).
+      reverseIndex?: boolean;
+    };
 
 interface ArtCarouselProps {
   // Minimal shape so both profile pieces (Visual2DOut) and prompt submissions
@@ -273,6 +281,7 @@ export default function ArtCarousel({ pieces, elements, initialPieceIndex, initi
                     <CollectionPage
                       key={el.pieces[0]?.id ?? `col-${i}`}
                       pieces={el.pieces}
+                      reverseIndex={el.reverseIndex}
                       width={screenW}
                       height={screenH}
                       active={i === index}
@@ -513,6 +522,7 @@ function ZoomablePage({
  */
 function CollectionPage({
   pieces,
+  reverseIndex,
   width,
   height,
   active,
@@ -521,6 +531,7 @@ function CollectionPage({
   onActiveChange,
 }: {
   pieces: CarouselPiece[];
+  reverseIndex?: boolean;
   width: number;
   height: number;
   active: boolean;
@@ -588,7 +599,9 @@ function CollectionPage({
       {pieces.length > 1 && !zoomedHere && (
         <View style={styles.collMarker} pointerEvents="none">
           <Text style={styles.collMarkerText}>
-            {Math.min(sub, pieces.length - 1) + 1}/{pieces.length}
+            {reverseIndex
+              ? pieces.length - Math.min(sub, pieces.length - 1)
+              : Math.min(sub, pieces.length - 1) + 1}/{pieces.length}
           </Text>
         </View>
       )}
