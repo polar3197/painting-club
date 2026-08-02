@@ -370,6 +370,7 @@ export default function AddArtDialog({
         series_name: formData.series ? formData.series : null,
         // Clear the series if the field was emptied while editing.
         clear_series: !formData.series && !!piece.series_name,
+        is_wip: formData.is_wip,
         file: pickedFile,
       };
       onClose();

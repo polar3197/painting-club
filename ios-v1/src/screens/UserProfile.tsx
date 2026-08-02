@@ -34,11 +34,14 @@ import {
   get_media,
   open_dm,
   get_unread_count,
+  get_wip_updates,
+  add_wip_update,
   Visual2DOut,
   WrittenFormOut,
   AudioOut,
   Profile,
   MediaType,
+  WipUpdateOut,
 } from '../api';
 import Dropdown from '../components/Dropdown';
 import ArtZoomIn from '../components/ArtZoomIn';
@@ -125,6 +128,7 @@ function Visual2DPiece({
   onRemove,
   onEdit,
   onZoom,
+  onRefresh,
   onLayout,
 }: {
   isOwner: boolean;
@@ -137,6 +141,8 @@ function Visual2DPiece({
   // Open the shared zoom viewer on this piece. Zoom state lives on the screen
   // so the viewer can swipe across all the profile's pieces.
   onZoom: () => void;
+  // Refetch the piece list (used after posting a WIP update).
+  onRefresh: () => void;
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const { token, currentUser } = useAuth();
@@ -162,6 +168,54 @@ function Visual2DPiece({
   // to ship before OR after the backend deploys.
   const [displayFailed, setDisplayFailed] = useState(false);
 
+  // WIP: superseded images, oldest first (the current image is the last page
+  // of the in-frame pager). Fetched lazily, only for WIP pieces; re-keyed on
+  // file_path so posting an update refreshes the history.
+  const [wipHistory, setWipHistory] = useState<WipUpdateOut[]>([]);
+  const [wipIndex, setWipIndex] = useState(0);
+  const [frameW, setFrameW] = useState(0);
+  // A history image opened standalone — its own one-image viewer, independent
+  // of the profile's shared carousel (which only ever shows the latest).
+  const [soloZoom, setSoloZoom] = useState<WipUpdateOut | null>(null);
+  const [postingUpdate, setPostingUpdate] = useState(false);
+  const wipPages = wipHistory.length + 1;
+  const showWipPager = !!piece.is_wip && wipHistory.length > 0 && frameW > 0;
+
+  useEffect(() => {
+    if (!piece.is_wip) {
+      setWipHistory([]);
+      return;
+    }
+    let cancelled = false;
+    get_wip_updates(piece.id)
+      .then((rows) => {
+        if (cancelled) return;
+        setWipHistory(rows);
+        setWipIndex(rows.length); // land on the current image
+      })
+      .catch(() => { if (!cancelled) setWipHistory([]); });
+    return () => { cancelled = true; };
+  }, [piece.id, piece.is_wip, piece.file_path]);
+
+  const postWipUpdate = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const a = result.assets[0];
+    setPostingUpdate(true);
+    try {
+      await add_wip_update(piece.id, token, {
+        uri: a.uri,
+        name: a.uri.split('/').pop() || 'update.jpg',
+        type: a.mimeType || 'image/jpeg',
+      });
+      onRefresh();
+    } catch (err: any) {
+      appAlert('Error', err?.message || 'Something went wrong');
+    } finally {
+      setPostingUpdate(false);
+    }
+  };
+
   const removeArt = async () => {
     await remove_visual_2d(piece.id, token);
     setShowRemoveConfirm(false);
@@ -185,12 +239,88 @@ function Visual2DPiece({
       {showComments && (
         <ArtComments piece={piece} onClose={() => setShowComments(false)} />
       )}
+      {soloZoom && (
+        // A history image viewed on its own — one-image viewer, independent of
+        // the profile carousel (which only ever pages the latest images).
+        <ArtCarousel
+          pieces={[{ id: soloZoom.id, file_path: soloZoom.file_path }]}
+          initialIndex={0}
+          isOwner={false}
+          creatorUsername={profileUsername}
+          onClose={() => setSoloZoom(null)}
+          hideKebab
+          captions={[{
+            title: piece.title,
+            creator: profileUsername,
+            aspectRatio: soloZoom.aspect_ratio ?? undefined,
+          }]}
+        />
+      )}
       <View style={[styles.artElement, { backgroundColor: cardBg }]} onLayout={onLayout}>
+        {showWipPager ? (
+          // WIP: the frame itself pages through the piece's history — older
+          // states first, the current image last (where it starts). The frame
+          // keeps the CURRENT image's aspect; older states letterbox inside it.
+          <View
+            style={styles.artVisual}
+            onLayout={(e) => setFrameW(e.nativeEvent.layout.width)}
+          >
+            <View style={[styles.artVisualInner, { aspectRatio }]}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                contentOffset={{ x: wipHistory.length * frameW, y: 0 }}
+                onMomentumScrollEnd={(e) =>
+                  setWipIndex(Math.round(e.nativeEvent.contentOffset.x / Math.max(1, frameW)))
+                }
+              >
+                {wipHistory.map((upd) => (
+                  <Pressable
+                    key={upd.id}
+                    style={[styles.wipPage, { width: frameW }]}
+                    onPress={() => setSoloZoom(upd)}
+                  >
+                    <Image
+                      source={imageSource(upd.file_path)}
+                      style={styles.artImage}
+                      contentFit="contain"
+                    />
+                  </Pressable>
+                ))}
+                <Pressable
+                  style={[styles.wipPage, { width: frameW }]}
+                  onPress={onZoom}
+                >
+                  <Image
+                    source={
+                      displayFailed
+                        ? imageSource(piece.file_path)
+                        : displaySource(piece.id, piece.file_path)
+                    }
+                    placeholder={thumbSource(piece.id, piece.file_path)}
+                    transition={450}
+                    style={styles.artImage}
+                    contentFit="contain"
+                    placeholderContentFit="contain"
+                    onError={() => setDisplayFailed(true)}
+                  />
+                </Pressable>
+              </ScrollView>
+              <View style={styles.wipBadge} pointerEvents="none">
+                <Text style={styles.wipBadgeText}>{wipIndex + 1}/{wipPages}</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
         <Pressable
           style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
           onPress={onZoom}
         >
-          <View style={[styles.artVisualInner, { aspectRatio }]}>
+          <View
+            style={[styles.artVisualInner, { aspectRatio }]}
+            onLayout={(e) => setFrameW(e.nativeEvent.layout.width)}
+          >
             <Image
               source={
                 displayFailed
@@ -216,6 +346,7 @@ function Visual2DPiece({
             />
           </View>
         </Pressable>
+        )}
         <View style={styles.artDetails}>
           <View style={styles.titleRow}>
             <Text style={styles.artTitle}>{piece.title}</Text>
@@ -335,6 +466,19 @@ function Visual2DPiece({
             </Pressable>
             <BookmarkButton artId={piece.id} size={32} style={styles.artBookmarkBtn} />
           </View>
+          {isOwner && !!piece.is_wip && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.addUpdateBtn,
+                (pressed || postingUpdate) && { opacity: 0.6 },
+              ]}
+              onPress={postingUpdate ? undefined : postWipUpdate}
+            >
+              <Text style={styles.addUpdateBtnText}>
+                {postingUpdate ? 'posting…' : 'add update'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </>
@@ -1227,6 +1371,7 @@ export default function UserProfile() {
                   cardBg={pageColors.artCardBg}
                   onRemove={() => setRefresh((r) => r + 1)}
                   onEdit={() => setEditingPiece(row.piece)}
+                  onRefresh={() => setRefresh((r) => r + 1)}
                   // Open the zoom viewer at this slot; it swipes across all
                   // visualElements (collapsed like the grid).
                   onZoom={() => setZoomIndex(ri)}
@@ -1648,6 +1793,38 @@ const styles = StyleSheet.create({
   artImage: {
     width: '100%',
     height: '100%',
+  },
+  // One page of a WIP piece's in-frame history pager.
+  wipPage: {
+    height: '100%',
+  },
+  wipBadge: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  wipBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+  addUpdateBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingVertical: 6,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginTop: 8,
+  },
+  addUpdateBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
   },
   pendingOverlay: {
     ...StyleSheet.absoluteFillObject,

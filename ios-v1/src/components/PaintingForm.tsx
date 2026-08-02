@@ -29,6 +29,7 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
     keywords: initialData?.keywords?.join(', ') ?? '',
     series: (initialData as any)?.series_name ?? initialSeries ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
+    is_wip: initialData?.is_wip ?? false,
   });
 
   // Seeded fields only reach the parent through onDataChange — push the
@@ -50,6 +51,13 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
     const next = !form.comments_enabled;
     Animated.timing(thumbPos, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
     update({ comments_enabled: next });
+  };
+
+  const wipThumbPos = useRef(new Animated.Value(form.is_wip ? 18 : 0)).current;
+  const toggleWip = () => {
+    const next = !form.is_wip;
+    Animated.timing(wipThumbPos, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
+    update({ is_wip: next });
   };
 
   return (
@@ -128,6 +136,22 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
           autoCapitalize="none"
           onChangeText={(v) => update({ keywords: v })}
         />
+      )}
+
+      {/* Marking WIP is an edit-time action — new pieces start finished. */}
+      {initialData != null && (
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>wip</Text>
+          <Pressable
+            style={[
+              styles.toggleTrack,
+              { backgroundColor: form.is_wip ? Colors.greenBright : Colors.redLight },
+            ]}
+            onPress={toggleWip}
+          >
+            <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: wipThumbPos }] }]} />
+          </Pressable>
+        </View>
       )}
 
       <View style={styles.toggleRow}>

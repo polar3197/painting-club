@@ -164,6 +164,17 @@ export interface Visual2DOut {
   series_id: string | null;
   series_name: string | null;
   order_index: number | null;
+  // Work-in-progress: file_path is the latest image; superseded images are
+  // fetched via get_wip_updates and shown as a swipeable history in the card.
+  is_wip?: boolean;
+}
+
+// One archived (superseded) image of a WIP piece.
+export interface WipUpdateOut {
+  id: string;
+  file_path: string;
+  aspect_ratio: number | null;
+  created_at: string;
 }
 
 export interface Visual2DUpdatePayload {
@@ -179,6 +190,8 @@ export interface Visual2DUpdatePayload {
   medium?: string | null;
   series_name?: string | null;
   clear_series?: boolean;
+  // Omit to leave the WIP mark untouched.
+  is_wip?: boolean;
   // When set, the on-disk file (and thumbnail) gets replaced.
   file?: { uri: string; name: string; type: string } | null;
 }

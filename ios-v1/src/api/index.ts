@@ -53,6 +53,7 @@ import type {
   UsageSummary,
   TelemetrySummary,
   InfraHealthOut,
+  WipUpdateOut,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -336,6 +337,7 @@ export function update_visual_2d(id: string, token: string | null, payload: Visu
   if (payload.medium) fd.append('medium', payload.medium);
   if (payload.series_name != null) fd.append('series_name', payload.series_name);
   if (payload.clear_series) fd.append('clear_series', String(payload.clear_series));
+  if (payload.is_wip != null) fd.append('is_wip', String(payload.is_wip));
   if (payload.file) {
     fd.append('file', {
       uri: payload.file.uri,
@@ -348,6 +350,28 @@ export function update_visual_2d(id: string, token: string | null, payload: Visu
     headers: { Authorization: `Bearer ${token}` },
     body: fd,
   });
+}
+
+/** Post a progress update on a WIP piece: archives the current image into the
+ *  swipeable history and installs this one as the piece's face everywhere. */
+export function add_wip_update(
+  artId: string,
+  token: string | null,
+  file: { uri: string; name: string; type: string },
+) {
+  const fd = new FormData();
+  fd.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+  return request(`/art/${artId}/wip-update`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+/** A WIP piece's archived images, oldest first (the current image is NOT
+ *  included — it's the piece's own file_path). */
+export function get_wip_updates(artId: string): Promise<WipUpdateOut[]> {
+  return request(`/art/${artId}/wip-updates`) as Promise<WipUpdateOut[]>;
 }
 
 export function remove_visual_2d(id: string, token: string | null) {
