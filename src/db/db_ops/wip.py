@@ -71,6 +71,29 @@ async def db_remove_wip_update(db: AsyncSession, art_id: str, update_id: str, me
     return file_path
 
 
+async def db_pop_wip_current(db: AsyncSession, art_id: str, member_id) -> tuple[str, str]:
+    """Remove the piece's CURRENT image by promoting the newest archived state
+    to be the face. Returns (removed_path, promoted_path). Refuses when there is
+    no archived state to fall back to (a piece must keep an image)."""
+    piece = await db_get_owned_visual(db, art_id, member_id)
+    latest = (
+        await db.execute(
+            select(WipUpdate)
+            .filter(WipUpdate.art_id == art_id)
+            .order_by(WipUpdate.created_at.desc())
+        )
+    ).scalars().first()
+    if latest is None:
+        raise ValueError("No earlier state to fall back to")
+    removed = piece.file_path
+    promoted = latest.file_path
+    piece.file_path = promoted
+    piece.aspect_ratio = latest.aspect_ratio
+    await db.delete(latest)
+    await db.commit()
+    return removed, promoted
+
+
 async def db_list_wip_updates(db: AsyncSession, art_id: str) -> list[WipUpdate]:
     """History rows for a piece, oldest first."""
     rows = (
