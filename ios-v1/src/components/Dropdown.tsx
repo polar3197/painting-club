@@ -1,5 +1,5 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
-import { View, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, Text, StyleSheet, Keyboard } from 'react-native';
 import { TextInput } from './AppTextInput';
 import { useFocusEffect } from '@react-navigation/native';
 import Fuse from 'fuse.js';
@@ -14,6 +14,10 @@ interface DropdownProps {
   // Open the option list ABOVE the input — for dropdowns pinned near the
   // bottom of a sheet, where a downward list would clip off-panel.
   openUp?: boolean;
+  // Hold the list until the keyboard has finished sliding up. Without this a
+  // dropdown that rides a keyboard-anchored sheet shows its list immediately,
+  // gets overlaid by the arriving keyboard, then jumps into place.
+  showAfterKeyboard?: boolean;
 }
 
 export interface DropdownHandle {
@@ -21,7 +25,7 @@ export interface DropdownHandle {
 }
 
 const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
-  { placeholder, options, onSelect, onInputChange, onFocus, openUp },
+  { placeholder, options, onSelect, onInputChange, onFocus, openUp, showAfterKeyboard },
   ref,
 ) {
   const [query, setQuery] = useState('');
@@ -34,10 +38,34 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
     fuseRef.current = new Fuse(options, { threshold: 0.4 });
   }, [options]);
 
+  // Pending "show the list once the keyboard settles" subscription + fallback
+  // (fallback covers hardware keyboards, where no keyboard ever slides up).
+  const deferredShow = useRef<{ sub?: { remove: () => void }; timer?: ReturnType<typeof setTimeout> }>({});
+  const cancelDeferredShow = React.useCallback(() => {
+    deferredShow.current.sub?.remove();
+    if (deferredShow.current.timer) clearTimeout(deferredShow.current.timer);
+    deferredShow.current = {};
+  }, []);
+
+  const openList = React.useCallback(() => {
+    if (!showAfterKeyboard || Keyboard.isVisible()) {
+      setShowList(true);
+      return;
+    }
+    cancelDeferredShow();
+    const reveal = () => {
+      cancelDeferredShow();
+      setShowList(true);
+    };
+    deferredShow.current.sub = Keyboard.addListener('keyboardDidShow', reveal);
+    deferredShow.current.timer = setTimeout(reveal, 500);
+  }, [showAfterKeyboard, cancelDeferredShow]);
+
   const close = React.useCallback(() => {
+    cancelDeferredShow();
     setShowList(false);
     inputRef.current?.blur();
-  }, []);
+  }, [cancelDeferredShow]);
 
   useImperativeHandle(ref, () => ({ close }), [close]);
 
@@ -76,10 +104,13 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
         autoCorrect={false}
         onChangeText={handleChange}
         onFocus={() => {
-          setShowList(true);
+          openList();
           onFocus?.();
         }}
-        onBlur={() => setTimeout(() => setShowList(false), 150)}
+        onBlur={() => {
+          cancelDeferredShow();
+          setTimeout(() => setShowList(false), 150);
+        }}
       />
       {showList && filtered.length > 0 && (
         <ScrollView

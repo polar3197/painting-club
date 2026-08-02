@@ -26,6 +26,7 @@ import {
   imageSource,
   get_wip_updates,
   remove_wip_update,
+  add_wip_update,
   WipUpdateOut,
 } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
@@ -220,11 +221,16 @@ export default function AddArtDialog({
     setIsWipToggle(next);
   };
 
-  // WIP history management (visual edit only): the archived images render as a
-  // strip of thumbs, each removable. Removing is two-tap — the × arms first
-  // (turns red) so a stray touch can't delete an image irreversibly.
+  // WIP edit mode: for a WIP piece the big dropbox is replaced by a horizontal
+  // strip of cards — the whole collection (archived states then the current
+  // image) plus a square + at the end that posts a new update. × removes an
+  // archived state IMMEDIATELY (server call on tap, no deferred save).
+  const wipMode = isVisual2D && !!piece && isWipToggle;
   const [wipRows, setWipRows] = useState<WipUpdateOut[]>([]);
-  const [armedWipRemove, setArmedWipRemove] = useState<string | null>(null);
+  // The piece's current image — updated in place when + posts a new update
+  // (the parent's piece prop is a stale snapshot until the profile refetches).
+  const [wipCurrentPath, setWipCurrentPath] = useState(piece?.file_path ?? '');
+  const [wipPosting, setWipPosting] = useState(false);
   useEffect(() => {
     if (!piece?.is_wip) return;
     let cancelled = false;
@@ -234,17 +240,33 @@ export default function AddArtDialog({
     return () => { cancelled = true; };
   }, [piece?.id, piece?.is_wip]);
   const removeWipRow = (updateId: string) => {
-    if (armedWipRemove !== updateId) {
-      setArmedWipRemove(updateId);
-      return;
-    }
-    setArmedWipRemove(null);
     remove_wip_update(piece!.id, updateId, token)
       .then(() => {
         setWipRows((rows) => rows.filter((r) => r.id !== updateId));
         onSuccess();
       })
       .catch((err: any) => appAlert('Error', err?.message || 'Something went wrong'));
+  };
+  const addWipPiece = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const a = result.assets[0];
+    setWipPosting(true);
+    try {
+      const resp: any = await add_wip_update(piece!.id, token, {
+        uri: a.uri,
+        name: a.uri.split('/').pop() || 'update.jpg',
+        type: a.mimeType || 'image/jpeg',
+      });
+      if (resp?.file_path) setWipCurrentPath(resp.file_path);
+      const rows = await get_wip_updates(piece!.id);
+      setWipRows(rows);
+      onSuccess();
+    } catch (err: any) {
+      appAlert('Error', err?.message || 'Something went wrong');
+    } finally {
+      setWipPosting(false);
+    }
   };
 
   // Track the keyboard height so the panel can shrink (rather than being
@@ -638,7 +660,7 @@ export default function AddArtDialog({
                 outer View holding panHandlers, the inner Pressable handles tap,
                 and a real downward drag is captured by the parent (capture
                 phase wins over the child) and dismisses the sheet. */}
-            {isVisual2D && (
+            {isVisual2D && !wipMode && (
               <View {...dropboxPanResponder.panHandlers}>
                 <Pressable style={styles.dropbox} onPress={pickImage}>
                   {pickedFile ? (
@@ -665,7 +687,7 @@ export default function AddArtDialog({
                 </Pressable>
               </View>
             )}
-            {isVisual2D && !!piece?.is_wip && wipRows.length > 0 && (
+            {wipMode && (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -674,17 +696,27 @@ export default function AddArtDialog({
                 keyboardShouldPersistTaps="handled"
               >
                 {wipRows.map((r) => (
-                  <View key={r.id} style={styles.wipThumbWrap}>
-                    <Image source={imageSource(r.file_path)} style={styles.wipThumb} contentFit="cover" />
+                  <View key={r.id} style={styles.wipCard}>
+                    <Image source={imageSource(r.file_path)} style={styles.wipCardImg} contentFit="cover" />
                     <Pressable
-                      style={[styles.wipThumbRemove, armedWipRemove === r.id && styles.wipThumbRemoveArmed]}
+                      style={styles.wipCardRemove}
                       onPress={() => removeWipRow(r.id)}
                       hitSlop={6}
                     >
-                      <Text style={styles.wipThumbRemoveText}>×</Text>
+                      <Text style={styles.wipCardRemoveText}>×</Text>
                     </Pressable>
                   </View>
                 ))}
+                {/* The current image — the piece itself, so no ×; + supersedes it. */}
+                <View style={styles.wipCard}>
+                  <Image source={imageSource(wipCurrentPath)} style={styles.wipCardImg} contentFit="cover" />
+                </View>
+                <Pressable
+                  style={[styles.wipAddBtn, wipPosting && { opacity: 0.5 }]}
+                  onPress={wipPosting ? undefined : addWipPiece}
+                >
+                  <Text style={styles.wipAddBtnText}>+</Text>
+                </Pressable>
               </ScrollView>
             )}
             {isWrittenForm && (
@@ -872,6 +904,7 @@ export default function AddArtDialog({
                         options={compatibleMedia}
                         onSelect={setNewMedium}
                         openUp
+                        showAfterKeyboard
                       />
                     </View>
                   </View>
@@ -1211,38 +1244,51 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   wipStripContent: {
-    gap: 8,
-    paddingVertical: 2,
+    gap: 10,
+    paddingVertical: 8,
+    paddingRight: 16,
   },
-  wipThumbWrap: {
-    width: 48,
-    height: 48,
+  wipCard: {
+    width: 110,
+    height: 110,
   },
-  wipThumb: {
+  wipCardImg: {
     width: '100%',
     height: '100%',
     borderWidth: 1,
     borderColor: '#000',
+    backgroundColor: Colors.secondary,
   },
-  wipThumbRemove: {
+  wipCardRemove: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 16,
-    height: 16,
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  wipThumbRemoveArmed: {
-    backgroundColor: Colors.redLight,
-  },
-  wipThumbRemoveText: {
+  wipCardRemoveText: {
     fontFamily: Fonts.serif,
-    fontSize: 11,
-    lineHeight: 12,
+    fontSize: 14,
+    lineHeight: 16,
+    color: Colors.black,
+  },
+  wipAddBtn: {
+    width: 110,
+    height: 110,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wipAddBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: 34,
     color: Colors.black,
   },
 });
