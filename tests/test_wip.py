@@ -102,6 +102,34 @@ def test_remove_wip_update_404_when_missing(client, monkeypatch):
     assert resp.status_code == 404
 
 
+def test_remove_wip_current_promotes_and_unlinks(client, fake_member, tmp_static, monkeypatch):
+    removed_rel = "/static/art/m/painting/current.jpg"
+    promoted_rel = "/static/art/m/painting/previous.jpg"
+    for rel in (removed_rel, promoted_rel):
+        p = tmp_static / rel.lstrip("/")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(make_jpeg_bytes())
+
+    async def fake_pop(db, art_id, member_id):
+        return removed_rel, promoted_rel
+
+    monkeypatch.setattr(main_mod, "db_pop_wip_current", fake_pop)
+    resp = client.delete(f"/art/{uuid.uuid4()}/wip-current")
+    assert resp.status_code == 200, resp.text
+    assert not (tmp_static / removed_rel.lstrip("/")).exists(), "removed current must be unlinked"
+    assert (tmp_static / promoted_rel.lstrip("/")).exists(), "promoted image must remain"
+    assert "previous.jpg" in resp.json()["file_path"]
+
+
+def test_remove_wip_current_404_without_fallback(client, monkeypatch):
+    async def fake_pop(db, art_id, member_id):
+        raise ValueError("No earlier state to fall back to")
+
+    monkeypatch.setattr(main_mod, "db_pop_wip_current", fake_pop)
+    resp = client.delete(f"/art/{uuid.uuid4()}/wip-current")
+    assert resp.status_code == 404
+
+
 def test_wip_update_403_for_non_owner(client, fake_member, tmp_static):
     piece, _ = _stub_piece(fake_member, tmp_static)
     piece.creator_id = uuid.uuid4()  # someone else's piece

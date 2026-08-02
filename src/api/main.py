@@ -119,6 +119,7 @@ from db.db_ops.wip import (
     db_add_wip_update,
     db_list_wip_updates,
     db_remove_wip_update,
+    db_pop_wip_current,
 )
 from db.db_ops.bookmarks import (
     db_add_bookmark,
@@ -1340,6 +1341,33 @@ async def remove_wip_update(
         raise HTTPException(status_code=403, detail=str(e))
     abs_path(removed_path).unlink(missing_ok=True)
     return {"ok": True}
+
+
+@app.delete("/art/{art_id}/wip-current")
+async def remove_wip_current(
+    art_id: str,
+    current_user: Member = Depends(get_current_member),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove the piece's CURRENT image: the newest archived state is promoted
+    to be the face everywhere. 404s when there is no archive to fall back to."""
+    try:
+        removed_path, promoted_path = await db_pop_wip_current(db, art_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    abs_path(removed_path).unlink(missing_ok=True)
+    # Promoted face → regenerate every art-id-keyed derivative (a stale display
+    # would keep showing the removed image in the viewer).
+    thumb_file(art_id).unlink(missing_ok=True)
+    display_file(art_id).unlink(missing_ok=True)
+    public_file(art_id).unlink(missing_ok=True)
+    promoted_abs = abs_path(promoted_path)
+    if promoted_abs.exists():
+        generate_thumbnail(str(art_id), promoted_abs)
+        generate_display(str(art_id), promoted_abs)
+    return {"ok": True, "file_path": sign_path(promoted_path)}
 
 
 @app.get("/art/{art_id}/wip-updates", response_model=list[WipUpdateOut])
