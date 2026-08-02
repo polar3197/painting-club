@@ -61,14 +61,17 @@ def main() -> int:
     for artist, title, img in EXTERNALS:
         r = c.get("/inspirations/search-targets", params={"q": artist})
         r.raise_for_status()
-        existing = next(
-            (n for n in r.json()
-             if n["kind"] == "external" and n["artist"] == artist and n["title"] == title),
-            None,
+        # Reuse any existing external by this artist (exact title first) — a
+        # member may have already added the piece via the app with a shorter
+        # or missing title, and a second node would split the connection.
+        candidates = [n for n in r.json() if n["kind"] == "external" and n["artist"] == artist]
+        existing = next((n for n in candidates if n["title"] == title), None) or (
+            candidates[0] if candidates else None
         )
         if existing:
             ext_by_artist[artist] = existing["id"]
-            print(f"= external exists: {artist} — {title}")
+            note = "" if existing["title"] == title else f" (kept member title: {existing['title']!r})"
+            print(f"= external exists: {artist} — {title}{note}")
             continue
         if not img.exists():
             print(f"! missing image, skipping: {img}")
