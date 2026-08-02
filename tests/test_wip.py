@@ -77,6 +77,31 @@ def test_wip_update_rejects_pdf(client, fake_member, tmp_static):
     assert resp.status_code == 400
 
 
+def test_remove_wip_update_unlinks_file(client, fake_member, tmp_static, monkeypatch):
+    # An archived history file on disk that the delete should unlink.
+    rel = "/static/art/m/painting/old-abc.jpg"
+    old_abs = tmp_static / rel.lstrip("/")
+    old_abs.parent.mkdir(parents=True, exist_ok=True)
+    old_abs.write_bytes(make_jpeg_bytes())
+
+    async def fake_remove_wip_update(db, art_id, update_id, member_id):
+        return rel
+
+    monkeypatch.setattr(main_mod, "db_remove_wip_update", fake_remove_wip_update)
+    resp = client.delete(f"/art/{uuid.uuid4()}/wip-updates/{uuid.uuid4()}")
+    assert resp.status_code == 200, resp.text
+    assert not old_abs.exists(), "archived file must be unlinked on removal"
+
+
+def test_remove_wip_update_404_when_missing(client, monkeypatch):
+    async def fake_remove_wip_update(db, art_id, update_id, member_id):
+        raise ValueError("Update not found")
+
+    monkeypatch.setattr(main_mod, "db_remove_wip_update", fake_remove_wip_update)
+    resp = client.delete(f"/art/{uuid.uuid4()}/wip-updates/{uuid.uuid4()}")
+    assert resp.status_code == 404
+
+
 def test_wip_update_403_for_non_owner(client, fake_member, tmp_static):
     piece, _ = _stub_piece(fake_member, tmp_static)
     piece.creator_id = uuid.uuid4()  # someone else's piece

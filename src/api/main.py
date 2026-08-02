@@ -118,6 +118,7 @@ from api.signed_urls import sign_path
 from db.db_ops.wip import (
     db_add_wip_update,
     db_list_wip_updates,
+    db_remove_wip_update,
 )
 from db.db_ops.bookmarks import (
     db_add_bookmark,
@@ -1314,6 +1315,25 @@ async def add_wip_update(
     generate_thumbnail(str(art_id), path)
 
     return {"ok": True, "file_path": sign_path(new_file_path)}
+
+
+@app.delete("/art/{art_id}/wip-updates/{update_id}")
+async def remove_wip_update(
+    art_id: str,
+    update_id: str,
+    current_user: Member = Depends(get_current_member),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove one archived image from a WIP piece's history. The piece's
+    current image is not touchable here — replace it via PATCH instead."""
+    try:
+        removed_path = await db_remove_wip_update(db, art_id, update_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    abs_path(removed_path).unlink(missing_ok=True)
+    return {"ok": True}
 
 
 @app.get("/art/{art_id}/wip-updates", response_model=list[WipUpdateOut])
