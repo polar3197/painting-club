@@ -54,6 +54,23 @@ async def db_add_wip_update(
     await db.commit()
 
 
+async def db_remove_wip_update(db: AsyncSession, art_id: str, update_id: str, member_id) -> str:
+    """Delete one archived image from a piece's WIP history (owner only).
+    Returns the removed row's file_path so the route can unlink the bytes."""
+    await db_get_owned_visual(db, art_id, member_id)
+    row = (
+        await db.execute(
+            select(WipUpdate).filter(WipUpdate.id == update_id, WipUpdate.art_id == art_id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError("Update not found")
+    file_path = row.file_path
+    await db.delete(row)
+    await db.commit()
+    return file_path
+
+
 async def db_list_wip_updates(db: AsyncSession, art_id: str) -> list[WipUpdate]:
     """History rows for a piece, oldest first."""
     rows = (
