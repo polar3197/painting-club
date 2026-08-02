@@ -1,4 +1,4 @@
--- 027: WIP interface for 2D visual pieces.
+-- 028: WIP interface for 2D visual pieces.
 -- is_wip flags a piece as work-in-progress. Each "add update" archives the
 -- superseded image into wip_update; visual_2d.file_path keeps pointing at the
 -- LATEST image so carousels/thumbs/search never special-case WIP.

@@ -483,7 +483,7 @@ async def run_migrations():
             "UPDATE media SET written_format = 'long' "
             "WHERE type = 'written_form' AND written_format IS NULL"
         ))
-        # 027: WIP interface for visual pieces. is_wip flags the piece; each
+        # 028: WIP interface for visual pieces. is_wip flags the piece; each
         # "add update" archives the superseded image into wip_update while
         # file_path keeps pointing at the latest (so nothing downstream changes).
         await conn.execute(text(
