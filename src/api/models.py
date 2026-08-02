@@ -389,6 +389,22 @@ class Visual2DOut(BaseModel):
     series_id: uuid.UUID | None = None
     series_name: str | None = None
     order_index: int | None = None
+    # Work-in-progress: file_path is the latest image; superseded images live
+    # in wip_update (GET /art/{id}/wip-updates) and the client shows a swipeable
+    # history when this is set.
+    is_wip: bool = False
+
+    @field_serializer("file_path")
+    def _sign_file_path(self, v):
+        return sign_path(v)
+
+
+class WipUpdateOut(BaseModel):
+    """One archived (superseded) image of a WIP piece."""
+    id: uuid.UUID
+    file_path: str
+    aspect_ratio: float | None = None
+    created_at: datetime
 
     @field_serializer("file_path")
     def _sign_file_path(self, v):

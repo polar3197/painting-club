@@ -52,6 +52,7 @@ from api.models import (
     MessagesPage,
     MediaVisibilityUpdate,
     Visual2DOut,
+    WipUpdateOut,
     WrittenFormOut,
     AudioOut,
     SeriesRename,
@@ -102,6 +103,11 @@ from api.models import (
     DeviceBatchIn,
 )
 
+from api.signed_urls import sign_path
+from db.db_ops.wip import (
+    db_add_wip_update,
+    db_list_wip_updates,
+)
 from db.db_ops.bookmarks import (
     db_add_bookmark,
     db_remove_bookmark,
@@ -617,6 +623,7 @@ async def get_visual_2d(
             series_id=visual_2d_row.series_id,
             series_name=series_name,
             order_index=visual_2d_row.series_order_index,
+            is_wip=visual_2d_row.is_wip,
         )
         visual_2ds.append(visual_2d)
     print(visual_2ds)
@@ -1054,6 +1061,8 @@ async def update_visual_2d(
     medium: str | None = Form(None),
     series_name: str | None = Form(None),
     clear_series: bool = Form(False),
+    # None = leave the WIP mark untouched (older client payloads omit it).
+    is_wip: bool | None = Form(None),
     file: UploadFile | None = File(None),
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
@@ -1147,6 +1156,7 @@ async def update_visual_2d(
             update_file=file is not None,
             series_name=series_name,
             clear_series=clear_series,
+            is_wip=is_wip,
         )
     except ValueError as e:
         # Roll back any file we just wrote so the DB and disk don't diverge.
@@ -1173,11 +1183,104 @@ async def update_visual_2d(
 
     return {"ok": True, "file_path": new_file_path}
 
+@app.post("/art/{art_id}/wip-update")
+async def add_wip_update(
+    art_id: str,
+    file: UploadFile = File(...),
+    current_user: Member = Depends(get_current_member),
+    db: AsyncSession = Depends(get_db),
+):
+    """Post a progress update on a WIP piece: the current image is archived
+    into the swipeable history and the new image becomes the piece's face
+    everywhere (carousel, thumbs, search). Mirrors the PATCH file-replace
+    machinery except the superseded file is KEPT on disk as history."""
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
+    mime = magic.from_buffer(contents, mime=True)
+    if mime not in ALLOWED_MIME_TYPES or mime == "application/pdf":
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+    if mime in HEIC_MIMES:
+        contents = heic_to_jpeg_bytes(contents)
+        mime = "image/jpeg"
+    ext_by_mime = {"image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg"}
+    file_ext = ext_by_mime[mime]
+
+    existing = (
+        await db.execute(select(Visual2D).filter(Visual2D.id == art_id))
+    ).scalar_one_or_none()
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Art not found")
+    if str(existing.creator_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not your piece")
+
+    try:
+        safe_medium = Path(existing.file_path).parent.name
+    except Exception:
+        safe_medium = "unknown"
+    rev = uuid.uuid4().hex[:8]
+    new_file_path = f"/static/art/{current_user.id}/{safe_medium}/{art_id}-{rev}.{file_ext}"
+    path = abs_path(new_file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
+    if not path.exists() or path.stat().st_size == 0:
+        raise HTTPException(status_code=500, detail="Upload write failed")
+
+    try:
+        await db_add_wip_update(
+            db=db,
+            art_id=art_id,
+            member_id=current_user.id,
+            new_file_path=new_file_path,
+            new_aspect_ratio=_compute_aspect_ratio(path),
+        )
+    except ValueError as e:
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=403, detail=str(e))
+
+    # New face → new thumbnail (same art-id path the grids key on).
+    thumb_file(art_id).unlink(missing_ok=True)
+    generate_thumbnail(str(art_id), path)
+
+    return {"ok": True, "file_path": sign_path(new_file_path)}
+
+
+@app.get("/art/{art_id}/wip-updates", response_model=list[WipUpdateOut])
+async def list_wip_updates(
+    art_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    rows = await db_list_wip_updates(db, art_id)
+    return [
+        WipUpdateOut(
+            id=r.id,
+            file_path=r.file_path,
+            aspect_ratio=r.aspect_ratio,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
 @app.delete("/art/{art_id}")
 async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_current_member), db: AsyncSession = Depends(get_db)):
+    # Collect WIP history paths BEFORE the delete — the cascade removes the
+    # rows, and the archived files would otherwise be orphaned on disk.
+    # Best-effort: a hiccup here must not block the delete itself (worst case
+    # is an orphaned history file, not a broken piece).
+    try:
+        wip_rows = await db_list_wip_updates(db, art_id)
+    except Exception:
+        wip_rows = []
     file_path = await db_remove_visual_2d(art_id=art_id, current_member_id=current_user.id, db=db)
     if file_path:
         abs_path(file_path).unlink(missing_ok=True)
+        for r in wip_rows:
+            abs_path(r.file_path).unlink(missing_ok=True)
     thumb_file(art_id).unlink(missing_ok=True)
     return
 

@@ -199,8 +199,23 @@ class Visual2D(Art):
     song_artist = Column(String(255))
     location = Column(String(255))
     aspect_ratio = Column(Float)
+    # Work-in-progress: the owner can post update images; file_path stays the
+    # LATEST image (so carousels/thumbs/search never special-case WIP) and
+    # superseded images are archived in wip_update.
+    is_wip = Column(Boolean, nullable=False, default=False, server_default='false')
 
     __mapper_args__ = {"polymorphic_identity": "visual_2d"}
+
+
+class WipUpdate(Base):
+    __tablename__ = "wip_update"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    art_id = Column(UUID(as_uuid=True), ForeignKey('visual_2d.id', ondelete='CASCADE'), nullable=False)
+    # The archived (superseded) image and its shape at the time it was current.
+    file_path = Column(String(500), nullable=False)
+    aspect_ratio = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class WrittenForm(Art):
     __tablename__ = "written_form"
