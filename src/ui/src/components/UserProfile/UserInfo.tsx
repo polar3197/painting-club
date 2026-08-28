@@ -1,11 +1,12 @@
 import { Dispatch, SetStateAction, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Profile, update_profile } from "../../api";
+import { Profile, update_profile, open_dm } from "../../api";
 import "../../styles/user-profile/user-deets.css";
 import "../../styles/portfolio.css";
 import { useAuth } from "../../context/AuthContext";
 import { useAdminPending } from "../../hooks/useAdminPending";
-import { GearIcon, PencilIcon, PaperPlaneIcon } from "../Utils/Icons";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { GearIcon, PencilIcon, PaperPlaneIcon, MailIcon } from "../Utils/Icons";
 import ShareMediaDialog from "../Utils/ShareMediaDialog";
 
 
@@ -29,6 +30,21 @@ const UserInfo = (
     const { token } = useAuth()!;
     const navigate = useNavigate();
     const adminPending = useAdminPending();
+    const unread = useUnreadCount();
+    const [openingDm, setOpeningDm] = useState(false);
+
+    const messageOwner = async () => {
+        if (openingDm) return;
+        setOpeningDm(true);
+        try {
+            const convo = await open_dm(profile.username, token);
+            navigate(`/messages/${convo.id}`, { state: { title: convo.title, type: convo.type, partnerUsername: convo.partner_username } });
+        } catch (err) {
+            alert((err as Error).message || "could not open messages");
+        } finally {
+            setOpeningDm(false);
+        }
+    };
 
     const handlePortfolioView = () => {
         if (!selectedMedium) return;
@@ -103,8 +119,16 @@ const UserInfo = (
                         portfolio view
                     </div>
                 )}
-                {/* Owner actions, same set as the iOS profile: settings,
-                    edit, share. (Messages joins this row when it lands.) */}
+                {/* Someone else's profile: message them (unless they blocked you). */}
+                {!profile.is_owner && !profile.viewer_blocked_by_owner && (
+                    <div className="owner-actions" onClick={(e) => e.stopPropagation()}>
+                        <button className="owner-action-btn" aria-label="message" title="message" onClick={messageOwner} disabled={openingDm}>
+                            <MailIcon />
+                        </button>
+                    </div>
+                )}
+                {/* Owner actions, same set as the iOS profile: settings, edit,
+                    messages, share. */}
                 {profile.is_owner && !updateProfile && (
                     <div className="owner-actions" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -123,6 +147,15 @@ const UserInfo = (
                             onClick={() => setUpdateProfile(true)}
                         >
                             <PencilIcon />
+                        </button>
+                        <button
+                            className="owner-action-btn"
+                            aria-label="messages"
+                            title="messages"
+                            onClick={() => navigate("/messages")}
+                        >
+                            <MailIcon />
+                            {unread > 0 && <span className="owner-action-dot" />}
                         </button>
                         <button
                             className="owner-action-btn"

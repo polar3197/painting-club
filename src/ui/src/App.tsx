@@ -15,6 +15,8 @@ import AnnouncementsFeed from "./components/Pages/AnnouncementsFeed";
 import Events from "./components/Pages/Events";
 import EventDetail from "./components/Pages/EventDetail";
 import EventEdit from "./components/Pages/EventEdit";
+import Messages from "./components/Pages/Messages";
+import ConversationThread from "./components/Pages/ConversationThread";
 import UserRoles from "./components/Pages/UserRoles";
 import UserRoleDetail from "./components/Pages/UserRoleDetail";
 import UserStats from "./components/Pages/UserStats";
@@ -65,6 +67,8 @@ export default function App() {
           <Route path="/events/new" element={<EventEdit />} />
           <Route path="/events/:id" element={<EventDetail />} />
           <Route path="/events/:id/edit" element={<EventEdit />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/messages/:id" element={<ConversationThread />} />
           <Route path="/user-roles" element={<UserRoles />} />
           <Route path="/user-roles/:username" element={<UserRoleDetail />} />
           <Route path="/user-stats" element={<UserStats />} />

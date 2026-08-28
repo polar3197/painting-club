@@ -938,3 +938,87 @@ export function upload_event_image(id: string, file: File, token: string | null)
 export function get_member_directory(token: string | null): Promise<MemberDirectoryEntry[]> {
   return request("/members/directory", { headers: auth(token) }) as Promise<MemberDirectoryEntry[]>;
 }
+
+// --- Messages ------------------------------------------------------------------
+
+export interface ConversationOut {
+  id: string;
+  type: "dm" | "group";
+  title: string; // partner display name for DMs, group title for groups
+  partner_username: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  last_sender_username: string | null;
+  unread: number;
+}
+
+export interface MessageOut {
+  id: string;
+  sender_username: string;
+  sender_firstname: string | null;
+  body: string;
+  created_at: string;
+  edited_at?: string | null;
+}
+
+export interface MessagesPage {
+  messages: MessageOut[]; // newest first
+  next_cursor: string | null;
+  // Read cursor BEFORE this fetch bumped it (first page only) — messages
+  // newer than this were unseen when the thread was opened.
+  previous_read_at: string | null;
+}
+
+export interface ParticipantOut {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+  role: string;
+}
+
+export function get_unread_count(token: string | null): Promise<{ unread: number }> {
+  return request("/conversations/unread-count", { headers: auth(token) }) as Promise<{ unread: number }>;
+}
+
+export function get_conversations(token: string | null): Promise<ConversationOut[]> {
+  return request("/conversations", { headers: auth(token) }) as Promise<ConversationOut[]>;
+}
+
+export function open_dm(username: string, token: string | null): Promise<ConversationOut> {
+  return request("/conversations/dm", { method: "POST", headers: auth(token), body: JSON.stringify({ username }) }) as Promise<ConversationOut>;
+}
+
+export function create_group(title: string, usernames: string[], token: string | null): Promise<ConversationOut> {
+  return request("/conversations/group", { method: "POST", headers: auth(token), body: JSON.stringify({ title, usernames }) }) as Promise<ConversationOut>;
+}
+
+/** Fetching the first page also advances the caller's read cursor. */
+export function get_messages(conversationId: string, token: string | null, cursor?: string | null, limit = 30): Promise<MessagesPage> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  return request(`/conversations/${conversationId}/messages?${params.toString()}`, { headers: auth(token) }) as Promise<MessagesPage>;
+}
+
+export function send_message(conversationId: string, body: string, token: string | null): Promise<MessageOut> {
+  return request(`/conversations/${conversationId}/messages`, { method: "POST", headers: auth(token), body: JSON.stringify({ body }) }) as Promise<MessageOut>;
+}
+
+export function edit_message(conversationId: string, messageId: string, body: string, token: string | null): Promise<MessageOut> {
+  return request(`/conversations/${conversationId}/messages/${messageId}`, { method: "PATCH", headers: auth(token), body: JSON.stringify({ body }) }) as Promise<MessageOut>;
+}
+
+export function delete_message(conversationId: string, messageId: string, token: string | null) {
+  return request(`/conversations/${conversationId}/messages/${messageId}`, { method: "DELETE", headers: auth(token) });
+}
+
+export function get_participants(conversationId: string, token: string | null): Promise<ParticipantOut[]> {
+  return request(`/conversations/${conversationId}/participants`, { headers: auth(token) }) as Promise<ParticipantOut[]>;
+}
+
+export function add_group_members(conversationId: string, usernames: string[], token: string | null) {
+  return request(`/conversations/${conversationId}/participants`, { method: "POST", headers: auth(token), body: JSON.stringify({ usernames }) });
+}
+
+export function leave_group(conversationId: string, token: string | null) {
+  return request(`/conversations/${conversationId}/leave`, { method: "POST", headers: auth(token) });
+}
