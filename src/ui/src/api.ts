@@ -240,6 +240,14 @@ export function login_user(payload: LoginPayload): Promise<LoginResponse> {
   }) as Promise<LoginResponse>;
 }
 
+/** Sliding session: swap a still-valid token for a fresh one (see AuthContext). */
+export function refresh_token(token: string): Promise<LoginResponse> {
+  return request("/members/refresh-token", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<LoginResponse>;
+}
+
 export function get_profile(username: string, token: string | null): Promise<Profile> {
   return request(`/members/${username}/profile`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},

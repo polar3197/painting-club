@@ -1,6 +1,6 @@
-import { createContext, useState, useContext, ReactNode, useEffect, useCallback } from "react";
-import { get_blocks } from "../api";
-import { readSession, writeSession, clearSession } from "../session";
+import { createContext, useState, useContext, ReactNode, useEffect, useCallback, useRef } from "react";
+import { get_blocks, get_profile, refresh_token } from "../api";
+import { readSession, writeSession, updateSession, clearSession } from "../session";
 
 interface AuthContextType {
   // Session token, null when logged out. Components pass this to api calls
@@ -28,6 +28,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentRole, setCurrentRole] = useState<string | null>(() => readSession().role);
   const [blockedUsernames, setBlockedUsernames] = useState<string[]>([]);
   const [profilePicVersions, setProfilePicVersions] = useState<Record<string, number>>({});
+
+  // Sliding session, mirroring the iOS app: on load — and when the tab comes
+  // back after a day away — exchange the stored token for a fresh one so an
+  // active member never reaches the JWT expiry. Before this the web never
+  // refreshed, so every session died a fixed time after login regardless of
+  // use. Failures are non-fatal: the stored token keeps working until it
+  // actually expires (and a real 401 is handled by api.ts). Reads the stored
+  // session rather than state so the effect isn't keyed on the token — a
+  // refreshed token must not re-trigger it.
+  const lastRefreshRef = useRef(0);
+  useEffect(() => {
+    const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
+    let cancelled = false;
+    const refresh = async () => {
+      const { token: tok, username: user, role } = readSession();
+      if (!tok || !user) return;
+      lastRefreshRef.current = Date.now();
+      try {
+        const res = await refresh_token(tok);
+        if (cancelled || !res?.access_token) return;
+        updateSession({ token: res.access_token });
+        setToken(res.access_token);
+        // Sync the role so a promotion shows up without a re-login.
+        try {
+          const profile = await get_profile(user, res.access_token);
+          if (!cancelled && profile?.role && profile.role !== role) {
+            updateSession({ role: profile.role });
+            setCurrentRole(profile.role);
+          }
+        } catch {
+          // offline / transient — keep the cached role
+        }
+      } catch {
+        // keep the stored token; api.ts already cleared it if this was a 401
+      }
+    };
+    refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastRefreshRef.current > REFRESH_AFTER_MS) refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
+  }, []);
 
   const bumpProfilePic = useCallback((memberId: string) => {
     setProfilePicVersions((prev) => ({ ...prev, [memberId]: Date.now() }));

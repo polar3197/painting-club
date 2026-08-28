@@ -27,6 +27,14 @@ export function writeSession({ token, username, role }: Session): void {
   localStorage.setItem(KEYS.role, role);
 }
 
+/** Overwrite only the given keys (e.g. a refreshed token, a synced role). */
+export function updateSession(patch: Partial<Session>): void {
+  for (const key of Object.keys(KEYS) as (keyof Session)[]) {
+    const v = patch[key];
+    if (v !== undefined) localStorage.setItem(KEYS[key], v);
+  }
+}
+
 export function clearSession(): void {
   for (const key of Object.values(KEYS)) localStorage.removeItem(key);
 }

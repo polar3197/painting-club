@@ -8,12 +8,16 @@ from db.models import Member
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 HASH_ALGORITHM = "HS256"
+TOKEN_LIFETIME_DAYS = 365
 
 def create_token(member: Member):
 
+    # Long-lived on purpose: both clients call /members/refresh-token on
+    # load, so an active member's session slides forever and only someone
+    # away for a full year has to log in again ("never logs you out").
     payload = {
         "sub": str(member.id),
-        "exp": datetime.now(timezone.utc) + timedelta(days=30)
+        "exp": datetime.now(timezone.utc) + timedelta(days=TOKEN_LIFETIME_DAYS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=HASH_ALGORITHM)
 

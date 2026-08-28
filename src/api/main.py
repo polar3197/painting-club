@@ -435,9 +435,9 @@ async def forgot_password_endpoint(
 
 @app.post("/members/refresh-token", response_model=Token)
 async def refresh_token_endpoint(current_member: Member = Depends(get_current_member)):
-    """Sliding session: exchange a still-valid token for a fresh 30-day one.
-    The app calls this on every launch, so active members never hit the JWT
-    expiry — only someone away for 30+ days has to log in again."""
+    """Sliding session: exchange a still-valid token for a fresh one-year one.
+    Both clients call this on launch/load, so active members never hit the
+    JWT expiry — only someone away for a full year has to log in again."""
     return Token(
         access_token=create_token(current_member),
         must_setup=bool(current_member.must_change_password),
