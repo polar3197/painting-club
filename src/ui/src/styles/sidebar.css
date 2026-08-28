@@ -122,10 +122,6 @@
     background-color: rgb(198, 164, 233);
 }
 
-.sidebar-element.logout button:hover {
-    background-color: lightcoral;
-}
-
 .sidebar-tooltip {
     position: absolute;
     left: 110%;

@@ -8,6 +8,7 @@ import Portfolio from "./components/Pages/Portfolio";
 import NotMember from "./components/Pages/NotMember";
 import Join from "./components/Pages/Join";
 import Admin from "./components/Pages/Admin";
+import Settings from "./components/Pages/Settings";
 import PageLayout from "./components/Pages/PageLayout";
 import Ethos from "./components/Pages/Ethos";
 import Privacy from "./components/Pages/Privacy";
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/members" element={<People />} />
           <Route path="/art" element={<ArtGallery />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/settings" element={<Settings />} />
 
           {/* <Route path="/groups" element={<Groups />} /> */}
           <Route path="/:username" element={<UserProfile />} />

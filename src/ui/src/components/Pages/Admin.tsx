@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
     ApplicationApproveOut,
     ApplicationOut,
@@ -11,6 +12,12 @@ import {
     ReportOut,
     get_reports,
     update_report_status,
+    get_admin_prompt_queue,
+    review_prompt_suggestion,
+    activate_suggestion,
+    get_active_prompt,
+    PromptSuggestionOut,
+    PromptOut,
 } from "../../api";
 import { useAuth } from "../../context/AuthContext";
 import ConfirmDialog from "../Utils/ConfirmDialog";
@@ -202,18 +209,82 @@ const MediaRequestRow = ({
     );
 };
 
+type AdminTab = "applications" | "media-requests" | "reports" | "prompts";
+const TABS: AdminTab[] = ["applications", "media-requests", "reports", "prompts"];
+
+// One proposed / queued weekly-prompt suggestion. Proposed rows get approve /
+// reject; approved ("up next") rows get "make this week's".
+const PromptSuggestionRow = ({ s, onReview, onActivate }: {
+    s: PromptSuggestionOut;
+    onReview?: (id: string, status: "approved" | "rejected") => void;
+    onActivate?: (id: string) => void;
+}) => (
+    <div className="application-row-item">
+        <div className="application-row-info">
+            <p className="application-name">{s.prompt_text}</p>
+            <p className="application-meta">
+                {s.media_name ?? "any medium"}{s.username ? `  ·  @${s.username}` : ""}
+            </p>
+        </div>
+        <div className="application-row-actions">
+            {onReview && (
+                <div className="prompt-row-btns">
+                    <button className="application-btn approve" onClick={() => onReview(s.id, "approved")}>approve</button>
+                    <button className="application-btn reject" onClick={() => onReview(s.id, "rejected")}>reject</button>
+                </div>
+            )}
+            {onActivate && (
+                <button className="application-btn activate" onClick={() => onActivate(s.id)}>make this week's</button>
+            )}
+        </div>
+    </div>
+);
+
 const Admin = () => {
-    const [tab, setTab] = useState<"applications" | "media-requests" | "reports">("applications");
+    // The tab lives in the URL (?tab=) so Settings can deep-link into a section.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get("tab") as AdminTab | null;
+    const tab: AdminTab = tabParam && TABS.includes(tabParam) ? tabParam : "applications";
+    const setTab = (t: AdminTab) => setSearchParams({ tab: t });
     const [applications, setApplications] = useState<ApplicationOut[]>([]);
     const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
     const [reports, setReports] = useState<ReportOut[]>([]);
+    const [proposed, setProposed] = useState<PromptSuggestionOut[]>([]);
+    const [upNext, setUpNext] = useState<PromptSuggestionOut[]>([]);
+    const [activePrompt, setActivePrompt] = useState<PromptOut | null>(null);
     const { token } = useAuth()!;
+
+    const fetchPrompts = () => {
+        get_admin_prompt_queue(token)
+            .then((q) => { setProposed(q.proposed); setUpNext(q.up_next); })
+            .catch(console.error);
+        get_active_prompt(token).then(setActivePrompt).catch(() => {});
+    };
 
     useEffect(() => {
         get_applications(token).then(setApplications).catch(console.error);
         get_media_requests(token).then(setMediaRequests).catch(console.error);
         get_reports(token).then(setReports).catch(console.error);
+        fetchPrompts();
     }, []);
+
+    const handleReviewPrompt = async (id: string, status: "approved" | "rejected") => {
+        try {
+            await review_prompt_suggestion(id, status, token);
+            fetchPrompts();
+        } catch (err) {
+            alert((err as Error).message || "couldn't update");
+        }
+    };
+
+    const handleActivateSuggestion = async (id: string) => {
+        try {
+            await activate_suggestion(id, token);
+            fetchPrompts();
+        } catch (err) {
+            alert((err as Error).message || "couldn't activate");
+        }
+    };
 
     const handleResolveReport = async (id: string, status: "resolved" | "dismissed") => {
         const res = await update_report_status(id, status, token);
@@ -275,9 +346,46 @@ const Admin = () => {
                     onClick={() => setTab("reports")}
                     style={{ cursor: "pointer", opacity: tab === "reports" ? 1 : 0.4 }}
                 >reports</span>
+                <span
+                    onClick={() => setTab("prompts")}
+                    style={{ cursor: "pointer", opacity: tab === "prompts" ? 1 : 0.4 }}
+                >prompts</span>
             </h1>
 
-            {tab === "reports" ? (
+            {tab === "prompts" ? (
+                <>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">this week's prompt</h2>
+                        {activePrompt ? (
+                            <div className="application-row-item">
+                                <div className="application-row-info">
+                                    <p className="application-name">{activePrompt.title}</p>
+                                    <p className="application-meta">{activePrompt.media_name ?? "any medium"}</p>
+                                </div>
+                            </div>
+                        ) : <p className="admin-empty">no active prompt</p>}
+                    </div>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">up next</h2>
+                        <p className="admin-hint">activate one to make it this week's (archives the current).</p>
+                        {upNext.length === 0
+                            ? <p className="admin-empty">nothing approved yet</p>
+                            : upNext.map(s => (
+                                <PromptSuggestionRow key={s.id} s={s} onActivate={handleActivateSuggestion} />
+                            ))
+                        }
+                    </div>
+                    <div className="admin-section">
+                        <h2 className="admin-section-title">proposed</h2>
+                        {proposed.length === 0
+                            ? <p className="admin-empty">no proposed prompts</p>
+                            : proposed.map(s => (
+                                <PromptSuggestionRow key={s.id} s={s} onReview={handleReviewPrompt} />
+                            ))
+                        }
+                    </div>
+                </>
+            ) : tab === "reports" ? (
                 <>
                     <div className="admin-section">
                         <h2 className="admin-section-title">pending</h2>

@@ -4,6 +4,9 @@ import { Profile, update_profile } from "../../api";
 import "../../styles/user-profile/user-deets.css";
 import "../../styles/portfolio.css";
 import { useAuth } from "../../context/AuthContext";
+import { useAdminPending } from "../../hooks/useAdminPending";
+import { GearIcon, PencilIcon, PaperPlaneIcon } from "../Utils/Icons";
+import ShareMediaDialog from "../Utils/ShareMediaDialog";
 
 
 const UserInfo = (
@@ -22,8 +25,10 @@ const UserInfo = (
     }
 ) => {
     const [updateProfile, setUpdateProfile] = useState<boolean>(false);
+    const [showShare, setShowShare] = useState(false);
     const { token } = useAuth()!;
     const navigate = useNavigate();
+    const adminPending = useAdminPending();
 
     const handlePortfolioView = () => {
         if (!selectedMedium) return;
@@ -98,7 +103,45 @@ const UserInfo = (
                         portfolio view
                     </div>
                 )}
+                {/* Owner actions, same set as the iOS profile: settings,
+                    edit, share. (Messages joins this row when it lands.) */}
+                {profile.is_owner && !updateProfile && (
+                    <div className="owner-actions" onClick={(e) => e.stopPropagation()}>
+                        <button
+                            className="owner-action-btn"
+                            aria-label="settings"
+                            title="settings"
+                            onClick={() => navigate("/settings")}
+                        >
+                            <GearIcon />
+                            {adminPending.total > 0 && <span className="owner-action-dot" />}
+                        </button>
+                        <button
+                            className="owner-action-btn"
+                            aria-label="edit profile"
+                            title="edit profile"
+                            onClick={() => setUpdateProfile(true)}
+                        >
+                            <PencilIcon />
+                        </button>
+                        <button
+                            className="owner-action-btn"
+                            aria-label="share a portfolio"
+                            title="share a portfolio"
+                            onClick={() => setShowShare(true)}
+                        >
+                            <PaperPlaneIcon />
+                        </button>
+                    </div>
+                )}
             </div>
+            {showShare && (
+                <ShareMediaDialog
+                    username={profile.username}
+                    media={profile.media ?? []}
+                    onClose={() => setShowShare(false)}
+                />
+            )}
             <div className="user-field-element" onClick={() => handleUpdateProfile()}>
                 {updateProfile ? 
                     <>

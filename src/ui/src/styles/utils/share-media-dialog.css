@@ -1,0 +1,74 @@
+.share-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 100;
+}
+
+.dialog.share-dialog {
+    width: 380px;
+    height: auto;
+    max-height: 80vh;
+    padding: 28px 24px 24px 24px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.share-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.share-empty {
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    color: rgb(140, 140, 140);
+    margin: 0;
+}
+
+.share-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+}
+
+.share-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid black;
+    background: white;
+    padding: 10px 12px;
+}
+
+.share-row-label {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 16px;
+}
+
+.share-btn {
+    font-family: system-ui, sans-serif;
+    font-size: 13px;
+    padding: 4px 12px;
+    border: 1px solid black;
+    background-color: rgb(238, 190, 100);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.share-btn:hover {
+    background-color: rgb(210, 160, 70);
+}
+
+@media (max-width: 640px) {
+    .dialog.share-dialog {
+        width: 92vw;
+        max-width: 92vw;
+    }
+}

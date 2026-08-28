@@ -556,6 +556,48 @@ export interface PromptDetailOut extends PromptOut {
   viewer_submission_id: string | null;
 }
 
+export interface PromptSuggestionOut {
+  id: string;
+  username: string | null;
+  media_id: string | null;
+  media_name: string | null; // null = medium-agnostic
+  prompt_text: string;
+  status: string;
+  order_index: number | null;
+  created_at: string;
+}
+
+export interface AdminPromptQueueOut {
+  proposed: PromptSuggestionOut[];
+  up_next: PromptSuggestionOut[]; // approved queue, in order
+}
+
+export function get_admin_prompt_queue(token: string | null): Promise<AdminPromptQueueOut> {
+  return request("/admin/weekly-prompts", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AdminPromptQueueOut>;
+}
+
+export function review_prompt_suggestion(
+  id: string,
+  status: "approved" | "rejected",
+  token: string | null,
+): Promise<PromptSuggestionOut> {
+  return request(`/admin/weekly-prompts/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  }) as Promise<PromptSuggestionOut>;
+}
+
+/** Make an approved suggestion this week's prompt (archives the current one). */
+export function activate_suggestion(id: string, token: string | null): Promise<PromptOut> {
+  return request(`/admin/weekly-prompts/${id}/activate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<PromptOut>;
+}
+
 export function get_active_prompt(token: string | null): Promise<PromptOut | null> {
   return request("/prompts/active", {
     headers: token ? { Authorization: `Bearer ${token}` } : {},

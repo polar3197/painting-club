@@ -43,8 +43,7 @@ const SidebarElement = ({
 const Sidebar = ({ isOpen }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, currentRole, logout } = useAuth()!;
-  console.log("CU: ", currentUser);
+  const { currentUser, currentRole } = useAuth()!;
 
   const gotoHome = () => {
     navigate("/home");
@@ -80,11 +79,6 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
     navigate("/ethos");
   };
 
-  const gotoLogout = () => {
-    logout(); // removes token from localStorage
-    navigate("/landing-page");
-  }
-
   return (
     <div className={`sidebar ${isOpen ? "open" : "closed"}`}>
       <div className="sidebar-top">
@@ -113,9 +107,6 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
       <div className="sidebar-bottom">
         <SidebarElement isOpen={isOpen} label="ethos" extraClass="docs" onClick={gotoDocs}>
           {isOpen ? "Docs" : "¶"}
-        </SidebarElement>
-        <SidebarElement isOpen={isOpen} label="logout" extraClass="logout" onClick={gotoLogout}>
-          {isOpen ? "Logout" : "≤"}
         </SidebarElement>
       </div>
     </div>
