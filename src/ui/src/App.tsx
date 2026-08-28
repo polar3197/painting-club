@@ -7,7 +7,6 @@ import ArtGallery from "./components/Pages/ArtGallery";
 import Portfolio from "./components/Pages/Portfolio";
 import NotMember from "./components/Pages/NotMember";
 import Admin from "./components/Pages/Admin";
-import PortfolioEditor from "./components/Pages/PortfolioEditor";
 import PageLayout from "./components/Pages/PageLayout";
 import Ethos from "./components/Pages/Ethos";
 import Privacy from "./components/Pages/Privacy";
@@ -42,7 +41,6 @@ export default function App() {
           <Route path="/members" element={<People />} />
           <Route path="/art" element={<ArtGallery />} />
           <Route path="/admin" element={<Admin />} />
-          <Route path="/portfolio-editor" element={<PortfolioEditor />} />
 
           {/* <Route path="/groups" element={<Groups />} /> */}
           <Route path="/:username" element={<UserProfile />} />

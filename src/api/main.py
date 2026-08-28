@@ -1,6 +1,5 @@
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status, UploadFile, File, Form, Response, Request
-from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import date, datetime
 from contextlib import asynccontextmanager
@@ -10,8 +9,6 @@ import io
 import os
 import uuid
 import magic
-import hmac
-import time as time_mod
 from PIL import Image
 import pillow_heif
 pillow_heif.register_heif_opener()
@@ -104,14 +101,6 @@ from api.models import (
     EventOut,
     UsageBatchIn,
     DeviceBatchIn,
-    PortfolioBlockOut,
-    PortfolioOut,
-    PortfolioUpdateIn,
-    BlockCreateIn,
-    BlockUpdateIn,
-    BlockPiecesIn,
-    ArtVisibilityIn,
-    PortfolioPieceOut,
 )
 
 from api.signed_urls import sign_path
@@ -312,13 +301,6 @@ from db.db_ops.inspirations import (
     db_get_external_art,
 )
 from api.models import InspirationIn
-
-from db.db_ops.portfolios import (
-    db_get_or_create_my_portfolio, db_update_portfolio, db_add_block,
-    db_update_block, db_delete_block, db_set_block_pieces,
-    db_my_portfolio_payload, db_list_my_visual_pieces,
-    db_public_portfolio_payload, db_public_art_file_path, db_set_art_visibility,
-)
 
 from db.session import get_db, AsyncSessionLocal
 from db.db_manager import init_db, empty_db, run_migrations, pre_init_migrations
@@ -574,7 +556,6 @@ async def delete_my_account(
         try:
             thumb_file(aid).unlink(missing_ok=True)
             display_file(aid).unlink(missing_ok=True)
-            public_file(aid).unlink(missing_ok=True)
         except Exception:
             pass
     try:
@@ -802,7 +783,6 @@ AUDIO_EXTS = {"m4a", "mp3", "wav", "aac"}
 STATIC_ROOT = Path(os.environ.get("STATIC_ROOT", "/app"))
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 DISPLAY_SIZE = 1600  # mid-res "display" derivative for the main viewer — phones can't show more
-PUBLIC_SIZE = 1600  # public pages never receive original bytes — this is the ceiling
 
 def abs_path(rel: str) -> Path:
     # rel is an absolute-looking web path like "/static/foo.jpg" — anchor it under STATIC_ROOT
@@ -862,28 +842,6 @@ def generate_display(art_id: str, src_abs: Path) -> Path | None:
         return out
     except Exception as e:
         print(f"[display] generation failed for {art_id}: {type(e).__name__}: {e}")
-        out.unlink(missing_ok=True)
-        return None
-
-def public_file(art_id: str) -> Path:
-    return STATIC_ROOT / "static" / "public" / f"{art_id}.jpg"
-
-
-def generate_public_image(art_id: str, src_abs: Path) -> Path | None:
-    """Downscaled, EXIF-stripped JPEG served to ANONYMOUS portfolio visitors.
-    Saving a fresh RGB image via Pillow drops all metadata (EXIF/GPS/etc.)."""
-    out = public_file(art_id)
-    try:
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with Image.open(src_abs) as img:
-            img.draft("RGB", (PUBLIC_SIZE, PUBLIC_SIZE))
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-            img.thumbnail((PUBLIC_SIZE, PUBLIC_SIZE * 4), Image.LANCZOS)
-            img.save(out, format="JPEG", quality=82, optimize=True)
-        return out
-    except Exception as e:
-        print(f"[public] gen failed for {art_id}: {type(e).__name__}: {e}")
         out.unlink(missing_ok=True)
         return None
 
@@ -1246,7 +1204,6 @@ async def update_visual_2d(
         # PDFs have no cached thumb file; drop the stale one if it exists.
         thumb_file(art_id).unlink(missing_ok=True)
         display_file(art_id).unlink(missing_ok=True)
-        public_file(art_id).unlink(missing_ok=True)
         if written_path.suffix.lower() != ".pdf":
             generate_thumbnail(str(art_id), written_path)
             generate_display(str(art_id), written_path)
@@ -1317,7 +1274,6 @@ async def add_wip_update(
     # look like it never happened.
     thumb_file(art_id).unlink(missing_ok=True)
     display_file(art_id).unlink(missing_ok=True)
-    public_file(art_id).unlink(missing_ok=True)
     generate_thumbnail(str(art_id), path)
     generate_display(str(art_id), path)
 
@@ -1362,7 +1318,6 @@ async def remove_wip_current(
     # would keep showing the removed image in the viewer).
     thumb_file(art_id).unlink(missing_ok=True)
     display_file(art_id).unlink(missing_ok=True)
-    public_file(art_id).unlink(missing_ok=True)
     promoted_abs = abs_path(promoted_path)
     if promoted_abs.exists():
         generate_thumbnail(str(art_id), promoted_abs)
@@ -1405,7 +1360,6 @@ async def remove_visual_2d(art_id: str, current_user: Member = Depends(get_curre
             abs_path(r.file_path).unlink(missing_ok=True)
     thumb_file(art_id).unlink(missing_ok=True)
     display_file(art_id).unlink(missing_ok=True)
-    public_file(art_id).unlink(missing_ok=True)
     return
 
 
@@ -3806,169 +3760,3 @@ async def get_external_art_image(
         if generate_external_thumb(ext_id, src_abs) is None:
             return FileResponse(src_abs, headers=cache_headers)
     return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
-
-
-# --- Public portfolios (editor API; public serving is in the same block) -----
-PUBLIC_SITE_ORIGIN = os.environ.get("PUBLIC_SITE_ORIGIN", "https://paintingclub.art")
-
-
-def _portfolio_out(payload: dict) -> PortfolioOut:
-    return PortfolioOut(**payload, public_url=f"{PUBLIC_SITE_ORIGIN}/p/{payload['slug']}")
-
-
-@app.get("/portfolio/mine", response_model=PortfolioOut)
-async def get_my_portfolio(db: AsyncSession = Depends(get_db), current_user: Member = Depends(get_current_member)):
-    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
-
-
-@app.patch("/portfolio/mine", response_model=PortfolioOut)
-async def update_my_portfolio(payload: PortfolioUpdateIn, db: AsyncSession = Depends(get_db),
-                              current_user: Member = Depends(get_current_member)):
-    try:
-        await db_update_portfolio(db, current_user.id, slug=payload.slug, title=payload.title,
-                                  published=payload.published, theme=payload.theme)
-    except ValueError as e:
-        raise HTTPException(status_code=409 if "taken" in str(e) else 400, detail=str(e))
-    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
-
-
-@app.post("/portfolio/blocks", response_model=PortfolioOut)
-async def add_portfolio_block(payload: BlockCreateIn, db: AsyncSession = Depends(get_db),
-                              current_user: Member = Depends(get_current_member)):
-    try:
-        await db_add_block(db, current_user.id, payload.kind, payload.position, payload.config)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
-
-
-@app.patch("/portfolio/blocks/{block_id}", response_model=PortfolioOut)
-async def update_portfolio_block(block_id: str, payload: BlockUpdateIn, db: AsyncSession = Depends(get_db),
-                                 current_user: Member = Depends(get_current_member)):
-    try:
-        await db_update_block(db, current_user.id, block_id, config=payload.config, position=payload.position)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=404 if "not found" in str(e).lower() else 400, detail=str(e))
-    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
-
-
-@app.delete("/portfolio/blocks/{block_id}", response_model=PortfolioOut)
-async def delete_portfolio_block(block_id: str, db: AsyncSession = Depends(get_db),
-                                 current_user: Member = Depends(get_current_member)):
-    try:
-        await db_delete_block(db, current_user.id, block_id)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
-
-
-@app.put("/portfolio/blocks/{block_id}/pieces", response_model=PortfolioOut)
-async def set_portfolio_block_pieces(block_id: str, payload: BlockPiecesIn, db: AsyncSession = Depends(get_db),
-                                     current_user: Member = Depends(get_current_member)):
-    try:
-        await db_set_block_pieces(db, current_user.id, block_id, payload.art_ids)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=404 if "not found" in str(e).lower() else 400, detail=str(e))
-    return _portfolio_out(await db_my_portfolio_payload(db, current_user))
-
-
-@app.get("/portfolio/my-pieces", response_model=List[PortfolioPieceOut])
-async def list_my_portfolio_pieces(db: AsyncSession = Depends(get_db),
-                                   current_user: Member = Depends(get_current_member)):
-    rows = await db_list_my_visual_pieces(db, current_user.id)
-    return [PortfolioPieceOut(id=str(r.id), title=r.title, file_path=r.file_path,
-                              visibility=r.visibility, aspect_ratio=r.aspect_ratio) for r in rows]
-
-
-@app.patch("/art/{art_id}/visibility")
-async def set_art_visibility(art_id: str, payload: ArtVisibilityIn, db: AsyncSession = Depends(get_db),
-                             current_user: Member = Depends(get_current_member)):
-    try:
-        art_id = str(uuid.UUID(art_id))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Not found")
-    try:
-        file_path = await db_set_art_visibility(db, current_user.id, art_id, payload.visibility)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=404 if "not found" in str(e).lower() else 400, detail=str(e))
-    if payload.visibility == "public":
-        src = abs_path(file_path) if file_path else None
-        if src is not None and src.exists() and src.suffix.lower() != ".pdf":
-            generate_public_image(art_id, src)
-    else:
-        public_file(art_id).unlink(missing_ok=True)
-    return {"art_id": art_id, "visibility": payload.visibility}
-
-
-_templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-
-
-def mint_preview_sig(key: str, exp: int) -> str:
-    return hmac.new(JWT_SECRET.encode(), f"{key}:{exp}".encode(), "sha256").hexdigest()
-
-
-def check_preview_sig(key: str, sig: str, exp) -> bool:
-    try:
-        exp = int(exp)
-    except (TypeError, ValueError):
-        return False
-    if exp < time_mod.time():
-        return False
-    return hmac.compare_digest(mint_preview_sig(key, exp).encode(), (sig or "").encode())
-
-
-@app.get("/portfolio/preview-link")
-async def get_portfolio_preview_link(db: AsyncSession = Depends(get_db),
-                                     current_user: Member = Depends(get_current_member)):
-    p = await db_get_or_create_my_portfolio(db, current_user)
-    exp = int(time_mod.time()) + 3600
-    return {"url": f"{PUBLIC_SITE_ORIGIN}/p/{p.slug}?pv={mint_preview_sig(str(p.id), exp)}&exp={exp}"}
-
-
-@app.get("/p/{slug}", response_class=HTMLResponse)
-async def public_portfolio_page(slug: str, request: Request, pv: str | None = None, exp: str | None = None,
-                                db: AsyncSession = Depends(get_db)):
-    """The public portfolio site. NO auth — but only published portfolios render
-    (a valid preview signature, bound to the portfolio's id, admits the owner's
-    unpublished draft). The page contains zero club references."""
-    payload = await db_public_portfolio_payload(db, slug, include_unpublished=True)
-    if payload is None:
-        raise HTTPException(status_code=404, detail="Not found")
-    previewing = bool(pv) and check_preview_sig(payload["id"], pv, exp)
-    if not payload["published"] and not previewing:
-        raise HTTPException(status_code=404, detail="Not found")
-    first_piece = next((pc for b in payload["blocks"] for pc in b["pieces"]), None)
-    scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
-    origin = f"{scheme}://{request.url.netloc}"
-    og_image = f"{origin}/p/img/{first_piece['id']}" if first_piece else None
-    resp = _templates.TemplateResponse(request, "portfolio_page.html", {"p": payload, "og_image": og_image})
-    resp.headers["Cache-Control"] = "no-store" if previewing else "public, max-age=300"
-    return resp
-
-
-@app.get("/p/img/{art_id}")
-async def public_portfolio_image(art_id: str, db: AsyncSession = Depends(get_db)):
-    """Public derivative ONLY — never original bytes. 404 unless the piece is
-    visibility='public'; flipping a piece back to club 404s this immediately."""
-    try:
-        art_id = str(uuid.UUID(art_id))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Not found")
-    file_path = await db_public_art_file_path(db, art_id)
-    if not file_path:
-        raise HTTPException(status_code=404, detail="Not found")
-    out = public_file(art_id)
-    if not out.exists():
-        src = abs_path(file_path)
-        if not src.exists() or src.suffix.lower() == ".pdf" or generate_public_image(art_id, src) is None:
-            raise HTTPException(status_code=404, detail="Not found")
-    return FileResponse(out, media_type="image/jpeg",
-                        headers={"Cache-Control": "public, max-age=86400"})

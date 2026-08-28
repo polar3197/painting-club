@@ -97,14 +97,6 @@ const UserInfo = (
                         portfolio view
                     </div>
                 )}
-                {!updateProfile && profile.is_owner && (
-                    <div
-                        className="portfolio-view-toggle"
-                        onClick={(e) => { e.stopPropagation(); navigate("/portfolio-editor"); }}
-                    >
-                        portfolio
-                    </div>
-                )}
             </div>
             <div className="user-field-element" onClick={() => handleUpdateProfile()}>
                 {updateProfile ? 

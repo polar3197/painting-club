@@ -484,7 +484,9 @@ async def run_migrations():
             "WHERE type = 'written_form' AND written_format IS NULL"
         ))
         # 027: public artist portfolios — visibility controls + portfolio hierarchy.
-        # create_all builds these on fresh DBs; guards cover existing prod DBs.
+        # The feature was removed from the app (2026-08); these statements stay so
+        # the migration history remains a faithful, idempotent record. The tables
+        # and art.visibility persist with their data but nothing reads them.
         # (Was drafted as 026; renumbered — written_format claimed 026 on main.)
         await conn.execute(text(
             "ALTER TABLE art ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) NOT NULL DEFAULT 'club'"

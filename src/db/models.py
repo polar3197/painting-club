@@ -183,11 +183,6 @@ class Art(Base):
     date = Column(Date)
     file_path = Column(String(300))
     comments_enabled = Column(Boolean, nullable=False, default=False)
-    # Who may see this piece: 'club' (members only — the default, today's
-    # behavior) or 'public' (also rendered on the owner's public portfolio and
-    # servable as a downscaled public derivative). Validated app-side
-    # (VALID_ART_VISIBILITY in db_ops/portfolios.py), free VARCHAR like role.
-    visibility = Column(String(10), nullable=False, default="club", server_default="club")
     type = Column(String(50), nullable=False)  # discriminator column
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -442,44 +437,6 @@ class Bookmark(Base):
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
     art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class Portfolio(Base):
-    """A member's public portfolio site. One per member. `slug` is the public
-    URL segment (/p/{slug}) — a strict-charset field deliberately separate from
-    username (usernames allow arbitrary chars). Nothing here is served publicly
-    until `published` is true."""
-    __tablename__ = "portfolio"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    member_id = Column(UUID(as_uuid=True), ForeignKey("member.id", ondelete="CASCADE"), nullable=False, unique=True)
-    slug = Column(String(60), nullable=False, unique=True)
-    title = Column(String(120))
-    published = Column(Boolean, nullable=False, default=False)
-    theme = Column(JSONB, nullable=False, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime)
-
-
-class PortfolioBlock(Base):
-    """One vertical block of a portfolio page. kind: 'statement' | 'gallery' |
-    'spotlight'. `config` holds per-kind knobs (gallery: {"layout": "grid"|"single"};
-    statement: {"text": str} overriding the member bio; spotlight: {"caption": str})."""
-    __tablename__ = "portfolio_block"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolio.id", ondelete="CASCADE"), nullable=False)
-    kind = Column(String(20), nullable=False)
-    position = Column(Integer, nullable=False, default=0)
-    config = Column(JSONB, nullable=False, default=dict)
-
-
-class PortfolioBlockPiece(Base):
-    """Ordered membership of an art piece in a gallery/spotlight block. Render
-    filters on art.visibility='public', so flipping a piece back to club
-    instantly removes it from the live site without touching these rows."""
-    __tablename__ = "portfolio_block_piece"
-    block_id = Column(UUID(as_uuid=True), ForeignKey("portfolio_block.id", ondelete="CASCADE"), primary_key=True)
-    art_id = Column(UUID(as_uuid=True), ForeignKey("art.id", ondelete="CASCADE"), primary_key=True)
-    position = Column(Integer, nullable=False, default=0)
 
 
 class Event(Base):
