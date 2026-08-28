@@ -11,6 +11,10 @@ import Admin from "./components/Pages/Admin";
 import Settings from "./components/Pages/Settings";
 import Contributor from "./components/Pages/Contributor";
 import AnnouncementDetail from "./components/Pages/AnnouncementDetail";
+import AnnouncementsFeed from "./components/Pages/AnnouncementsFeed";
+import Events from "./components/Pages/Events";
+import EventDetail from "./components/Pages/EventDetail";
+import EventEdit from "./components/Pages/EventEdit";
 import UserRoles from "./components/Pages/UserRoles";
 import UserRoleDetail from "./components/Pages/UserRoleDetail";
 import UserStats from "./components/Pages/UserStats";
@@ -55,7 +59,12 @@ export default function App() {
           {/* Contributor tooling (Settings → …). Static segments outrank the
               /:username catch-all below, so these never collide with it. */}
           <Route path="/contributor" element={<Contributor />} />
+          <Route path="/announcements" element={<AnnouncementsFeed />} />
           <Route path="/announcements/:id" element={<AnnouncementDetail />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/new" element={<EventEdit />} />
+          <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="/events/:id/edit" element={<EventEdit />} />
           <Route path="/user-roles" element={<UserRoles />} />
           <Route path="/user-roles/:username" element={<UserRoleDetail />} />
           <Route path="/user-stats" element={<UserStats />} />

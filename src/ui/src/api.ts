@@ -549,6 +549,8 @@ export interface PromptOut {
   media_name: string;
   is_active: boolean;
   submission_count: number;
+  // When the prompt became active (naive UTC). Drives the 7-day lifespan ring.
+  activated_at: string | null;
 }
 
 export interface PromptDetailOut extends PromptOut {
@@ -850,4 +852,89 @@ export function get_infra_health(token: string | null): Promise<InfraHealthOut> 
   return request("/infra/health", {
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<InfraHealthOut>;
+}
+
+// --- Events ------------------------------------------------------------------
+
+export interface EventOut {
+  id: string;
+  title: string;
+  description: string | null;
+  event_date: string;        // YYYY-MM-DD
+  event_time: string | null; // HH:MM:SS
+  image_path: string | null; // plain /static/events/... path
+  color: string | null;
+  is_public: boolean;
+  creator_username: string;
+  hosts: string[];
+  // Only present when the viewer is a host; invitees don't see the guest list.
+  invited: string[] | null;
+  can_edit: boolean;
+  created_at: string;
+}
+
+export interface EventIn {
+  title: string;
+  description?: string | null;
+  event_date: string;
+  event_time?: string | null; // HH:MM
+  is_public?: boolean;
+  color?: string | null;
+  hosts?: string[];
+}
+
+export type EventUpdate = Partial<Omit<EventIn, "hosts">>;
+
+export interface MemberDirectoryEntry {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+}
+
+const auth = (token: string | null) => ({ Authorization: `Bearer ${token}` });
+
+export function list_events(token: string | null): Promise<EventOut[]> {
+  return request("/events", { headers: auth(token) }) as Promise<EventOut[]>;
+}
+
+export function get_event(id: string, token: string | null): Promise<EventOut> {
+  return request(`/events/${id}`, { headers: auth(token) }) as Promise<EventOut>;
+}
+
+export function create_event(payload: EventIn, token: string | null): Promise<EventOut> {
+  return request("/events", { method: "POST", headers: auth(token), body: JSON.stringify(payload) }) as Promise<EventOut>;
+}
+
+export function update_event(id: string, payload: EventUpdate, token: string | null): Promise<EventOut> {
+  return request(`/events/${id}`, { method: "PATCH", headers: auth(token), body: JSON.stringify(payload) }) as Promise<EventOut>;
+}
+
+export function delete_event(id: string, token: string | null): Promise<{ ok: boolean }> {
+  return request(`/events/${id}`, { method: "DELETE", headers: auth(token) }) as Promise<{ ok: boolean }>;
+}
+
+export function add_event_hosts(id: string, usernames: string[], token: string | null) {
+  return request(`/events/${id}/hosts`, { method: "POST", headers: auth(token), body: JSON.stringify({ usernames }) });
+}
+
+export function remove_event_host(id: string, username: string, token: string | null) {
+  return request(`/events/${id}/hosts/${username}`, { method: "DELETE", headers: auth(token) });
+}
+
+export function add_event_invites(id: string, usernames: string[], token: string | null) {
+  return request(`/events/${id}/invites`, { method: "POST", headers: auth(token), body: JSON.stringify({ usernames }) });
+}
+
+export function remove_event_invite(id: string, username: string, token: string | null) {
+  return request(`/events/${id}/invites/${username}`, { method: "DELETE", headers: auth(token) });
+}
+
+export function upload_event_image(id: string, file: File, token: string | null): Promise<{ image_path: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return request(`/events/${id}/image`, { method: "POST", headers: auth(token), body: fd }) as Promise<{ image_path: string }>;
+}
+
+export function get_member_directory(token: string | null): Promise<MemberDirectoryEntry[]> {
+  return request("/members/directory", { headers: auth(token) }) as Promise<MemberDirectoryEntry[]>;
 }

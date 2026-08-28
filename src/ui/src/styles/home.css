@@ -1,201 +1,206 @@
 .home {
-    height: 100%;
+    min-height: 100%;
     width: 100%;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
+    gap: 22px;
+    padding: 28px 32px 40px 32px;
+    box-sizing: border-box;
     background-color: rgb(201, 247, 193);
 }
 
-.home-left {
-    width: 60%;
-    height: 100%;
-
+.home-top {
     display: flex;
-    flex-direction: column;
-}
-
-.home-right {
-    display: flex;
-    justify-content: end;
-    padding-right: 40px;
     align-items: center;
-    width: 40%;
-    height: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
-.home-left-top {
-    width: 100%;
-    height: 20%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    padding: 20px;
-    gap: 25px;
-}
-
-.home-left-title {
-    display: flex;
-    justify-content: center;
+.home-title {
+    display: inline-flex;
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
     font-weight: 500;
-    font-size: 36px;
-    padding: 20px;
+    font-size: 32px;
+    padding: 14px 22px;
     border: 2px solid black;
     background-color: rgb(210, 243, 210);
-    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
 }
 
-.home-left-content {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: 2px black solid;
-    margin-left: 30px;
-    margin-bottom: 30px;
-    background-color: rgb(251, 219, 161);
-
-    width: 100%;
-    height: 90%;
-}
-
-.painting-club-message {
-    width: 85%;
-    height: 85%;
-    background-color: rgb(255, 250, 245);
-    border: 2px solid black;
+.home-admin-alert {
     font-family: 'Courier New', Courier, monospace;
-    font-weight: 580;
-
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 20px;
-    overflow-y: auto;
-    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px;
-}
-
-.prompt-banner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 28px 36px;
-    background-color: rgb(210, 243, 210);
-    border: 2px solid black;
-    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 13px;
+    border: 1px solid black;
+    background-color: rgb(238, 190, 100);
+    padding: 8px 14px;
     cursor: pointer;
 }
 
-.prompt-banner-label {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    letter-spacing: 0.12em;
-    text-transform: lowercase;
-    color: #333;
+.home-squares {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 420px));
+    gap: 22px;
 }
 
-.prompt-banner-title {
-    font-size: 28px;
-    font-weight: 500;
-    color: #000;
+.home-square {
+    aspect-ratio: 1 / 1;
+    border: 2px solid black;
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
+    box-sizing: border-box;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: black;
+}
+
+/* prompt square: the ring */
+.home-square-prompt {
+    background-color: rgb(251, 219, 161);
+    align-items: center;
+    justify-content: center;
+}
+
+.home-square-prompt.empty { cursor: default; }
+
+.prompt-ring {
+    width: 78%;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    border: 2px solid black;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.prompt-ring-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: rgb(251, 219, 161);
+    border: 1px solid black;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14%;
+    box-sizing: border-box;
     text-align: center;
 }
 
-.prompt-banner-medium {
+.prompt-label {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: #333;
+}
+
+.prompt-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 24px;
+    line-height: 1.15;
+}
+
+.prompt-medium {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
     color: #555;
 }
 
-.prompt-banner-empty {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
-    color: #555;
-    opacity: 0.6;
+/* events square */
+.home-square-events {
+    background-color: rgb(255, 250, 245);
 }
 
-.stamp-wrapper {
+.home-square-head {
     display: flex;
-    width: 100%;
-    height: 100%;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.home-square-label {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 20px;
+}
+
+.home-square-link {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: #555;
+}
+
+.home-upcoming {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: auto;
+    border-top: 1px solid black;
+    padding-top: 8px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.home-upcoming-empty {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: rgb(140, 140, 140);
+}
+
+.home-upcoming-row {
+    display: grid;
+    grid-template-columns: 8px 1fr auto;
     align-items: center;
-    justify-content: center;
-    /* border: 1px black solid; */
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.home-upcoming-row:hover .home-upcoming-title { text-decoration: underline; }
+
+.home-upcoming-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid black;
+    box-sizing: border-box;
+}
+
+.home-upcoming-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.home-upcoming-when {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    color: #555;
+    white-space: nowrap;
+}
+
+.home-announcements {
+    max-width: 862px;
 }
 
 @media (max-width: 1024px) {
-    .home-left {
-        width: 55%;
-    }
-
-    .home-right {
-        width: 45%;
-    }
-
-    .home-left-title {
-        font-size: 28px;
-        padding: 14px;
-    }
+    .home { padding: 20px; }
+    .home-title { font-size: 26px; padding: 10px 16px; }
 }
 
 @media (max-width: 640px) {
-    .home {
-        flex-direction: column;
-        height: auto;
-        min-height: 100%;
-        overflow-y: auto;
-    }
-
-    .home-left,
-    .home-right {
-        width: 100%;
-    }
-
-    .home-left {
-        height: auto;
-    }
-
-    .home-right {
-        height: auto;
-        justify-content: center;
-        padding: 16px;
-        box-sizing: border-box;
-    }
-
-    .home-left-top {
-        height: auto;
-        padding: 16px;
-        gap: 14px;
-        flex-wrap: wrap;
-    }
-
-    .home-left-title {
-        font-size: 24px;
-        padding: 10px 16px;
-    }
-
-    .home-left-content {
-        height: auto;
-        margin-left: 0;
-        margin-bottom: 16px;
-        padding: 20px;
-        font-size: 14px;
-    }
-
-    .painting-club-message {
-        width: 100%;
-        height: auto;
-        padding: 18px;
-        font-size: 14px;
-        line-height: 1.5;
-        box-sizing: border-box;
-        overflow-y: visible;
-    }
-
-    .stamp-wrapper {
-        height: auto;
-        margin-top: 12px;
-    }
+    .home { padding: 14px; gap: 16px; }
+    .home-title { font-size: 22px; padding: 8px 14px; }
+    .home-squares { grid-template-columns: 1fr; }
+    .home-square { aspect-ratio: auto; min-height: 320px; }
+    .prompt-ring { width: 70%; }
+    .prompt-title { font-size: 20px; }
 }

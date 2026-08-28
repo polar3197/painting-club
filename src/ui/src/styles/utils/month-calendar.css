@@ -1,0 +1,98 @@
+.mcal {
+    width: 100%;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.mcal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.mcal-month {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 18px;
+}
+
+.mcal-arrow {
+    background: none;
+    border: 1px solid black;
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    background-color: white;
+}
+
+.mcal-arrow:hover {
+    background-color: rgb(250, 244, 202);
+}
+
+.mcal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.mcal-weekday {
+    text-align: center;
+    font-size: 11px;
+    color: rgb(120, 120, 120);
+    padding-bottom: 2px;
+}
+
+.mcal-cell {
+    aspect-ratio: 1 / 1;
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    font: inherit;
+    color: black;
+}
+
+.mcal-cell:not([tabindex="0"]) {
+    cursor: default;
+}
+
+.mcal-day {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border: 1px solid transparent;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.mcal-cell:hover .mcal-day {
+    border-color: black;
+}
+
+.mcal-day.today {
+    border: 1px dashed black;
+}
+
+.mcal-day.sel {
+    background-color: black;
+    color: white;
+}
+
+.mcal-dot {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+
+.mcal-compact .mcal-month { font-size: 15px; }
+.mcal-compact .mcal-day { font-size: 12px; }
+.mcal-compact .mcal-weekday { font-size: 10px; }
+.mcal-compact .mcal-dot { width: 4px; height: 4px; bottom: 2px; }
