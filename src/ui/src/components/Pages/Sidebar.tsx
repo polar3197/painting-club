@@ -5,7 +5,6 @@ import { useAuth } from "../../context/AuthContext";
 
 interface SidebarProps {
   isOpen: boolean;
-  toggleSidebar: () => void;
 }
 
 const SidebarElement = ({
@@ -41,7 +40,7 @@ const SidebarElement = ({
   );
 };
 
-const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
+const Sidebar = ({ isOpen }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, currentRole, logout } = useAuth()!;

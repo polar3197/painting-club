@@ -88,4 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Kept alongside the provider so every consumer imports from one place. The
+// react-refresh rule only concerns HMR granularity, not correctness.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

@@ -5,13 +5,11 @@ import { Outlet } from "react-router-dom";
 import "../../styles/page-layout.css";
 
 const PageLayout = () => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const toggleSidebar = () => setIsOpen(!isOpen);
+  const [isOpen] = useState(false);
 
   return (
     <div className="page-wrapper">
-        <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+        <Sidebar isOpen={isOpen} />
         <div id="page-body" className="page-body">
             <Outlet />
         </div>

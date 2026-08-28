@@ -1,7 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useProfile } from "../../hooks/useProfile";
-import { Profile } from "../../api";
 import UserDetails from "../UserProfile/UserDetails";
 import MediaBar from "../UserProfile/MediaBar";
 import Art from "../UserProfile/Art";

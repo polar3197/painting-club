@@ -64,8 +64,7 @@ const UserDetails = (
               src={src!}
               width="180"
               height="200"
-              // @ts-ignore — fetchpriority isn't in the standard React img types yet
-              fetchpriority="high"
+              fetchPriority="high"
             />
           </div>
         ) : profile.is_owner ? (

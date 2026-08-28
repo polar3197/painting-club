@@ -51,7 +51,7 @@ const MediaBar = (
   {
     profile: Profile;
     setProfile: Dispatch<SetStateAction<Profile | null>>;
-    selectedMedium: string;
+    selectedMedium: string | null;
     setSelectedMedium: Dispatch<SetStateAction<string | null>>;
     selectedKeywords: string[];
     setSelectedKeywords: Dispatch<SetStateAction<string[]>>;
@@ -87,7 +87,7 @@ const MediaBar = (
     }
     setProfile({ ...profile, media, hidden_media: hidden });
     if (hiddenNow && selectedMedium === name) {
-      setSelectedMedium(media[0] ?? null as any);
+      setSelectedMedium(media[0] ?? null);
       setSelectedKeywords([]);
     }
   };
@@ -115,12 +115,14 @@ const MediaBar = (
           </button>
         )}
       </div>
-      <Keywords
-        availableKeywords={availableKeywords}
-        selectedMedium={selectedMedium}
-        selectedKeywords={selectedKeywords}
-        setSelectedKeywords={setSelectedKeywords}
-      />
+      {selectedMedium && (
+        <Keywords
+          availableKeywords={availableKeywords}
+          selectedMedium={selectedMedium}
+          selectedKeywords={selectedKeywords}
+          setSelectedKeywords={setSelectedKeywords}
+        />
+      )}
       {showAddMedia && (
         <AddMediaDialog
           shown={profile.media ?? []}

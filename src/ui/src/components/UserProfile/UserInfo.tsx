@@ -5,22 +5,6 @@ import "../../styles/user-profile/user-deets.css";
 import "../../styles/portfolio.css";
 
 
-const UserQuestion = (
-    { question, answer } : { question : string; answer : string;}
-) => {
-    return (
-        <div className="question-wrapper">
-            <div className="question">
-                {question}
-            </div>
-            <div className="answer">
-                {answer}
-            </div>
-        </div>
-    )
-}
-
-
 const UserInfo = (
     {
         profile,

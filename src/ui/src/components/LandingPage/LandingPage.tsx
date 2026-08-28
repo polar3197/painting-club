@@ -1,4 +1,3 @@
-import Announcements from "../Utils/Announcements";
 import Login from "./Login";
 import "../../styles/app-layout.css";
 
@@ -80,7 +79,7 @@ export default function LandingPage() {
         bottom={theme.announcements_bottom}
         left={theme.announcements_left}
       /> */}
-      <Login 
+      <Login
         bottom={theme.login_bottom}
         left={theme.login_left}
         background_color={theme.login_background_color}
