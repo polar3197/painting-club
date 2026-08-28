@@ -19,12 +19,12 @@ const UserDetails = (
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const auth = useAuth();
+  const token = auth?.token ?? null;
   const versions = auth?.profilePicVersions ?? {};
   const src = profilePicSrc(profile, versions);
   const hasPic = !!src;
 
   const handleUpload = async (file: File) => {
-    const token = localStorage.getItem("token");
     const result = await upload_profile_picture(file, token);
     setProfile({ ...profile, profile_pic_path: result.profile_pic_path });
     // Same-extension re-uploads write to the same URL — bump versions so corner

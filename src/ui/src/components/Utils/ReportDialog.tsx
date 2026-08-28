@@ -11,8 +11,7 @@ interface Props {
 }
 
 export default function ReportDialog({ open, targetType, targetId, onClose }: Props) {
-    const auth = useAuth();
-    const token = localStorage.getItem("token");
+    const token = useAuth()?.token ?? null;
     const [reason, setReason] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
@@ -30,8 +29,6 @@ export default function ReportDialog({ open, targetType, targetId, onClose }: Pr
         } finally {
             setSubmitting(false);
         }
-        // referenced to keep useAuth import valid even if currentUser unused here
-        void auth;
     };
 
     const handleCancel = () => {

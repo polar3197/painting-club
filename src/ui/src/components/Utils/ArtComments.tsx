@@ -5,10 +5,11 @@ import ArtZoomIn from "./ArtZoomIn";
 import ContextPopup from "./ContextPopup";
 import ReportDialog from "./ReportDialog";
 import "../../styles/utils/art-comments.css";
+import { useAuth } from "../../context/AuthContext";
 
 const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: boolean) => void }) => {
-    const currentUser = (localStorage.getItem("username") ?? "").toLowerCase();
-    const token = localStorage.getItem("token");
+    const { token, currentUser: user } = useAuth()!;
+    const currentUser = (user ?? "").toLowerCase();
     const navigate = useNavigate();
     const [comments, setComments] = useState<CommentOut[]>([]);
     const [input, setInput] = useState("");
@@ -23,7 +24,7 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
 
     useEffect(() => {
         get_comments(piece.id, token).then(setComments).catch(() => {});
-    }, [piece.id]);
+    }, [piece.id, token]);
 
     useEffect(() => {
         setImgSrc(thumbUrl(piece.id));

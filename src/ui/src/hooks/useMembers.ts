@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { get_members, Profile } from "../api";
+import { useAuth } from "../context/AuthContext";
 
 export function useMembers(city: string , username: string ): [Profile[] | [], Error | null, boolean] {
   const [members, setMembers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const { token } = useAuth()!;
 
 
   useEffect(() => {
     const fetchMembers = async () => {
-      const token = localStorage.getItem("token");
       try {
         const data = await get_members(city, username, token);
         setMembers(data);
@@ -23,7 +24,7 @@ export function useMembers(city: string , username: string ): [Profile[] | [], E
     };
 
     fetchMembers();
-  }, [city, username]);
+  }, [city, username, token]);
 
   return [members, error, loading];
 }

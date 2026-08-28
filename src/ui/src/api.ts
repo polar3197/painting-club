@@ -1,3 +1,4 @@
+import { getToken, clearSession } from "./session";
 
 const API_BASE = "/api";
 
@@ -32,7 +33,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
   // Attach the session token by default — the backend lockdown member-gated
   // routes this client still called bare (e.g. the per-medium art lists), and
   // any 401 below nukes the session. Explicit headers still win via spread.
-  const token = localStorage.getItem("token");
+  const token = getToken();
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -48,9 +49,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
   // Expired/invalid token on an authenticated request → clear session + kick to landing.
   // Skip the redirect for the login endpoint itself so bad-password attempts don't bounce the page.
   if (response.status === 401 && !path.startsWith("/members/login")) {
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
-    localStorage.removeItem("role");
+    clearSession();
     if (window.location.pathname !== "/landing-page") {
       window.location.href = "/landing-page";
     }

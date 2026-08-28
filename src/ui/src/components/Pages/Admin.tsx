@@ -12,6 +12,7 @@ import {
     get_reports,
     update_report_status,
 } from "../../api";
+import { useAuth } from "../../context/AuthContext";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import "../../styles/admin.css";
 
@@ -206,7 +207,7 @@ const Admin = () => {
     const [applications, setApplications] = useState<ApplicationOut[]>([]);
     const [mediaRequests, setMediaRequests] = useState<MediaRequest[]>([]);
     const [reports, setReports] = useState<ReportOut[]>([]);
-    const token = localStorage.getItem("token");
+    const { token } = useAuth()!;
 
     useEffect(() => {
         get_applications(token).then(setApplications).catch(console.error);

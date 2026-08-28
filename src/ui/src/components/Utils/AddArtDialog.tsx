@@ -5,6 +5,7 @@ import PaintingForm from "../Utils/PaintingForm";
 import WrittenFormForm from "../Utils/WrittenFormForm";
 import "../../styles/utils/dialog.css";
 import { update_visual_2d, update_written_form, Visual2DOut, Visual2DIn, WrittenFormOut, WrittenFormIn, get_media, MediaType } from "../../api";
+import { useAuth } from "../../context/AuthContext";
 
 // this element will be z= 100 and centered relative to the whole page
 const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMoved, piece, writtenPiece, onCreate, onCreateWrittenForm }
@@ -43,6 +44,7 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
     );
 
     const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+    const { token } = useAuth()!;
     const [newMedium, setNewMedium] = useState<string>("");
 
     useEffect(() => {
@@ -59,7 +61,6 @@ const AddArtDialog = ({ setShowDialog, selectedMedium, username, onSuccess, onMo
 
     const submit = () => {
         if (!formData) return;
-        const token = localStorage.getItem("token");
 
         if (isWrittenForm) {
             const title = (formData.title || "").trim();

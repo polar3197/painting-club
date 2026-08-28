@@ -3,6 +3,7 @@ import ConfirmDialog from "../Utils/ConfirmDialog";
 import WrittenFormZoomIn from "../Utils/WrittenFormZoomIn";
 import { extFromPath, isTextExt, useWrittenFormText } from "../../hooks/useWrittenFormText";
 import { remove_written_form, WrittenFormOut } from "../../api";
+import { useAuth } from "../../context/AuthContext";
 
 const PREVIEW_LINES = 12;
 
@@ -25,13 +26,14 @@ const WrittenFormPiece = ({
 }) => {
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
     const [isZoomedIn, setIsZoomedIn] = useState(false);
+    const { token } = useAuth()!;
 
     const ext = extFromPath(piece.file_path);
     const textContent = useWrittenFormText(piece.file_path);
     const snippet = previewSnippet(textContent);
 
     const removePiece = async () => {
-        await remove_written_form(piece.id, localStorage.getItem("token"));
+        await remove_written_form(piece.id, token);
         setShowRemoveConfirm(false);
         onRemove();
     };

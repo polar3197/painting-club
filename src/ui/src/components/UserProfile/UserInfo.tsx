@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Profile, update_profile } from "../../api";
 import "../../styles/user-profile/user-deets.css";
 import "../../styles/portfolio.css";
+import { useAuth } from "../../context/AuthContext";
 
 
 const UserInfo = (
@@ -21,7 +22,7 @@ const UserInfo = (
     }
 ) => {
     const [updateProfile, setUpdateProfile] = useState<boolean>(false);
-    const token = localStorage.getItem("token");
+    const { token } = useAuth()!;
     const navigate = useNavigate();
 
     const handlePortfolioView = () => {

@@ -4,19 +4,20 @@ import { useNavigate } from "react-router-dom";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 import { get_active_prompt, PromptOut } from "../../api";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Home() {
   const navigate = useNavigate();
+  const { token } = useAuth()!;
   const [prompt, setPrompt] = useState<PromptOut | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     let cancelled = false;
     get_active_prompt(token)
       .then((p) => { if (!cancelled) setPrompt(p); })
       .catch(() => { if (!cancelled) setPrompt(null); });
     return () => { cancelled = true; };
-  }, []);
+  }, [token]);
 
   return (
     <main className="page">

@@ -5,6 +5,7 @@ import "../../styles/profiles/members-display.css";
 import "../../styles/weekly-prompt.css";
 import { get_prompt, PromptDetailOut, ArtResult } from "../../api";
 import ArtImage from "../Utils/ArtImage";
+import { useAuth } from "../../context/AuthContext";
 
 const ArtCard = ({ piece }: { piece: ArtResult }) => {
   const navigate = useNavigate();
@@ -30,16 +31,16 @@ const WeeklyPromptGrid = () => {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState<PromptDetailOut | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { token } = useAuth()!;
 
   useEffect(() => {
     if (!id) return;
-    const token = localStorage.getItem("token");
     let cancelled = false;
     get_prompt(id, token)
       .then((p) => { if (!cancelled) setPrompt(p); })
       .catch((e) => { if (!cancelled) setError(e?.message || "Could not load prompt"); });
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, token]);
 
   if (error) {
     return <main className="page weekly-prompt-page"><div className="weekly-prompt-error">{error}</div></main>;

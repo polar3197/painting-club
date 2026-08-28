@@ -35,7 +35,7 @@ const ArtZoomIn = ({
     const blockedUsernames = auth?.blockedUsernames ?? [];
     const noteBlocked = auth?.noteBlocked ?? (() => {});
     const noteUnblocked = auth?.noteUnblocked ?? (() => {});
-    const token = localStorage.getItem("token");
+    const token = auth?.token ?? null;
     const [showReport, setShowReport] = useState(false);
     const [pendingBlock, setPendingBlock] = useState<string | null>(null);
     const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);

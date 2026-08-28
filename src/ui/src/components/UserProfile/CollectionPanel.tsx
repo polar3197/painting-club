@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AddArtDialog from "../Utils/AddArtDialog";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import { rename_series, remove_written_form, set_series_order, WrittenFormOut } from "../../api";
+import { useAuth } from "../../context/AuthContext";
 
 const CollectionPanel = ({
     pieces,
@@ -31,7 +32,7 @@ const CollectionPanel = ({
     const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
     const [overIdx, setOverIdx] = useState<number | null>(null);
 
-    const token = localStorage.getItem("token");
+    const { token } = useAuth()!;
 
     const saveName = async () => {
         const trimmed = nameDraft.trim();

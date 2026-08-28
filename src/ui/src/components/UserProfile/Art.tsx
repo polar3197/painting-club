@@ -29,12 +29,13 @@ const Visual2DPiece = ({
 }) => {
     const auth = useAuth();
     const currentUser = auth?.currentUser ?? null;
+    const token = auth?.token ?? null;
     const [isZoomedIn, setIsZoomedIn] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
     const removeArt = async ({ pieceId }: { pieceId: string }) => {
-        await remove_visual_2d(pieceId, localStorage.getItem("token"));
+        await remove_visual_2d(pieceId, token);
         setShowRemoveConfirm(false);
         onRemove();
     }
@@ -106,6 +107,7 @@ const Visual2DPiece = ({
 
 
 const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, onKeywordsLoaded, scrollToArtId, onMoved } : { profile: Profile; selectedMedium: string | null; selectedKeywords: string[]; refresh: number; onRefresh: () => void; onKeywordsLoaded: (keywords: string[]) => void; scrollToArtId?: string | null; onMoved?: (newMedium: string) => void; }) => {
+    const { token } = useAuth()!;
     const [showDialog, setShowDialog] = useState(false);
     const [editingPiece, setEditingPiece] = useState<Visual2DOut | null>(null);
     const [editingWrittenForm, setEditingWrittenForm] = useState<WrittenFormOut | null>(null);
@@ -127,7 +129,6 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                 ? Number(payload.width) / Number(payload.height)
                 : 1;
         setPendingPieces(p => [...p, { tempId, medium: payload.medium, previewUrl, title: payload.title || "uploading…", aspectRatio }]);
-        const token = localStorage.getItem("token");
         add_new_visual_2d(token, payload)
             .then(() => onRefresh())
             .catch((err: any) => alert(err?.message || "Upload failed"))
@@ -141,7 +142,6 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
         const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const ext = (payload.file?.name.match(/\.([a-z0-9]+)$/i)?.[1] ?? "TXT").toUpperCase();
         setPendingWrittenForms(p => [...p, { tempId, medium: payload.medium, title: payload.title || "uploading…", ext }]);
-        const token = localStorage.getItem("token");
         add_new_written_form(token, payload)
             .then(() => onRefresh())
             .catch((err: any) => alert(err?.message || "Upload failed"))

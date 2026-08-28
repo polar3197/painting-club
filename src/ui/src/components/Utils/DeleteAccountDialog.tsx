@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { export_my_data, delete_account } from "../../api";
 import "../../styles/utils/delete-account-dialog.css";
+import { useAuth } from "../../context/AuthContext";
 
 interface Props {
   open: boolean;
@@ -10,7 +11,7 @@ interface Props {
 }
 
 const DeleteAccountDialog = ({ open, username, onClose, onDeleted }: Props) => {
-  const token = localStorage.getItem("token");
+  const { token } = useAuth()!;
   const [typed, setTyped] = useState("");
   const [downloaded, setDownloaded] = useState(false);
   const [downloading, setDownloading] = useState(false);

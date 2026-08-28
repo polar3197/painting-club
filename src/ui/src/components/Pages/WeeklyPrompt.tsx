@@ -5,6 +5,7 @@ import "../../styles/weekly-prompt.css";
 import { get_prompt, add_new_visual_2d, PromptDetailOut, ArtResult, Visual2DIn } from "../../api";
 import ArtImage from "../Utils/ArtImage";
 import AddArtDialog from "../Utils/AddArtDialog";
+import { useAuth } from "../../context/AuthContext";
 
 // Compute the (cols, rows) that maximizes the per-tile area inside (W, H) for N items.
 // Tries every column count and picks the layout whose min(W/cols, H/rows) is largest.
@@ -63,10 +64,10 @@ const WeeklyPrompt = () => {
   const [prompt, setPrompt] = useState<PromptDetailOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const { token, currentUser } = useAuth()!;
 
   const refresh = () => {
     if (!id) return;
-    const token = localStorage.getItem("token");
     get_prompt(id, token)
       .then(setPrompt)
       .catch((e) => setError(e?.message || "Could not load prompt"));
@@ -74,19 +75,17 @@ const WeeklyPrompt = () => {
 
   useEffect(() => {
     if (!id) return;
-    const token = localStorage.getItem("token");
     let cancelled = false;
     get_prompt(id, token)
       .then((p) => { if (!cancelled) setPrompt(p); })
       .catch((e) => { if (!cancelled) setError(e?.message || "Could not load prompt"); });
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, token]);
 
-  const username = localStorage.getItem("username") ?? "";
+  const username = currentUser ?? "";
 
   const onCreateSubmission = (payload: Visual2DIn) => {
     if (!prompt) return;
-    const token = localStorage.getItem("token");
     add_new_visual_2d(token, { ...payload, collection_id: prompt.id })
       .then(() => { setShowDialog(false); refresh(); })
       .catch((err: any) => alert(err?.message || "Could not submit"));

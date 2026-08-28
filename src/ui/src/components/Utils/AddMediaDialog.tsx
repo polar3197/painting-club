@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { get_media, submit_media_request, set_media_visibility, MediaType } from "../../api";
 import "../../styles/utils/add-media-dialog.css";
+import { useAuth } from "../../context/AuthContext";
 
 type Tab = "hide-show" | "new";
 
@@ -16,6 +17,7 @@ const AddMediaDialog = (
     }
 ) => {
     const [tab, setTab] = useState<Tab>("hide-show");
+    const { token } = useAuth()!;
     const [media, setMedia] = useState<MediaType[] | null>(null);
     // Freeze the order of artforms at mount time so toggling doesn't reshuffle rows.
     const initialOrder = useMemo(() => [...shown, ...hidden], []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -39,7 +41,6 @@ const AddMediaDialog = (
         if (!name) return;
         setRequestError(null);
         try {
-            const token = localStorage.getItem("token");
             await submit_media_request(name, token);
             setRequestName("");
             setRequestSent(true);
@@ -51,7 +52,6 @@ const AddMediaDialog = (
 
     const toggleVisibility = async (name: string, makeHidden: boolean) => {
         try {
-            const token = localStorage.getItem("token");
             await set_media_visibility(name, makeHidden, token);
             onVisibilityChange(name, makeHidden);
         } catch (e: any) {

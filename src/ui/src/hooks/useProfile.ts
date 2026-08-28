@@ -1,6 +1,7 @@
 import { useEffect, useState, Dispatch, SetStateAction } from 'react';
 
 import { get_profile, Profile } from "../api";
+import { useAuth } from "../context/AuthContext";
 
 export function useProfile(username: string | undefined): 
   [
@@ -13,10 +14,10 @@ export function useProfile(username: string | undefined):
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const { token } = useAuth()!;
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("token");
       try {
         const data = await get_profile(username!, token);
         setProfile(data);
@@ -28,7 +29,7 @@ export function useProfile(username: string | undefined):
     };
 
     fetchProfile();
-  }, [username]);
+  }, [username, token]);
 
   return [profile, setProfile, error, loading];
 }

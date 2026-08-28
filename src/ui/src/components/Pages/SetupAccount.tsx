@@ -14,7 +14,7 @@ const Themes = [
 ];
 
 export default function SetupAccount() {
-  const { login, logout } = useAuth()!;
+  const { token, login, logout } = useAuth()!;
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -23,7 +23,6 @@ export default function SetupAccount() {
   const [error, setError] = useState<string | null>(null);
 
   const theme = useMemo(() => Themes[Math.floor(Math.random() * Themes.length)], []);
-  const token = localStorage.getItem("token");
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

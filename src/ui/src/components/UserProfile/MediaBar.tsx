@@ -4,6 +4,7 @@ import { Profile, add_member_media } from "../../api";
 import Dropdown from "../Utils/Dropdown";
 import AddMediaDialog from "../Utils/AddMediaDialog";
 import "../../styles/user-profile/media-bar.css";
+import { useAuth } from "../../context/AuthContext";
 
 const Keywords = (
   { availableKeywords, selectedMedium, selectedKeywords, setSelectedKeywords } :
@@ -59,10 +60,10 @@ const MediaBar = (
   }
 ) => {
   const [showAddMedia, setShowAddMedia] = useState(false);
+  const { token } = useAuth()!;
   const noMedia = (profile.media?.length ?? 0) === 0;
 
   const handleAddMedia = async (name: string) => {
-    const token = localStorage.getItem("token");
     try {
       await add_member_media(profile.username, name, token);
       setProfile({ ...profile, media: [...(profile.media ?? []), name] });
