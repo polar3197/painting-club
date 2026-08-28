@@ -9,6 +9,12 @@ import NotMember from "./components/Pages/NotMember";
 import Join from "./components/Pages/Join";
 import Admin from "./components/Pages/Admin";
 import Settings from "./components/Pages/Settings";
+import Contributor from "./components/Pages/Contributor";
+import AnnouncementDetail from "./components/Pages/AnnouncementDetail";
+import UserRoles from "./components/Pages/UserRoles";
+import UserRoleDetail from "./components/Pages/UserRoleDetail";
+import UserStats from "./components/Pages/UserStats";
+import InfraStats from "./components/Pages/InfraStats";
 import PageLayout from "./components/Pages/PageLayout";
 import Ethos from "./components/Pages/Ethos";
 import Privacy from "./components/Pages/Privacy";
@@ -46,6 +52,14 @@ export default function App() {
           <Route path="/art" element={<ArtGallery />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/settings" element={<Settings />} />
+          {/* Contributor tooling (Settings → …). Static segments outrank the
+              /:username catch-all below, so these never collide with it. */}
+          <Route path="/contributor" element={<Contributor />} />
+          <Route path="/announcements/:id" element={<AnnouncementDetail />} />
+          <Route path="/user-roles" element={<UserRoles />} />
+          <Route path="/user-roles/:username" element={<UserRoleDetail />} />
+          <Route path="/user-stats" element={<UserStats />} />
+          <Route path="/infra-stats" element={<InfraStats />} />
 
           {/* <Route path="/groups" element={<Groups />} /> */}
           <Route path="/:username" element={<UserProfile />} />

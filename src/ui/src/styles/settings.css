@@ -67,6 +67,10 @@
     background-color: rgb(238, 190, 100);
 }
 
+.settings-btn-contributor {
+    background-color: rgb(198, 164, 233);
+}
+
 .settings-btn-logout {
     background-color: rgb(255, 215, 0);
 }

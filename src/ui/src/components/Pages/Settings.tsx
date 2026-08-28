@@ -74,6 +74,18 @@ export default function Settings() {
 
         <div className="settings-spacer" />
 
+        {/* Contributor is the top tier (admin + docs / roles / announcements);
+            admins don't see these. */}
+        {currentRole === "contributor" && (
+          <div className="settings-section">
+            <h2 className="settings-section-title">contributor</h2>
+            <button className="settings-btn settings-btn-contributor" onClick={() => navigate("/contributor")}>contributor</button>
+            <button className="settings-btn" onClick={() => navigate("/user-roles")}>user roles</button>
+            <button className="settings-btn" onClick={() => navigate("/user-stats")}>user stats</button>
+            <button className="settings-btn" onClick={() => navigate("/infra-stats")}>infra stats</button>
+          </div>
+        )}
+
         {isStaff && (
           <div className="settings-section">
             <h2 className="settings-section-title">admin</h2>

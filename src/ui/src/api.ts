@@ -703,3 +703,151 @@ export function update_report_status(
     body: JSON.stringify({ status }),
   }) as Promise<ReportOut>;
 }
+
+// --- Contributor tooling (announcements, roles, usage, infra) ---------------
+
+export type MemberRole = "member" | "contributor" | "admin";
+
+export interface AdminMemberOut {
+  username: string;
+  firstname: string | null;
+  lastname: string | null;
+  role: MemberRole;
+}
+
+export function get_admin_members(token: string | null): Promise<AdminMemberOut[]> {
+  return request("/admin/members", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AdminMemberOut[]>;
+}
+
+export function set_member_role(
+  username: string,
+  role: MemberRole,
+  token: string | null,
+): Promise<{ username: string; role: MemberRole }> {
+  return request(`/admin/members/${username}/role`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ role }),
+  }) as Promise<{ username: string; role: MemberRole }>;
+}
+
+export interface AnnouncementOut {
+  id: string;
+  title: string;
+  body: string;
+  author_username: string | null;
+  author_firstname: string | null;
+  comment_count: number;
+  created_at: string;
+}
+
+export interface AnnouncementCommentOut {
+  id: string;
+  username: string;
+  firstname: string | null;
+  text: string;
+  created_at: string;
+}
+
+export interface AnnouncementDetailOut extends AnnouncementOut {
+  comments: AnnouncementCommentOut[];
+}
+
+export function get_announcements(token: string | null): Promise<AnnouncementOut[]> {
+  return request("/announcements", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AnnouncementOut[]>;
+}
+
+export function get_announcement(id: string, token: string | null): Promise<AnnouncementDetailOut> {
+  return request(`/announcements/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<AnnouncementDetailOut>;
+}
+
+export function create_announcement(title: string, body: string, token: string | null): Promise<AnnouncementOut> {
+  return request("/announcements", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ title, body }),
+  }) as Promise<AnnouncementOut>;
+}
+
+export function delete_announcement(id: string, token: string | null): Promise<void> {
+  return request(`/announcements/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<void>;
+}
+
+export function add_announcement_comment(id: string, text: string, token: string | null): Promise<AnnouncementCommentOut> {
+  return request(`/announcements/${id}/comments`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ text }),
+  }) as Promise<AnnouncementCommentOut>;
+}
+
+export function delete_announcement_comment(id: string, commentId: string, token: string | null): Promise<void> {
+  return request(`/announcements/${id}/comments/${commentId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<void>;
+}
+
+export interface DayCount {
+  date: string; // YYYY-MM-DD
+  count: number;
+}
+
+export interface ActiveMember {
+  username: string;
+  firstname: string | null;
+}
+
+export interface UsageSummary {
+  days: number;
+  // "Visits" = app-use sessions (a member's activity split on >30min gaps).
+  total_visits: number;
+  total_events: number;
+  visits_per_day: DayCount[];
+  active_per_day: DayCount[];
+  active_today: ActiveMember[];
+  top_screens: { screen: string; count: number }[];
+}
+
+export function get_usage_summary(days: number, token: string | null): Promise<UsageSummary> {
+  return request(`/usage/summary?days=${days}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<UsageSummary>;
+}
+
+export interface DiskHealth {
+  path: string | null;
+  total: number | null;
+  used: number | null;
+  free: number | null;
+  percent: number | null;
+}
+
+export interface InfraHealthOut {
+  ok: boolean;
+  // False when the host's /proc was unreadable (e.g. dev off-Linux).
+  host_metrics_available: boolean;
+  kernel: string | null;
+  uptime_seconds: number | null;
+  temperature_c: number | null;
+  cpu: { percent: number | null; cores: number | null; load_1: number | null; load_5: number | null; load_15: number | null };
+  memory: { total: number | null; used: number | null; available: number | null; percent: number | null };
+  disk: DiskHealth;          // system / SD card
+  content_disk: DiskHealth;  // the drive uploads live on
+  content: { path: string | null; bytes: number | null; files: number | null; truncated: boolean };
+}
+
+export function get_infra_health(token: string | null): Promise<InfraHealthOut> {
+  return request("/infra/health", {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<InfraHealthOut>;
+}
