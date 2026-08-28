@@ -5,10 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&display=swap" rel="stylesheet"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- iOS Safari "Open in app / GET" banner. Works today, no app release or
+         Universal Link needed; app-argument is what the app receives on open. -->
+    <meta name="apple-itunes-app" content="app-id=6762710261, app-argument=https://paintingclub.art/join" />
     <title>painting club</title>
   </head>
   <body autocapitalize="off">
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

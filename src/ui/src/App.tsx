@@ -6,6 +6,7 @@ import People from "./components/Pages/People";
 import ArtGallery from "./components/Pages/ArtGallery";
 import Portfolio from "./components/Pages/Portfolio";
 import NotMember from "./components/Pages/NotMember";
+import Join from "./components/Pages/Join";
 import Admin from "./components/Pages/Admin";
 import PageLayout from "./components/Pages/PageLayout";
 import Ethos from "./components/Pages/Ethos";
@@ -30,6 +31,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/landing-page" element={<LandingPage />} />
+        {/* Flyer QR target: a standalone full-page request-account form. */}
+        <Route path="/join" element={<Join />} />
 
         {/* All sidebar pages live here */}
         <Route element={<PageLayout />}>
