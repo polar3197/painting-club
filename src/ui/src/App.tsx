@@ -9,6 +9,7 @@ import NotMember from "./components/Pages/NotMember";
 import Join from "./components/Pages/Join";
 import Admin from "./components/Pages/Admin";
 import Settings from "./components/Pages/Settings";
+import EditProfile from "./components/Pages/EditProfile";
 import Contributor from "./components/Pages/Contributor";
 import AnnouncementDetail from "./components/Pages/AnnouncementDetail";
 import AnnouncementsFeed from "./components/Pages/AnnouncementsFeed";
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/art" element={<ArtGallery />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/edit-profile" element={<EditProfile />} />
           {/* Contributor tooling (Settings → …). Static segments outrank the
               /:username catch-all below, so these never collide with it. */}
           <Route path="/contributor" element={<Contributor />} />

@@ -1,3 +1,7 @@
+/* Colors read the member's scheme via --pc-* (set on .profile-page); the
+   fallbacks are the defaults. */
+.profile-page { display: contents; }
+
 
 
 .user-deets {
@@ -8,7 +12,7 @@
     min-height: 50vh;
     height: 50vh;
     width: 100%;
-    background-color: rgb(255, 250, 245);
+    background-color: var(--pc-bg, rgb(255, 250, 245));
     padding: 10px; 
 }
 
@@ -29,7 +33,7 @@
 
 .user-profile-pic {
     width: 20%;
-    border: 5px rgb(238, 190, 100) solid;
+    border: 5px var(--pc-frame, rgb(238, 190, 100)) solid;
     box-shadow: 0 0 0 1px black;
     border-radius: 5px;
     cursor: pointer;
@@ -48,7 +52,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgb(255, 250, 245);
+    background-color: var(--pc-bg, rgb(255, 250, 245));
     min-height: 200px;
 }
 
@@ -93,6 +97,7 @@
     align-items: center;
     font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
     font-size: 24px;
+    color: var(--pc-name, #000);
 }
 
 .user-name p {
@@ -103,6 +108,7 @@
     display: flex;
     align-items: center;
     font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    color: var(--pc-name, #000);
 }
 
 /* Owner action row (settings / edit / share), under the name + location. */
@@ -121,7 +127,7 @@
     height: 38px;
     padding: 0;
     border: 1px solid black;
-    background-color: rgb(250, 244, 202);
+    background-color: var(--pc-btn, rgb(250, 244, 202));
     color: black;
     cursor: pointer;
 }
@@ -154,6 +160,7 @@
     padding: 10px;
     margin-top: 12px;
     flex: 1;
+    background-color: var(--pc-statement, transparent);
 }
 
 .user-field-element hr {

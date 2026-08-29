@@ -110,6 +110,8 @@ export interface Profile {
   profile_pic_path: string | null;
   viewer_blocked_by_owner?: boolean;
   blocked_usernames?: string[] | null;
+  // Component-key -> color from the edit-profile color tab; null = never customized.
+  profile_colors?: Record<string, string> | null;
 }
 
 export interface ReportOut {

@@ -4,6 +4,7 @@ import { useProfile } from "../../hooks/useProfile";
 import UserDetails from "../UserProfile/UserDetails";
 import MediaBar from "../UserProfile/MediaBar";
 import Art from "../UserProfile/Art";
+import { profileColorVars } from "../../utils/profileColors";
 
 const UserProfile = () => {
   const { username } = useParams();
@@ -32,8 +33,10 @@ const UserProfile = () => {
 
   
 
+  // The member's color scheme (shared with the iOS app) as CSS variables the
+  // profile stylesheets read; defaults apply for anyone who never customized.
   return (
-    <>
+    <div className="profile-page" style={profileColorVars(profile.profile_colors)}>
       <UserDetails
         profile={profile}
         setProfile={setProfile}
@@ -64,8 +67,7 @@ const UserProfile = () => {
           setRefresh(r => r + 1);
         }}
       />
-    </>
-
+    </div>
   );
 };
 

@@ -1,0 +1,172 @@
+.ep-page {
+    background-color: rgb(255, 250, 245);
+    overflow-y: auto;
+}
+
+.ep-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px 40px 24px;
+    box-sizing: border-box;
+}
+
+/* details <-> color scheme, styled like the profile's media tabs */
+.ep-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.ep-tab {
+    flex: 1;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 17px;
+    padding: 8px;
+    border: 1px solid black;
+    background-color: rgb(250, 244, 202);
+    cursor: pointer;
+}
+
+.ep-tab.on { background-color: rgb(238, 190, 100); }
+
+.ep-empty {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    color: rgb(150, 150, 150);
+}
+
+.ep-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ep-form label {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: rgb(100, 100, 100);
+    margin-top: 10px;
+}
+
+.ep-form input, .ep-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid black;
+    background: white;
+    padding: 9px 12px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 16px;
+    outline: none;
+    resize: vertical;
+}
+
+.ep-save, .ep-default {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 16px;
+    padding: 12px 22px;
+    border: 1px solid black;
+    background-color: rgb(238, 190, 100);
+    cursor: pointer;
+    align-self: flex-end;
+    margin-top: 18px;
+}
+
+.ep-default { background-color: rgb(250, 244, 202); }
+.ep-save:disabled { opacity: 0.55; cursor: default; }
+
+/* ---- color scheme tab ---- */
+.ep-colors { display: flex; flex-direction: column; gap: 16px; }
+
+.mini-page {
+    border: 1px solid black;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-sizing: border-box;
+}
+
+.mini-hl { outline: 2px solid blue; outline-offset: 1px; }
+
+.mini-top { display: flex; justify-content: space-between; gap: 12px; }
+.mini-identity { display: flex; flex-direction: column; gap: 8px; }
+.mini-name-group { display: inline-flex; flex-direction: column; padding: 2px; }
+.mini-name { font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif; font-size: 16px; }
+.mini-location { font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif; font-size: 12px; }
+.mini-actions { display: flex; gap: 6px; }
+.mini-action { width: 22px; height: 22px; border: 1px solid black; box-sizing: border-box; }
+.mini-pic-wrap { padding: 2px; }
+.mini-pic { width: 64px; height: 72px; border: 4px solid; box-shadow: 0 0 0 1px black; box-sizing: border-box; background: rgb(240, 240, 240); }
+.mini-bio { border: 1px solid black; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+.mini-bio-label { font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif; font-size: 12px; text-align: center; }
+.mini-bio-hr { height: 1px; background: black; }
+.mini-line { height: 6px; background: rgb(200, 200, 200); }
+.mini-tabs { display: flex; gap: 6px; }
+.mini-tab { flex: 1; border: 1px solid black; text-align: center; font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif; font-size: 12px; padding: 4px; }
+.mini-art { border: 1px solid black; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.mini-art-img { width: 60px; height: 60px; background: rgb(200, 200, 200); border: 1px solid black; }
+
+.ep-elements {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+}
+
+.ep-element {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    color: black;
+}
+
+.ep-element.on .ep-element-label { color: blue; }
+
+.ep-swatch {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border: 1px solid black;
+    box-sizing: border-box;
+}
+
+.ep-element.on .ep-swatch { outline: 2px solid blue; outline-offset: 1px; }
+
+.ep-picker {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+}
+
+.ep-picker input[type="color"] {
+    width: 56px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid black;
+    background: white;
+    cursor: pointer;
+}
+
+.ep-hex { color: rgb(120, 120, 120); }
+
+.ep-color-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.ep-color-actions .ep-save, .ep-color-actions .ep-default { margin-top: 0; }
+
+@media (max-width: 640px) {
+    .ep-inner { padding: 44px 14px 30px 14px; }
+    .ep-elements { grid-template-columns: repeat(4, 1fr); }
+    .ep-form input, .ep-form textarea { font-size: 16px; }
+}
