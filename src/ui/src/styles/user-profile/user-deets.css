@@ -145,7 +145,7 @@
     padding: 0;
     border: 1px solid black;
     border-radius: 6px;
-    background-color: var(--pc-btn, rgb(250, 244, 202));
+    background-color: rgb(250, 244, 202); /* the sidebar's colour, regardless of the member's scheme */
     color: black;
     cursor: pointer;
 }
