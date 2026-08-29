@@ -1,22 +1,22 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { get_active_prompt, get_prompt, PromptOut, PromptDetailOut } from "../../api";
 import { swr } from "../../cache";
 import ArtImage from "../Utils/ArtImage";
-import SubmissionLightbox from "../Utils/SubmissionLightbox";
 
 // Columns grow ~square with the submission count: ceil(sqrt(n)), clamped 1..4.
 const columnsFor = (n: number) => Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n)))));
 
 // The week's prompt as a small gallery: one bordered box holding the title
-// and the submissions. No actions here — adding art and proposing prompts
-// live on the prompt page (/prompts/:id/grid). Clicking a piece zooms it,
-// with ← → through the rest.
+// and the submissions. Clicking anything opens the full prompt page
+// (/prompts/:id/grid), where pieces zoom and art is added.
 export default function PromptColumn() {
+  const navigate = useNavigate();
   const { token } = useAuth()!;
   const [active, setActive] = useState<PromptOut | null | undefined>(undefined);
   const [prompt, setPrompt] = useState<PromptDetailOut | null>(null);
-  const [zoom, setZoom] = useState<number | null>(null);
+  const open = () => active && navigate(`/prompts/${active.id}/grid`);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +36,8 @@ export default function PromptColumn() {
   const cols = columnsFor(submissions.length);
 
   return (
-    <div className="hp-box">
+    <div className={`hp-box ${active ? "hp-box-link" : ""}`} onClick={open} role={active ? "link" : undefined} tabIndex={active ? 0 : -1}
+      onKeyDown={(e) => { if (e.key === "Enter") open(); }}>
       <div className="hp-header">
         <span className="hp-kicker">this week's prompt</span>
         {active === undefined ? null : active === null ? (
@@ -57,17 +58,14 @@ export default function PromptColumn() {
           <div className="hp-empty">no submissions yet</div>
         ) : (
           <div className="hp-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-            {submissions.map((s, i) => (
-              <button key={s.id} className="hp-cell" onClick={() => setZoom(i)}>
+            {submissions.map((s) => (
+              <span key={s.id} className="hp-cell">
                 <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="hp-cell-img" />
-              </button>
+              </span>
             ))}
           </div>
         )}
       </div>
-      {zoom !== null && (
-        <SubmissionLightbox pieces={submissions} index={zoom} onIndex={setZoom} onClose={() => setZoom(null)} />
-      )}
     </div>
   );
 }

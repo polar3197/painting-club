@@ -139,13 +139,15 @@
     gap: 8px;
 }
 
+.hp-box-link { cursor: pointer; }
+.hp-box-link:hover .hp-title { text-decoration: underline; }
+
 .hp-cell {
+    display: block;
     aspect-ratio: 1 / 1;
-    padding: 0;
     border: 1px solid black;
     background: rgb(250, 244, 202);
     overflow: hidden;
-    cursor: zoom-in;
 }
 
 .hp-cell-img {

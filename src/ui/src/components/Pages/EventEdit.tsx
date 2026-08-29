@@ -44,7 +44,7 @@ export default function EventEdit() {
         setColor(e.color);
         setPreviewUrl(e.image_path);
       })
-      .catch((err) => { alert((err as Error).message || "could not load event"); navigate("/events"); })
+      .catch((err) => { alert((err as Error).message || "could not load event"); navigate("/home"); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [isEdit, id, token, navigate]);
@@ -70,9 +70,9 @@ export default function EventEdit() {
       if (isEdit) await update_event(id!, body, token);
       else eventId = (await create_event(body, token)).id;
       if (picked && eventId) await upload_event_image(eventId, picked, token);
-      // Back to the calendar on the event's day after a create; back to the
-      // event after an edit.
-      navigate(isEdit ? `/events/${id}` : `/events?focus=${date}`);
+      // Home (where the calendar lives) after a create; back to the event
+      // after an edit.
+      navigate(isEdit ? `/events/${id}` : "/home");
     } catch (err) {
       alert((err as Error).message || "could not save");
     } finally {
@@ -86,7 +86,7 @@ export default function EventEdit() {
         <div className="events-header">
           <h1 className="events-title">{isEdit ? "edit event" : "new event"}</h1>
           <div className="events-actions">
-            <button className="events-btn events-btn-plain" onClick={() => navigate(isEdit ? `/events/${id}` : "/events")}>cancel</button>
+            <button className="events-btn events-btn-plain" onClick={() => navigate(isEdit ? `/events/${id}` : "/home")}>cancel</button>
           </div>
         </div>
         {loading ? <p className="events-empty">loading…</p> : (

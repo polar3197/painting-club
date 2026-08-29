@@ -7,15 +7,16 @@ import { todayLocalISO } from "../../utils/date";
 import { MonthCursor, stepMonth } from "../../utils/calendar";
 import { eventsByDate, eventMarks } from "../../utils/events";
 import MonthCalendar from "../Utils/MonthCalendar";
-import { EventRow } from "./Events";
+import EventRow from "../Utils/EventRow";
 import Bulletin from "../Home/Bulletin";
 import PromptColumn from "../Home/PromptColumn";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 
 // Home in three full-height thirds: the bulletin, the week's prompt as a
-// narrow column, and events — pick a day to see its events right here; only
-// opening a specific event leaves the page.
+// small gallery, and events. The calendar lives here (there's no separate
+// events page): pick a day to see its events, open one to read it, and its
+// back button returns here.
 export default function Home() {
   const navigate = useNavigate();
   const { token } = useAuth()!;
@@ -48,7 +49,7 @@ export default function Home() {
         <div className="home-events">
           <div className="home-square-head">
             <span className="home-square-label">events</span>
-            <button className="home-square-link" onClick={() => navigate("/events")}>all events ›</button>
+            <button className="home-square-link" onClick={() => navigate("/events/new")}>+ new event</button>
           </div>
           <MonthCalendar
             cursor={cursor}
