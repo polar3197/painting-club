@@ -3,6 +3,7 @@ import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import { useAuth } from "../../context/AuthContext";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import UserInfo from "./UserInfo";
+import OwnerActions from "./OwnerActions";
 import "../../styles/user-profile/user-deets.css";
 
 const UserDetails = (
@@ -58,34 +59,38 @@ const UserDetails = (
           selectedKeywords={selectedKeywords}
         />
 
-        {hasPic ? (
-          <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
-            <img
-              src={src!}
-              width="180"
-              height="200"
-              fetchPriority="high"
-            />
-          </div>
-        ) : profile.is_owner ? (
-          <div className="user-profile-pic empty-pic">
-            <button
-              className="add-pic-plus"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              add prof pic
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/heic,image/heif,.heic,.heif"
-              style={{ display: "none" }}
-              onChange={handleFileInput}
-            />
-          </div>
-        ) : (
-          <div className="user-profile-pic empty-pic" />
-        )}
+        {/* action stack + picture: the buttons run the picture's full height */}
+        <div className="pic-with-actions">
+          <OwnerActions profile={profile} />
+          {hasPic ? (
+            <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
+              <img
+                src={src!}
+                width="180"
+                height="200"
+                fetchPriority="high"
+              />
+            </div>
+          ) : profile.is_owner ? (
+            <div className="user-profile-pic empty-pic">
+              <button
+                className="add-pic-plus"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                add prof pic
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/heic,image/heif,.heic,.heif"
+                style={{ display: "none" }}
+                onChange={handleFileInput}
+              />
+            </div>
+          ) : (
+            <div className="user-profile-pic empty-pic" />
+          )}
+        </div>
       </div>
 
     </div>

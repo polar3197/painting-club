@@ -56,7 +56,7 @@ export default function EventEdit() {
         setOriginalInvites(e.invited ?? []);
         setHosts(e.hosts);
       })
-      .catch((err) => { alert((err as Error).message || "could not load event"); navigate("/home"); })
+      .catch((err) => { alert((err as Error).message || "could not load event"); navigate("/events"); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [isEdit, id, token, navigate]);
@@ -88,9 +88,8 @@ export default function EventEdit() {
         if (added.length) await add_event_invites(eventId, added, token);
         for (const u of removed) await remove_event_invite(eventId, u, token);
       }
-      // Home (where the calendar lives) after a create; back to the event
-      // after an edit.
-      navigate(isEdit ? `/events/${id}` : "/home");
+      // Back to the calendar after a create; back to the event after an edit.
+      navigate(isEdit ? `/events/${id}` : "/events");
     } catch (err) {
       alert((err as Error).message || "could not save");
     } finally {
@@ -112,7 +111,7 @@ export default function EventEdit() {
 
   return (
     <main className="page events-page">
-      <button className="back-btn" onClick={() => navigate(isEdit ? `/events/${id}` : "/home")}>‹ cancel</button>
+      <button className="back-btn" onClick={() => navigate(isEdit ? `/events/${id}` : "/events")}>‹ cancel</button>
       {showPicker && (
         <div className="picker-backdrop" onClick={() => setShowPicker(false)}>
           <div className="dialog picker-dialog" onClick={(e) => e.stopPropagation()}>

@@ -13,6 +13,7 @@ import EditProfile from "./components/Pages/EditProfile";
 import Contributor from "./components/Pages/Contributor";
 import AnnouncementDetail from "./components/Pages/AnnouncementDetail";
 import AnnouncementsFeed from "./components/Pages/AnnouncementsFeed";
+import Events from "./components/Pages/Events";
 import EventDetail from "./components/Pages/EventDetail";
 import EventEdit from "./components/Pages/EventEdit";
 import Messages from "./components/Pages/Messages";
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/contributor" element={<Contributor />} />
           <Route path="/announcements" element={<AnnouncementsFeed />} />
           <Route path="/announcements/:id" element={<AnnouncementDetail />} />
+          <Route path="/events" element={<Events />} />
           <Route path="/events/new" element={<EventEdit />} />
           <Route path="/events/:id" element={<EventDetail />} />
           <Route path="/events/:id/edit" element={<EventEdit />} />

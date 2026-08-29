@@ -1,18 +1,16 @@
 /* =====================================================================
-   LAYOUT KNOBS — every proportion on the home page lives in these
-   variables. Layout:
+   LAYOUT KNOBS. Layout (for now):
 
-       ┌───────────┬──────────────────────────────────┐
-       │ title     │ weekly prompt                    │
-       │ about     ├──────────────┬───────────────────┤
-       │ shelf     │ feature board│ events            │
-       └───────────┴──────────────┴───────────────────┘
+       ┌──────────────────────────────────────┐
+       │ title                                │
+       │                    ← 1 part space    │
+       │ weekly prompt (full width)           │
+       │                    ← 1.618 parts     │
+       └──────────────────────────────────────┘
    ===================================================================== */
 .home {
-    --left-col: 300px;        /* width of the title + bookshelf column */
-    --bottom-row: 460px;      /* height of the feature board / events row */
-    --bottom-split: minmax(0, 2fr) minmax(0, 5fr);  /* feature board : events widths */
-    --gutter: 22px;           /* space between all boxes */
+    --prompt-height: 420px;   /* height of the weekly-prompt box */
+    --gutter: 22px;
     --page-pad: 24px 28px 28px 28px;
     --prompt-thumb: 130px;    /* size of a weekly-prompt thumbnail */
     --shelf-gap: 10px;        /* space between the three book spines */
@@ -20,28 +18,21 @@
 
     height: 100%;
     width: 100%;
-    display: grid;
-    /* minmax(0, …): a long event title must never widen its column. */
-    grid-template-columns: var(--left-col) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) var(--bottom-row);
-    gap: var(--gutter);
+    display: flex;
+    flex-direction: column;
     padding: var(--page-pad);
     box-sizing: border-box;
     background-color: rgb(216, 237, 138); /* iOS Home container bg */
     overflow: hidden;
 }
 
-.home > * {
-    min-height: 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-}
+/* golden section: free space above : below = 1 : 1.618 */
+.home-space-above { flex: 1 1 0; }
+.home-space-below { flex: 1.618 1 0; }
 
-/* ---- left stack ---- */
-.home-left {
-    grid-row: 1 / 3;
-    gap: 14px;
+.home > .hp-box {
+    flex: 0 0 var(--prompt-height);
+    width: 100%;
 }
 
 /* title, then the shelf taking all remaining height */
@@ -53,21 +44,6 @@
     gap: 14px;
 }
 
-/* ---- bottom right: feature board beside events ---- */
-.home-bottom {
-    display: grid;
-    grid-template-columns: var(--bottom-split);
-    gap: var(--gutter);
-}
-
-.home-bottom > * {
-    min-width: 0;
-    min-height: 0;
-}
-
-.home-bottom .fr-board {
-    min-height: 0;
-}
 
 .home-top {
     display: flex;
@@ -141,7 +117,6 @@
 
 /* ---- top-right: week's prompt, title over a strip of submissions ---- */
 .hp-box {
-    flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -319,14 +294,7 @@
 }
 
 @media (max-width: 860px) {
-    .home { height: auto; overflow: visible; grid-template-columns: 1fr; grid-template-rows: auto; }
-    .home-left { grid-row: auto; }
-    .home-bottom { grid-template-columns: 1fr; }
-    .home-events-body { flex-direction: column; }
-    .home-events-cal { height: auto; width: 100%; aspect-ratio: auto; }
-    .bulletin, .hp-box { overflow: visible; height: auto; }
-    .shelf { min-height: 220px; }
-    .home-events, .fr-board { min-height: 300px; }
-    .home-events-body { grid-template-columns: 1fr; }
-    .home-day { border-left: none; padding-left: 0; border-top: 1px solid black; padding-top: 10px; }
+    .home { height: auto; overflow: visible; }
+    .home-space-above, .home-space-below { display: none; }
+    .home > .hp-box { flex: none; height: var(--prompt-height); margin-top: 16px; }
 }
