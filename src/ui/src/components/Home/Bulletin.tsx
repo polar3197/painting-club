@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useAdminPending } from "../../hooks/useAdminPending";
 import Announcements from "../Utils/Announcements";
+import FeatureBoard from "./FeatureBoard";
 
-// Left third of Home: the club noticeboard — title, announcements, and the
-// two app links the iOS home pins to its corners.
+// Left third of Home: the club noticeboard — title, announcements, the
+// feature-request board, and the about link.
 export default function Bulletin() {
   const navigate = useNavigate();
   const adminPending = useAdminPending();
@@ -21,9 +22,10 @@ export default function Bulletin() {
 
       <Announcements />
 
+      <FeatureBoard />
+
       <div className="bulletin-links">
         <button className="bulletin-link" onClick={() => navigate("/about")}>about the app</button>
-        <button className="bulletin-link" onClick={() => navigate("/request-feature")}>request something for the app</button>
       </div>
     </div>
   );
