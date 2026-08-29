@@ -6,7 +6,7 @@
     display: grid;
     /* minmax(0, …): a long event title must never widen its column. */
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-    grid-template-rows: minmax(0, 1fr) 380px;
+    grid-template-rows: minmax(0, 1fr) 460px;
     gap: 22px;
     padding: 24px 28px 28px 28px;
     box-sizing: border-box;
@@ -69,19 +69,8 @@
 }
 
 .shelf-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
     padding: 12px 16px;
     border-bottom: 1px solid black;
-    background: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    font: inherit;
-    color: black;
-    cursor: pointer;
-    text-align: left;
 }
 
 .shelf-books {
@@ -165,23 +154,29 @@
     justify-content: center;
 }
 
-/* One row of square thumbnails, scrolled sideways. */
+/* One row of square thumbnails, scrolled sideways; they grow to the box's
+   height so the row fills it. */
 .hp-strip {
     display: flex;
+    align-items: stretch;
     gap: 8px;
+    height: 100%;
+    min-height: 150px;
     overflow-x: auto;
     padding-bottom: 4px;
     scrollbar-width: thin;
+    box-sizing: border-box;
 }
 
 .hp-cell {
     display: block;
     flex: 0 0 auto;
-    width: 150px;
-    height: 150px;
+    height: 100%;
+    aspect-ratio: 1 / 1;
     border: 1px solid black;
     background: rgb(250, 244, 202);
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .hp-cell-img {
