@@ -3,19 +3,14 @@ import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import { useAuth } from "../../context/AuthContext";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import UserInfo from "./UserInfo";
-import OwnerActions from "./OwnerActions";
 import "../../styles/user-profile/user-deets.css";
 
 const UserDetails = (
-  { profile, setProfile, selectedMedium, selectedKeywords, portfolioMode, onTogglePortfolio }
+  { profile, setProfile }
   :
   {
     profile: Profile,
     setProfile: Dispatch<SetStateAction<Profile | null>>;
-    selectedMedium: string | null;
-    selectedKeywords: string[];
-    portfolioMode: boolean;
-    onTogglePortfolio: () => void;
   }
   ) => {
 
@@ -54,17 +49,9 @@ const UserDetails = (
 
     <div className="user-deets">
       <div className="user-body">
-        <UserInfo
-          profile={profile}
-          setProfile={setProfile}
-          selectedMedium={selectedMedium}
-          selectedKeywords={selectedKeywords}
-        />
+        <UserInfo profile={profile} />
 
-        {/* action stack + picture: the buttons run the picture's full height */}
-        <div className="pic-with-actions">
-          <OwnerActions profile={profile} selectedMedium={selectedMedium} portfolioMode={portfolioMode} onTogglePortfolio={onTogglePortfolio} />
-          {hasPic ? (
+        {hasPic ? (
             <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
               <img
                 src={src!}
@@ -92,7 +79,6 @@ const UserDetails = (
           ) : (
             <div className="user-profile-pic empty-pic" />
           )}
-        </div>
       </div>
 
     </div>

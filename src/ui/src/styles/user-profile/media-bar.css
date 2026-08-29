@@ -96,6 +96,29 @@
     gap: 10px;
 }
 
+/* portfolio toggle at the right end of the filter row */
+.portfolio-toggle {
+    margin-left: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid black;
+    border-radius: 6px;
+    background-color: rgb(250, 244, 202);
+    color: black;
+    cursor: pointer;
+}
+
+.portfolio-toggle:hover, .portfolio-toggle.on {
+    background-color: rgb(238, 190, 100);
+}
+
+.portfolio-toggle svg { width: 18px; height: 18px; }
+
 .bubble {
     display: flex;
     flex-direction: row;

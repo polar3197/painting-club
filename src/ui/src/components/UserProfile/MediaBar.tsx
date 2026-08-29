@@ -4,15 +4,18 @@ import { Profile, add_member_media } from "../../api";
 import Dropdown from "../Utils/Dropdown";
 import AddMediaDialog from "../Utils/AddMediaDialog";
 import "../../styles/user-profile/media-bar.css";
+import { GalleryIcon } from "../Utils/Icons";
 import { useAuth } from "../../context/AuthContext";
 
 const Keywords = (
-  { availableKeywords, selectedMedium, selectedKeywords, setSelectedKeywords } :
+  { availableKeywords, selectedMedium, selectedKeywords, setSelectedKeywords, portfolioMode, onTogglePortfolio } :
   {
     availableKeywords: string[];
     selectedMedium: string;
     selectedKeywords: string[];
     setSelectedKeywords: Dispatch<SetStateAction<string[]>>;
+    portfolioMode: boolean;
+    onTogglePortfolio: () => void;
   }
 ) => {
 
@@ -43,12 +46,19 @@ const Keywords = (
           </div>
         ))}
       </div>
+      {/* portfolio view: swaps the rows below for the grid; lit while on */}
+      <button
+        className={`portfolio-toggle ${portfolioMode ? "on" : ""}`}
+        aria-label="portfolio view"
+        aria-pressed={portfolioMode}
+        onClick={onTogglePortfolio}
+      ><GalleryIcon /></button>
     </div>
   )
 }
 
 const MediaBar = (
-  { profile, setProfile, selectedMedium, setSelectedMedium, selectedKeywords, setSelectedKeywords, availableKeywords }:
+  { profile, setProfile, selectedMedium, setSelectedMedium, selectedKeywords, setSelectedKeywords, availableKeywords, portfolioMode, onTogglePortfolio }:
   {
     profile: Profile;
     setProfile: Dispatch<SetStateAction<Profile | null>>;
@@ -57,6 +67,8 @@ const MediaBar = (
     selectedKeywords: string[];
     setSelectedKeywords: Dispatch<SetStateAction<string[]>>;
     availableKeywords: string[];
+    portfolioMode: boolean;
+    onTogglePortfolio: () => void;
   }
 ) => {
   const [showAddMedia, setShowAddMedia] = useState(false);
@@ -123,6 +135,8 @@ const MediaBar = (
           selectedMedium={selectedMedium}
           selectedKeywords={selectedKeywords}
           setSelectedKeywords={setSelectedKeywords}
+          portfolioMode={portfolioMode}
+          onTogglePortfolio={onTogglePortfolio}
         />
       )}
       </div>

@@ -1,7 +1,7 @@
 /* Colors read the member's scheme via --pc-* (set on .profile-page); the
    fallbacks are the defaults. --profile-inset is the one left/right margin
    every section (header content, media bar, filter bar, art) lines up on. */
-.profile-page { display: contents; --profile-inset: 64px; }
+.profile-page { display: contents; --profile-inset: 64px; --profile-header: 300px; /* height of the header row (statement box and picture) */ }
 
 
 
@@ -10,11 +10,9 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 50vh;
-    height: 50vh;
     width: 100%;
     background-color: var(--pc-bg, rgb(255, 250, 245));
-    padding: 10px; 
+    padding: 10px;
 }
 
 .top-bar {
@@ -23,29 +21,31 @@
     justify-content: end;
 }
 
+/* One row: identity column · statement · picture, all --profile-header tall. */
 .user-body {
-    flex: 1;
     display: flex;
-    justify-content: space-between;
-    gap: 10px;
     flex-direction: row;
-    /* deets pads 10 and the fields pad 10 more on the left */
-    padding: 10px calc(var(--profile-inset) - 10px) 0 calc(var(--profile-inset) - 20px);
-}
-
-/* the square action buttons stacked against the picture, sharing its height */
-.pic-with-actions {
-    display: flex;
     align-items: stretch;
-    gap: 8px;
-    flex-shrink: 0;
-    height: 100%;
+    gap: 16px;
+    height: var(--profile-header);
+    padding: 10px calc(var(--profile-inset) - 10px) 0 calc(var(--profile-inset) - 10px);
+    box-sizing: content-box;
 }
 
-/* Width is viewport-based (what 20% of the row came to); the row sets the height. */
+.user-fields { display: contents; }
+
+.user-col {
+    width: 240px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Portrait, as tall as the row; width follows (4:5). */
 .user-profile-pic {
-    width: 19vw;
-    max-width: 400px;
+    height: var(--profile-header);
+    width: calc(var(--profile-header) * 0.8);
     flex-shrink: 0;
     border: 5px var(--pc-frame, rgb(238, 190, 100)) solid;
     box-shadow: 0 0 0 1px black;
@@ -89,17 +89,6 @@
 }
 
 
-.user-fields {
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    /* no bottom padding: the statement box ends where the picture does */
-    padding: 10px 10px 0 10px;
-    position: relative;
-}
-
 .user-identity {
     display: flex;
     flex-direction: column;
@@ -128,17 +117,12 @@
     color: var(--pc-name, #000);
 }
 
-/* Four square buttons in a column, together as tall as the picture. */
+/* The square buttons stacked under the name and location. */
 .owner-actions {
-    display: grid;
-    grid-auto-rows: minmax(0, 1fr);
-    /* The gap alone sets the button size: the first button's top and the
-       last one's bottom sit flush with the picture. */
-    gap: 34px;
-    height: 100%;
-    justify-items: center;
-    /* -1px top and bottom: flush with the picture's outline */
-    margin: -1px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
 }
 
 .owner-action-btn {
@@ -146,8 +130,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
-    aspect-ratio: 1 / 1;
+    width: 42px;
+    height: 42px;
     padding: 0;
     border: 1px solid black;
     border-radius: 6px;
@@ -192,10 +176,12 @@
     border: 1px solid black;
     border-radius: 5px;
     padding: 10px;
-    margin-top: 12px;
-    /* -1px: meet the picture's 1px outline, which sits outside its frame */
-    margin-bottom: -1px;
+    /* fills the row's width; 1px taller each side to meet the picture's
+       outline, which sits outside its frame */
     flex: 1;
+    min-width: 0;
+    margin: -1px 0;
+    overflow-y: auto;
     background-color: var(--pc-statement, transparent);
 }
 
@@ -299,18 +285,19 @@
         column-gap: 12px;
         row-gap: 8px;
         padding: 10px;
+        height: auto;
         position: relative;
     }
 
-    .user-fields {
-        display: contents;
+    .user-col {
+        grid-column: 1;
+        grid-row: 1;
+        width: auto;
+        min-width: 0;
     }
 
     .user-identity {
-        grid-column: 1;
-        grid-row: 1;
         gap: 2px;
-        align-self: stretch;
         min-width: 0;
     }
 
@@ -340,13 +327,6 @@
         margin-top: auto;
     }
 
-    /* No room for a stack beside a 32vw picture: the picture keeps its
-       corner and the buttons become a row of fixed 40px squares beneath
-       the name and picture. */
-    .pic-with-actions {
-        display: contents;
-    }
-
     .user-profile-pic {
         grid-column: 2;
         grid-row: 1;
@@ -356,20 +336,16 @@
         aspect-ratio: 1 / 1;
     }
 
+    /* the buttons become a row under the name */
     .owner-actions {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        display: flex;
         flex-direction: row;
         gap: 10px;
-        height: auto;
-        margin: 4px 0 0 0;
+        margin-top: 8px;
     }
 
     .owner-action-btn {
-        width: 40px;
-        height: 40px;
-        aspect-ratio: auto;
+        width: 38px;
+        height: 38px;
     }
 
     .empty-pic {
@@ -378,11 +354,10 @@
 
     .user-field-element {
         grid-column: 1 / -1;
-        grid-row: 3;
+        grid-row: 2;
         font-size: 15px;
-        margin-top: 4px;
-        margin-left: -8px;
-        margin-right: -8px;
+        min-height: 120px;
+        margin: 4px -8px 0 -8px;
     }
 
     .artist-statement-label {
@@ -396,7 +371,7 @@
     .submit-profile {
         position: static;
         grid-column: 1 / -1;
-        grid-row: 4;
+        grid-row: 3;
         justify-self: flex-end;
         margin-top: 8px;
         padding: 4px 10px;

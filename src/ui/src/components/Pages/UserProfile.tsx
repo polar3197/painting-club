@@ -41,14 +41,7 @@ const UserProfile = () => {
   // profile stylesheets read; defaults apply for anyone who never customized.
   return (
     <div className="profile-page" style={profileColorVars(profile.profile_colors)}>
-      <UserDetails
-        profile={profile}
-        setProfile={setProfile}
-        selectedMedium={selectedMedium}
-        selectedKeywords={selectedKeywords}
-        portfolioMode={portfolioMode}
-        onTogglePortfolio={() => setPortfolioMode((m) => !m)}
-      />
+      <UserDetails profile={profile} setProfile={setProfile} />
       <MediaBar
         profile={profile}
         setProfile={setProfile}
@@ -57,6 +50,8 @@ const UserProfile = () => {
         selectedKeywords={selectedKeywords}
         setSelectedKeywords={setSelectedKeywords}
         availableKeywords={availableKeywords}
+        portfolioMode={portfolioMode}
+        onTogglePortfolio={() => setPortfolioMode((m) => !m)}
       />
       {portfolioMode && selectedMedium ? (
         <div className="profile-portfolio">
