@@ -18,11 +18,11 @@
     flex-direction: column;
 }
 
+/* "+ add art" on its own row above the cards, right-aligned to the inset. */
 .add {
-    position: absolute;
-    top: 10px;
-    right: var(--profile-inset, 10px);
-    z-index: 10;
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px var(--profile-inset, 10px) 0;
 }
 
 .art {

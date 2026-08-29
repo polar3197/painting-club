@@ -1,11 +1,11 @@
 
+/* Media tabs + filter as one boxed unit, on the profile's shared inset. */
 .media-bar-wrapper {
     display: flex;
     flex-direction: column;
-    width: 100%;
+    margin: 0 var(--profile-inset, 0);
     background-color: var(--pc-bg, rgb(255, 250, 245));
-    border-top: 1px black solid;
-    border-bottom: 1px black solid;
+    border: 1px black solid;
     justify-content: center;
 }
 
@@ -17,7 +17,7 @@
     background-color: var(--pc-bg, rgb(255, 250, 245));
     border-bottom: 1px black solid;
     justify-content: center;
-    padding: 5px var(--profile-inset, 10px);
+    padding: 5px 10px;
     align-items: center;
 }
 
@@ -69,7 +69,7 @@
     justify-content: start;
     align-items: center;
     height: 3rem;
-    padding: 5px var(--profile-inset, 5px);
+    padding: 5px 10px;
     gap: 6px;
 }
 
