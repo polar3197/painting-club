@@ -6,7 +6,7 @@
 .tools-inner {
     max-width: 720px;
     margin: 0 auto;
-    padding: 30px 24px 40px 24px;
+    padding: 48px 24px 40px 24px;
     box-sizing: border-box;
 }
 
@@ -517,7 +517,7 @@
 }
 
 @media (max-width: 640px) {
-    .tools-inner { padding: 20px 14px 30px 14px; }
+    .tools-inner { padding: 44px 14px 30px 14px; }
     .tools-title { font-size: 22px; }
     .tools-bar-row { grid-template-columns: 80px 1fr 36px; }
     .tools-tile-value { font-size: 24px; }

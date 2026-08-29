@@ -9,7 +9,7 @@
     max-width: 720px;
     width: 100%;
     margin: 0 auto;
-    padding: 24px 24px 32px 24px;
+    padding: 48px 24px 32px 24px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -385,7 +385,7 @@
 }
 
 @media (max-width: 640px) {
-    .messages-inner { padding: 14px 12px 20px 12px; }
+    .messages-inner { padding: 44px 12px 20px 12px; }
     .messages-title { font-size: 22px; }
     .msg-row { max-width: 88%; }
     .msg-action { opacity: 1; }

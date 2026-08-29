@@ -9,7 +9,7 @@
     max-width: 520px;
     min-height: 100%;
     margin: 0 auto;
-    padding: 30px 24px 40px 24px;
+    padding: 48px 24px 40px 24px;
     box-sizing: border-box;
 }
 
@@ -94,7 +94,7 @@
 
 @media (max-width: 640px) {
     .settings-inner {
-        padding: 20px 16px 30px 16px;
+        padding: 44px 16px 30px 16px;
     }
 
     .settings-title {
