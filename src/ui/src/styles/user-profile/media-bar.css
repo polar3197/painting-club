@@ -86,8 +86,10 @@
 .keyword-bubbles-wrapper {
     flex: 1;
     min-width: 0;
-    min-height: 30px;
+    /* same height as the search box, so chips never grow the row */
+    height: 30px;
     overflow-x: auto;
+    overflow-y: hidden;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -97,30 +99,32 @@
 .bubble {
     display: flex;
     flex-direction: row;
+    align-items: center;
+    box-sizing: border-box;
+    height: 30px;
     border: 2px blue solid;
     background-color: rgb(252, 219, 121);
     border-radius: 15px;
     flex-shrink: 0;
-    padding: 4px;
+    padding: 0 4px 0 10px;
     gap: 6px;
 }
 
 .bubble-name {
-    display: flex;
-    justify-content: center;
-    align-items: center;
     white-space: nowrap;
-    padding: 4px;
-    font-size: 18px;
+    font-size: 15px;
+    line-height: 1;
 }
 
 .bubble-x {
     display: flex;
     justify-content: center;
-    border-radius: 50%;
     align-items: center;
-    aspect-ratio: 1;
-    height: 100%;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 12px;
+    line-height: 1;
     cursor: pointer;
     background-color: white;
 }
