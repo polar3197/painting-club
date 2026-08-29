@@ -12,7 +12,7 @@ export default function BookShelf() {
       </div>
       <div className="shelf-books">
         {ABOUT_SECTIONS.map((s) => (
-          <button key={s.key} className="shelf-book" style={{ backgroundColor: s.bg, color: s.fg }} onClick={() => navigate(`/about/${s.key}`)}>
+          <button key={s.key} className="shelf-book" style={{ backgroundColor: s.bg, color: s.fg, borderColor: s.border }} onClick={() => navigate(`/about/${s.key}`)}>
             {s.label}
           </button>
         ))}

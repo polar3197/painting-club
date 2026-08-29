@@ -1,10 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import "../../styles/about.css";
 
+// Painter's palette: each section is a tint inside a fuller-strength border.
 export const ABOUT_SECTIONS = [
-  { key: "ethos", label: "ethos", bg: "rgb(13, 43, 107)", fg: "#fff" }, // phthalo blue
-  { key: "art", label: "art", bg: "rgb(251, 236, 93)", fg: "#000" },    // cadmium yellow light
-  { key: "aims", label: "aims", bg: "rgb(229, 60, 57)", fg: "#fff" },   // bright warm red
+  { key: "ethos", label: "ethos", bg: "rgb(122, 162, 224)", border: "rgb(13, 43, 107)", fg: "rgb(13, 43, 107)" }, // light phthalo in phthalo blue
+  { key: "art", label: "art", bg: "rgb(251, 236, 93)", border: "rgb(255, 193, 0)", fg: "#000" },                 // cad yellow light in cad yellow medium
+  { key: "aims", label: "aims", bg: "rgb(244, 130, 100)", border: "rgb(229, 60, 57)", fg: "#000" },              // cad red light in cad red
 ] as const;
 
 // "about the app" hub, copied from iOS: three full-width painted panels
@@ -17,7 +18,7 @@ export default function About() {
       <h1 className="about-title">about paint club</h1>
       <div className="about-panels">
         {ABOUT_SECTIONS.map((s) => (
-          <button key={s.key} className="about-panel" style={{ backgroundColor: s.bg, color: s.fg }} onClick={() => navigate(`/about/${s.key}`)}>
+          <button key={s.key} className="about-panel" style={{ backgroundColor: s.bg, color: s.fg, borderColor: s.border }} onClick={() => navigate(`/about/${s.key}`)}>
             {s.label}
           </button>
         ))}

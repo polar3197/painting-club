@@ -26,7 +26,7 @@
 
 .about-panel {
     flex: 1;
-    border: 2px solid black;
+    border: 8px solid black; /* colour set per section */
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
     font-size: 34px;
     cursor: pointer;
