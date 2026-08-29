@@ -129,9 +129,10 @@
 .owner-actions {
     display: grid;
     grid-template-rows: repeat(4, minmax(0, 1fr));
-    gap: 14px;
+    /* The gap alone sets the button size: the first button's top and the
+       last one's bottom sit flush with the picture. */
+    gap: 22px;
     height: 100%;
-    align-items: center;
     justify-items: center;
 }
 
@@ -140,7 +141,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 82%;
+    height: 100%;
     aspect-ratio: 1 / 1;
     padding: 0;
     border: 1px solid black;
