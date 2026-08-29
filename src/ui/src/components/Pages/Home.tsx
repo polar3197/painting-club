@@ -56,60 +56,58 @@ export default function Home() {
   return (
     <main className="page">
       <div className="home">
-        <div className="home-top">
-          <div className="home-title">-• Painting Club •-</div>
-          {adminPending.total > 0 && (
-            <button className="home-admin-alert" onClick={() => navigate("/admin")}>
-              {adminPending.total} {adminPending.total === 1 ? "request" : "requests"} to review
-            </button>
-          )}
+        {/* left two-thirds: title, this week's prompt, latest announcement */}
+        <div className="home-main">
+          <div className="home-top">
+            <div className="home-title">-• Painting Club •-</div>
+            {adminPending.total > 0 && (
+              <button className="home-admin-alert" onClick={() => navigate("/admin")}>
+                {adminPending.total} {adminPending.total === 1 ? "request" : "requests"} to review
+              </button>
+            )}
+          </div>
+          <button
+            className={`home-square home-square-prompt ${prompt ? "" : "empty"}`}
+            onClick={() => prompt && navigate(`/prompts/${prompt.id}`)}
+            disabled={!prompt}
+          >
+            <span className="prompt-ring" style={ringStyle}>
+              <span className="prompt-ring-inner">
+                <span className="prompt-label">week's prompt</span>
+                {prompt ? (
+                  <>
+                    <span className="prompt-title">{prompt.title}</span>
+                    <span className="prompt-medium">{prompt.media_name ?? "any medium"}</span>
+                  </>
+                ) : (
+                  <span className="prompt-medium">no prompt this week</span>
+                )}
+              </span>
+            </span>
+          </button>
+          <Announcements />
         </div>
 
-        <div className="home-body">
-          {/* events: left half, full height */}
-          <div className="home-events" onClick={() => navigate("/events")} role="link" tabIndex={0}
-            onKeyDown={(e) => { if (e.key === "Enter") navigate("/events"); }}>
-            <div className="home-square-head">
-              <span className="home-square-label">events</span>
-              <span className="home-square-link">open ›</span>
-            </div>
-            <MonthCalendar cursor={cursor} marks={marks} />
-            <div className="home-upcoming">
-              <span className="home-upcoming-label">coming up</span>
-              {upcoming.length === 0 ? (
-                <span className="home-upcoming-empty">nothing coming up</span>
-              ) : upcoming.map((e) => (
-                <span key={e.id} className="home-upcoming-row" onClick={(ev) => { ev.stopPropagation(); navigate(`/events/${e.id}`); }}>
-                  <span className="home-upcoming-dot" style={{ backgroundColor: e.color || DEFAULT_EVENT_COLOR }} />
-                  <span className="home-upcoming-title">{e.title}</span>
-                  <span className="home-upcoming-when">{formatEventWhen(e.event_date, e.event_time)}</span>
-                </span>
-              ))}
-            </div>
+        {/* right third: events, the full height of the page (beside the
+            title, not under it) */}
+        <div className="home-events" onClick={() => navigate("/events")} role="link" tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter") navigate("/events"); }}>
+          <div className="home-square-head">
+            <span className="home-square-label">events</span>
+            <span className="home-square-link">open ›</span>
           </div>
-
-          {/* right half: week's prompt above the latest announcement */}
-          <div className="home-side">
-            <button
-              className={`home-square home-square-prompt ${prompt ? "" : "empty"}`}
-              onClick={() => prompt && navigate(`/prompts/${prompt.id}`)}
-              disabled={!prompt}
-            >
-              <span className="prompt-ring" style={ringStyle}>
-                <span className="prompt-ring-inner">
-                  <span className="prompt-label">week's prompt</span>
-                  {prompt ? (
-                    <>
-                      <span className="prompt-title">{prompt.title}</span>
-                      <span className="prompt-medium">{prompt.media_name ?? "any medium"}</span>
-                    </>
-                  ) : (
-                    <span className="prompt-medium">no prompt this week</span>
-                  )}
-                </span>
+          <MonthCalendar cursor={cursor} marks={marks} />
+          <div className="home-upcoming">
+            <span className="home-upcoming-label">coming up</span>
+            {upcoming.length === 0 ? (
+              <span className="home-upcoming-empty">nothing coming up</span>
+            ) : upcoming.map((e) => (
+              <span key={e.id} className="home-upcoming-row" onClick={(ev) => { ev.stopPropagation(); navigate(`/events/${e.id}`); }}>
+                <span className="home-upcoming-dot" style={{ backgroundColor: e.color || DEFAULT_EVENT_COLOR }} />
+                <span className="home-upcoming-title">{e.title}</span>
+                <span className="home-upcoming-when">{formatEventWhen(e.event_date, e.event_time)}</span>
               </span>
-            </button>
-            <Announcements />
+            ))}
           </div>
         </div>
       </div>

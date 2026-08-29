@@ -1,13 +1,23 @@
+/* Two columns: everything else on the left (2/3), events on the right (1/3)
+   running the full height of the page beside the title. */
 .home {
     height: 100%;
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 22px;
     padding: 24px 28px 28px 28px;
     box-sizing: border-box;
     background-color: rgb(201, 247, 193);
     overflow: hidden;
+}
+
+.home-main {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow-y: auto;
 }
 
 .home-top {
@@ -38,16 +48,6 @@
     cursor: pointer;
 }
 
-/* Below the title: events fill the left half top to bottom; the prompt
-   and announcements stack on the right. */
-.home-body {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 22px;
-}
-
 .home-events {
     min-height: 0;
     display: flex;
@@ -59,14 +59,6 @@
     padding: 18px;
     box-sizing: border-box;
     cursor: pointer;
-}
-
-.home-side {
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    overflow-y: auto;
 }
 
 .home-square {
@@ -222,10 +214,9 @@
 }
 
 @media (max-width: 800px) {
-    .home { height: auto; overflow: visible; }
-    .home-body { grid-template-columns: 1fr; }
+    .home { height: auto; overflow: visible; grid-template-columns: 1fr; }
+    .home-main { overflow: visible; }
     .home-events { min-height: 480px; }
-    .home-side { overflow: visible; }
 }
 
 @media (max-width: 640px) {
