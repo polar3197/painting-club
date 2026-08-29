@@ -40,8 +40,10 @@
     height: 100%;
 }
 
+/* Same portrait shape as before (the 180×200 image), sized by the row's height. */
 .user-profile-pic {
-    width: 20%;
+    height: 100%;
+    aspect-ratio: 4 / 5;
     border: 5px var(--pc-frame, rgb(238, 190, 100)) solid;
     box-shadow: 0 0 0 1px black;
     border-radius: 5px;
@@ -247,7 +249,7 @@
 
 @media (max-width: 1024px) {
     .user-profile-pic {
-        width: 28%;
+        aspect-ratio: 4 / 5;
     }
 
     .user-fields {
@@ -324,6 +326,7 @@
     }
 
     .user-profile-pic {
+        height: auto;
         width: 32vw;
         aspect-ratio: 1 / 1;
     }

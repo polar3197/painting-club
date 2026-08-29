@@ -9,7 +9,7 @@
        └──────────────────────────────────────┘
    ===================================================================== */
 .home {
-    --prompt-height: 420px;   /* height of the weekly-prompt box */
+    --prompt-height: 320px;   /* height of the weekly-prompt box (fixed) */
     --gutter: 22px;
     --page-pad: 24px 28px 28px 28px;
     --prompt-thumb: 130px;    /* size of a weekly-prompt thumbnail */
