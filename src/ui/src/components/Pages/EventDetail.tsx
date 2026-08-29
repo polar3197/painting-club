@@ -29,7 +29,7 @@ export default function EventDetail() {
 
   const load = useCallback(async () => {
     try { setEvent(await get_event(id, token)); }
-    catch (err) { alert((err as Error).message || "could not load event"); navigate("/events"); }
+    catch (err) { alert((err as Error).message || "could not load event"); navigate("/home"); }
     finally { setLoading(false); }
   }, [id, token, navigate]);
   useEffect(() => { load(); }, [load]);
@@ -57,7 +57,7 @@ export default function EventDetail() {
 
   const confirmDelete = async () => {
     setShowDelete(false);
-    try { await delete_event(id, token); navigate("/events"); }
+    try { await delete_event(id, token); navigate("/home"); }
     catch (err) { alert((err as Error).message || "could not delete"); }
   };
 
@@ -103,7 +103,7 @@ export default function EventDetail() {
         </div>
       )}
 
-      <button className="back-btn" onClick={() => navigate("/events")}>‹ back</button>
+      <button className="back-btn" onClick={() => navigate("/home")}>‹ back</button>
       <div className="events-inner">
         <div className="events-header">
           <h1 className="events-title">event</h1>

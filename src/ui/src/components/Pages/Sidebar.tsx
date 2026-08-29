@@ -98,9 +98,6 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
         <SidebarElement isOpen={isOpen} label="art" imgSrc="/imgs/art.png" onClick={gotoArt}>
           {isOpen ? "Art" : <img src="/imgs/art.png" width="100%" height="100%" />}
         </SidebarElement>
-        <SidebarElement isOpen={isOpen} label="events" onClick={() => navigate("/events")}>
-          {isOpen ? "Events" : "▦"}
-        </SidebarElement>
         {currentRole === "admin" && (
           <SidebarElement isOpen={isOpen} label="admin" onClick={() => navigate("/admin")}>
             {isOpen ? "Admin" : "★"}

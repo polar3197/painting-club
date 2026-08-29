@@ -8,10 +8,11 @@ import { MonthCursor, stepMonth } from "../../utils/calendar";
 import { eventsByDate, eventMarks } from "../../utils/events";
 import MonthCalendar from "../Utils/MonthCalendar";
 import EventRow from "../Utils/EventRow";
-import "../../styles/events.css";
 
-// Events (sidebar): a square calendar beside the selected day's events.
-export default function Events() {
+// The events box: a square calendar beside the selected day's events. This is
+// the events UI (no separate page) — open an event to read it, and its back
+// button returns here.
+export default function EventsBox() {
   const navigate = useNavigate();
   const { token } = useAuth()!;
   const [events, setEvents] = useState<EventOut[]>([]);
@@ -32,26 +33,22 @@ export default function Events() {
   const dayLabel = new Date(sy, sm - 1, sd).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }).toLowerCase();
 
   return (
-    <main className="page events-page">
-      <div className="events-inner events-inner-wide">
-        <div className="events-header">
-          <h1 className="events-title">events</h1>
-          <div className="events-actions">
-            <button className="events-btn" onClick={() => navigate("/events/new")}>+ new event</button>
-          </div>
+    <div className="home-events">
+      <div className="home-square-head">
+        <span className="home-square-label">events</span>
+        <button className="home-square-link" onClick={() => navigate("/events/new")}>+ new event</button>
+      </div>
+      <div className="home-events-body">
+        <div className="home-events-cal">
+          <MonthCalendar cursor={cursor} onStep={(d) => setCursor((c) => stepMonth(c, d))} selected={selected} onSelect={setSelected} marks={marks} compact fill />
         </div>
-        <div className="events-split">
-          <div className="events-split-cal">
-            <MonthCalendar cursor={cursor} onStep={(d) => setCursor((c) => stepMonth(c, d))} selected={selected} onSelect={setSelected} marks={marks} fill />
-          </div>
-          <div className="events-split-day">
-            <span className="events-day-label">{selected === today ? "today" : dayLabel}</span>
-            {dayEvents.length === 0
-              ? <span className="events-empty">no events on this day</span>
-              : dayEvents.map((e) => <EventRow key={e.id} e={e} onClick={() => navigate(`/events/${e.id}`)} />)}
-          </div>
+        <div className="home-day">
+          <span className="home-upcoming-label">{selected === today ? "today" : dayLabel}</span>
+          {dayEvents.length === 0
+            ? <span className="home-upcoming-empty">no events on this day</span>
+            : dayEvents.map((e) => <EventRow key={e.id} e={e} onClick={() => navigate(`/events/${e.id}`)} />)}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

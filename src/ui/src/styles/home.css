@@ -4,14 +4,18 @@
        ┌──────────────────────────────────────┐
        │ title                                │
        │                                      │
-       │ weekly prompt (full width), its      │
-       │ centre at --prompt-center down       │
-       │ the page (61.8% = golden section)    │
-       └──────────────────────────────────────┘
+       │ weekly prompt (full width), centre   │
+       │ at --prompt-center down the page     │
+       ├──────────┬──────────┬────────────────┤
+       │ events   │ requests │ about (shelf)  │  ← --below-split, --below-gap
+       └──────────┴──────────┴────────────────┘
    ===================================================================== */
 .home {
     --prompt-height: 320px;   /* height of the weekly-prompt box (fixed) */
     --prompt-center: 38.2%;   /* where the box's centre sits down the page (golden section: less above than below) */
+    --below-split: minmax(0, 3fr) minmax(0, 2fr) 300px;  /* events : requests : about widths */
+    --below-gap: 36px;        /* space between the three boxes under the prompt */
+    --below-top-gap: 36px;    /* space between the prompt box and that band */
     --gutter: 22px;
     --page-pad: 24px 28px 28px 28px;
     --prompt-thumb: 130px;    /* size of a weekly-prompt thumbnail */
@@ -40,13 +44,22 @@
     height: var(--prompt-height);
 }
 
-/* title, then the shelf taking all remaining height */
-.bulletin {
-    flex: 1 1 0;
+/* The band under the prompt: from just below the box to the page bottom.
+   Positioned independently so the prompt never moves. */
+.home-below {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    top: calc(var(--prompt-center) + var(--prompt-height) / 2 + var(--below-top-gap));
+    bottom: 28px;
+    display: grid;
+    grid-template-columns: var(--below-split);
+    gap: var(--below-gap);
+}
+
+.home-below > * {
+    min-width: 0;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
 }
 
 
@@ -80,7 +93,6 @@
 
 /* the About bookshelf: three spines standing side by side */
 .shelf {
-    flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -301,4 +313,9 @@
 @media (max-width: 860px) {
     .home { height: auto; overflow: visible; }
     .home > .hp-box { position: static; transform: none; height: var(--prompt-height); margin-top: 16px; }
+    .home-below { position: static; grid-template-columns: 1fr; margin-top: var(--below-top-gap); }
+    .home-events, .fr-board { min-height: 300px; }
+    .shelf { min-height: 220px; }
+    .home-events-body { flex-direction: column; }
+    .home-events-cal { height: auto; width: 100%; aspect-ratio: auto; }
 }

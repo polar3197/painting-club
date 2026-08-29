@@ -1,13 +1,16 @@
 import { useNavigate } from "react-router-dom";
 import { useAdminPending } from "../../hooks/useAdminPending";
 import PromptColumn from "../Home/PromptColumn";
+import EventsBox from "../Home/EventsBox";
+import FeatureBoard from "../Home/FeatureBoard";
+import BookShelf from "../Home/BookShelf";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 
-// Home, pared back for now: the title, and the week's prompt full width with
-// its centre at the golden section of the page (--prompt-center in home.css). Events moved to the sidebar; the feature
-// board (Home/FeatureBoard) and the About bookshelf (Home/Bulletin) are
-// unmounted but kept for their return.
+// Home: the title; the week's prompt full width with its centre at the golden
+// section; and beneath it a band with events, the feature-request board and
+// the About bookshelf, each sized to what it shows. Every proportion is a
+// knob at the top of home.css.
 export default function Home() {
   const navigate = useNavigate();
   const adminPending = useAdminPending();
@@ -24,6 +27,11 @@ export default function Home() {
           )}
         </div>
         <PromptColumn />
+        <div className="home-below">
+          <EventsBox />
+          <FeatureBoard />
+          <BookShelf />
+        </div>
       </div>
     </main>
   );
