@@ -63,7 +63,14 @@
 }
 
 
+/* The title is centred vertically in the band above the prompt box, without
+   moving the box: pinned to that band's exact height. */
 .home-top {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    top: 0;
+    height: calc(var(--prompt-center) - var(--prompt-height) / 2);
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -312,6 +319,7 @@
 
 @media (max-width: 860px) {
     .home { height: auto; overflow: visible; }
+    .home-top { position: static; height: auto; }
     .home > .hp-box { position: static; transform: none; height: var(--prompt-height); margin-top: 16px; }
     .home-below { position: static; grid-template-columns: 1fr; margin-top: var(--below-top-gap); }
     .home-events, .fr-board { min-height: 300px; }
