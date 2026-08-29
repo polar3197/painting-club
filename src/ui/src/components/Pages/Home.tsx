@@ -4,8 +4,8 @@ import PromptColumn from "../Home/PromptColumn";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 
-// Home, pared back for now: the title, then the week's prompt full width at
-// the golden section of the page. Events moved to the sidebar; the feature
+// Home, pared back for now: the title, and the week's prompt full width with
+// its centre at the golden section of the page (--prompt-center in home.css). Events moved to the sidebar; the feature
 // board (Home/FeatureBoard) and the About bookshelf (Home/Bulletin) are
 // unmounted but kept for their return.
 export default function Home() {
@@ -23,9 +23,7 @@ export default function Home() {
             </button>
           )}
         </div>
-        <div className="home-space-above" />
         <PromptColumn />
-        <div className="home-space-below" />
       </div>
     </main>
   );

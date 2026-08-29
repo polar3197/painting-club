@@ -3,19 +3,22 @@
 
        ┌──────────────────────────────────────┐
        │ title                                │
-       │                    ← 1 part space    │
-       │ weekly prompt (full width)           │
-       │                    ← 1.618 parts     │
+       │                                      │
+       │ weekly prompt (full width), its      │
+       │ centre at --prompt-center down       │
+       │ the page (61.8% = golden section)    │
        └──────────────────────────────────────┘
    ===================================================================== */
 .home {
     --prompt-height: 320px;   /* height of the weekly-prompt box (fixed) */
+    --prompt-center: 61.8%;   /* where the box's centre sits down the page (38.2% for above centre) */
     --gutter: 22px;
     --page-pad: 24px 28px 28px 28px;
     --prompt-thumb: 130px;    /* size of a weekly-prompt thumbnail */
     --shelf-gap: 10px;        /* space between the three book spines */
     --box-border: 1px;        /* box borders — matches the sidebar's 1px */
 
+    position: relative;
     height: 100%;
     width: 100%;
     display: flex;
@@ -26,13 +29,15 @@
     overflow: hidden;
 }
 
-/* golden section: free space above : below = 1 : 1.618 */
-.home-space-above { flex: 1 1 0; }
-.home-space-below { flex: 1.618 1 0; }
-
+/* The box is taken out of flow and pinned by its centre, so the title above
+   doesn't shift it. */
 .home > .hp-box {
-    flex: 0 0 var(--prompt-height);
-    width: 100%;
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    top: var(--prompt-center);
+    transform: translateY(-50%);
+    height: var(--prompt-height);
 }
 
 /* title, then the shelf taking all remaining height */
@@ -295,6 +300,5 @@
 
 @media (max-width: 860px) {
     .home { height: auto; overflow: visible; }
-    .home-space-above, .home-space-below { display: none; }
-    .home > .hp-box { flex: none; height: var(--prompt-height); margin-top: 16px; }
+    .home > .hp-box { position: static; transform: none; height: var(--prompt-height); margin-top: 16px; }
 }
