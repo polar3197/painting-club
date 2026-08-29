@@ -39,3 +39,15 @@ export const GalleryIcon = () => (
     <rect x="14" y="14" width="7" height="7" />
   </svg>
 );
+
+// Rows view: three stacked rows, each an image block beside a text line.
+export const RowsIcon = () => (
+  <svg {...base} aria-hidden="true">
+    <rect x="3" y="4" width="5" height="4" />
+    <path d="M11 6h10" />
+    <rect x="3" y="10" width="5" height="4" />
+    <path d="M11 12h10" />
+    <rect x="3" y="16" width="5" height="4" />
+    <path d="M11 18h10" />
+  </svg>
+);

@@ -113,7 +113,7 @@
     cursor: pointer;
 }
 
-.portfolio-toggle:hover, .portfolio-toggle.on {
+.portfolio-toggle:hover {
     background-color: rgb(238, 190, 100);
 }
 

@@ -4,7 +4,7 @@ import { Profile, add_member_media } from "../../api";
 import Dropdown from "../Utils/Dropdown";
 import AddMediaDialog from "../Utils/AddMediaDialog";
 import "../../styles/user-profile/media-bar.css";
-import { GalleryIcon } from "../Utils/Icons";
+import { GalleryIcon, RowsIcon } from "../Utils/Icons";
 import { useAuth } from "../../context/AuthContext";
 
 const Keywords = (
@@ -46,13 +46,15 @@ const Keywords = (
           </div>
         ))}
       </div>
-      {/* portfolio view: swaps the rows below for the grid; lit while on */}
+      {/* portfolio view: swaps the rows below for the grid. The icon shows
+          the view you'll get by clicking: grid while in rows, rows while
+          in the grid. */}
       <button
-        className={`portfolio-toggle ${portfolioMode ? "on" : ""}`}
-        aria-label="portfolio view"
+        className="portfolio-toggle"
+        aria-label={portfolioMode ? "rows view" : "portfolio view"}
         aria-pressed={portfolioMode}
         onClick={onTogglePortfolio}
-      ><GalleryIcon /></button>
+      >{portfolioMode ? <RowsIcon /> : <GalleryIcon />}</button>
     </div>
   )
 }
