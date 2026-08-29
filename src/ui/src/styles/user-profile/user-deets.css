@@ -1,7 +1,7 @@
 /* Colors read the member's scheme via --pc-* (set on .profile-page); the
    fallbacks are the defaults. --profile-inset is the one left/right margin
    every section (header content, media bar, filter bar, art) lines up on. */
-.profile-page { display: contents; --profile-inset: 64px; --profile-header: 300px; /* height of the header row (statement box and picture) */ }
+.profile-page { display: contents; --profile-inset: 64px; --profile-header: 320px; /* height of the header row (statement box and picture) */ }
 
 
 
@@ -34,8 +34,10 @@
 
 .user-fields { display: contents; }
 
+/* shrink-wraps the name or the buttons, whichever is wider */
 .user-col {
-    width: 240px;
+    width: fit-content;
+    max-width: 260px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -121,8 +123,8 @@
 .owner-actions {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-top: 14px;
+    gap: 10px;
+    margin-top: 12px;
 }
 
 .owner-action-btn {
@@ -130,8 +132,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 42px;
-    height: 42px;
+    width: 50px;
+    height: 50px;
     padding: 0;
     border: 1px solid black;
     border-radius: 6px;
