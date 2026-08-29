@@ -275,11 +275,12 @@
 }
 
 /* edit form */
+/* Same width as the header rule above it, so the two line up. */
 .event-form {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-width: 560px;
+    width: 100%;
 }
 
 .event-form label {
