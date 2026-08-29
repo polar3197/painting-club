@@ -1022,3 +1022,84 @@ export function add_group_members(conversationId: string, usernames: string[], t
 export function leave_group(conversationId: string, token: string | null) {
   return request(`/conversations/${conversationId}/leave`, { method: "POST", headers: auth(token) });
 }
+
+// --- Prompts: list + member suggestions --------------------------------------
+
+export interface PromptSummary {
+  id: string;
+  title: string;
+  media_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export function list_prompts(token: string | null): Promise<PromptSummary[]> {
+  return request("/prompts", { headers: auth(token) }) as Promise<PromptSummary[]>;
+}
+
+/** Member proposes next week's prompt; lands in the admin "prompts" tab. */
+export function create_prompt_suggestion(prompt_text: string, media_id: string | null, token: string | null): Promise<PromptSuggestionOut> {
+  return request("/weekly-prompts/suggestions", { method: "POST", headers: auth(token), body: JSON.stringify({ prompt_text, media_id }) }) as Promise<PromptSuggestionOut>;
+}
+
+// --- About docs ("about the app": ethos / art / aims) -------------------------
+
+export interface DocOut {
+  slug: string;
+  section: string | null;
+  title: string;
+  body: string;
+  order_index: number;
+  updated_at: string | null;
+}
+
+export function get_docs_by_section(section: string, token: string | null): Promise<DocOut[]> {
+  return request(`/docs/section/${section}`, { headers: auth(token) }) as Promise<DocOut[]>;
+}
+
+export function get_doc(slug: string, token: string | null): Promise<DocOut> {
+  return request(`/docs/${slug}`, { headers: auth(token) }) as Promise<DocOut>;
+}
+
+export function create_doc(section: string, title: string, body: string, token: string | null): Promise<DocOut> {
+  return request("/docs", { method: "POST", headers: auth(token), body: JSON.stringify({ section, title, body }) }) as Promise<DocOut>;
+}
+
+export function update_doc(slug: string, title: string, body: string, token: string | null): Promise<DocOut> {
+  return request(`/docs/${slug}`, { method: "PUT", headers: auth(token), body: JSON.stringify({ title, body }) }) as Promise<DocOut>;
+}
+
+export function delete_doc(slug: string, token: string | null) {
+  return request(`/docs/${slug}`, { method: "DELETE", headers: auth(token) });
+}
+
+// --- Feature requests ("request something for the app") -----------------------
+
+export interface FeatureRequestOut {
+  id: string;
+  username: string | null; // only populated for admins — the board is anonymous
+  title: string;
+  up: number;
+  down: number;
+  my_vote: 1 | -1 | null;
+  is_owner: boolean;
+  created_at: string;
+}
+
+export interface FeatureRequestVoteOut { up: number; down: number; my_vote: 1 | -1 | null }
+
+export function get_feature_requests(token: string | null): Promise<FeatureRequestOut[]> {
+  return request("/feature-requests", { headers: auth(token) }) as Promise<FeatureRequestOut[]>;
+}
+
+export function create_feature_request(title: string, token: string | null): Promise<FeatureRequestOut> {
+  return request("/feature-requests", { method: "POST", headers: auth(token), body: JSON.stringify({ title }) }) as Promise<FeatureRequestOut>;
+}
+
+export function vote_feature_request(id: string, value: 1 | -1, token: string | null): Promise<FeatureRequestVoteOut> {
+  return request(`/feature-requests/${id}/vote`, { method: "PUT", headers: auth(token), body: JSON.stringify({ value }) }) as Promise<FeatureRequestVoteOut>;
+}
+
+export function delete_feature_request(id: string, token: string | null) {
+  return request(`/feature-requests/${id}`, { method: "DELETE", headers: auth(token) });
+}

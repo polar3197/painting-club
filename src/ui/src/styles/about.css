@@ -1,0 +1,82 @@
+.about-page {
+    background-color: rgb(255, 250, 245);
+    display: flex;
+    flex-direction: column;
+    padding: 48px 24px 28px 24px;
+    box-sizing: border-box;
+    gap: 14px;
+}
+
+.about-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 28px;
+    font-weight: 500;
+    margin: 0;
+    border-bottom: 1px solid black;
+    padding-bottom: 10px;
+}
+
+.about-panels {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.about-panel {
+    flex: 1;
+    border: 2px solid black;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 34px;
+    cursor: pointer;
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
+}
+
+.about-panel:hover { filter: brightness(1.05); }
+
+.doc {
+    background: white;
+    border: 1px solid black;
+    padding: 28px 32px;
+}
+
+.doc-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 28px;
+    margin: 0 0 16px 0;
+}
+
+.doc-body {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 17px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.doc-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.doc-title-input, .doc-body-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid black;
+    background: white;
+    padding: 10px 12px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 16px;
+    outline: none;
+}
+
+.doc-title-input { font-size: 20px; }
+.doc-body-input { resize: vertical; line-height: 1.5; }
+
+@media (max-width: 640px) {
+    .about-page { padding: 44px 14px 20px 14px; }
+    .about-panel { font-size: 26px; min-height: 90px; }
+    .doc { padding: 18px; }
+    .doc-title-input, .doc-body-input { font-size: 16px; }
+}
