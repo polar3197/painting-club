@@ -45,6 +45,87 @@
     transform: scale(1);
 }
 
+.art-element-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.art-element-buttons--centered {
+    justify-content: center;
+}
+
+.comments-toggle button {
+    width: 100%;
+    border: 1px black solid;
+    padding: 3px;
+    cursor: pointer;
+    background-color: rgb(250, 244, 202);
+    transition: transform 0.2s ease;
+}
+
+.comments-toggle {
+    width: 33%;
+    display: flex;
+    justify-content: center;
+}
+
+.comments-toggle button:hover {
+    transform: scale(1.02);
+    background-color: rgb(252, 219, 121);
+}
+
+.comments-toggle button:active {
+    transform: scale(1);
+    background-color: rgb(250, 244, 202);
+}
+
+.art-element-buttons button {
+    border: 1px black solid;
+    transition: transform 0.2s ease;
+    padding: 3px;
+    cursor: pointer;
+    padding: 3px;
+}
+
+.art-element-buttons button:hover {
+    transform: scale(1.02);
+}
+
+.art-element-buttons button:active {
+    transform: scale(1);
+}
+
+.art-element-buttons button:focus {
+    outline: none;
+}
+
+.remove button {
+    background-color: rgb(255, 175, 175);
+}
+
+.remove button:hover {
+    background-color: rgb(246, 110, 110);
+}
+
+.remove button:active {
+    background-color: rgb(255, 175, 175);
+}
+
+.edit button {
+    background-color: rgb(189, 240, 189);
+}
+
+.edit button:hover {
+    background-color: rgb(100, 202, 100);
+}
+
+.remove button:active {
+    background-color: rgb(189, 240, 189);
+}
+
 .art {
     display: flex;
     flex-direction: column;
