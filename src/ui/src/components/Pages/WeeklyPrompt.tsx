@@ -6,6 +6,7 @@ import { get_prompt, add_new_visual_2d, PromptDetailOut, ArtResult, Visual2DIn }
 import ArtImage from "../Utils/ArtImage";
 import AddArtDialog from "../Utils/AddArtDialog";
 import { useAuth } from "../../context/AuthContext";
+import { swr } from "../../cache";
 
 // Compute the (cols, rows) that maximizes the per-tile area inside (W, H) for N items.
 // Tries every column count and picks the layout whose min(W/cols, H/rows) is largest.
@@ -76,8 +77,7 @@ const WeeklyPrompt = () => {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    get_prompt(id, token)
-      .then((p) => { if (!cancelled) setPrompt(p); })
+    swr(`prompt:${id}`, () => get_prompt(id, token), (p) => { if (!cancelled) setPrompt(p); })
       .catch((e) => { if (!cancelled) setError(e?.message || "Could not load prompt"); });
     return () => { cancelled = true; };
   }, [id, token]);

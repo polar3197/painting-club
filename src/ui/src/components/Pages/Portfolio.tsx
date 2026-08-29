@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { get_members_visual_2d, Visual2DOut } from "../../api";
 import { useProfile } from "../../hooks/useProfile";
+import { swr } from "../../cache";
 import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtImage from "../Utils/ArtImage";
 import "../../styles/portfolio.css";
@@ -72,13 +73,13 @@ const Portfolio = () => {
 
   useEffect(() => {
     if (!username || !medium) return;
-    get_members_visual_2d(username, medium).then((data) => {
+    swr(`art:${username}:${medium}`, () => get_members_visual_2d(username, medium), (data) => {
       const filtered =
         keywords.length > 0
           ? data.filter((p) => keywords.every((k) => p.keywords?.includes(k)))
           : data;
       setArt(filtered);
-    });
+    }).catch(() => {});
   }, [username, medium, keywordsParam]);
 
   const headerParts = [medium, ...keywords].filter(Boolean);

@@ -7,6 +7,7 @@ import ArtZoomIn from "../Utils/ArtZoomIn";
 import ArtComments from "../Utils/ArtComments";
 import ArtImage from "../Utils/ArtImage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
+import { swr, getCached } from "../../cache";
 import { useAuth } from "../../context/AuthContext";
 import { get_members_visual_2d, remove_visual_2d, add_new_visual_2d, Visual2DOut, Visual2DIn, get_members_written_form, add_new_written_form, WrittenFormOut, WrittenFormIn, get_media, MediaType } from "../../api";
 import WrittenFormPiece from "./WrittenForm";
@@ -113,7 +114,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
     const [editingWrittenForm, setEditingWrittenForm] = useState<WrittenFormOut | null>(null);
     const [art, setArt] = useState<Visual2DOut[]>([]);
     const [writtenForms, setWrittenForms] = useState<WrittenFormOut[]>([]);
-    const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+    const [allMedia, setAllMedia] = useState<MediaType[]>(() => getCached<MediaType[]>("media") ?? []);
     const [pendingPieces, setPendingPieces] = useState<
         { tempId: string; medium: string; previewUrl: string; title: string; aspectRatio: number }[]
     >([]);
@@ -151,25 +152,26 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
     };
 
     useEffect(() => {
-        get_media().then(setAllMedia).catch(() => {});
+        swr("media", get_media, setAllMedia).catch(() => {});
     }, []);
 
     const selectedMediumType = selectedMedium ? allMedia.find(m => m.name === selectedMedium)?.type ?? null : null;
     const isVisual2D = selectedMediumType === "visual_2d";
     const isWrittenForm = selectedMediumType === "written_form";
 
+    // Cached lists paint immediately on remount; the fetch then refreshes them.
     useEffect(() => {
         const getArt = async() => {
             if (selectedMedium && isVisual2D) {
-                const data = await get_members_visual_2d(profile.username, selectedMedium);
-                setArt(data);
-                const unique = [...new Set(data.flatMap(p => p.keywords ?? []))];
-                onKeywordsLoaded(unique);
+                await swr(`art:${profile.username}:${selectedMedium}`, () => get_members_visual_2d(profile.username, selectedMedium), (data) => {
+                    setArt(data);
+                    onKeywordsLoaded([...new Set(data.flatMap(p => p.keywords ?? []))]);
+                });
             } else if (selectedMedium && isWrittenForm) {
-                const data = await get_members_written_form(profile.username, selectedMedium);
-                setWrittenForms(data);
-                const unique = [...new Set(data.flatMap(p => p.keywords ?? []))];
-                onKeywordsLoaded(unique);
+                await swr(`written:${profile.username}:${selectedMedium}`, () => get_members_written_form(profile.username, selectedMedium), (data) => {
+                    setWrittenForms(data);
+                    onKeywordsLoaded([...new Set(data.flatMap(p => p.keywords ?? []))]);
+                });
             } else {
                 onKeywordsLoaded([]);
             }

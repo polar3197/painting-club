@@ -6,6 +6,7 @@ import "../../styles/weekly-prompt.css";
 import { get_prompt, PromptDetailOut, ArtResult } from "../../api";
 import ArtImage from "../Utils/ArtImage";
 import { useAuth } from "../../context/AuthContext";
+import { swr } from "../../cache";
 
 const ArtCard = ({ piece }: { piece: ArtResult }) => {
   const navigate = useNavigate();
@@ -36,8 +37,7 @@ const WeeklyPromptGrid = () => {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    get_prompt(id, token)
-      .then((p) => { if (!cancelled) setPrompt(p); })
+    swr(`prompt:${id}`, () => get_prompt(id, token), (p) => { if (!cancelled) setPrompt(p); })
       .catch((e) => { if (!cancelled) setError(e?.message || "Could not load prompt"); });
     return () => { cancelled = true; };
   }, [id, token]);

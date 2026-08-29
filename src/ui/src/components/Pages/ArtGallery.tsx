@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Fuse from "fuse.js";
 import { useOptions } from "../../hooks/useOptions";
 import { ArtResult, search_art } from "../../api";
+import { swr, getCached } from "../../cache";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
 import ArtImage from "../Utils/ArtImage";
@@ -32,11 +33,11 @@ const ART_KEYS = ["title", "medium", "song", "creator_username", "location", "ke
 const ArtGallery = () => {
   const [query, setQuery] = useState("");
   const [chips, setChips] = useState<string[]>([]);
-  const [allArt, setAllArt] = useState<ArtResult[]>([]);
+  const [allArt, setAllArt] = useState<ArtResult[]>(() => getCached<ArtResult[]>("art:all") ?? []);
   const [options] = useOptions();
 
   useEffect(() => {
-    search_art("").then(setAllArt).catch((e) => console.error("art fetch failed:", e));
+    swr("art:all", () => search_art(""), setAllArt).catch((e) => console.error("art fetch failed:", e));
   }, []);
 
   const artOptions = [...options.titles, ...options.songs, ...options.keywords, ...options.mediums, ...options.usernames, ...options.cities].filter(Boolean);
