@@ -89,7 +89,6 @@
     transform: translateX(-50%);
     width: 5px;
     height: 5px;
-    border-radius: 50%;
 }
 
 .mcal-compact .mcal-month { font-size: 15px; }

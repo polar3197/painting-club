@@ -283,7 +283,6 @@
 .tools-role-pic {
     width: 96px;
     height: 96px;
-    border-radius: 50%;
     border: 1px solid black;
     object-fit: cover;
     background-color: rgb(250, 244, 202);
@@ -327,7 +326,6 @@
 .tools-role-radio {
     width: 18px;
     height: 18px;
-    border-radius: 50%;
     border: 1px solid black;
     background: white;
     flex-shrink: 0;

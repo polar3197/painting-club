@@ -121,7 +121,6 @@
     height: 38px;
     padding: 0;
     border: 1px solid black;
-    border-radius: 6px;
     background-color: rgb(250, 244, 202);
     color: black;
     cursor: pointer;
@@ -141,7 +140,6 @@
     right: -4px;
     width: 10px;
     height: 10px;
-    border-radius: 50%;
     background-color: rgb(227, 0, 34);
     border: 1px solid black;
 }
