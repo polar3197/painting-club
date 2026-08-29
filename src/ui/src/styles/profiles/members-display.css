@@ -68,6 +68,11 @@
     object-fit: cover;
 }
 
+.member-pic-empty {
+    width: 130px;
+    height: 155px;
+}
+
 .art-card-img {
     flex: 40;
 }
@@ -85,7 +90,6 @@
     height: auto;
     object-fit: scale-down;
     display: block;
-    border: 1px black solid;
 }
 
 .art-card-deets {

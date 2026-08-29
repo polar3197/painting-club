@@ -12,7 +12,9 @@ const MemberCard = ({ member }: { member: Profile }) => {
   const navigate = useNavigate();
   const auth = useAuth();
   const versions = auth?.profilePicVersions ?? {};
-  const src = profilePicSrc(member, versions) ?? `/imgs/${member.id}.png`;
+  // No fallback image: a member without a picture gets blank space, not a
+  // broken-image box.
+  const src = profilePicSrc(member, versions);
 
   return (
     <div className='display-card member-card' onClick={() => navigate(`/members/${member.username}/profile`)}>
@@ -25,7 +27,7 @@ const MemberCard = ({ member }: { member: Profile }) => {
         )}
       </div>
       <div className='member-pic'>
-        <img src={src} width="130" height="155" />
+        {src ? <img src={src} width="130" height="155" /> : <div className="member-pic-empty" />}
       </div>
     </div>
   );
