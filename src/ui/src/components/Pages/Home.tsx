@@ -10,13 +10,15 @@ import MonthCalendar from "../Utils/MonthCalendar";
 import EventRow from "../Utils/EventRow";
 import Bulletin from "../Home/Bulletin";
 import PromptColumn from "../Home/PromptColumn";
+import FeatureBoard from "../Home/FeatureBoard";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 
-// Home: the bulletin on the left third; the right two-thirds stacks the
-// week's prompt (a strip of submissions) over events. The calendar lives
-// here (there's no separate events page): pick a day to see its events
-// beside it, open one to read it, and its back button returns here.
+// Home as a 2×2 grid. Top: title + the About bookshelf (left third), the
+// week's prompt (right two-thirds). Bottom, one shorter row at a shared
+// height: the feature-request board (left), events (right). The calendar
+// lives here (there's no separate events page): pick a day to see its
+// events beside it, open one to read it, and its back button returns here.
 export default function Home() {
   const navigate = useNavigate();
   const { token } = useAuth()!;
@@ -41,11 +43,10 @@ export default function Home() {
     <main className="page">
       <div className="home">
         <Bulletin />
+        <PromptColumn />
+        <FeatureBoard />
 
-        <div className="home-right">
-          <PromptColumn />
-
-          <div className="home-events">
+        <div className="home-events">
             <div className="home-square-head">
               <span className="home-square-label">events</span>
               <button className="home-square-link" onClick={() => navigate("/events/new")}>+ new event</button>
@@ -58,6 +59,7 @@ export default function Home() {
                   selected={selected}
                   onSelect={setSelected}
                   marks={marks}
+                  compact
                 />
               </div>
               <div className="home-day">
@@ -68,7 +70,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
       </div>
     </main>
   );

@@ -1,10 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useAdminPending } from "../../hooks/useAdminPending";
-import Announcements from "../Utils/Announcements";
-import FeatureBoard from "./FeatureBoard";
+import { ABOUT_SECTIONS } from "../Pages/About";
 
-// Left third of Home: the club noticeboard — title, announcements, the
-// feature-request board, and the about link.
+// Top-left of Home: the title, then "about the app" as a bookshelf — the
+// three sections (ethos / art / aims) standing as spines; click one to open
+// it, or the shelf's header for the About hub.
 export default function Bulletin() {
   const navigate = useNavigate();
   const adminPending = useAdminPending();
@@ -12,21 +12,27 @@ export default function Bulletin() {
   return (
     <div className="bulletin">
       <div className="home-top">
-        <div className="home-title">-• Painting Club •-</div>
+        <div className="home-title">-• Paint Club •-</div>
+        {adminPending.total > 0 && (
+          <button className="home-admin-alert" onClick={() => navigate("/admin")}>
+            {adminPending.total} {adminPending.total === 1 ? "request" : "requests"} to review
+          </button>
+        )}
       </div>
-      {adminPending.total > 0 && (
-        <button className="home-admin-alert" onClick={() => navigate("/admin")}>
-          {adminPending.total} {adminPending.total === 1 ? "request" : "requests"} to review
+
+      <section className="shelf">
+        <button className="shelf-head" onClick={() => navigate("/about")}>
+          <span className="home-square-label">about the app</span>
+          <span className="home-square-link">open ›</span>
         </button>
-      )}
-
-      <Announcements />
-
-      <FeatureBoard />
-
-      <div className="bulletin-links">
-        <button className="bulletin-link" onClick={() => navigate("/about")}>about the app</button>
-      </div>
+        <div className="shelf-books">
+          {ABOUT_SECTIONS.map((s) => (
+            <button key={s.key} className="shelf-book" style={{ backgroundColor: s.bg, color: s.fg }} onClick={() => navigate(`/about/${s.key}`)}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

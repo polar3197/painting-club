@@ -36,7 +36,7 @@ export default function PromptColumn() {
     <div className={`hp-box ${active ? "hp-box-link" : ""}`} onClick={open} role={active ? "link" : undefined} tabIndex={active ? 0 : -1}
       onKeyDown={(e) => { if (e.key === "Enter") open(); }}>
       <div className="hp-header">
-        <span className="hp-kicker">this week's prompt</span>
+        <span className="hp-kicker">weekly prompt</span>
         {active === undefined ? null : active === null ? (
           <span className="hp-title">no prompt this week</span>
         ) : (

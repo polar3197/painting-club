@@ -1,11 +1,12 @@
-/* Bulletin on the left third; the right two-thirds stacks the prompt row
-   over the events row. */
+/* 2×2: [title + about shelf | weekly prompt] over [feature board | events].
+   The bottom row is a fixed, shorter height shared by both widgets. */
 .home {
     height: 100%;
     width: 100%;
     display: grid;
     /* minmax(0, …): a long event title must never widen its column. */
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-rows: minmax(0, 1fr) 300px;
     gap: 22px;
     padding: 24px 28px 28px 28px;
     box-sizing: border-box;
@@ -16,14 +17,13 @@
 .home > * {
     min-height: 0;
     min-width: 0;
-}
-
-/* ---- bulletin (left) ---- */
-.bulletin {
     display: flex;
     flex-direction: column;
+}
+
+/* ---- top-left: title + about shelf ---- */
+.bulletin {
     gap: 14px;
-    overflow-y: auto;
 }
 
 .home-top {
@@ -54,38 +54,65 @@
     cursor: pointer;
 }
 
-.bulletin-links {
-    flex-shrink: 0;
+/* the About bookshelf: three spines standing side by side */
+.shelf {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    border: 2px solid black;
+    background-color: rgb(255, 250, 245);
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
+    overflow: hidden;
 }
 
-.bulletin-link {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    text-align: left;
-    padding: 10px 14px;
-    border: 1px solid black;
-    background-color: rgb(255, 250, 245);
+.shelf-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 16px;
+    border-bottom: 1px solid black;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font: inherit;
     color: black;
     cursor: pointer;
+    text-align: left;
 }
 
-.bulletin-link:hover {
-    background-color: rgb(250, 244, 202);
-}
-
-/* ---- right column: prompt row over events row ---- */
-.home-right {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 22px;
+.shelf-books {
+    flex: 1;
     min-height: 0;
+    display: flex;
+    gap: 10px;
+    padding: 14px;
+    /* the shelf plank */
+    border-bottom: 10px solid rgb(120, 85, 50);
 }
 
-/* ---- week's prompt: title over a strip of submissions ---- */
+.shelf-book {
+    flex: 1;
+    border: 2px solid black;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 26px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    padding: 12px 0;
+}
+
+.shelf-book:hover { filter: brightness(1.06); }
+
+/* ---- top-right: week's prompt, title over a strip of submissions ---- */
 .hp-box {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     border: 2px solid black;
@@ -96,7 +123,7 @@
 }
 
 .hp-box-link { cursor: pointer; }
-.hp-box-link:hover .hp-title { text-decoration: underline; }
+.hp-box-link:hover { background-color: rgb(255, 253, 248); }
 
 /* The title sits inside the box's border, separated by a rule. */
 .hp-header {
@@ -110,9 +137,11 @@
 
 .hp-kicker {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    color: #333;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: black;
 }
 
 .hp-title {
@@ -128,9 +157,12 @@
 }
 
 .hp-grid-area {
+    flex: 1;
+    min-height: 0;
     padding: 10px;
     display: flex;
     flex-direction: column;
+    justify-content: center;
 }
 
 /* One row of square thumbnails, scrolled sideways. */
@@ -212,8 +244,8 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-    gap: 18px;
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 16px;
 }
 
 .home-events-cal {
@@ -249,10 +281,10 @@
 }
 
 @media (max-width: 860px) {
-    .home { height: auto; overflow: visible; grid-template-columns: 1fr; }
-    .home-right { grid-template-rows: auto auto; }
+    .home { height: auto; overflow: visible; grid-template-columns: 1fr; grid-template-rows: auto; }
     .bulletin, .hp-box { overflow: visible; height: auto; }
-    .home-events { min-height: 0; }
+    .shelf { min-height: 220px; }
+    .home-events, .fr-board { min-height: 300px; }
     .home-events-body { grid-template-columns: 1fr; }
     .home-day { border-left: none; padding-left: 0; border-top: 1px solid black; padding-top: 10px; }
 }
