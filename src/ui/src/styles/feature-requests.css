@@ -80,7 +80,7 @@
     min-height: 240px;
     display: flex;
     flex-direction: column;
-    border: 2px solid black;
+    border: 1px solid black;
     background-color: rgb(255, 250, 245);
     box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
     overflow: hidden;
