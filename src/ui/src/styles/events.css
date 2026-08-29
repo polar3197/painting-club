@@ -192,15 +192,6 @@
 
 .chip-x:hover { color: black; }
 
-.chip-add {
-    border: 1px dashed black;
-    background: rgb(250, 244, 202);
-    padding: 4px 10px;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    cursor: pointer;
-}
-
 /* member picker */
 .picker-backdrop {
     position: fixed;
