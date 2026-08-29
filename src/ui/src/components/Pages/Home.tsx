@@ -14,9 +14,9 @@ import FeatureBoard from "../Home/FeatureBoard";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 
-// Home as a 2×2 grid. Top: title + the About bookshelf (left third), the
-// week's prompt (right two-thirds). Bottom, one shorter row at a shared
-// height: the feature-request board (left), events (right). The calendar
+// Home: a fixed-width left stack (title, About bookshelf, feature board —
+// the shelf and board split the height) beside the week's prompt over
+// events. The calendar
 // lives here (there's no separate events page): pick a day to see its
 // events beside it, open one to read it, and its back button returns here.
 export default function Home() {
@@ -42,9 +42,11 @@ export default function Home() {
   return (
     <main className="page">
       <div className="home">
-        <Bulletin />
+        <div className="home-left">
+          <Bulletin />
+          <FeatureBoard />
+        </div>
         <PromptColumn />
-        <FeatureBoard />
 
         <div className="home-events">
             <div className="home-square-head">
@@ -60,6 +62,7 @@ export default function Home() {
                   onSelect={setSelected}
                   marks={marks}
                   compact
+                  fill
                 />
               </div>
               <div className="home-day">

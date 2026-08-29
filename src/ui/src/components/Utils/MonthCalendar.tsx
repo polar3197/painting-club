@@ -8,13 +8,15 @@ const WEEKDAYS = ["s", "m", "t", "w", "t", "f", "s"];
 // A month grid. `marks` maps YYYY-MM-DD -> accent color for days that have
 // events (the first event's color, or a default). Shared by the Events page
 // and the Home events square (compact: no month nav, smaller cells).
-export default function MonthCalendar({ cursor, onStep, selected, onSelect, marks, compact = false }: {
+export default function MonthCalendar({ cursor, onStep, selected, onSelect, marks, compact = false, fill = false }: {
   cursor: MonthCursor;
   onStep?: (delta: number) => void;
   selected?: string | null;
   onSelect?: (iso: string) => void;
   marks: Record<string, string>;
   compact?: boolean;
+  // Stretch the week rows to fill the container's height (Home's square box).
+  fill?: boolean;
 }) {
   const today = todayLocalISO();
   const cells = useMemo(() => {
@@ -28,7 +30,7 @@ export default function MonthCalendar({ cursor, onStep, selected, onSelect, mark
   }, [cursor]);
 
   return (
-    <div className={`mcal ${compact ? "mcal-compact" : ""}`}>
+    <div className={`mcal ${compact ? "mcal-compact" : ""} ${fill ? "mcal-fill" : ""}`}>
       <div className="mcal-nav">
         {onStep ? <button className="mcal-arrow" onClick={() => onStep(-1)} aria-label="previous month">‹</button> : <span />}
         <span className="mcal-month">{LONG_MONTHS[cursor.m0]} {cursor.y}</span>

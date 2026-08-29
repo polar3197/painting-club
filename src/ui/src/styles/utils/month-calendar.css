@@ -95,3 +95,22 @@
 .mcal-compact .mcal-day { font-size: 12px; }
 .mcal-compact .mcal-weekday { font-size: 10px; }
 .mcal-compact .mcal-dot { width: 4px; height: 4px; bottom: 2px; }
+
+/* fill: the grid takes the container's height, week rows share it evenly */
+.mcal-fill {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mcal-fill .mcal-grid {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: auto;
+    grid-auto-rows: minmax(0, 1fr);
+}
+
+.mcal-fill .mcal-cell {
+    aspect-ratio: auto;
+    height: 100%;
+}

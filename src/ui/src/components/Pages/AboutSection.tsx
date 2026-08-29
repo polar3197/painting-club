@@ -22,7 +22,7 @@ export default function AboutSection() {
     <ToolsPage
       title={label}
       contributorOnly={false}
-      onBack={() => navigate("/about")}
+      onBack={() => navigate("/home")}
       action={currentRole === "contributor" && <button className="tools-btn" onClick={() => navigate(`/about/${section}/new`)}>+ doc</button>}
     >
       {docs === null ? <p className="tools-empty">loading…</p>

@@ -1,11 +1,11 @@
-/* 2×2: [title + about shelf | weekly prompt] over [feature board | events].
-   The bottom row is a fixed, shorter height shared by both widgets. */
+/* A 300px left stack spanning both rows (title, about shelf, feature board)
+   beside the week's prompt (top) and events (bottom). */
 .home {
     height: 100%;
     width: 100%;
     display: grid;
     /* minmax(0, …): a long event title must never widen its column. */
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-columns: 300px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) 460px;
     gap: 22px;
     padding: 24px 28px 28px 28px;
@@ -21,9 +21,24 @@
     flex-direction: column;
 }
 
-/* ---- top-left: title + about shelf ---- */
-.bulletin {
+/* ---- left stack ---- */
+.home-left {
+    grid-row: 1 / 3;
     gap: 14px;
+}
+
+/* title + shelf; the shelf and the feature board below share the height */
+.bulletin {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.home-left .fr-board {
+    flex: 1 1 0;
+    min-height: 0;
 }
 
 .home-top {
@@ -58,8 +73,6 @@
 .shelf {
     flex: 1;
     min-height: 0;
-    width: 100%;
-    max-width: 300px;
     display: flex;
     flex-direction: column;
     border: 2px solid black;
@@ -125,13 +138,12 @@
 }
 
 .hp-kicker {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 15px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 22px;
     font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: black;
 }
+
+.hp-kicker::after { content: " —"; font-weight: 400; }
 
 .hp-title {
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
@@ -158,10 +170,8 @@
    height so the row fills it. */
 .hp-strip {
     display: flex;
-    align-items: stretch;
+    align-items: center;
     gap: 8px;
-    height: 100%;
-    min-height: 150px;
     overflow-x: auto;
     padding-bottom: 4px;
     scrollbar-width: thin;
@@ -171,7 +181,7 @@
 .hp-cell {
     display: block;
     flex: 0 0 auto;
-    height: 100%;
+    height: 130px;
     aspect-ratio: 1 / 1;
     border: 1px solid black;
     background: rgb(250, 244, 202);
@@ -238,14 +248,19 @@
 .home-events-body {
     flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 230px minmax(0, 1fr);
+    display: flex;
     gap: 16px;
 }
 
+/* as tall as the box, and square */
 .home-events-cal {
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    flex: 0 0 auto;
     min-width: 0;
 }
+
+.home-day { flex: 1; }
 
 .home-day {
     display: flex;
@@ -277,6 +292,9 @@
 
 @media (max-width: 860px) {
     .home { height: auto; overflow: visible; grid-template-columns: 1fr; grid-template-rows: auto; }
+    .home-left { grid-row: auto; }
+    .home-events-body { flex-direction: column; }
+    .home-events-cal { height: auto; width: 100%; aspect-ratio: auto; }
     .bulletin, .hp-box { overflow: visible; height: auto; }
     .shelf { min-height: 220px; }
     .home-events, .fr-board { min-height: 300px; }
