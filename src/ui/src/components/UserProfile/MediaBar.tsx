@@ -47,14 +47,13 @@ const Keywords = (
         ))}
       </div>
       {/* portfolio view: swaps the rows below for the grid. The icon shows
-          the view you'll get by clicking: grid while in rows, rows while
-          in the grid. */}
+          the current view: rows while in rows, grid while in the grid. */}
       <button
         className="portfolio-toggle"
         aria-label={portfolioMode ? "rows view" : "portfolio view"}
         aria-pressed={portfolioMode}
         onClick={onTogglePortfolio}
-      >{portfolioMode ? <RowsIcon /> : <GalleryIcon />}</button>
+      >{portfolioMode ? <GalleryIcon /> : <RowsIcon />}</button>
     </div>
   )
 }
