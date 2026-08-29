@@ -11,7 +11,7 @@
    ===================================================================== */
 .home {
     --prompt-height: 320px;   /* height of the weekly-prompt box (fixed) */
-    --prompt-center: 61.8%;   /* where the box's centre sits down the page (38.2% for above centre) */
+    --prompt-center: 38.2%;   /* where the box's centre sits down the page (golden section: less above than below) */
     --gutter: 22px;
     --page-pad: 24px 28px 28px 28px;
     --prompt-thumb: 130px;    /* size of a weekly-prompt thumbnail */
