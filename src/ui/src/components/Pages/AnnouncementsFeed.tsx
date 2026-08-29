@@ -16,7 +16,7 @@ export default function AnnouncementsFeed() {
   }, [token]);
 
   return (
-    <ToolsPage title="announcements" contributorOnly={false}>
+    <ToolsPage title="announcements" contributorOnly={false} onBack={() => navigate(-1)}>
       {items === null ? <p className="tools-empty">loading…</p>
         : items.length === 0 ? <p className="tools-empty">nothing announced yet.</p>
         : items.map((a) => (

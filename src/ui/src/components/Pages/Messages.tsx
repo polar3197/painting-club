@@ -105,7 +105,10 @@ export default function Messages() {
 
       <div className="messages-inner">
         <div className="messages-header">
-          <h1 className="messages-title">messages</h1>
+          <div className="messages-header-left">
+            <button className="back-btn" onClick={() => navigate(currentUser ? `/members/${currentUser}/profile` : "/home")}>‹ back</button>
+            <h1 className="messages-title">messages</h1>
+          </div>
           <div className="messages-actions">
             <button className="msg-btn" onClick={openCompose}>+ new</button>
           </div>

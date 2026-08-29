@@ -61,7 +61,10 @@ export default function Settings() {
       />
 
       <div className="settings-inner">
-        <h1 className="settings-title">settings</h1>
+        <div className="settings-head">
+          <button className="back-btn" onClick={() => navigate(currentUser ? `/members/${currentUser}/profile` : "/home")}>‹ back</button>
+          <h1 className="settings-title">settings</h1>
+        </div>
 
         {/* Staff accounts can't self-delete (same rule as iOS). */}
         {currentUser && !isStaff && (

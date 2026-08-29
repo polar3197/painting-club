@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { InfraHealthOut, get_infra_health } from "../../api";
 import { ToolsPage, Section } from "../Utils/ToolsPage";
@@ -45,6 +46,7 @@ const Meter = ({ label, percent, value }: { label: string; percent: number | nul
 // Contributor "infra stats": live Raspberry Pi host health from /infra/health,
 // refreshed every 15s. Read-only.
 export default function InfraStats() {
+  const navigate = useNavigate();
   const { token } = useAuth()!;
   const [data, setData] = useState<InfraHealthOut | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +67,7 @@ export default function InfraStats() {
   const sub = `raspberry pi · ${data?.kernel || "host"}${data?.uptime_seconds != null ? ` · up ${fmtUptime(data.uptime_seconds)}` : ""}`;
 
   return (
-    <ToolsPage title="infra stats" sub={sub}>
+    <ToolsPage title="infra stats" onBack={() => navigate("/settings")} sub={sub}>
       {loading ? (
         <p className="tools-empty">loading…</p>
       ) : error && !data ? (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { UsageSummary, get_usage_summary } from "../../api";
 import { ToolsPage, Section } from "../Utils/ToolsPage";
@@ -23,6 +24,7 @@ function BarRow({ label, count, max, accent }: { label: string; count: number; m
 // Contributor "user stats": visits + active members per day and the busiest
 // screens, from /usage/summary. Read-only.
 export default function UserStats() {
+  const navigate = useNavigate();
   const { token } = useAuth()!;
   const [data, setData] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,7 @@ export default function UserStats() {
   const activeToday = data?.active_today ?? [];
 
   return (
-    <ToolsPage title="user stats" sub={`last ${data?.days ?? WINDOW_DAYS} days`}
+    <ToolsPage title="user stats" onBack={() => navigate("/settings")} sub={`last ${data?.days ?? WINDOW_DAYS} days`}
       action={<button className="tools-btn" onClick={load}>refresh</button>}>
       {loading ? (
         <p className="tools-empty">loading…</p>

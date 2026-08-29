@@ -44,7 +44,7 @@ export default function Home() {
   const byDate = useMemo(() => eventsByDate(events), [events]);
   const marks = useMemo(() => eventMarks(byDate), [byDate]);
   const upcoming = useMemo(
-    () => events.filter((e) => e.event_date >= today).sort((a, b) => (a.event_date + (a.event_time || "")).localeCompare(b.event_date + (b.event_time || ""))).slice(0, 3),
+    () => events.filter((e) => e.event_date >= today).sort((a, b) => (a.event_date + (a.event_time || "")).localeCompare(b.event_date + (b.event_time || ""))),
     [events, today],
   );
 
@@ -65,37 +65,17 @@ export default function Home() {
           )}
         </div>
 
-        <div className="home-squares">
-          {/* week's prompt */}
-          <button
-            className={`home-square home-square-prompt ${prompt ? "" : "empty"}`}
-            onClick={() => prompt && navigate(`/prompts/${prompt.id}`)}
-            disabled={!prompt}
-          >
-            <span className="prompt-ring" style={ringStyle}>
-              <span className="prompt-ring-inner">
-                <span className="prompt-label">week's prompt</span>
-                {prompt ? (
-                  <>
-                    <span className="prompt-title">{prompt.title}</span>
-                    <span className="prompt-medium">{prompt.media_name ?? "any medium"}</span>
-                  </>
-                ) : (
-                  <span className="prompt-medium">no prompt this week</span>
-                )}
-              </span>
-            </span>
-          </button>
-
-          {/* events */}
-          <div className="home-square home-square-events" onClick={() => navigate("/events")} role="link" tabIndex={0}
+        <div className="home-body">
+          {/* events: left half, full height */}
+          <div className="home-events" onClick={() => navigate("/events")} role="link" tabIndex={0}
             onKeyDown={(e) => { if (e.key === "Enter") navigate("/events"); }}>
             <div className="home-square-head">
               <span className="home-square-label">events</span>
               <span className="home-square-link">open ›</span>
             </div>
-            <MonthCalendar cursor={cursor} marks={marks} compact />
+            <MonthCalendar cursor={cursor} marks={marks} />
             <div className="home-upcoming">
+              <span className="home-upcoming-label">coming up</span>
               {upcoming.length === 0 ? (
                 <span className="home-upcoming-empty">nothing coming up</span>
               ) : upcoming.map((e) => (
@@ -107,10 +87,30 @@ export default function Home() {
               ))}
             </div>
           </div>
-        </div>
 
-        <div className="home-announcements">
-          <Announcements />
+          {/* right half: week's prompt above the latest announcement */}
+          <div className="home-side">
+            <button
+              className={`home-square home-square-prompt ${prompt ? "" : "empty"}`}
+              onClick={() => prompt && navigate(`/prompts/${prompt.id}`)}
+              disabled={!prompt}
+            >
+              <span className="prompt-ring" style={ringStyle}>
+                <span className="prompt-ring-inner">
+                  <span className="prompt-label">week's prompt</span>
+                  {prompt ? (
+                    <>
+                      <span className="prompt-title">{prompt.title}</span>
+                      <span className="prompt-medium">{prompt.media_name ?? "any medium"}</span>
+                    </>
+                  ) : (
+                    <span className="prompt-medium">no prompt this week</span>
+                  )}
+                </span>
+              </span>
+            </button>
+            <Announcements />
+          </div>
         </div>
       </div>
     </main>

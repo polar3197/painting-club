@@ -65,7 +65,10 @@ export default function Events() {
     <main className="page events-page">
       <div className="events-inner">
         <div className="events-header">
-          <h1 className="events-title">events</h1>
+          <div className="events-header-left">
+            <button className="back-btn" onClick={() => navigate("/home")}>‹ home</button>
+            <h1 className="events-title">events</h1>
+          </div>
           <div className="events-actions">
             <button className="events-btn" onClick={() => navigate(`/events/new?date=${selected}`)}>+ new event</button>
           </div>

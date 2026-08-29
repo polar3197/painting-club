@@ -13,13 +13,20 @@
     box-sizing: border-box;
 }
 
+.settings-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 20px 0;
+    border-bottom: 1px solid black;
+    padding-bottom: 10px;
+}
+
 .settings-title {
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
     font-size: 28px;
     font-weight: 500;
-    margin: 0 0 20px 0;
-    border-bottom: 1px solid black;
-    padding-bottom: 10px;
+    margin: 0;
 }
 
 .settings-section {

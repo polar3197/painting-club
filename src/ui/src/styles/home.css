@@ -1,12 +1,13 @@
 .home {
-    min-height: 100%;
+    height: 100%;
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 22px;
-    padding: 28px 32px 40px 32px;
+    gap: 18px;
+    padding: 24px 28px 28px 28px;
     box-sizing: border-box;
     background-color: rgb(201, 247, 193);
+    overflow: hidden;
 }
 
 .home-top {
@@ -37,14 +38,42 @@
     cursor: pointer;
 }
 
-.home-squares {
+/* Below the title: events fill the left half top to bottom; the prompt
+   and announcements stack on the right. */
+.home-body {
+    flex: 1;
+    min-height: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 420px));
+    grid-template-columns: 1fr 1fr;
     gap: 22px;
+}
+
+.home-events {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border: 2px solid black;
+    background-color: rgb(255, 250, 245);
+    box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
+    padding: 18px;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.home-side {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow-y: auto;
 }
 
 .home-square {
     aspect-ratio: 1 / 1;
+    width: 100%;
+    max-width: 420px;
+    flex-shrink: 0;
     border: 2px solid black;
     box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px;
     box-sizing: border-box;
@@ -113,11 +142,6 @@
     color: #555;
 }
 
-/* events square */
-.home-square-events {
-    background-color: rgb(255, 250, 245);
-}
-
 .home-square-head {
     display: flex;
     justify-content: space-between;
@@ -136,14 +160,21 @@
 }
 
 .home-upcoming {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-top: auto;
+    gap: 6px;
     border-top: 1px solid black;
-    padding-top: 8px;
+    padding-top: 10px;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
+}
+
+.home-upcoming-label {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: #555;
 }
 
 .home-upcoming-empty {
@@ -157,8 +188,9 @@
     grid-template-columns: 8px 1fr auto;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: 14px;
     cursor: pointer;
+    padding: 2px 0;
 }
 
 .home-upcoming-row:hover .home-upcoming-title { text-decoration: underline; }
@@ -184,20 +216,22 @@
     white-space: nowrap;
 }
 
-.home-announcements {
-    max-width: 862px;
-}
-
 @media (max-width: 1024px) {
     .home { padding: 20px; }
     .home-title { font-size: 26px; padding: 10px 16px; }
 }
 
+@media (max-width: 800px) {
+    .home { height: auto; overflow: visible; }
+    .home-body { grid-template-columns: 1fr; }
+    .home-events { min-height: 480px; }
+    .home-side { overflow: visible; }
+}
+
 @media (max-width: 640px) {
     .home { padding: 14px; gap: 16px; }
     .home-title { font-size: 22px; padding: 8px 14px; }
-    .home-squares { grid-template-columns: 1fr; }
-    .home-square { aspect-ratio: auto; min-height: 320px; }
+    .home-square { max-width: none; }
     .prompt-ring { width: 70%; }
     .prompt-title { font-size: 20px; }
 }

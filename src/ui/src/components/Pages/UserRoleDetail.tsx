@@ -53,7 +53,7 @@ export default function UserRoleDetail() {
   const pic = profile ? profilePicSrc(profile) : null;
 
   return (
-    <ToolsPage title="role" action={<button className="tools-btn" onClick={() => navigate("/user-roles")}>‹ back</button>}>
+    <ToolsPage title="role" onBack={() => navigate("/user-roles")}>
       {loading || !profile ? (
         <p className="tools-empty">loading…</p>
       ) : (

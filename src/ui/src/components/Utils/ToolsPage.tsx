@@ -6,10 +6,13 @@ import "../../styles/admin-tools.css";
 // roles / user stats / infra stats). Gates on role client-side so a
 // bookmarked URL shows a plain message instead of a wall of 403 errors —
 // the backend enforces it regardless.
-export function ToolsPage({ title, sub, action, contributorOnly = true, children }: {
+export function ToolsPage({ title, sub, action, onBack, contributorOnly = true, children }: {
   title: string;
   sub?: ReactNode;
   action?: ReactNode;
+  // Where "‹ back" goes. Pages reached from Settings return there; the
+  // announcement pages return to wherever the reader came from.
+  onBack?: () => void;
   contributorOnly?: boolean;
   children: ReactNode;
 }) {
@@ -19,7 +22,10 @@ export function ToolsPage({ title, sub, action, contributorOnly = true, children
     <main className="page tools-page">
       <div className="tools-inner">
         <div className="tools-header">
-          <h1 className="tools-title">{title}</h1>
+          <div className="tools-header-left">
+            {onBack && <button className="back-btn" onClick={onBack}>‹ back</button>}
+            <h1 className="tools-title">{title}</h1>
+          </div>
           {action}
         </div>
         {sub && <p className="tools-sub">{sub}</p>}

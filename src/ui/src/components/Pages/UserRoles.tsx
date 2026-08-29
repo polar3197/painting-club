@@ -27,7 +27,7 @@ export default function UserRoles() {
     : members;
 
   return (
-    <ToolsPage title="user roles">
+    <ToolsPage title="user roles" onBack={() => navigate("/settings")}>
       <input
         className="tools-search"
         value={search}

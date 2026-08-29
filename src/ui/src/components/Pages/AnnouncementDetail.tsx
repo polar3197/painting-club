@@ -83,14 +83,10 @@ export default function AnnouncementDetail() {
     <ToolsPage
       title="announcement"
       contributorOnly={false}
-      action={
-        <div className="tools-row-actions">
-          <button className="tools-btn" onClick={() => navigate(-1)}>‹ back</button>
-          {canDeleteAnnouncement && (
-            <button className="tools-btn tools-btn-danger" onClick={() => setConfirmDeleteAnn(true)}>delete</button>
-          )}
-        </div>
-      }
+      onBack={() => navigate(-1)}
+      action={canDeleteAnnouncement && (
+        <button className="tools-btn tools-btn-danger" onClick={() => setConfirmDeleteAnn(true)}>delete</button>
+      )}
     >
       {confirmDeleteAnn && (
         <ConfirmDialog

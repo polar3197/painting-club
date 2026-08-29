@@ -35,7 +35,7 @@ export default function Contributor() {
 
   return (
     <ToolsPage
-      title="contributor"
+      title="contributor" onBack={() => navigate("/settings")}
       sub="announcements — click to open its discussion"
       action={<button className="tools-btn" onClick={() => setComposing(true)}>+ announcement</button>}
     >
