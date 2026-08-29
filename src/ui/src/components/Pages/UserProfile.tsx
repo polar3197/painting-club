@@ -4,6 +4,7 @@ import { useProfile } from "../../hooks/useProfile";
 import UserDetails from "../UserProfile/UserDetails";
 import MediaBar from "../UserProfile/MediaBar";
 import Art from "../UserProfile/Art";
+import PortfolioGrid from "../UserProfile/PortfolioGrid";
 import { profileColorVars } from "../../utils/profileColors";
 
 const UserProfile = () => {
@@ -18,6 +19,9 @@ const UserProfile = () => {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
   const [refresh, setRefresh] = useState(0)
   const [availableKeywords, setAvailableKeywords] = useState<string[]>([])
+  // Portfolio toggle: while on, the selected medium shows as the masonry grid
+  // in place of the rows below the media bar.
+  const [portfolioMode, setPortfolioMode] = useState(false)
 
   useEffect(() => {
     if (!mediumParam) setSelectedMedium(profile?.media[0] ?? null);
@@ -42,6 +46,8 @@ const UserProfile = () => {
         setProfile={setProfile}
         selectedMedium={selectedMedium}
         selectedKeywords={selectedKeywords}
+        portfolioMode={portfolioMode}
+        onTogglePortfolio={() => setPortfolioMode((m) => !m)}
       />
       <MediaBar
         profile={profile}
@@ -52,6 +58,11 @@ const UserProfile = () => {
         setSelectedKeywords={setSelectedKeywords}
         availableKeywords={availableKeywords}
       />
+      {portfolioMode && selectedMedium ? (
+        <div className="profile-portfolio">
+          <PortfolioGrid username={profile.username} medium={selectedMedium} keywords={selectedKeywords} />
+        </div>
+      ) : (
       <Art
         profile={profile}
         selectedMedium={selectedMedium}
@@ -67,6 +78,7 @@ const UserProfile = () => {
           setRefresh(r => r + 1);
         }}
       />
+      )}
     </div>
   );
 };

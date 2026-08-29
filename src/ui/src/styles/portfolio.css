@@ -127,3 +127,12 @@
         margin-left: 0;
     }
 }
+
+/* the grid inside the profile (portfolio toggle on) */
+.profile-portfolio {
+    flex: 64;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 15px var(--profile-inset, 15px);
+    background-color: var(--pc-bg, rgb(255, 250, 245));
+}

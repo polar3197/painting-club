@@ -169,6 +169,11 @@
     cursor: default;
 }
 
+/* the portfolio toggle while on: holds the hover colour */
+.owner-action-btn.on {
+    background-color: rgb(238, 190, 100);
+}
+
 .owner-action-dot {
     position: absolute;
     top: -4px;

@@ -8,12 +8,13 @@ import { GearIcon, PencilIcon, PaperPlaneIcon, MailIcon, GalleryIcon } from "../
 import ShareMediaDialog from "../Utils/ShareMediaDialog";
 
 // The vertical stack of square buttons against the profile picture. Owner:
-// settings / edit / messages / share (the iOS set) + portfolio view. Visitor:
-// message the owner (unless they've blocked you) + portfolio view.
-export default function OwnerActions({ profile, selectedMedium, selectedKeywords }: {
+// settings / edit / messages / share (the iOS set) + the portfolio toggle.
+// Visitor: message the owner (unless they've blocked you) + the toggle.
+export default function OwnerActions({ profile, selectedMedium, portfolioMode, onTogglePortfolio }: {
   profile: Profile;
   selectedMedium: string | null;
-  selectedKeywords: string[];
+  portfolioMode: boolean;
+  onTogglePortfolio: () => void;
 }) {
   const navigate = useNavigate();
   const { token } = useAuth()!;
@@ -35,14 +36,16 @@ export default function OwnerActions({ profile, selectedMedium, selectedKeywords
     }
   };
 
-  const portfolioView = () => {
-    if (!selectedMedium) return;
-    const params = new URLSearchParams({ medium: selectedMedium });
-    if (selectedKeywords.length > 0) params.set("keywords", selectedKeywords.join(","));
-    navigate(`/members/${profile.username}/portfolio?${params.toString()}`);
-  };
+  // Toggles the grid in place of the rows below the media bar; stays lit
+  // while on.
   const portfolioBtn = (
-    <button className="owner-action-btn" aria-label="portfolio view" onClick={portfolioView} disabled={!selectedMedium}><GalleryIcon /></button>
+    <button
+      className={`owner-action-btn ${portfolioMode ? "on" : ""}`}
+      aria-label="portfolio view"
+      aria-pressed={portfolioMode}
+      onClick={onTogglePortfolio}
+      disabled={!selectedMedium}
+    ><GalleryIcon /></button>
   );
 
   if (!profile.is_owner) {

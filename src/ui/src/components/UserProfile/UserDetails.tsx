@@ -7,13 +7,15 @@ import OwnerActions from "./OwnerActions";
 import "../../styles/user-profile/user-deets.css";
 
 const UserDetails = (
-  { profile, setProfile, selectedMedium, selectedKeywords }
+  { profile, setProfile, selectedMedium, selectedKeywords, portfolioMode, onTogglePortfolio }
   :
   {
     profile: Profile,
     setProfile: Dispatch<SetStateAction<Profile | null>>;
     selectedMedium: string | null;
     selectedKeywords: string[];
+    portfolioMode: boolean;
+    onTogglePortfolio: () => void;
   }
   ) => {
 
@@ -61,7 +63,7 @@ const UserDetails = (
 
         {/* action stack + picture: the buttons run the picture's full height */}
         <div className="pic-with-actions">
-          <OwnerActions profile={profile} selectedMedium={selectedMedium} selectedKeywords={selectedKeywords} />
+          <OwnerActions profile={profile} selectedMedium={selectedMedium} portfolioMode={portfolioMode} onTogglePortfolio={onTogglePortfolio} />
           {hasPic ? (
             <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
               <img
