@@ -209,3 +209,17 @@
 @media (max-width: 640px) {
     .wp-thumb { width: 130px; height: 130px; }
 }
+
+.wp-medium-pick {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+}
+
+.wp-medium-pick-label {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    margin-right: 4px;
+}
