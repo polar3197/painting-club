@@ -110,12 +110,15 @@ const WeeklyPromptGrid = () => {
         </div>
       )}
 
-      <div className="wp-strip">
-        {subs.length > 0 ? subs.map((s, i) => (
-          <button key={s.id} className="wp-thumb" title={`${s.title} · @${s.creator_username}`} onClick={() => setZoom(i)}>
-            <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="wp-thumb-img" />
-          </button>
-        )) : <p className="weekly-prompt-empty">no submissions yet{prompt.is_active ? " — be the first" : ""}.</p>}
+      {/* The art box fills the rest of the page; the strip sits centred in it. */}
+      <div className="wp-art-box">
+        <div className="wp-strip">
+          {subs.length > 0 ? subs.map((s, i) => (
+            <button key={s.id} className="wp-thumb" title={`${s.title} · @${s.creator_username}`} onClick={() => setZoom(i)}>
+              <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="wp-thumb-img" />
+            </button>
+          )) : <p className="weekly-prompt-empty">no submissions yet{prompt.is_active ? " — be the first" : ""}.</p>}
+        </div>
       </div>
 
       {zoom !== null && <SubmissionLightbox pieces={subs} index={zoom} onIndex={setZoom} onClose={() => setZoom(null)} />}

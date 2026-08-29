@@ -54,7 +54,7 @@
 @media (max-width: 768px) {
 }
 
-.weekly-prompt-grid-page { padding-top: 48px; }
+.weekly-prompt-grid-page { padding-top: 48px; height: 100%; min-height: 0; }
 
 .weekly-prompt-grid-header {
     justify-content: space-between;
@@ -177,12 +177,26 @@
     .weekly-prompt-grid-page { padding-top: 44px; }
 }
 
-/* Submissions as one row of square thumbnails, scrolled sideways. */
+/* The art box takes the remaining page height; the row of thumbnails is
+   centred vertically inside it and scrolls sideways. */
+.wp-art-box {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    border: 1px solid black;
+    background: rgb(255, 250, 245);
+    padding: 16px;
+    box-sizing: border-box;
+}
+
 .wp-strip {
     display: flex;
+    align-items: center;
     gap: 10px;
+    width: 100%;
     overflow-x: auto;
-    padding: 4px 0 12px 0;
+    padding: 4px 0 8px 0;
     scrollbar-width: thin;
 }
 
