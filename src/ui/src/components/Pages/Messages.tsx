@@ -110,7 +110,7 @@ export default function Messages() {
             <h1 className="messages-title">messages</h1>
           </div>
           <div className="messages-actions">
-            <button className="msg-btn" onClick={openCompose}>+ new</button>
+            <button className="add-btn" onClick={openCompose}>+ new</button>
           </div>
         </div>
 

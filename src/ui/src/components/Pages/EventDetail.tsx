@@ -136,7 +136,7 @@ export default function EventDetail() {
               )}
             </span>
           ))}
-          {canEdit && <button className="chip-add" onClick={() => openPicker("host")}>+ co-host</button>}
+          {canEdit && <button className="add-btn" onClick={() => openPicker("host")}>+ co-host</button>}
         </div>
 
         {canEdit && (
@@ -150,7 +150,7 @@ export default function EventDetail() {
                 </span>
               ))}
               {(event.invited || []).length === 0 && <span className="events-empty">no one invited yet</span>}
-              <button className="chip-add" onClick={() => openPicker("invite")}>+ invite</button>
+              <button className="add-btn" onClick={() => openPicker("invite")}>+ invite</button>
             </div>
           </>
         )}

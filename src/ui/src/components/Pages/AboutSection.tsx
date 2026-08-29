@@ -23,7 +23,7 @@ export default function AboutSection() {
       title={label}
       contributorOnly={false}
       onBack={() => navigate("/home")}
-      action={currentRole === "contributor" && <button className="tools-btn" onClick={() => navigate(`/about/${section}/new`)}>+ doc</button>}
+      action={currentRole === "contributor" && <button className="add-btn" onClick={() => navigate(`/about/${section}/new`)}>+ doc</button>}
     >
       {docs === null ? <p className="tools-empty">loading…</p>
         : docs.length === 0 ? <p className="tools-empty">{emptyText}</p>

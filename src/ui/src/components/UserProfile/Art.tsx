@@ -201,7 +201,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
         <div className='art-wrapper'>
             {profile.is_owner &&
                 <div className="add">
-                    <button onClick={() => setShowDialog(true)}>+</button>
+                    <button className="add-btn" onClick={() => setShowDialog(true)}>+ add art</button>
                 </div>
             }
             { showDialog && selectedMedium &&

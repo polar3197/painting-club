@@ -36,7 +36,7 @@ export default function EventsBox() {
     <div className="home-events">
       <div className="home-square-head">
         <span className="home-square-label">events</span>
-        <button className="home-square-link" onClick={() => navigate("/events/new")}>+ new event</button>
+        <button className="add-btn" onClick={() => navigate("/events/new")}>+ new event</button>
       </div>
       <div className="home-events-body">
         <div className="home-events-cal">

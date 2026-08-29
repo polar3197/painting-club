@@ -258,7 +258,7 @@ export default function ConversationThread() {
             )}
           </div>
           <div className="messages-actions">
-            {isGroup && <button className="msg-btn" onClick={openInvite}>+ add</button>}
+            {isGroup && <button className="add-btn" onClick={openInvite}>+ add</button>}
             {isGroup && <button className="msg-btn msg-btn-danger" onClick={() => setConfirmLeave(true)}>leave</button>}
           </div>
         </div>

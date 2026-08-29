@@ -33,14 +33,14 @@ export default function FeatureBoard() {
       )}
       <div className="fr-board-head">
         <span className="fr-board-label">requests for the app</span>
-        <button className="fr-add" onClick={() => setAdding((a) => !a)}>{adding ? "cancel" : "+ request"}</button>
+        <button className="add-btn" onClick={() => setAdding((a) => !a)}>{adding ? "cancel" : "+ request"}</button>
       </div>
       <div className="fr-board-list">
         {adding && (
           <form className="fr-add-row" onSubmit={submit}>
             <input className="fr-add-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="what would you like?" autoFocus
               onKeyDown={(e) => { if (e.key === "Escape") setAdding(false); }} />
-            <button type="submit" className="fr-add" disabled={!title.trim() || posting}>{posting ? "posting…" : "post"}</button>
+            <button type="submit" className="add-btn" disabled={!title.trim() || posting}>{posting ? "posting…" : "post"}</button>
           </form>
         )}
         {requests === null ? <p className="fr-empty">loading…</p>

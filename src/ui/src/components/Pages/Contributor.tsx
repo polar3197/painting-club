@@ -38,7 +38,7 @@ export default function Contributor() {
     <ToolsPage
       title="contributor" onBack={() => navigate("/settings")}
       sub="announcements — click to open its discussion; ⋯ to delete"
-      action={<button className="tools-btn" onClick={() => setComposing(true)}>+ announcement</button>}
+      action={<button className="add-btn" onClick={() => setComposing(true)}>+ announcement</button>}
     >
       {pendingDelete && (
         <ConfirmDialog

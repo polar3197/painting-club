@@ -172,7 +172,7 @@ export default function EventEdit() {
                 </span>
               ))}
               {invites.length === 0 && <span className="event-hint">{isPublic ? "everyone can see it; invites are optional" : "no one invited yet"}</span>}
-              <button type="button" className="chip-add" onClick={openPicker}>+ invite</button>
+              <button type="button" className="add-btn" onClick={openPicker}>+ invite</button>
             </div>
 
             <label htmlFor="ev-color">accent color (optional)</label>
