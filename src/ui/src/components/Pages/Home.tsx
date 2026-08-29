@@ -14,9 +14,9 @@ import FeatureBoard from "../Home/FeatureBoard";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 
-// Home: a fixed-width left stack (title, About bookshelf, feature board —
-// the shelf and board split the height) beside the week's prompt over
-// events. The calendar
+// Home: a fixed-width left column (title + the About bookshelf, full height)
+// beside the week's prompt (top) over the feature board and events (bottom,
+// side by side). All the proportions are knobs at the top of home.css. The calendar
 // lives here (there's no separate events page): pick a day to see its
 // events beside it, open one to read it, and its back button returns here.
 export default function Home() {
@@ -44,10 +44,11 @@ export default function Home() {
       <div className="home">
         <div className="home-left">
           <Bulletin />
-          <FeatureBoard />
         </div>
         <PromptColumn />
 
+        <div className="home-bottom">
+        <FeatureBoard />
         <div className="home-events">
             <div className="home-square-head">
               <span className="home-square-label">events</span>
@@ -73,6 +74,7 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
       </div>
     </main>
   );

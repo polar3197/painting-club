@@ -1,14 +1,30 @@
-/* A 300px left stack spanning both rows (title, about shelf, feature board)
-   beside the week's prompt (top) and events (bottom). */
+/* =====================================================================
+   LAYOUT KNOBS — every proportion on the home page lives in these
+   variables. Layout:
+
+       ┌───────────┬──────────────────────────────────┐
+       │ title     │ weekly prompt                    │
+       │ about     ├──────────────┬───────────────────┤
+       │ shelf     │ feature board│ events            │
+       └───────────┴──────────────┴───────────────────┘
+   ===================================================================== */
 .home {
+    --left-col: 300px;        /* width of the title + bookshelf column */
+    --bottom-row: 460px;      /* height of the feature board / events row */
+    --bottom-split: minmax(0, 1fr) minmax(0, 1fr);  /* feature board : events widths */
+    --gutter: 22px;           /* space between all boxes */
+    --page-pad: 24px 28px 28px 28px;
+    --prompt-thumb: 130px;    /* size of a weekly-prompt thumbnail */
+    --shelf-gap: 10px;        /* space between the three book spines */
+
     height: 100%;
     width: 100%;
     display: grid;
     /* minmax(0, …): a long event title must never widen its column. */
-    grid-template-columns: 300px minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 460px;
-    gap: 22px;
-    padding: 24px 28px 28px 28px;
+    grid-template-columns: var(--left-col) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) var(--bottom-row);
+    gap: var(--gutter);
+    padding: var(--page-pad);
     box-sizing: border-box;
     background-color: rgb(216, 237, 138); /* iOS Home container bg */
     overflow: hidden;
@@ -27,7 +43,7 @@
     gap: 14px;
 }
 
-/* title + shelf; the shelf and the feature board below share the height */
+/* title, then the shelf taking all remaining height */
 .bulletin {
     flex: 1 1 0;
     min-height: 0;
@@ -36,8 +52,19 @@
     gap: 14px;
 }
 
-.home-left .fr-board {
-    flex: 1 1 0;
+/* ---- bottom right: feature board beside events ---- */
+.home-bottom {
+    display: grid;
+    grid-template-columns: var(--bottom-split);
+    gap: var(--gutter);
+}
+
+.home-bottom > * {
+    min-width: 0;
+    min-height: 0;
+}
+
+.home-bottom .fr-board {
     min-height: 0;
 }
 
@@ -90,7 +117,7 @@
     flex: 1;
     min-height: 0;
     display: flex;
-    gap: 10px;
+    gap: var(--shelf-gap);
     padding: 14px;
 }
 
@@ -143,7 +170,7 @@
     font-weight: 700;
 }
 
-.hp-kicker::after { content: " —"; font-weight: 400; }
+
 
 .hp-title {
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
@@ -181,7 +208,7 @@
 .hp-cell {
     display: block;
     flex: 0 0 auto;
-    height: 130px;
+    height: var(--prompt-thumb);
     aspect-ratio: 1 / 1;
     border: 1px solid black;
     background: rgb(250, 244, 202);
@@ -293,6 +320,7 @@
 @media (max-width: 860px) {
     .home { height: auto; overflow: visible; grid-template-columns: 1fr; grid-template-rows: auto; }
     .home-left { grid-row: auto; }
+    .home-bottom { grid-template-columns: 1fr; }
     .home-events-body { flex-direction: column; }
     .home-events-cal { height: auto; width: 100%; aspect-ratio: auto; }
     .bulletin, .hp-box { overflow: visible; height: auto; }
