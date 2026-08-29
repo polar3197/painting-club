@@ -327,16 +327,7 @@
     align-items: center;
 }
 
-.msg-action {
-    background: none;
-    border: none;
-    padding: 0;
-    font: inherit;
-    color: rgb(140, 140, 140);
-    cursor: pointer;
-    text-decoration: underline;
-    opacity: 0;
-}
+.msg-action { opacity: 0; }
 
 .msg-row:hover .msg-action, .msg-action:focus { opacity: 1; }
 

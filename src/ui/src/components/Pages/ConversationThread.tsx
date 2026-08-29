@@ -7,6 +7,7 @@ import {
 } from "../../api";
 import { parseUtc } from "../../utils/date";
 import ConfirmDialog from "../Utils/ConfirmDialog";
+import KebabMenu from "../Utils/KebabMenu";
 import "../../styles/utils/dialog.css";
 import "../../styles/messages.css";
 
@@ -283,10 +284,12 @@ export default function ConversationThread() {
                   <span className="msg-time">
                     {formatTime(when)}{m.edited_at ? " · edited" : ""}
                     {isOwn && (
-                      <>
-                        <button className="msg-action" onClick={() => { setEditText(m.body); setEditing(m); }}>edit</button>
-                        <button className="msg-action" onClick={() => setPendingDelete(m)}>delete</button>
-                      </>
+                      <span className="msg-action">
+                        <KebabMenu small items={[
+                          { label: "edit", onClick: () => { setEditText(m.body); setEditing(m); } },
+                          { label: "delete", onClick: () => setPendingDelete(m), destructive: true },
+                        ]} />
+                      </span>
                     )}
                   </span>
                 </div>

@@ -7,6 +7,7 @@ import {
 } from "../../api";
 import { formatEventWhen } from "../../utils/date";
 import ConfirmDialog from "../Utils/ConfirmDialog";
+import KebabMenu from "../Utils/KebabMenu";
 import "../../styles/utils/dialog.css";
 import "../../styles/events.css";
 
@@ -107,8 +108,12 @@ export default function EventDetail() {
         <div className="events-header">
           <h1 className="events-title">event</h1>
           <div className="events-actions">
-            {canEdit && <button className="events-btn events-btn-gold" onClick={() => navigate(`/events/${id}/edit`)}>edit</button>}
-            {canEdit && <button className="events-btn events-btn-danger" onClick={() => setShowDelete(true)}>delete</button>}
+            {canEdit && (
+              <KebabMenu items={[
+                { label: "edit event", onClick: () => navigate(`/events/${id}/edit`) },
+                { label: "delete event", onClick: () => setShowDelete(true), destructive: true },
+              ]} />
+            )}
           </div>
         </div>
 
