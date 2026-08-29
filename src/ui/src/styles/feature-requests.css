@@ -37,14 +37,14 @@
 
 .fr-add:disabled { opacity: 0.55; cursor: default; }
 
-/* The list takes all remaining height and scrolls under the pinned header. */
+/* The list takes all remaining height and scrolls under the pinned header.
+   Kept narrow — these are one-line requests, not a table. */
 .fr-list {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    border: 1px solid black;
-    background: rgb(250, 244, 202);
-    padding: 10px;
+    width: 100%;
+    max-width: 560px;
 }
 
 .fr-empty {
@@ -62,17 +62,18 @@
 
 .fr-actions { display: flex; gap: 6px; }
 
+/* Plain rows separated by hairlines — no boxes, no backdrop. */
 .fr-row {
     display: flex;
     min-width: 0;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    border: 1px solid black;
-    background: white;
-    padding: 12px 14px;
-    margin-bottom: 8px;
+    padding: 10px 4px;
+    border-bottom: 1px solid rgb(200, 200, 200);
 }
+
+.fr-row:last-child { border-bottom: none; }
 
 .fr-main {
     flex: 1;
@@ -98,13 +99,16 @@
 .fr-vote {
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
-    padding: 5px 10px;
-    border: 1px solid black;
-    background: white;
+    padding: 3px 8px;
+    border: none;
+    background: none;
+    color: rgb(90, 90, 90);
     cursor: pointer;
 }
 
-.fr-vote.on { background-color: rgb(238, 190, 100); }
+.fr-vote:hover { color: black; }
+
+.fr-vote.on { color: black; font-weight: 700; }
 
 .fr-delete {
     background: none;
@@ -184,10 +188,8 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 10px;
-    background: rgb(250, 244, 202);
+    padding: 4px 14px;
 }
 
-.fr-board .fr-row { padding: 9px 12px; }
 .fr-board .fr-title { font-size: 15px; }
-.fr-board .fr-vote { padding: 4px 8px; font-size: 12px; }
+.fr-board .fr-vote { font-size: 12px; }

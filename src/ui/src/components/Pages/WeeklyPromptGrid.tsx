@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import "../../styles/profiles/members-display.css";
 import "../../styles/weekly-prompt.css";
 import { get_prompt, list_prompts, add_new_visual_2d, PromptDetailOut, PromptSummary, Visual2DIn } from "../../api";
 import ArtImage from "../Utils/ArtImage";
@@ -11,9 +10,9 @@ import { useAuth } from "../../context/AuthContext";
 import { swr } from "../../cache";
 import "../../styles/utils/dialog.css";
 
-// The prompt page: every submission as a card; click one to zoom, with ← →
-// through the rest. Adding your art and proposing next week's prompt live
-// here (the home column is just a gallery).
+// The prompt page: the submissions as one scrolling strip of images; click
+// one to zoom, with ← → through the rest. Adding your art and proposing
+// next week's prompt live here (the home column is just a gallery).
 const WeeklyPromptGrid = () => {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -73,18 +72,11 @@ const WeeklyPromptGrid = () => {
         </div>
       </div>
 
-      <div className="members-display">
+      <div className="wp-strip">
         {subs.length > 0 ? subs.map((s, i) => (
-          <div key={s.id} className="display-card art-card" onClick={() => setZoom(i)}>
-            <div className="art-card-img">
-              <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} />
-            </div>
-            <div className="art-card-deets">
-              <p><b>{s.title}</b></p>
-              <p>{s.medium}</p>
-              <p className="art-card-creator">@{s.creator_username}</p>
-            </div>
-          </div>
+          <button key={s.id} className="wp-thumb" title={`${s.title} · @${s.creator_username}`} onClick={() => setZoom(i)}>
+            <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="wp-thumb-img" />
+          </button>
         )) : <p className="weekly-prompt-empty">no submissions yet{prompt.is_active ? " — be the first" : ""}.</p>}
       </div>
 
