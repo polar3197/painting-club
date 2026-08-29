@@ -119,12 +119,16 @@
     color: var(--pc-name, #000);
 }
 
-/* The square buttons stacked under the name and location. */
+/* A 2×2 of buttons under the name: as wide as the column, filling the
+   rest of the row's height, with room between them. */
 .owner-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 12px;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 14px;
 }
 
 .owner-action-btn {
@@ -132,8 +136,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 50px;
-    height: 50px;
+    width: 100%;
+    height: 100%;
     padding: 0;
     border: 1px solid black;
     border-radius: 6px;
@@ -340,9 +344,11 @@
 
     /* the buttons become a row under the name */
     .owner-actions {
+        display: flex;
         flex-direction: row;
         gap: 10px;
         margin-top: 8px;
+        flex: none;
     }
 
     .owner-action-btn {
