@@ -57,6 +57,9 @@ class Profile(BaseModel):
     viewer_blocked_by_owner: bool = False
     blocked_usernames: list[str] | None = None
     profile_colors: dict[str, str] | None = None
+    # When the member first signed in and accepted the terms — the closest
+    # thing to a join date the schema records. None for accounts that predate it.
+    joined_at: datetime | None = None
 
     @field_serializer("profile_pic_path")
     def _sign_profile_pic(self, v):

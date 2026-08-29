@@ -112,6 +112,8 @@ export interface Profile {
   blocked_usernames?: string[] | null;
   // Component-key -> color from the edit-profile color tab; null = never customized.
   profile_colors?: Record<string, string> | null;
+  // First sign-in (terms accepted) — the join date; null for the oldest accounts.
+  joined_at?: string | null;
 }
 
 export interface ReportOut {

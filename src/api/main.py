@@ -516,6 +516,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db), current
         viewer_blocked_by_owner=viewer_blocked_by_owner,
         blocked_usernames=blocked_usernames,
         profile_colors=member_row.profile_colors,
+        joined_at=member_row.terms_accepted_at,
     )
 
 @app.post("/members/accept-terms")
@@ -668,6 +669,7 @@ async def search_members(
             is_owner=is_owner,
             role=member_row.role or "member",
             profile_pic_path=versioned_pic_path(member_row.profile_pic_path),
+            joined_at=member_row.terms_accepted_at,
         )
         profiles.append(profile)
     return profiles

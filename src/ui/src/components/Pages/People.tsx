@@ -54,6 +54,14 @@ const People = () => {
   const addChip = (value: string) => setChips(prev => prev.includes(value) ? prev : [...prev, value]);
   const removeChip = (value: string) => setChips(prev => prev.filter(c => c !== value));
 
+  // Members with a picture first, then those without; newest to join first
+  // within each group (accounts with no join date sort last).
+  const ordered = [...filtered].sort((a, b) => {
+    const picDiff = Number(!!b.profile_pic_path) - Number(!!a.profile_pic_path);
+    if (picDiff) return picDiff;
+    return (b.joined_at ?? "").localeCompare(a.joined_at ?? "");
+  });
+
   return (
     <>
       <CentralFilter
@@ -68,7 +76,7 @@ const People = () => {
       />
       <div className='members-display'>
         {filtered.length > 0
-          ? filtered.map(m => <MemberCard key={m.username} member={m} />)
+          ? ordered.map(m => <MemberCard key={m.username} member={m} />)
           : <p>No people found :(</p>
         }
       </div>
