@@ -14,7 +14,7 @@ export default function About() {
   return (
     <main className="page about-page">
       <button className="back-btn" onClick={() => navigate("/home")}>‹ back</button>
-      <h1 className="about-title">about painting club</h1>
+      <h1 className="about-title">about paint club</h1>
       <div className="about-panels">
         {ABOUT_SECTIONS.map((s) => (
           <button key={s.key} className="about-panel" style={{ backgroundColor: s.bg, color: s.fg }} onClick={() => navigate(`/about/${s.key}`)}>

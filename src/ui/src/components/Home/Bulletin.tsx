@@ -22,7 +22,7 @@ export default function Bulletin() {
 
       <section className="shelf">
         <div className="shelf-head">
-          <span className="home-square-label">about the app</span>
+          <span className="home-square-label">about paint club</span>
         </div>
         <div className="shelf-books">
           {ABOUT_SECTIONS.map((s) => (

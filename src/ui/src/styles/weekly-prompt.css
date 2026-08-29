@@ -177,20 +177,22 @@
     .weekly-prompt-grid-page { padding-top: 44px; }
 }
 
-/* The art box takes the remaining page height; the row of thumbnails is
-   centred vertically inside it and scrolls sideways. */
+/* The art area takes the remaining page height (no box). The row sits at
+   the golden section: free space above : below = 1 : 1.618. */
 .wp-art-box {
     flex: 1;
     min-height: 0;
     display: flex;
-    align-items: center;
-    border: 1px solid black;
-    background: rgb(255, 250, 245);
-    padding: 16px;
+    flex-direction: column;
+    padding: 16px 0;
     box-sizing: border-box;
 }
 
+.wp-art-box::before { content: ""; flex: 1 1 0; }
+.wp-art-box::after { content: ""; flex: 1.618 1 0; }
+
 .wp-strip {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 10px;
