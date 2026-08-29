@@ -12,7 +12,7 @@ const shortDate = (iso: string) => { const [, m, d] = iso.split("-"); return `${
 function BarRow({ label, count, max, accent }: { label: string; count: number; max: number; accent?: string }) {
   return (
     <div className="tools-bar-row">
-      <span className="tools-bar-label" title={label}>{label}</span>
+      <span className="tools-bar-label">{label}</span>
       <div className="tools-bar-track">
         <div className="tools-bar-fill" style={{ width: `${Math.round((count / max) * 100)}%`, ...(accent ? { backgroundColor: accent } : {}) }} />
       </div>

@@ -114,7 +114,7 @@ const WeeklyPromptGrid = () => {
       <div className="wp-art-box">
         <div className="wp-strip">
           {subs.length > 0 ? subs.map((s, i) => (
-            <button key={s.id} className="wp-thumb" title={`${s.title} · @${s.creator_username}`} onClick={() => setZoom(i)}>
+            <button key={s.id} className="wp-thumb" onClick={() => setZoom(i)}>
               <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="wp-thumb-img" />
             </button>
           )) : <p className="weekly-prompt-empty">no submissions yet{prompt.is_active ? " — be the first" : ""}.</p>}

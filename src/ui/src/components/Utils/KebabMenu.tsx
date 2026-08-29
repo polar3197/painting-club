@@ -14,7 +14,6 @@ export default function KebabMenu({ items, label = "options", small = false }: {
       <button
         className={`kebab-btn ${small ? "kebab-btn-small" : ""}`}
         aria-label={label}
-        title={label}
         onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setAnchor({ x: r.right - 180, y: r.bottom + 4 }); }}
       >⋯</button>
       <ContextPopup open={anchor !== null} anchor={anchor} onClose={() => setAnchor(null)}>
