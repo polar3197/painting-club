@@ -124,7 +124,7 @@
 
 .shelf-book {
     flex: 1;
-    border: 8px solid black; /* colour set per section */
+    border: 5px solid black; /* colour set per section */
     writing-mode: vertical-rl;
     transform: rotate(180deg);
     display: flex;

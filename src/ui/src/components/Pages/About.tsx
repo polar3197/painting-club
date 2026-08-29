@@ -3,7 +3,7 @@ import "../../styles/about.css";
 
 // Painter's palette: each section is a tint inside a fuller-strength border.
 export const ABOUT_SECTIONS = [
-  { key: "ethos", label: "ethos", bg: "rgb(122, 162, 224)", border: "rgb(13, 43, 107)", fg: "rgb(13, 43, 107)" }, // light phthalo in phthalo blue
+  { key: "ethos", label: "ethos", bg: "rgb(122, 162, 224)", border: "rgb(13, 43, 107)", fg: "#000" }, // light phthalo in phthalo blue
   { key: "art", label: "art", bg: "rgb(251, 236, 93)", border: "rgb(255, 193, 0)", fg: "#000" },                 // cad yellow light in cad yellow medium
   { key: "aims", label: "aims", bg: "rgb(244, 130, 100)", border: "rgb(229, 60, 57)", fg: "#000" },              // cad red light in cad red
 ] as const;
