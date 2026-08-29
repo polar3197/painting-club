@@ -95,7 +95,8 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 10px;
+    /* no bottom padding: the statement box ends where the picture does */
+    padding: 10px 10px 0 10px;
     position: relative;
 }
 
@@ -136,6 +137,8 @@
     gap: 34px;
     height: 100%;
     justify-items: center;
+    /* -1px top and bottom: flush with the picture's outline */
+    margin: -1px 0;
 }
 
 .owner-action-btn {
@@ -185,6 +188,8 @@
     border-radius: 5px;
     padding: 10px;
     margin-top: 12px;
+    /* -1px: meet the picture's 1px outline, which sits outside its frame */
+    margin-bottom: -1px;
     flex: 1;
     background-color: var(--pc-statement, transparent);
 }
