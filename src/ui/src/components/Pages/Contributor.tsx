@@ -5,6 +5,7 @@ import { AnnouncementOut, get_announcements, delete_announcement } from "../../a
 import { ToolsPage } from "../Utils/ToolsPage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import AnnouncementComposeDialog from "../Utils/AnnouncementComposeDialog";
+import KebabMenu from "../Utils/KebabMenu";
 
 // Contributor-only hub (Settings → "contributor"): author and moderate
 // announcements. Click a row for its discussion; delete from the row.
@@ -36,7 +37,7 @@ export default function Contributor() {
   return (
     <ToolsPage
       title="contributor" onBack={() => navigate("/settings")}
-      sub="announcements — click to open its discussion"
+      sub="announcements — click to open its discussion; ⋯ to delete"
       action={<button className="tools-btn" onClick={() => setComposing(true)}>+ announcement</button>}
     >
       {pendingDelete && (
@@ -68,11 +69,7 @@ export default function Contributor() {
                 {a.comment_count > 0 ? `${a.comment_count} ${a.comment_count === 1 ? "reply" : "replies"}` : "no replies yet"}
               </span>
             </div>
-            <div className="tools-row-actions">
-              <button className="tools-btn tools-btn-danger" onClick={(e) => { e.stopPropagation(); setPendingDelete(a); }}>
-                delete
-              </button>
-            </div>
+            <KebabMenu items={[{ label: "delete", onClick: () => setPendingDelete(a), destructive: true }]} />
           </div>
         ))
       )}

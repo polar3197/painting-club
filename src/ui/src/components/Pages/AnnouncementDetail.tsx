@@ -8,6 +8,7 @@ import {
 import { formatWhen } from "../../utils/date";
 import { ToolsPage } from "../Utils/ToolsPage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
+import KebabMenu from "../Utils/KebabMenu";
 
 // One announcement + its discussion. Any member can read and reply; the
 // author or a contributor can delete the announcement or any comment (the
@@ -85,7 +86,7 @@ export default function AnnouncementDetail() {
       contributorOnly={false}
       onBack={() => navigate(-1)}
       action={canDeleteAnnouncement && (
-        <button className="tools-btn tools-btn-danger" onClick={() => setConfirmDeleteAnn(true)}>delete</button>
+        <KebabMenu items={[{ label: "delete announcement", onClick: () => setConfirmDeleteAnn(true), destructive: true }]} />
       )}
     >
       {confirmDeleteAnn && (
@@ -125,7 +126,9 @@ export default function AnnouncementDetail() {
                 <span className="ann-comment-author">{c.firstname || c.username}</span>
                 <span className="ann-comment-time">{formatWhen(c.created_at)}</span>
                 {canDeleteComment(c) && (
-                  <button className="ann-comment-delete" onClick={() => setConfirmDeleteComment(c.id)}>delete</button>
+                  <span className="ann-comment-kebab">
+                    <KebabMenu small items={[{ label: "delete comment", onClick: () => setConfirmDeleteComment(c.id), destructive: true }]} />
+                  </span>
                 )}
               </div>
               <p className="ann-comment-text">{c.text}</p>

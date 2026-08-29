@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { DocOut, get_doc, create_doc, update_doc, delete_doc } from "../../api";
 import { ToolsPage } from "../Utils/ToolsPage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
+import KebabMenu from "../Utils/KebabMenu";
 import "../../styles/about.css";
 
 // A single About doc: members read it as a clean page; contributors get an
@@ -58,10 +59,10 @@ export default function AboutDoc() {
       contributorOnly={false}
       onBack={() => navigate(backTarget)}
       action={!editing && isContributor && doc && (
-        <div className="tools-row-actions">
-          <button className="tools-btn tools-btn-gold" onClick={() => setEditing(true)}>edit</button>
-          <button className="tools-btn tools-btn-danger" onClick={() => setShowDelete(true)}>delete</button>
-        </div>
+        <KebabMenu items={[
+          { label: "edit", onClick: () => setEditing(true) },
+          { label: "delete", onClick: () => setShowDelete(true), destructive: true },
+        ]} />
       )}
     >
       {showDelete && (

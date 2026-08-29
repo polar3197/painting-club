@@ -414,16 +414,7 @@
 .ann-comment-author { font-weight: 700; }
 .ann-comment-time { color: rgb(140, 140, 140); }
 
-.ann-comment-delete {
-    margin-left: auto;
-    background: none;
-    border: none;
-    color: rgb(140, 140, 140);
-    font: inherit;
-    cursor: pointer;
-    text-decoration: underline;
-    padding: 0;
-}
+.ann-comment-kebab { margin-left: auto; }
 
 .ann-comment-text {
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;

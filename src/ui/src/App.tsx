@@ -19,7 +19,6 @@ import ConversationThread from "./components/Pages/ConversationThread";
 import About from "./components/Pages/About";
 import AboutSection from "./components/Pages/AboutSection";
 import AboutDoc from "./components/Pages/AboutDoc";
-import RequestFeature from "./components/Pages/RequestFeature";
 import UserRoles from "./components/Pages/UserRoles";
 import UserRoleDetail from "./components/Pages/UserRoleDetail";
 import UserStats from "./components/Pages/UserStats";
@@ -80,7 +79,6 @@ export default function App() {
           <Route path="/about/doc/:slug" element={<AboutDoc />} />
           <Route path="/about/:section" element={<AboutSection />} />
           <Route path="/about/:section/new" element={<AboutDoc />} />
-          <Route path="/request-feature" element={<RequestFeature />} />
           <Route path="/user-roles" element={<UserRoles />} />
           <Route path="/user-roles/:username" element={<UserRoleDetail />} />
           <Route path="/user-stats" element={<UserStats />} />
