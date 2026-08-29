@@ -35,21 +35,21 @@ export default function OwnerActions({ profile }: { profile: Profile }) {
     if (profile.viewer_blocked_by_owner) return null;
     return (
       <div className="owner-actions">
-        <button className="owner-action-btn" aria-label="message" title="message" onClick={messageOwner} disabled={openingDm}><MailIcon /></button>
+        <button className="owner-action-btn" aria-label="message" onClick={messageOwner} disabled={openingDm}><MailIcon /></button>
       </div>
     );
   }
 
   return (
     <div className="owner-actions">
-      <button className="owner-action-btn" aria-label="settings" title="settings" onClick={() => navigate("/settings")}>
+      <button className="owner-action-btn" aria-label="settings" onClick={() => navigate("/settings")}>
         <GearIcon />{adminPending.total > 0 && <span className="owner-action-dot" />}
       </button>
-      <button className="owner-action-btn" aria-label="edit profile" title="edit profile" onClick={() => navigate("/edit-profile")}><PencilIcon /></button>
-      <button className="owner-action-btn" aria-label="messages" title="messages" onClick={() => navigate("/messages")}>
+      <button className="owner-action-btn" aria-label="edit profile" onClick={() => navigate("/edit-profile")}><PencilIcon /></button>
+      <button className="owner-action-btn" aria-label="messages" onClick={() => navigate("/messages")}>
         <MailIcon />{unread > 0 && <span className="owner-action-dot" />}
       </button>
-      <button className="owner-action-btn" aria-label="share a portfolio" title="share a portfolio" onClick={() => setShowShare(true)}><PaperPlaneIcon /></button>
+      <button className="owner-action-btn" aria-label="share a portfolio" onClick={() => setShowShare(true)}><PaperPlaneIcon /></button>
       {showShare && <ShareMediaDialog username={profile.username} media={profile.media ?? []} onClose={() => setShowShare(false)} />}
     </div>
   );
