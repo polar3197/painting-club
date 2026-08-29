@@ -34,7 +34,7 @@ export default function OwnerActions({ profile }: { profile: Profile }) {
   if (!profile.is_owner) {
     if (profile.viewer_blocked_by_owner) return null;
     return (
-      <div className="owner-actions">
+      <div className="owner-actions owner-actions-single">
         <button className="owner-action-btn" aria-label="message" onClick={messageOwner} disabled={openingDm}><MailIcon /></button>
       </div>
     );
