@@ -1,0 +1,47 @@
+/* The stamped title band. Sizes are em-based on --stamp-size so one knob
+   scales the whole thing. */
+.stamp-band {
+    --stamp-size: 64px;
+    --stamp-overlap: -0.16em;   /* how much neighbouring letters overlap */
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+    font-size: var(--stamp-size);
+    line-height: 1;
+    color: black;
+    filter: url(#stamp-grain);
+    pointer-events: none;
+    user-select: none;
+}
+
+.stamp-pass {
+    display: flex;
+    gap: 0.45em;
+    white-space: nowrap;
+    font-weight: 900;
+}
+
+.stamp-word {
+    display: inline-flex;
+}
+
+.stamp-letter {
+    display: inline-block;
+    margin-left: var(--stamp-overlap);
+}
+
+.stamp-letter:first-child { margin-left: 0; }
+
+@media (max-width: 1400px) {
+    .stamp-band { --stamp-size: 52px; }
+    .stamp-pass:nth-child(n+5) { display: none; }  /* three passes fit */
+}
+
+@media (max-width: 860px) {
+    .stamp-band { --stamp-size: 44px; height: 120px; justify-content: center; }
+    .stamp-pass:nth-child(n+3) { display: none; }  /* one pass on phones */
+}

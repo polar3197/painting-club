@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAdminPending } from "../../hooks/useAdminPending";
 import PromptColumn from "../Home/PromptColumn";
+import StampBanner from "../Home/StampBanner";
 import EventsBox from "../Home/EventsBox";
 import FeatureBoard from "../Home/FeatureBoard";
 import BookShelf from "../Home/BookShelf";
@@ -19,7 +20,7 @@ export default function Home() {
     <main className="page">
       <div className="home">
         <div className="home-top">
-          <div className="home-title">-• Paint Club •-</div>
+          <StampBanner />
           {adminPending.total > 0 && (
             <button className="home-admin-alert" onClick={() => navigate("/admin")}>
               {adminPending.total} {adminPending.total === 1 ? "request" : "requests"} to review
