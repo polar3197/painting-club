@@ -26,3 +26,11 @@ html, body, #root {
     outline: none;
   }
 }
+
+/* No rubber-band overscroll at the window level: the document behind the app
+   is white and would show above the page when pulled down. Cream behind
+   everything anyway, in case a browser still overscrolls. */
+html, body {
+    overscroll-behavior-y: none;
+    background-color: rgb(255, 250, 245);
+}
