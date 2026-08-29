@@ -1,0 +1,63 @@
+.pp-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 100; }
+
+.dialog.pp-dialog {
+    width: 420px;
+    height: auto;
+    max-height: 80vh;
+    padding: 28px 22px 20px 22px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pp-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.pp-note {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 15px;
+    margin: 0;
+}
+
+.pp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.pp-chip {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid black;
+    background: white;
+    cursor: pointer;
+}
+
+.pp-chip.on { background-color: rgb(238, 190, 100); }
+
+.dialog.pp-dialog textarea.pp-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid black;
+    background: white;
+    padding: 10px 12px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 16px;
+    resize: vertical;
+    outline: none;
+}
+
+.pp-submit {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    padding: 12px;
+    border: 1px solid black;
+    background-color: rgb(238, 190, 100);
+    cursor: pointer;
+}
+
+.pp-submit:disabled { opacity: 0.55; cursor: default; }
+
+@media (max-width: 640px) { .dialog.pp-dialog { width: 92vw; max-width: 92vw; } }

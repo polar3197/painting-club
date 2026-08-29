@@ -66,7 +66,7 @@ export default function Events() {
       <div className="events-inner">
         <div className="events-header">
           <div className="events-header-left">
-            <button className="back-btn" onClick={() => navigate("/home")}>‹ home</button>
+            <button className="back-btn" onClick={() => navigate("/home")}>‹ back</button>
             <h1 className="events-title">events</h1>
           </div>
           <div className="events-actions">

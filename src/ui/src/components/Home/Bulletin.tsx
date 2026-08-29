@@ -2,8 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { useAdminPending } from "../../hooks/useAdminPending";
 import Announcements from "../Utils/Announcements";
 
-// Left third of Home: the club noticeboard — title, the open question,
-// announcements, and the two app links the iOS home pins to its corners.
+// Left third of Home: the club noticeboard — title, announcements, and the
+// two app links the iOS home pins to its corners.
 export default function Bulletin() {
   const navigate = useNavigate();
   const adminPending = useAdminPending();
@@ -18,13 +18,6 @@ export default function Bulletin() {
           {adminPending.total} {adminPending.total === 1 ? "request" : "requests"} to review
         </button>
       )}
-
-      {/* Open question. Nothing feeds this yet — placeholder slot until the
-          club decides what an "open question" is and where it's posted. */}
-      <section className="bulletin-card bulletin-question">
-        <h2 className="bulletin-label">open question</h2>
-        <p className="bulletin-empty">no open question right now</p>
-      </section>
 
       <Announcements />
 

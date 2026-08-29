@@ -1,115 +1,3 @@
-.weekly-prompt-page {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    background-color: rgb(255, 250, 245);
-    height: 100%;
-    min-height: 100%;
-    box-sizing: border-box;
-}
-
-.weekly-prompt-left {
-    width: 38%;
-    display: flex;
-    flex-direction: column;
-    padding: 24px;
-    gap: 16px;
-    box-sizing: border-box;
-}
-
-.weekly-prompt-right {
-    flex: 1;
-    margin: 24px 24px 24px 0;
-    padding: 16px;
-    box-sizing: border-box;
-    border: 1px solid black;
-    overflow-y: auto;
-}
-
-.weekly-prompt-header {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    background-color: rgb(250, 244, 202);
-    border: 1px solid black;
-    padding: 14px 18px;
-}
-
-.weekly-prompt-heading {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 18px;
-    font-weight: 700;
-    color: #000;
-}
-
-.weekly-prompt-title {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
-    font-weight: 400;
-    color: #000;
-}
-
-.weekly-prompt-summary {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    color: #222;
-    line-height: 1.4;
-}
-
-.weekly-prompt-medium {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    color: #555;
-    border: 1px solid black;
-    padding: 3px 8px;
-    background-color: rgb(255, 250, 245);
-    align-self: flex-start;
-}
-
-.weekly-prompt-drop-frame {
-    flex: 1;
-    min-height: 0;
-    border: 1px solid black;
-    background-color: rgb(255, 250, 245);
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
-    color: #555;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.weekly-prompt-drop-frame:hover {
-    background-color: rgb(250, 244, 202);
-}
-
-.weekly-prompt-already {
-    border: 1px solid black;
-    padding: 14px;
-    background-color: rgb(255, 250, 245);
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    color: #222;
-}
-
-.weekly-prompt-edit-link {
-    margin-top: 10px;
-    border: 1px solid black;
-    padding: 8px 12px;
-    background-color: rgb(250, 244, 202);
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-.weekly-prompt-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 16px;
-}
-
 .weekly-prompt-empty {
     font-family: 'Courier New', Courier, monospace;
     font-size: 14px;
@@ -119,81 +7,12 @@
     opacity: 0.6;
 }
 
-.prompt-submission {
-    border: 1px solid black;
-    background-color: white;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-}
-
-.prompt-submission-img {
-    width: 100%;
-    aspect-ratio: 1;
-    overflow: hidden;
-    border-bottom: 1px solid black;
-    background-color: #f4f4f4;
-}
-
-.prompt-submission-img img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.prompt-submission-meta {
-    padding: 8px 10px;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-}
-
-.prompt-submission-title {
-    font-weight: 600;
-    color: #000;
-    margin-bottom: 2px;
-}
-
-.prompt-submission-by {
-    color: #555;
-}
-
 .weekly-prompt-loading,
 .weekly-prompt-error {
     padding: 40px;
     text-align: center;
     font-family: 'Courier New', Courier, monospace;
     font-size: 14px;
-}
-
-.prompt-mosaic {
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-    overflow: hidden;
-}
-
-.prompt-mosaic-grid {
-    display: grid;
-    width: 100%;
-    height: 100%;
-    gap: 0;
-}
-
-.prompt-mosaic-cell {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    min-width: 0;
-    min-height: 0;
-}
-
-.prompt-mosaic-img,
-.prompt-mosaic-cell img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover;
-    display: block;
 }
 
 .weekly-prompt-grid-page {
@@ -248,15 +67,129 @@
 }
 
 @media (max-width: 768px) {
-    .weekly-prompt-page {
-        flex-direction: column;
-    }
+}
 
-    .weekly-prompt-left {
-        width: 100%;
-    }
+.weekly-prompt-grid-page { padding-top: 48px; }
 
-    .weekly-prompt-right {
-        margin: 0 24px 24px 24px;
-    }
+.weekly-prompt-grid-header {
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.weekly-prompt-grid-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.weekly-prompt-grid-kicker {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: #333;
+}
+
+.weekly-prompt-grid-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 24px;
+    font-weight: 500;
+}
+
+.weekly-prompt-grid-summary {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 14px;
+    color: #444;
+}
+
+.weekly-prompt-grid-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.weekly-prompt-empty {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    color: rgb(140, 140, 140);
+}
+
+.weekly-prompt-grid-page .display-card { cursor: zoom-in; }
+
+.wp-btn {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    padding: 8px 14px;
+    border: 1px solid black;
+    background-color: rgb(250, 244, 202);
+    color: black;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.wp-btn:hover { filter: brightness(0.95); }
+.wp-btn-gold { background-color: rgb(238, 190, 100); }
+.wp-btn-plain { background-color: white; }
+
+.wp-modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 100; }
+
+.dialog.wp-modal {
+    width: 420px;
+    height: auto;
+    max-height: 80vh;
+    padding: 28px 22px 20px 22px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.wp-modal-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.wp-modal-list { overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+
+.wp-past-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid black;
+    background: white;
+    padding: 8px 12px;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    color: black;
+}
+
+.wp-past-row:hover:not(:disabled) { background-color: rgb(250, 244, 202); }
+.wp-past-row.current { background-color: rgb(250, 244, 202); cursor: default; }
+
+.wp-past-title {
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wp-past-date {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    border: 1px solid black;
+    padding: 2px 8px;
+    background-color: lightcoral;
+    flex-shrink: 0;
+}
+
+.wp-past-date.live { background-color: rgb(189, 240, 189); }
+
+@media (max-width: 640px) {
+    .dialog.wp-modal { width: 92vw; max-width: 92vw; }
+    .weekly-prompt-grid-page { padding-top: 44px; }
 }

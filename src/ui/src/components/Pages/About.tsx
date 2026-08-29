@@ -13,7 +13,7 @@ export default function About() {
   const navigate = useNavigate();
   return (
     <main className="page about-page">
-      <button className="back-btn" onClick={() => navigate("/home")}>‹ home</button>
+      <button className="back-btn" onClick={() => navigate("/home")}>‹ back</button>
       <h1 className="about-title">about painting club</h1>
       <div className="about-panels">
         {ABOUT_SECTIONS.map((s) => (

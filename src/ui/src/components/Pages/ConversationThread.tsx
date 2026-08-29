@@ -245,6 +245,7 @@ export default function ConversationThread() {
         </div>
       )}
 
+      <button className="back-btn" onClick={() => navigate("/messages")}>‹ back</button>
       <div className="messages-inner">
         <div className="messages-header">
           <div style={{ minWidth: 0 }}>
@@ -256,7 +257,6 @@ export default function ConversationThread() {
             )}
           </div>
           <div className="messages-actions">
-            <button className="msg-btn msg-btn-plain" onClick={() => navigate("/messages")}>‹ messages</button>
             {isGroup && <button className="msg-btn" onClick={openInvite}>+ add</button>}
             {isGroup && <button className="msg-btn msg-btn-danger" onClick={() => setConfirmLeave(true)}>leave</button>}
           </div>

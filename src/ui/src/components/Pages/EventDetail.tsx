@@ -102,11 +102,11 @@ export default function EventDetail() {
         </div>
       )}
 
+      <button className="back-btn" onClick={() => navigate("/events")}>‹ back</button>
       <div className="events-inner">
         <div className="events-header">
           <h1 className="events-title">event</h1>
           <div className="events-actions">
-            <button className="events-btn events-btn-plain" onClick={() => navigate("/events")}>‹ events</button>
             {canEdit && <button className="events-btn events-btn-gold" onClick={() => navigate(`/events/${id}/edit`)}>edit</button>}
             {canEdit && <button className="events-btn events-btn-danger" onClick={() => setShowDelete(true)}>delete</button>}
           </div>

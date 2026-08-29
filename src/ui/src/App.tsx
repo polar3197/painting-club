@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import UserProfile from "./components/Pages/UserProfile";
 import LandingPage from "./components/LandingPage/LandingPage";
@@ -32,8 +32,12 @@ import Support from "./components/Pages/Support";
 import SetupAccount from "./components/Pages/SetupAccount";
 import "./styles/app-layout.css";
 import Home from "./components/Pages/Home";
-import WeeklyPrompt from "./components/Pages/WeeklyPrompt";
 import WeeklyPromptGrid from "./components/Pages/WeeklyPromptGrid";
+
+function PromptRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/prompts/${id}/grid`} replace />;
+}
 
 export default function App() {
   useEffect(() => {
@@ -55,7 +59,8 @@ export default function App() {
         <Route element={<PageLayout />}>
           <Route path="/not-a-member" element={<NotMember />} />
           <Route path="/home" element={<Home />} />
-          <Route path="/prompts/:id" element={<WeeklyPrompt />} />
+          {/* The grid page is the prompt page; old links land there too. */}
+          <Route path="/prompts/:id" element={<PromptRedirect />} />
           <Route path="/prompts/:id/grid" element={<WeeklyPromptGrid />} />
           <Route path="/members/:username/profile" element={<UserProfile />} />
           <Route path="/members" element={<People />} />
