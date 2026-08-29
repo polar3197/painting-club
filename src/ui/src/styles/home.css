@@ -11,7 +11,7 @@
 .home {
     --left-col: 300px;        /* width of the title + bookshelf column */
     --bottom-row: 460px;      /* height of the feature board / events row */
-    --bottom-split: minmax(0, 1fr) minmax(0, 1fr);  /* feature board : events widths */
+    --bottom-split: minmax(0, 2fr) minmax(0, 5fr);  /* feature board : events widths */
     --gutter: 22px;           /* space between all boxes */
     --page-pad: 24px 28px 28px 28px;
     --prompt-thumb: 130px;    /* size of a weekly-prompt thumbnail */
