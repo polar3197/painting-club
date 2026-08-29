@@ -13,10 +13,10 @@ import PromptColumn from "../Home/PromptColumn";
 import "../../styles/app-layout.css";
 import "../../styles/home.css";
 
-// Home in three full-height thirds: the bulletin, the week's prompt as a
-// small gallery, and events. The calendar lives here (there's no separate
-// events page): pick a day to see its events, open one to read it, and its
-// back button returns here.
+// Home: the bulletin on the left third; the right two-thirds stacks the
+// week's prompt (a strip of submissions) over events. The calendar lives
+// here (there's no separate events page): pick a day to see its events
+// beside it, open one to read it, and its back button returns here.
 export default function Home() {
   const navigate = useNavigate();
   const { token } = useAuth()!;
@@ -42,27 +42,31 @@ export default function Home() {
       <div className="home">
         <Bulletin />
 
-        <div className="home-prompt">
+        <div className="home-right">
           <PromptColumn />
-        </div>
 
-        <div className="home-events">
-          <div className="home-square-head">
-            <span className="home-square-label">events</span>
-            <button className="home-square-link" onClick={() => navigate("/events/new")}>+ new event</button>
-          </div>
-          <MonthCalendar
-            cursor={cursor}
-            onStep={(d) => setCursor((c) => stepMonth(c, d))}
-            selected={selected}
-            onSelect={setSelected}
-            marks={marks}
-          />
-          <div className="home-day">
-            <span className="home-upcoming-label">{selected === today ? "today" : dayLabel}</span>
-            {dayEvents.length === 0
-              ? <span className="home-upcoming-empty">no events on this day</span>
-              : dayEvents.map((e) => <EventRow key={e.id} e={e} onClick={() => navigate(`/events/${e.id}`)} />)}
+          <div className="home-events">
+            <div className="home-square-head">
+              <span className="home-square-label">events</span>
+              <button className="home-square-link" onClick={() => navigate("/events/new")}>+ new event</button>
+            </div>
+            <div className="home-events-body">
+              <div className="home-events-cal">
+                <MonthCalendar
+                  cursor={cursor}
+                  onStep={(d) => setCursor((c) => stepMonth(c, d))}
+                  selected={selected}
+                  onSelect={setSelected}
+                  marks={marks}
+                />
+              </div>
+              <div className="home-day">
+                <span className="home-upcoming-label">{selected === today ? "today" : dayLabel}</span>
+                {dayEvents.length === 0
+                  ? <span className="home-upcoming-empty">no events on this day</span>
+                  : dayEvents.map((e) => <EventRow key={e.id} e={e} onClick={() => navigate(`/events/${e.id}`)} />)}
+              </div>
+            </div>
           </div>
         </div>
       </div>

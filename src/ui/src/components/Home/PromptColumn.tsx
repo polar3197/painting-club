@@ -5,12 +5,10 @@ import { get_active_prompt, get_prompt, PromptOut, PromptDetailOut } from "../..
 import { swr } from "../../cache";
 import ArtImage from "../Utils/ArtImage";
 
-// Columns grow ~square with the submission count: ceil(sqrt(n)), clamped 1..4.
-const columnsFor = (n: number) => Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n)))));
-
-// The week's prompt as a small gallery: one bordered box holding the title
-// and the submissions. Clicking anything opens the full prompt page
-// (/prompts/:id/grid), where pieces zoom and art is added.
+// The week's prompt as a row: one bordered box with the title on top and the
+// submissions as a strip of images scrolled sideways. Clicking anything
+// opens the full prompt page (/prompts/:id/grid), where pieces zoom and art
+// is added.
 export default function PromptColumn() {
   const navigate = useNavigate();
   const { token } = useAuth()!;
@@ -33,7 +31,6 @@ export default function PromptColumn() {
   }, [active, token]);
 
   const submissions = prompt?.submissions ?? [];
-  const cols = columnsFor(submissions.length);
 
   return (
     <div className={`hp-box ${active ? "hp-box-link" : ""}`} onClick={open} role={active ? "link" : undefined} tabIndex={active ? 0 : -1}
@@ -57,7 +54,7 @@ export default function PromptColumn() {
         ) : submissions.length === 0 ? (
           <div className="hp-empty">no submissions yet</div>
         ) : (
-          <div className="hp-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+          <div className="hp-strip">
             {submissions.map((s) => (
               <span key={s.id} className="hp-cell">
                 <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="hp-cell-img" />

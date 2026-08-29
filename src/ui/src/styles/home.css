@@ -1,10 +1,11 @@
-/* Three full-height thirds: bulletin · week's prompt · events. */
+/* Bulletin on the left third; the right two-thirds stacks the prompt row
+   over the events row. */
 .home {
     height: 100%;
     width: 100%;
     display: grid;
     /* minmax(0, …): a long event title must never widen its column. */
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     gap: 22px;
     padding: 24px 28px 28px 28px;
     box-sizing: border-box;
@@ -75,17 +76,16 @@
     background-color: rgb(250, 244, 202);
 }
 
-/* ---- week's prompt (center): one bordered gallery box ---- */
-.home-prompt {
-    display: flex;
-    justify-content: center;
-    overflow: hidden;
+/* ---- right column: prompt row over events row ---- */
+.home-right {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 22px;
+    min-height: 0;
 }
 
+/* ---- week's prompt: title over a strip of submissions ---- */
 .hp-box {
-    width: 100%;
-    max-width: 380px;
-    height: 100%;
     display: flex;
     flex-direction: column;
     border: 2px solid black;
@@ -95,15 +95,17 @@
     overflow: hidden;
 }
 
+.hp-box-link { cursor: pointer; }
+.hp-box-link:hover .hp-title { text-decoration: underline; }
+
 /* The title sits inside the box's border, separated by a rule. */
 .hp-header {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 16px 16px 12px 16px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    padding: 12px 16px;
     border-bottom: 1px solid black;
-    text-align: center;
 }
 
 .hp-kicker {
@@ -115,7 +117,7 @@
 
 .hp-title {
     font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-    font-size: 24px;
+    font-size: 22px;
     line-height: 1.2;
 }
 
@@ -126,25 +128,25 @@
 }
 
 .hp-grid-area {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
     padding: 10px;
     display: flex;
     flex-direction: column;
 }
 
-.hp-grid {
-    display: grid;
+/* One row of square thumbnails, scrolled sideways. */
+.hp-strip {
+    display: flex;
     gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
 }
-
-.hp-box-link { cursor: pointer; }
-.hp-box-link:hover .hp-title { text-decoration: underline; }
 
 .hp-cell {
     display: block;
-    aspect-ratio: 1 / 1;
+    flex: 0 0 auto;
+    width: 150px;
+    height: 150px;
     border: 1px solid black;
     background: rgb(250, 244, 202);
     overflow: hidden;
@@ -158,7 +160,6 @@
 }
 
 .hp-empty {
-    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -166,7 +167,7 @@
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
     color: rgb(140, 140, 140);
-    padding: 20px 0;
+    padding: 40px 0;
 }
 
 /* ---- events (right) ---- */
@@ -174,6 +175,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-height: 0;
     overflow: hidden;
     border: 2px solid black;
     background-color: rgb(255, 250, 245);
@@ -205,13 +207,25 @@
 
 .home-square-link:hover { text-decoration: underline; }
 
-.home-day {
+/* calendar on the left, the selected day's events on the right */
+.home-events-body {
     flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    gap: 18px;
+}
+
+.home-events-cal {
+    min-width: 0;
+}
+
+.home-day {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    border-top: 1px solid black;
-    padding-top: 10px;
+    border-left: 1px solid black;
+    padding-left: 18px;
     min-height: 0;
     overflow-y: auto;
 }
@@ -236,8 +250,9 @@
 
 @media (max-width: 860px) {
     .home { height: auto; overflow: visible; grid-template-columns: 1fr; }
-    .bulletin, .home-prompt, .hp-box { overflow: visible; height: auto; }
-    .hp-box { max-width: none; }
-    .hp-grid-area { flex: none; }
-    .home-events { min-height: 480px; }
+    .home-right { grid-template-rows: auto auto; }
+    .bulletin, .hp-box { overflow: visible; height: auto; }
+    .home-events { min-height: 0; }
+    .home-events-body { grid-template-columns: 1fr; }
+    .home-day { border-left: none; padding-left: 0; border-top: 1px solid black; padding-top: 10px; }
 }
