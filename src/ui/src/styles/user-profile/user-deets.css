@@ -128,7 +128,7 @@
 /* Four square buttons in a column, together as tall as the picture. */
 .owner-actions {
     display: grid;
-    grid-template-rows: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: minmax(0, 1fr);
     /* The gap alone sets the button size: the first button's top and the
        last one's bottom sit flush with the picture. */
     gap: 34px;
@@ -157,6 +157,11 @@
 
 .owner-action-btn:active {
     transform: scale(0.96);
+}
+
+.owner-action-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
 }
 
 .owner-action-dot {

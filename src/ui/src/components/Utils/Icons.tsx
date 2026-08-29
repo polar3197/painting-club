@@ -29,3 +29,13 @@ export const MailIcon = () => (
     <path d="M3 7l9 6 9-6" />
   </svg>
 );
+
+// Portfolio view: a wall of four framed pieces.
+export const GalleryIcon = () => (
+  <svg {...base} aria-hidden="true">
+    <rect x="3" y="3" width="7" height="7" />
+    <rect x="14" y="3" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" />
+    <rect x="14" y="14" width="7" height="7" />
+  </svg>
+);

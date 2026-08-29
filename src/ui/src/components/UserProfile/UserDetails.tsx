@@ -61,7 +61,7 @@ const UserDetails = (
 
         {/* action stack + picture: the buttons run the picture's full height */}
         <div className="pic-with-actions">
-          <OwnerActions profile={profile} />
+          <OwnerActions profile={profile} selectedMedium={selectedMedium} selectedKeywords={selectedKeywords} />
           {hasPic ? (
             <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>
               <img
