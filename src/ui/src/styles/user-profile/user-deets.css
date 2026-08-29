@@ -1,6 +1,7 @@
 /* Colors read the member's scheme via --pc-* (set on .profile-page); the
-   fallbacks are the defaults. */
-.profile-page { display: contents; }
+   fallbacks are the defaults. --profile-inset is the one left/right margin
+   every section (header content, media bar, filter bar, art) lines up on. */
+.profile-page { display: contents; --profile-inset: 64px; }
 
 
 
@@ -28,7 +29,8 @@
     justify-content: space-between;
     gap: 10px;
     flex-direction: row;
-    padding: 10px 20px 0px 20px;
+    /* deets pads 10 and the fields pad 10 more on the left */
+    padding: 10px calc(var(--profile-inset) - 10px) 0 calc(var(--profile-inset) - 20px);
 }
 
 /* the square action buttons stacked against the picture, sharing its height */
@@ -272,6 +274,8 @@
 }
 
 @media (max-width: 640px) {
+    .profile-page { --profile-inset: 12px; }
+
     .user-deets {
         height: auto;
         min-height: 0;
