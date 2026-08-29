@@ -1,10 +1,16 @@
 
-/* Media tabs + filter as one boxed unit, on the profile's shared inset. */
+/* Full-width strip painting the profile background; inside it, the media
+   tabs + filter as one boxed unit on the profile's shared inset. */
 .media-bar-wrapper {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px var(--profile-inset, 0);
+    background-color: var(--pc-bg, rgb(255, 250, 245));
+}
+
+.media-bar-box {
     display: flex;
     flex-direction: column;
-    margin: 14px var(--profile-inset, 0);
-    background-color: var(--pc-bg, rgb(255, 250, 245));
     border: 1px black solid;
 }
 

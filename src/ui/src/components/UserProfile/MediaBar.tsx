@@ -95,6 +95,7 @@ const MediaBar = (
 
   return (
     <div className="media-bar-wrapper">
+      <div className="media-bar-box">
       <div className="media-bar">
         {profile.media.map((medium) => (
           <div
@@ -124,6 +125,7 @@ const MediaBar = (
           setSelectedKeywords={setSelectedKeywords}
         />
       )}
+      </div>
       {showAddMedia && (
         <AddMediaDialog
           shown={profile.media ?? []}
