@@ -88,8 +88,6 @@
     display: flex;
     gap: 10px;
     padding: 14px;
-    /* the shelf plank */
-    border-bottom: 10px solid rgb(120, 85, 50);
 }
 
 .shelf-book {
