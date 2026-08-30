@@ -182,27 +182,14 @@
         font-size: 13px;
     }
 
-    .keywords-bar {
-        height: auto;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-    }
-
-    .keyword-select-wrapper {
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px black solid;
-        padding-bottom: 8px;
-    }
-
+    /* No keyword filtering on phones — just the portfolio toggle, kept
+       because it's the only way into the grid view. */
+    .keyword-select-wrapper,
     .keyword-bubbles-wrapper {
-        width: 100%;
-        height: 2.5rem;
+        display: none;
     }
 
-    .bubble-name {
-        font-size: 14px;
-        padding: 2px;
+    .keywords-bar {
+        padding: 6px 8px;
     }
 }
