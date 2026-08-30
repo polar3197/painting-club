@@ -124,6 +124,16 @@ export function redeem_setup_code(code: string): Promise<LoginResponse> {
   }) as Promise<LoginResponse>;
 }
 
+/** Self-serve reset: always answers ok; lodges the request in the admin
+ *  panel's "password resets" list, and the admin hands over a fresh secret
+ *  code manually (redeemed via redeem_setup_code above). */
+export function forgot_password(username: string): Promise<{ ok: boolean }> {
+  return request("/members/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ username }),
+  }) as Promise<{ ok: boolean }>;
+}
+
 export function setup_account(payload: SetupAccountIn, token: string | null): Promise<{ id: string; username: string }> {
   return request("/members/setup-account", {
     method: "POST",

@@ -1,14 +1,10 @@
 .login-container {
-  display: grid;
-  grid-template-rows: 2fr 6fr;
-  row-gap: 10px;
   position: absolute;
   bottom: 3rem;
   left: 4rem;
   z-index: 1;
   /* border: 1px black solid; */
-  width: 130px;
-  height: 110px;
+  width: 150px;
   padding: 4px;
 }
 
@@ -39,25 +35,8 @@
   font-size: 12px;
 }
 
-.login-footer {
-  border: transparent;
-}
-
 .login-container input {
   color: black;
-}
-
-.login-footer button {
-  background-color: transparent;
-  border: 1px black solid;
-  padding: 5px;
-  width: 100%;
-  height: auto;
-}
-
-.login-footer button:hover {
-  background-color: rgb(72, 111, 204);
-  border-color: transparent;
 }
 
 .login-body {
@@ -66,31 +45,10 @@
   /* border: 1px black solid; */
 }
 
-.non-member {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
-}
-
-.non-member button {
-  background: transparent;
-  color: #3a3a3a;
-  cursor: pointer;
-  text-align: center;
-  border: 1px solid black;
-  height: 30px;
-  width: 100%;
-}
-
-.non-member button:hover {
-  background: #0c8c6e;
-}
-
 .user-form {
   display: flex;
   flex-direction: column;
-  max-width: 130px;
+  max-width: 100%;
   gap: 5px;
 }
 
@@ -129,6 +87,99 @@
 
 .user-form button:active{
   background: #0c8c6e;
+}
+
+/* Split row: the two onboarding paths side by side, equally weighted —
+   mirrors the iOS landing page. */
+.login-split-row {
+  display: flex;
+  gap: 5px;
+}
+
+.login-split-row button {
+  flex: 1;
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 2px 0;
+}
+
+.user-form .login-forgot-link,
+.user-form .login-forgot-link:hover,
+.user-form .login-forgot-link:active {
+  background: transparent;
+  border: none;
+  width: auto;
+  align-self: center;
+  padding: 0;
+  text-decoration: underline;
+  color: #3a3a3a;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Secret-code / forgot-password overlay — web twin of the iOS modals. */
+.secret-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.secret-panel {
+  background: rgb(255, 250, 245);
+  border: 1px solid black;
+  padding: 16px;
+  width: 240px;
+  max-width: calc(100vw - 3rem);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.secret-label {
+  font-family: Cambria, Cochin, Georgia, Times, "Times New Roman", serif;
+  font-size: 15px;
+}
+
+.forgot-body {
+  margin: 0;
+  font-size: 12px;
+  color: #3a3a3a;
+}
+
+.secret-code-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.secret-code-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #000;
+  outline: none;
+  font-size: 13px;
+  padding: 2px 0;
+  color: #000;
+}
+
+.secret-code-btn {
+  background: rgb(255, 250, 245);
+  border: 1px solid black;
+  width: 30px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+
+.secret-code-btn:hover {
+  background: rgb(210, 160, 70);
 }
 
 .error {
@@ -216,9 +267,7 @@
     z-index: 2;
     width: 72vw !important;
     max-width: 300px;
-    height: 72vw !important;
-    max-height: 300px;
-    aspect-ratio: 1 / 1;
+    height: auto !important;
     margin: 2rem auto;
     padding: 1rem;
     display: flex;
@@ -246,17 +295,6 @@
     flex: 1;
     width: 100%;
     display: flex;
-  }
-
-  .login-footer {
-    width: 100%;
-    flex-shrink: 0;
-  }
-
-  .login-footer button {
-    padding: 14px;
-    font-size: 20px;
-    font-weight: 500;
   }
 
   .user-form {
@@ -292,16 +330,36 @@
     font-weight: 500;
   }
 
-  .non-member {
-    width: 100%;
-    height: 100%;
-    justify-content: space-between;
+  .login-split-row button {
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: 500;
   }
 
-  .non-member button {
-    height: auto;
-    flex: 1;
-    padding: 14px;
+  .user-form .login-forgot-link,
+  .user-form .login-forgot-link:hover,
+  .user-form .login-forgot-link:active {
+    font-size: 15px;
+    padding: 4px 0;
+  }
+
+  .secret-panel {
+    width: 80vw;
+    padding: 20px;
+  }
+
+  .secret-label {
     font-size: 18px;
+  }
+
+  .forgot-body,
+  .secret-code-input {
+    font-size: 16px;
+  }
+
+  .secret-code-btn {
+    width: 44px;
+    height: 36px;
+    font-size: 16px;
   }
 }
