@@ -14,7 +14,48 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AnnouncementComposeDialog from '../components/AnnouncementComposeDialog';
-import { AnnouncementOut, get_announcements, delete_announcement } from '../api';
+import qrcode from 'qrcode-generator';
+import {
+  AnnouncementOut,
+  get_announcements,
+  delete_announcement,
+  get_signup_invites,
+  create_signup_invite,
+  getJoinUrl,
+} from '../api';
+
+// The standing club QR, drawn as plain Views from a pure-JS module matrix —
+// no native QR/svg dependency, so it ships over OTA. Cell size is floored to
+// whole points to keep module edges crisp.
+const QR_SIZE = 240;
+const QrPanel = ({ modules }: { modules: boolean[][] }) => {
+  const n = modules.length;
+  const cell = Math.max(2, Math.floor(QR_SIZE / n));
+  // Merge each row's cells into same-color runs: ~10x fewer Views.
+  const rows = modules.map((row) => {
+    const runs: { dark: boolean; len: number }[] = [];
+    for (const dark of row) {
+      const last = runs[runs.length - 1];
+      if (last && last.dark === dark) last.len += 1;
+      else runs.push({ dark, len: 1 });
+    }
+    return runs;
+  });
+  return (
+    <View style={[styles.qrPanel, { padding: cell * 2 }]}>
+      {rows.map((runs, r) => (
+        <View key={r} style={{ flexDirection: 'row' }}>
+          {runs.map((run, i) => (
+            <View
+              key={i}
+              style={{ width: cell * run.len, height: cell, backgroundColor: run.dark ? '#000' : '#fff' }}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+};
 
 // Contributor-only hub (Settings → "contributor"): the single place to author
 // and moderate announcements. Compose lives here (not on Home — Home's card is
@@ -28,6 +69,40 @@ export default function Contributor() {
   const [refreshing, setRefreshing] = useState(false);
   const [composing, setComposing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<AnnouncementOut | null>(null);
+
+  // The club's standing signup QR (same logic as the web contributor page):
+  // reuse the newest live invite token, mint one the first time. Scanning
+  // lands on paintingclub.art/join?i=<token> — instant account.
+  const [qrModules, setQrModules] = useState<boolean[][] | null>(null);
+  const [qrError, setQrError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const invites = await get_signup_invites(token);
+        const live = invites.find((i) =>
+          !i.revoked &&
+          (i.expires_at === null || new Date(i.expires_at + 'Z') > new Date()) &&
+          (i.max_uses === null || i.uses < i.max_uses)
+        ) ?? await create_signup_invite({ label: 'club qr' }, token);
+        const qr = qrcode(0, 'M');
+        qr.addData(getJoinUrl(live.token));
+        qr.make();
+        const n = qr.getModuleCount();
+        const rows: boolean[][] = [];
+        for (let r = 0; r < n; r++) {
+          const row: boolean[] = [];
+          for (let c = 0; c < n; c++) row.push(qr.isDark(r, c));
+          rows.push(row);
+        }
+        if (!cancelled) setQrModules(rows);
+      } catch {
+        if (!cancelled) setQrError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +169,14 @@ export default function Contributor() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
+          <Text style={styles.sectionTitle}>club QR — scan to join</Text>
+          {qrModules ? (
+            <QrPanel modules={qrModules} />
+          ) : (
+            <Text style={styles.empty}>{qrError ? "couldn't load the QR" : 'loading…'}</Text>
+          )}
+
+          <Text style={[styles.sectionTitle, styles.sectionGap]}>announcements</Text>
           <Text style={styles.sub}>your announcements — tap to open, hold to delete</Text>
           {items.length === 0 ? (
             <Text style={styles.empty}>no announcements yet. tap + to post one.</Text>
@@ -176,6 +259,22 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.textMuted,
     marginTop: 8,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+  },
+  sectionGap: {
+    marginTop: 24,
+  },
+  qrPanel: {
+    alignSelf: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#000',
+    marginBottom: 4,
   },
   row: {
     borderWidth: 1,

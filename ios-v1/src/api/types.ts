@@ -552,3 +552,17 @@ export interface InfraHealthOut {
   // Size of the static-files volume (uploaded art + profile images).
   content: { path: string | null; bytes: number | null; files: number | null; truncated: boolean };
 }
+
+// --- Signup invites (contributor page's standing club QR) ---------------------
+
+export interface SignupInviteOut {
+  id: string;
+  token: string;
+  label: string | null;
+  max_uses: number | null;
+  uses: number;
+  expires_at: string | null;
+  revoked: boolean;
+  created_at: string;
+  joined: string[];
+}

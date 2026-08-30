@@ -1,5 +1,5 @@
 export * from './types';
-export { resolveImageUrl, getPortfolioUrl, thumbUrl, thumbSource, authHeaders, profileThumbUrl, profilePicSrc, setAuthToken } from './client';
+export { resolveImageUrl, getPortfolioUrl, getJoinUrl, thumbUrl, thumbSource, authHeaders, profileThumbUrl, profilePicSrc, setAuthToken } from './client';
 
 import { request } from './client';
 import type {
@@ -51,6 +51,7 @@ import type {
   UsageSummary,
   TelemetrySummary,
   InfraHealthOut,
+  SignupInviteOut,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -1010,4 +1011,23 @@ export function get_infra_health(token: string | null): Promise<InfraHealthOut> 
   return request('/infra/health', {
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<InfraHealthOut>;
+}
+
+// --- Signup invites (the contributor screen's standing club QR) ---------------
+
+export function get_signup_invites(token: string | null): Promise<SignupInviteOut[]> {
+  return request('/admin/signup-invites', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<SignupInviteOut[]>;
+}
+
+export function create_signup_invite(
+  payload: { label?: string; expires_in_days?: number | null; max_uses?: number | null },
+  token: string | null,
+): Promise<SignupInviteOut> {
+  return request('/admin/signup-invites', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }) as Promise<SignupInviteOut>;
 }

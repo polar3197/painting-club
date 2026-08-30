@@ -112,6 +112,11 @@ export function profilePicSrc(
   return resolveImageUrl(profile.profile_pic_path);
 }
 
+/** The browser signup page a flyer / contributor-screen QR points at. */
+export function getJoinUrl(inviteToken: string): string {
+  return `${SERVER_ORIGIN}/join?i=${inviteToken}`;
+}
+
 export function getPortfolioUrl(username: string, medium?: string, keywords?: string[]): string {
   const params = new URLSearchParams();
   if (medium) params.set('medium', medium);
