@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import QRCode from "qrcode";
 import { useSearchParams } from "react-router-dom";
 import {
     ApplicationApproveOut,
@@ -13,10 +12,6 @@ import {
     ReportOut,
     get_reports,
     update_report_status,
-    get_signup_invites,
-    create_signup_invite,
-    revoke_signup_invite,
-    SignupInviteOut,
     get_admin_prompt_queue,
     review_prompt_suggestion,
     activate_suggestion,
@@ -214,8 +209,8 @@ const MediaRequestRow = ({
     );
 };
 
-type AdminTab = "applications" | "media-requests" | "reports" | "prompts" | "invites";
-const TABS: AdminTab[] = ["applications", "media-requests", "reports", "prompts", "invites"];
+type AdminTab = "applications" | "media-requests" | "reports" | "prompts";
+const TABS: AdminTab[] = ["applications", "media-requests", "reports", "prompts"];
 
 // One proposed / queued weekly-prompt suggestion. Proposed rows get approve /
 // reject; approved ("up next") rows get "make this week's".
@@ -245,41 +240,6 @@ const PromptSuggestionRow = ({ s, onReview, onActivate }: {
     </div>
 );
 
-// One flyer token: label, url + QR (rendered client-side for printing),
-// use counts, who joined through it, revoke.
-const InviteRow = ({ inv, onRevoke }: { inv: SignupInviteOut; onRevoke: (id: string) => void }) => {
-    const [qr, setQr] = useState<string | null>(null);
-    const url = `${window.location.origin}/join?i=${inv.token}`;
-    useEffect(() => {
-        QRCode.toDataURL(url, { margin: 1, width: 220 }).then(setQr).catch(() => {});
-    }, [url]);
-    const dead = inv.revoked || (inv.expires_at !== null && new Date(inv.expires_at + "Z") < new Date()) ||
-        (inv.max_uses !== null && inv.uses >= inv.max_uses);
-    return (
-        <div className={`application-row-item invite-row ${dead ? "invite-dead" : ""}`}>
-            {qr && <img className="invite-qr" src={qr} alt={`QR for ${url}`} />}
-            <div className="application-row-info">
-                <p className="application-name">{inv.label || inv.token}</p>
-                <p className="application-meta invite-url">{url}</p>
-                <p className="application-meta">
-                    {inv.uses}{inv.max_uses !== null ? ` / ${inv.max_uses}` : ""} used
-                    {inv.expires_at ? ` · expires ${new Date(inv.expires_at + "Z").toLocaleDateString()}` : " · never expires"}
-                    {inv.revoked ? " · revoked" : dead ? " · dead" : ""}
-                </p>
-                {inv.joined.length > 0 && (
-                    <p className="application-meta">joined: {inv.joined.map(u => `@${u}`).join(", ")}</p>
-                )}
-            </div>
-            <div className="application-row-actions">
-                <button className="application-btn" onClick={() => navigator.clipboard.writeText(url).catch(() => {})}>copy link</button>
-                {!inv.revoked && (
-                    <button className="application-btn reject" onClick={() => onRevoke(inv.id)}>revoke</button>
-                )}
-            </div>
-        </div>
-    );
-};
-
 const Admin = () => {
     // The tab lives in the URL (?tab=) so Settings can deep-link into a section.
     const [searchParams, setSearchParams] = useSearchParams();
@@ -292,35 +252,7 @@ const Admin = () => {
     const [proposed, setProposed] = useState<PromptSuggestionOut[]>([]);
     const [upNext, setUpNext] = useState<PromptSuggestionOut[]>([]);
     const [activePrompt, setActivePrompt] = useState<PromptOut | null>(null);
-    const [invites, setInvites] = useState<SignupInviteOut[]>([]);
-    const [inviteLabel, setInviteLabel] = useState("");
-    const [inviteDays, setInviteDays] = useState("");
-    const [inviteMax, setInviteMax] = useState("");
     const { token } = useAuth()!;
-
-    const fetchInvites = () => {
-        get_signup_invites(token).then(setInvites).catch(console.error);
-    };
-
-    const handleCreateInvite = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            await create_signup_invite({
-                label: inviteLabel.trim() || undefined,
-                expires_in_days: inviteDays.trim() ? Number(inviteDays) : null,
-                max_uses: inviteMax.trim() ? Number(inviteMax) : null,
-            }, token);
-            setInviteLabel(""); setInviteDays(""); setInviteMax("");
-            fetchInvites();
-        } catch (err) {
-            alert((err as Error).message || "could not create invite");
-        }
-    };
-
-    const handleRevokeInvite = async (id: string) => {
-        try { await revoke_signup_invite(id, token); fetchInvites(); }
-        catch (err) { alert((err as Error).message || "could not revoke"); }
-    };
 
     const fetchPrompts = () => {
         get_admin_prompt_queue(token)
@@ -334,7 +266,6 @@ const Admin = () => {
         get_media_requests(token).then(setMediaRequests).catch(console.error);
         get_reports(token).then(setReports).catch(console.error);
         fetchPrompts();
-        fetchInvites();
     }, []);
 
     const handleReviewPrompt = async (id: string, status: "approved" | "rejected") => {
@@ -419,32 +350,9 @@ const Admin = () => {
                     onClick={() => setTab("prompts")}
                     style={{ cursor: "pointer", opacity: tab === "prompts" ? 1 : 0.4 }}
                 >prompts</span>
-                <span
-                    onClick={() => setTab("invites")}
-                    style={{ cursor: "pointer", opacity: tab === "invites" ? 1 : 0.4 }}
-                >invites</span>
             </h1>
 
-            {tab === "invites" ? (
-                <>
-                    <div className="admin-section">
-                        <h2 className="admin-section-title">new flyer QR</h2>
-                        <p className="admin-hint">anyone scanning a live token can create an account directly — no review, no code. rotate (revoke + mint) if a flyer escapes.</p>
-                        <form className="invite-form" onSubmit={handleCreateInvite}>
-                            <input value={inviteLabel} onChange={e => setInviteLabel(e.target.value)} placeholder="label (e.g. flyer-mission)" />
-                            <input value={inviteDays} onChange={e => setInviteDays(e.target.value)} placeholder="expires in days (blank = never)" inputMode="numeric" />
-                            <input value={inviteMax} onChange={e => setInviteMax(e.target.value)} placeholder="max uses (blank = unlimited)" inputMode="numeric" />
-                            <button type="submit" className="add-btn">+ mint</button>
-                        </form>
-                    </div>
-                    <div className="admin-section">
-                        <h2 className="admin-section-title">tokens</h2>
-                        {invites.length === 0
-                            ? <p className="admin-empty">no invites yet</p>
-                            : invites.map(inv => <InviteRow key={inv.id} inv={inv} onRevoke={handleRevokeInvite} />)}
-                    </div>
-                </>
-            ) : tab === "prompts" ? (
+            {tab === "prompts" ? (
                 <>
                     <div className="admin-section">
                         <h2 className="admin-section-title">this week's prompt</h2>

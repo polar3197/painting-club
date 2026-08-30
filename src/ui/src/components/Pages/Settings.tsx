@@ -84,7 +84,6 @@ export default function Settings() {
             <h2 className="settings-section-title">contributor</h2>
             <button className="settings-btn settings-btn-contributor" onClick={() => navigate("/contributor")}>contributor</button>
             <button className="settings-btn" onClick={() => navigate("/user-roles")}>user roles</button>
-            <button className="settings-btn" onClick={() => navigate("/admin?tab=invites")}>invites</button>
             <button className="settings-btn" onClick={() => navigate("/user-stats")}>user stats</button>
             <button className="settings-btn" onClick={() => navigate("/infra-stats")}>infra stats</button>
           </div>

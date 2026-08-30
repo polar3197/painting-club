@@ -95,6 +95,16 @@
     margin: 0 0 10px 0;
 }
 
+/* the standing signup QR on the contributor page */
+.tools-qr {
+    display: block;
+    width: 240px;
+    height: 240px;
+    border: 1px solid black;
+    background: white;
+    margin: 4px auto 0 auto;
+}
+
 /* rows (announcements, members) */
 .tools-row {
     display: flex;

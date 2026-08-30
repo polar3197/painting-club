@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { AnnouncementOut, get_announcements, delete_announcement } from "../../api";
+import QRCode from "qrcode";
+import { AnnouncementOut, get_announcements, delete_announcement, get_signup_invites, create_signup_invite } from "../../api";
 import { ToolsPage } from "../Utils/ToolsPage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import AnnouncementComposeDialog from "../Utils/AnnouncementComposeDialog";
@@ -16,6 +17,31 @@ export default function Contributor() {
   const [loading, setLoading] = useState(true);
   const [composing, setComposing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<AnnouncementOut | null>(null);
+
+  // The club's standing signup QR: reuse the newest live invite token, mint
+  // one the first time. Scanning lands on /join?i=<token> — instant account.
+  const [qr, setQr] = useState<string | null>(null);
+  const [qrError, setQrError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const invites = await get_signup_invites(token);
+        const live = invites.find((i) =>
+          !i.revoked &&
+          (i.expires_at === null || new Date(i.expires_at + "Z") > new Date()) &&
+          (i.max_uses === null || i.uses < i.max_uses)
+        ) ?? await create_signup_invite({ label: "club qr" }, token);
+        const url = `${window.location.origin}/join?i=${live.token}`;
+        const data = await QRCode.toDataURL(url, { margin: 1, width: 480 });
+        if (!cancelled) setQr(data);
+      } catch {
+        if (!cancelled) setQrError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
 
   const load = useCallback(async () => {
     try { setItems(await get_announcements(token)); }
@@ -37,7 +63,6 @@ export default function Contributor() {
   return (
     <ToolsPage
       title="contributor" onBack={() => navigate("/settings")}
-      sub="announcements — click to open its discussion; ⋯ to delete"
       action={<button className="add-btn" onClick={() => setComposing(true)}>+ announcement</button>}
     >
       {pendingDelete && (
@@ -52,6 +77,17 @@ export default function Contributor() {
       {composing && (
         <AnnouncementComposeDialog onClose={() => setComposing(false)} onPosted={load} />
       )}
+
+      <section className="tools-section">
+        <h2 className="tools-section-title">club QR — scan to join</h2>
+        {qr
+          ? <img className="tools-qr" src={qr} alt="scan to join painting club" />
+          : <p className="tools-empty">{qrError ? "couldn't load the QR" : "loading…"}</p>}
+      </section>
+
+      <section className="tools-section">
+      <h2 className="tools-section-title">announcements</h2>
+      <p className="tools-note">click a row for its discussion; ⋯ to delete</p>
       {loading ? (
         <p className="tools-empty">loading…</p>
       ) : items.length === 0 ? (
@@ -73,6 +109,7 @@ export default function Contributor() {
           </div>
         ))
       )}
+      </section>
     </ToolsPage>
   );
 }
