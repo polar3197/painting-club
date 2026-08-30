@@ -83,6 +83,9 @@ from api.models import (
     ApplicationApproveOut,
     SetupAccountIn,
     SetupCodeIn,
+    JoinRedeemIn,
+    SignupInviteCreateIn,
+    SignupInviteOut,
     ForgotPasswordIn,
     PasswordResetOut,
     CommentOut,
@@ -104,6 +107,9 @@ from api.models import (
 )
 
 from api.signed_urls import sign_path
+from db.db_ops.invites import (
+    db_create_invite, db_list_invites, db_revoke_invite, db_redeem_invite, InviteDead,
+)
 from db.db_ops.wip import (
     db_add_wip_update,
     db_list_wip_updates,
@@ -414,6 +420,52 @@ async def redeem_setup_code_endpoint(payload: SetupCodeIn, db: AsyncSession = De
         raise HTTPException(status_code=401, detail="Invalid or expired setup code")
     token = create_token(member)
     return Token(access_token=token, must_setup=True)
+
+
+@app.post("/join/redeem", response_model=Token)
+async def redeem_signup_invite_endpoint(payload: JoinRedeemIn, db: AsyncSession = Depends(get_db)) -> Token:
+    """QR fast path: a live flyer token stands in for the admin-sent secret
+    code. Creates the member (must_change_password) and returns a setup token;
+    the client finishes through the existing /members/setup-account. 410 when
+    the token is revoked / expired / used up."""
+    if not payload.firstname.strip() or not payload.lastname.strip():
+        raise HTTPException(status_code=400, detail="first and last name required")
+    try:
+        member = await db_redeem_invite(db, payload.token, payload.firstname, payload.lastname, payload.email)
+    except InviteDead:
+        raise HTTPException(status_code=410, detail="This invite is no longer valid — ask a member for a fresh QR")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return Token(access_token=create_token(member), must_setup=True)
+
+
+def _invite_out(inv, joined: list[str]) -> SignupInviteOut:
+    return SignupInviteOut(
+        id=inv.id, token=inv.token, label=inv.label, max_uses=inv.max_uses, uses=inv.uses,
+        expires_at=inv.expires_at, revoked=inv.revoked, created_at=inv.created_at, joined=joined,
+    )
+
+
+@app.post("/admin/signup-invites", response_model=SignupInviteOut, status_code=201)
+async def create_signup_invite(payload: SignupInviteCreateIn, db: AsyncSession = Depends(get_db),
+                               _: Member = Depends(get_admin_member)):
+    inv = await db_create_invite(db, payload.label, payload.expires_in_days, payload.max_uses)
+    return _invite_out(inv, [])
+
+
+@app.get("/admin/signup-invites", response_model=list[SignupInviteOut])
+async def list_signup_invites(db: AsyncSession = Depends(get_db), _: Member = Depends(get_admin_member)):
+    return [_invite_out(inv, joined) for inv, joined in await db_list_invites(db)]
+
+
+@app.delete("/admin/signup-invites/{invite_id}")
+async def revoke_signup_invite(invite_id: str, db: AsyncSession = Depends(get_db),
+                               _: Member = Depends(get_admin_member)):
+    try:
+        await db_revoke_invite(db, invite_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True}
 
 
 @app.post("/members/forgot-password")

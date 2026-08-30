@@ -229,3 +229,42 @@
         font-size: 16px;
     }
 }
+
+/* ---- signup invites (flyer QRs) ---- */
+.invite-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.invite-form input {
+    flex: 1;
+    min-width: 180px;
+    border: 1px solid black;
+    background: white;
+    padding: 8px 10px;
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    outline: none;
+}
+
+.invite-row {
+    align-items: center;
+}
+
+.invite-row.invite-dead {
+    opacity: 0.55;
+}
+
+.invite-qr {
+    width: 110px;
+    height: 110px;
+    border: 1px solid black;
+    flex-shrink: 0;
+    background: white;
+}
+
+.invite-url {
+    user-select: all;
+    word-break: break-all;
+}

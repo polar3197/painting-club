@@ -1,6 +1,6 @@
 # QR Onboarding & Seamless App Handoff — Plan & Tracker
 
-**Last updated:** 2026-08-28
+**Last updated:** 2026-08-30
 **Owner:** Charlie
 **Status:** Web `/join` + Phase 2 polish **committed on main** · **blocked on RPi access to deploy**
 
@@ -214,3 +214,36 @@ Same QR (`https://paintingclub.art/join`); opens the app if installed, else web.
 - App Store: `https://apps.apple.com/app/id6762710261` · bundle `com.paintingclub.app`.
 - This Mac's SSH pubkey (needs to reach the Pi's authorized_keys):
   `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINXlqdD92xX7s/TLS/UaR6wr7RCzXgrpJ9vN1lwuFlhP polar1738@Charlies-MacBook-Pro`
+
+
+---
+
+## 9. 2026-08-30 — Browser-first QR fast path (SHIPPED; supersedes parts of Phases 2–3)
+
+Design agreed between Charlie, the iOS Claude and the web Claude: the QR
+creates the account **in the browser**, which deletes the deferred-deep-link
+problem — by the time the app matters, the person already has a username +
+password and the app's existing login handles them (`must_setup` is false
+after browser setup). No Branch/App Clip/paste-code, no App Store rebuild.
+Universal Links remain a someday nice-to-have for already-installed re-scans.
+
+Shipped (migration 029 + backend + web, deployed):
+- `signup_invite` table: rotatable/expiring/max-use tokens; members created
+  through one carry `signup_invite_id` for after-the-fact review.
+- `POST /join/redeem {token, firstname, lastname, email}` → setup token
+  (410 when revoked/expired/used up; 409 when the email owns a completed
+  account; orphan pending-setup emails are reused like the approve path).
+- Admin → **invites** tab: mint (label / expiry days / max uses), printable
+  QR per token, use counts + who joined, copy link, revoke.
+- `/join?i=<token>`: one combined form (name, email, username, password) →
+  redeem + setup-account behind one submit → logged in → success screen
+  offering the App Store link or continue-in-browser. Dead token falls back
+  to the normal application form with a notice. `/join` without a token is
+  unchanged (admin-review application flow).
+
+iOS: nothing required (existing login covers QR-joined members). Optional
+one-line "new here? sign up at paintingclub.art" on the app's entry screen —
+ping the iOS Claude to OTA it.
+
+Flyer QR now encodes `https://paintingclub.art/join?i=<token>` — mint the
+token in Admin → invites and print the QR straight from that panel.

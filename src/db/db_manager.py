@@ -538,4 +538,20 @@ async def run_migrations():
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_wip_update_art ON wip_update (art_id)"
         ))
+        # 029: QR signup invites (flyer tokens) + review pointer on member.
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS signup_invite ("
+            " id UUID PRIMARY KEY,"
+            " token VARCHAR(64) NOT NULL UNIQUE,"
+            " label VARCHAR(120),"
+            " max_uses INT,"
+            " uses INT NOT NULL DEFAULT 0,"
+            " expires_at TIMESTAMP,"
+            " revoked BOOLEAN NOT NULL DEFAULT FALSE,"
+            " created_at TIMESTAMP DEFAULT now()"
+            ")"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE member ADD COLUMN IF NOT EXISTS signup_invite_id UUID REFERENCES signup_invite(id)"
+        ))
     print("Migrations applied.")

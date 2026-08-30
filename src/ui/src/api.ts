@@ -80,6 +80,43 @@ export interface SetupAccountIn {
 
 // Redeem a one-time setup code (handed out by an admin) for a temp-account
 // token. Mirrors the iOS landing-page secret-code flow.
+/** QR fast path: a live flyer token stands in for the secret code. Returns a
+ *  setup token; finish with setup_account. 410 = dead invite. */
+export function redeem_signup_invite(payload: { token: string; firstname: string; lastname: string; email?: string | null }): Promise<LoginResponse> {
+  return request("/join/redeem", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }) as Promise<LoginResponse>;
+}
+
+export interface SignupInviteOut {
+  id: string;
+  token: string;
+  label: string | null;
+  max_uses: number | null;
+  uses: number;
+  expires_at: string | null;
+  revoked: boolean;
+  created_at: string;
+  joined: string[]; // usernames created through this invite
+}
+
+export function create_signup_invite(payload: { label?: string; expires_in_days?: number | null; max_uses?: number | null }, token: string | null): Promise<SignupInviteOut> {
+  return request("/admin/signup-invites", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }) as Promise<SignupInviteOut>;
+}
+
+export function get_signup_invites(token: string | null): Promise<SignupInviteOut[]> {
+  return request("/admin/signup-invites", { headers: { Authorization: `Bearer ${token}` } }) as Promise<SignupInviteOut[]>;
+}
+
+export function revoke_signup_invite(id: string, token: string | null) {
+  return request(`/admin/signup-invites/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+}
+
 export function redeem_setup_code(code: string): Promise<LoginResponse> {
   return request("/members/redeem-setup-code", {
     method: "POST",

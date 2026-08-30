@@ -98,6 +98,32 @@ class SetupAccountIn(BaseModel):
     new_username: str
     new_password: str
 
+class JoinRedeemIn(BaseModel):
+    token: str
+    firstname: str
+    lastname: str
+    email: str | None = None
+
+
+class SignupInviteCreateIn(BaseModel):
+    label: str | None = None
+    expires_in_days: int | None = None  # None = never expires
+    max_uses: int | None = None         # None = unlimited
+
+
+class SignupInviteOut(BaseModel):
+    id: uuid.UUID
+    token: str
+    label: str | None = None
+    max_uses: int | None = None
+    uses: int
+    expires_at: datetime | None = None
+    revoked: bool
+    created_at: datetime
+    # Usernames created through this invite (after-the-fact review).
+    joined: list[str] = []
+
+
 class SetupCodeIn(BaseModel):
     code: str
 

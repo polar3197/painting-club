@@ -28,6 +28,9 @@ class Member(Base):
     # Timestamp of the last time the user opened their "comments on my art"
     # dialog. Comments with created_at > this value render as unseen.
     comments_last_viewed_at = Column(DateTime)
+    # Set when the account was created by redeeming a QR signup invite —
+    # lets admins review who came in off which flyer.
+    signup_invite_id = Column(UUID(as_uuid=True), ForeignKey("signup_invite.id"))
     # Profile page colors from the edit-profile color tab: component-key ->
     # color string ('#rrggbb'). NULL = never customized; clients fall back to
     # the app-default palette.
@@ -348,6 +351,21 @@ class Comment(Base):
     art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), nullable=False)
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), nullable=False)
     text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SignupInvite(Base):
+    """A rotatable QR signup token (flyers). Redeeming one creates a member
+    directly — no application, no admin code. max_uses NULL = unlimited;
+    revoked/expired tokens 410 at redeem time."""
+    __tablename__ = "signup_invite"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token = Column(String(64), nullable=False, unique=True)
+    label = Column(String(120))
+    max_uses = Column(Integer)
+    uses = Column(Integer, nullable=False, default=0)
+    expires_at = Column(DateTime)
+    revoked = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
