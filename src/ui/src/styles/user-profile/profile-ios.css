@@ -296,7 +296,12 @@
         overflow: visible;
         background-color: var(--pc-statement, rgb(255, 250, 245));
     }
-    .statement-comments { display: block; padding: 0; overflow: hidden; }
+    /* The comments page must not size the strip (its list is as long as your
+       comment history, which stretched the statement to match). It takes the
+       statement's height instead: no intrinsic height, list inset inside. */
+    .statement-strip { align-items: stretch; }
+    .statement-comments { display: block; position: relative; padding: 0; overflow: hidden; min-height: 0; }
+    .statement-comments > * { position: absolute; inset: 0; }
     .artist-statement-label { font-family: var(--ios-serif); font-size: 20px; font-weight: 400; margin-bottom: 4px; }
     .user-field-element hr { margin: 0 0 8px; }
     .user-bio { font-family: system-ui, sans-serif; font-size: 14px; font-weight: 300; line-height: 22px; margin: 0; }
