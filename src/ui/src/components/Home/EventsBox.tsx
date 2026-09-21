@@ -47,7 +47,7 @@ export default function EventsBox() {
         <button className="add-btn" onClick={() => navigate("/events/new")}>+</button>
       </div>
       <div className="events-page-cal">
-        <MonthCalendar cursor={cursor} onStep={(d) => setCursor((c) => stepMonth(c, d))} selected={selected} onSelect={pick} marks={marks} compact fill />
+        <MonthCalendar cursor={cursor} onStep={(d) => setCursor((c) => stepMonth(c, d))} selected={selected} onSelect={pick} marks={marks} />
       </div>
       <div className="events-page-list">
         {upcoming.length === 0 ? (
