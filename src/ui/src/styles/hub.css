@@ -66,32 +66,18 @@
     white-space: nowrap;
 }
 
-.hub-edge {
-    position: absolute;
-    background: none;
-    border: none;
-    padding: 4px;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: #000;
-    cursor: pointer;
-}
-.hub-edge-top { top: calc(env(safe-area-inset-top, 0px) + 6px); left: 50%; transform: translateX(-50%); }
-.hub-edge-bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); left: 50%; transform: translateX(-50%); }
-.hub-edge-left { left: 4px; top: 50%; transform: translateY(-50%); letter-spacing: 0; }
-.hub-edge-right { right: 4px; top: 50%; transform: translateY(-50%); letter-spacing: 0; }
-
 .hub-stacked { display: inline-flex; flex-direction: column; align-items: center; line-height: 13px; }
 
-/* ---- the green band on each panel's Home-facing edge -------------------- */
+/* ---- seam bands: one per neighbor, positioned by Hub.tsx (placeBands) ---- */
 .hub-band {
-    position: absolute;
-    z-index: 20;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 30;
     border: none;
     padding: 0;
     margin: 0;
-    background: var(--hub-green);
+    background: var(--hub-green, rgb(216, 237, 138));
     font-family: 'Courier New', Courier, monospace;
     font-size: 12px;
     letter-spacing: 2px;
@@ -100,30 +86,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    will-change: transform;
 }
 .hub-band .hub-stacked { letter-spacing: 0; }
-.hub-band-left { left: 0; top: 0; bottom: 0; width: var(--hub-band); }
-.hub-band-right { right: 0; top: 0; bottom: 0; width: var(--hub-band); }
-.hub-band-bottom {
-    left: 0; right: 0; bottom: 0;
-    height: calc(var(--hub-band) + env(safe-area-inset-bottom, 0px));
-    align-items: flex-start;
-    padding-top: 2px;
-}
-/* the top band also fills the status-bar / notch area in Home green */
-.hub-band-top {
-    left: 0; right: 0; top: 0;
-    height: calc(var(--hub-band) + env(safe-area-inset-top, 0px));
-    align-items: flex-end;
-    padding-bottom: 2px;
-}
+.hub-band-top, .hub-band-bottom { width: 100vw; height: 18px; }
+.hub-band-left, .hub-band-right { width: 18px; height: 100dvh; }
 
-/* keep panel content clear of its band */
-.hub-panel-scroll { padding: 0; }
-.hub-people { padding-left: var(--hub-band); }
-.hub-panel:has(.hub-band-right) .hub-panel-scroll { padding-right: var(--hub-band); }
-.hub-panel:has(.hub-band-bottom) .hub-panel-scroll { padding-bottom: calc(var(--hub-band) + env(safe-area-inset-bottom, 0px)); }
-.hub-events { padding: calc(var(--hub-band) + env(safe-area-inset-top, 0px) + 12px) 12px 12px; }
+/* each panel is laid out beside its band, not under it */
+.hub-panel-artwall { padding-bottom: 18px; }
+.hub-panel-profile { padding-right: 18px; }
+.hub-panel-people { padding-left: 18px; }
+.hub-panel-events { padding-top: 18px; }
+.hub-panel { box-sizing: border-box; }
+.hub-events { padding: 12px; }
 
 /* events panel: the home events box, stacked like on phones */
 .hub-events .home-events { height: 100%; box-shadow: none; }
