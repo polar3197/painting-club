@@ -110,15 +110,41 @@ const ApplicationRow = ({
                     onCancel={() => setShowConfirmDelete(false)}
                 />
             )}
+            {/* The application piece. Box is reserved from the stored aspect
+                ratio so the row doesn't collapse and then jump when it lands. */}
+            {(app.art_thumb_url || app.art_url) && (
+                <a
+                    className="application-art"
+                    href={app.art_url ?? app.art_thumb_url ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ aspectRatio: String(app.art_aspect_ratio || 1) }}
+                >
+                    <img
+                        src={app.art_thumb_url ?? app.art_url ?? undefined}
+                        alt={`piece by ${app.firstname} ${app.lastname}`}
+                        loading="lazy"
+                        decoding="async"
+                    />
+                </a>
+            )}
             <div className="application-row-info">
                 <p className="application-name">{app.firstname} {app.lastname}</p>
+                {/* Chosen up front, so approval makes it real as-is. */}
+                {app.username && <p className="application-meta">wants @{app.username}</p>}
                 <p className="application-meta">{app.email}</p>
                 {(app.city || app.state) && <p className="application-meta">{[app.city, app.state].filter(Boolean).join(", ")}</p>}
                 {app.known_member && <p className="application-meta">knows: {app.known_member}</p>}
                 {app.reason && <p className="application-reason">"{app.reason}"</p>}
                 <p className="application-date">{new Date(app.created_at).toLocaleDateString()}</p>
+                {/* Legacy rows only: these applicants still need a code sent by
+                    hand. Anyone who applied with their own credentials just
+                    logs in, so there is nothing to show. */}
                 {app.status === "pending_setup" && app.temp_password && (
                     <TempCreds password={app.temp_password} />
+                )}
+                {app.status === "approved" && app.username && (
+                    <p className="application-ready">account is live — they can log in as @{app.username}</p>
                 )}
             </div>
             <div className="application-row-actions">

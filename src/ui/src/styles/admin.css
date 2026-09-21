@@ -229,3 +229,32 @@
         font-size: 16px;
     }
 }
+
+/* The application piece in the review queue. Square corners, black rule, and a
+   reserved box (inline aspect-ratio) so rows don't collapse then jump. */
+.application-art {
+    display: block;
+    width: 96px;
+    /* `auto` rather than a 96px basis: the row flips to a column on phones,
+       where a basis would set HEIGHT and fight the inline aspect-ratio.
+       Width + aspect-ratio decides the box in both directions. */
+    flex: 0 0 auto;
+    border: 1px solid black;
+    background: white;
+    overflow: hidden;
+    align-self: flex-start;
+}
+
+.application-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.application-ready {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: rgb(20, 120, 80);
+    margin: 6px 0 0 0;
+}

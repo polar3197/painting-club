@@ -97,6 +97,9 @@ export function redeem_signup_invite(payload: { token: string; firstname: string
 export interface SignupInviteOut {
   id: string;
   token: string;
+  /** false = the standing club QR (scan -> application -> a member reviews).
+   *  true  = the trusted QR (scan -> a live account, no review). */
+  instant?: boolean;
   label: string | null;
   max_uses: number | null;
   uses: number;
@@ -106,7 +109,7 @@ export interface SignupInviteOut {
   joined: string[]; // usernames created through this invite
 }
 
-export function create_signup_invite(payload: { label?: string; expires_in_days?: number | null; max_uses?: number | null }, token: string | null): Promise<SignupInviteOut> {
+export function create_signup_invite(payload: { label?: string; expires_in_days?: number | null; max_uses?: number | null; instant?: boolean }, token: string | null): Promise<SignupInviteOut> {
   return request("/admin/signup-invites", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

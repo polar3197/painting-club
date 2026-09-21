@@ -95,6 +95,17 @@
     margin: 0 0 10px 0;
 }
 
+/* The trusted QR bypasses review entirely, so its warning reads as a warning
+   and its QR is bordered in red — the two codes must never be confused at a
+   glance while someone is holding a phone out at a meeting. */
+.tools-note-warn {
+    color: rgb(170, 40, 40);
+}
+
+.tools-qr-trusted {
+    border: 3px solid rgb(170, 40, 40);
+}
+
 /* the standing signup QR on the contributor page */
 .tools-qr {
     display: block;

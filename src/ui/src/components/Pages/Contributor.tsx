@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { AnnouncementOut, get_announcements, delete_announcement, get_signup_invites, create_signup_invite } from "../../api";
+import { AnnouncementOut, get_announcements, delete_announcement, get_signup_invites, create_signup_invite, SignupInviteOut } from "../../api";
 import { ToolsPage } from "../Utils/ToolsPage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
 import AnnouncementComposeDialog from "../Utils/AnnouncementComposeDialog";
 import KebabMenu from "../Utils/KebabMenu";
 
-// Contributor-only hub (Settings → "contributor"): author and moderate
-// announcements. Click a row for its discussion; delete from the row.
+// Contributor-only hub (Settings → "contributor"): the two club QRs, plus
+// authoring and moderating announcements.
 export default function Contributor() {
   const navigate = useNavigate();
   const { token } = useAuth()!;
@@ -17,31 +17,60 @@ export default function Contributor() {
   const [composing, setComposing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<AnnouncementOut | null>(null);
 
-  // The club's standing signup QR: reuse the newest live invite token, mint
-  // one the first time. Scanning lands on /join?i=<token> — instant account.
-  const [qr, setQr] = useState<string | null>(null);
+  // Two QRs, and they do very different things — see the labels below. The
+  // club one is the one you hold up at a meeting; the trusted one hands out a
+  // live account with nobody reviewing it, so it stays hidden until asked for.
+  const [clubQr, setClubQr] = useState<string | null>(null);
+  const [trustedQr, setTrustedQr] = useState<string | null>(null);
   const [qrError, setQrError] = useState(false);
+  const [showTrusted, setShowTrusted] = useState(false);
+  const [mintingTrusted, setMintingTrusted] = useState(false);
 
+  const isLive = (i: SignupInviteOut) =>
+    !i.revoked &&
+    (i.expires_at === null || new Date(i.expires_at + "Z") > new Date()) &&
+    (i.max_uses === null || i.uses < i.max_uses);
+
+  const renderQr = useCallback(async (inviteToken: string) => {
+    const { default: QRCode } = await import("qrcode");
+    return QRCode.toDataURL(`${window.location.origin}/join?i=${inviteToken}`, { margin: 1, width: 480 });
+  }, []);
+
+  // The club QR is minted on first view if it doesn't exist. The trusted one
+  // never is — it only appears when a contributor deliberately asks for it.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const invites = await get_signup_invites(token);
-        const live = invites.find((i) =>
-          !i.revoked &&
-          (i.expires_at === null || new Date(i.expires_at + "Z") > new Date()) &&
-          (i.max_uses === null || i.uses < i.max_uses)
-        ) ?? await create_signup_invite({ label: "club qr" }, token);
-        const url = `${window.location.origin}/join?i=${live.token}`;
-        const { default: QRCode } = await import("qrcode");
-        const data = await QRCode.toDataURL(url, { margin: 1, width: 480 });
-        if (!cancelled) setQr(data);
+        const club =
+          invites.find((i) => isLive(i) && !i.instant) ??
+          (await create_signup_invite({ label: "club qr" }, token));
+        const data = await renderQr(club.token);
+        if (!cancelled) setClubQr(data);
       } catch {
         if (!cancelled) setQrError(true);
       }
     })();
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, renderQr]);
+
+  const revealTrusted = async () => {
+    setShowTrusted(true);
+    if (trustedQr || mintingTrusted) return;
+    setMintingTrusted(true);
+    try {
+      const invites = await get_signup_invites(token);
+      const trusted =
+        invites.find((i) => isLive(i) && i.instant) ??
+        (await create_signup_invite({ label: "trusted qr", instant: true }, token));
+      setTrustedQr(await renderQr(trusted.token));
+    } catch {
+      setQrError(true);
+    } finally {
+      setMintingTrusted(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try { setItems(await get_announcements(token)); }
@@ -79,10 +108,32 @@ export default function Contributor() {
       )}
 
       <section className="tools-section">
-        <h2 className="tools-section-title">club QR — scan to join</h2>
-        {qr
-          ? <img className="tools-qr" src={qr} alt="scan to join painting club" />
+        <h2 className="tools-section-title">club QR — scan to apply</h2>
+        <p className="tools-note">
+          the one to hold up at a meeting. they fill in an application and pick their own
+          username and password; a member approves it and they're in — no code to send.
+        </p>
+        {clubQr
+          ? <img className="tools-qr" src={clubQr} alt="scan to apply to painting club" />
           : <p className="tools-empty">{qrError ? "couldn't load the QR" : "loading…"}</p>}
+      </section>
+
+      <section className="tools-section">
+        <h2 className="tools-section-title">trusted QR — instant account, no review</h2>
+        <p className="tools-note tools-note-warn">
+          skips the queue entirely: whoever scans this has an account before anyone sees it.
+          only for someone standing in front of you. hidden by default so it can't be
+          scanned off your screen by accident.
+        </p>
+        {showTrusted ? (
+          trustedQr
+            ? <img className="tools-qr tools-qr-trusted" src={trustedQr} alt="trusted QR — creates an account immediately" />
+            : <p className="tools-empty">{qrError ? "couldn't load the QR" : "minting…"}</p>
+        ) : (
+          <button className="tools-btn tools-btn-gold" onClick={revealTrusted}>
+            show the trusted QR
+          </button>
+        )}
       </section>
 
       <section className="tools-section">
