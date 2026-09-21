@@ -21,9 +21,10 @@ import {
   get_members_visual_2d,
   remove_visual_2d,
   rename_series,
-  resolveImageUrl,
+  artDisplaySource,
+  artThumbSource,
+  artTileSource,
   set_series_order,
-  thumbUrl,
   update_visual_2d,
   Visual2DIn,
   Visual2DOut,
@@ -112,9 +113,10 @@ export default function PaintingSeriesRow({
         >
           <View style={[styles.artVisualInner, { aspectRatio }]}>
             <Image
-              source={{ uri: resolveImageUrl(cover.file_path) }}
-              placeholder={{ uri: thumbUrl(cover.id) }}
-              transition={200}
+              source={artDisplaySource(cover)}
+              placeholder={artThumbSource(cover)}
+              cachePolicy="memory-disk"
+              transition={150}
               style={styles.artImage}
               contentFit="contain"
               onLoad={(e) => {
@@ -505,9 +507,9 @@ function PaintingSeriesZoomIn({
                     onPress={() => setZoomIndex(i)}
                   >
                     <Image
-                      source={{ uri: resolveImageUrl(p.file_path) }}
-                      placeholder={{ uri: thumbUrl(p.id) }}
-                      transition={200}
+                      source={artTileSource(p, cellW)}
+                      cachePolicy="memory-disk"
+                      transition={150}
                       style={[styles.cellImage, { width: cellW - 2, height: cellW - 2 }]}
                       contentFit="cover"
                     />
@@ -536,7 +538,8 @@ function PaintingSeriesZoomIn({
               {standalone.map((p) => (
                 <View key={p.id} style={styles.addRow}>
                   <Image
-                    source={{ uri: thumbUrl(p.id) }}
+                    source={artThumbSource(p)}
+                    cachePolicy="memory-disk"
                     style={styles.addThumb}
                     contentFit="cover"
                   />

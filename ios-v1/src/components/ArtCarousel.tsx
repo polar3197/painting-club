@@ -26,7 +26,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { resolveImageUrl, block_user, unblock_user } from '../api';
+import { imageSource, artDisplaySource, block_user, unblock_user } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
@@ -46,7 +46,7 @@ const NAME_BAND = 56;
 interface ArtCarouselProps {
   // Minimal shape so both profile pieces (Visual2DOut) and prompt submissions
   // (ArtResult) can be passed.
-  pieces: { id: string; file_path: string }[];
+  pieces: { id: string; file_path: string; display_url?: string | null }[];
   initialIndex: number;
   isOwner: boolean;
   // Username of the profile these pieces belong to (used for block/unblock).
@@ -205,7 +205,7 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
                 {pieces.map((p, i) => (
                   <ZoomablePage
                     key={p.id}
-                    uri={resolveImageUrl(p.file_path)}
+                    piece={p}
                     width={screenW}
                     height={screenH}
                     topInset={imgTopInset}
@@ -319,7 +319,7 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
  * it stops being the active page (so a stale zoom never blocks paging).
  */
 function ZoomablePage({
-  uri,
+  piece,
   width,
   height,
   topInset = 0,
@@ -327,7 +327,7 @@ function ZoomablePage({
   active,
   onZoomChange,
 }: {
-  uri: string;
+  piece: { file_path: string; display_url?: string | null };
   width: number;
   height: number;
   topInset?: number;
@@ -337,6 +337,9 @@ function ZoomablePage({
 }) {
   const ref = useRef<ScrollView>(null);
   const wasZoomed = useRef(false);
+  // 1x shows the ~1600px display copy (already cached from the profile); the
+  // original is only fetched once the user actually pinches in.
+  const [wantOriginal, setWantOriginal] = useState(false);
 
   // When this page scrolls offscreen, snap it back to 1x.
   React.useEffect(() => {
@@ -369,11 +372,14 @@ function ZoomablePage({
         if (z !== wasZoomed.current) {
           wasZoomed.current = z;
           onZoomChange(z);
+          if (z) setWantOriginal(true);
         }
       }}
     >
       <Image
-        source={{ uri }}
+        source={wantOriginal ? imageSource(piece.file_path) : artDisplaySource(piece)}
+        placeholder={wantOriginal ? artDisplaySource(piece) : undefined}
+        cachePolicy="memory-disk"
         // Inset from the screen edges so wide pieces don't run full-bleed.
         // contentFit="contain" keeps every piece's own proportions; the page
         // itself stays screen-width so paging still snaps cleanly. Height is the

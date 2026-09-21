@@ -5,10 +5,10 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Image,
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

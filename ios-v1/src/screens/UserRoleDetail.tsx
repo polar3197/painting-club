@@ -2,17 +2,17 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  Image,
   Pressable,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { appAlert } from '../components/AppAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
-import { Profile, MemberRole, get_profile, set_member_role, profilePicSrc } from '../api';
+import { Profile, MemberRole, get_profile, set_member_role, profilePicThumbSource } from '../api';
 
 const ROLES: MemberRole[] = ['member', 'admin', 'contributor'];
 
@@ -81,7 +81,7 @@ export default function UserRoleDetail() {
     );
   }
 
-  const pic = profilePicSrc(profile);
+  const pic = profilePicThumbSource(profile);
   const name =
     profile.firstname || profile.lastname
       ? `${profile.firstname || ''} ${profile.lastname || ''}`.trim()
@@ -92,7 +92,7 @@ export default function UserRoleDetail() {
     <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
       <View style={styles.head}>
         {pic ? (
-          <Image source={{ uri: pic }} style={styles.pic} />
+          <Image source={pic} cachePolicy="memory-disk" style={styles.pic} />
         ) : (
           <View style={[styles.pic, styles.picBlank]}>
             <Text style={styles.picInitial}>{(name[0] || '?').toUpperCase()}</Text>

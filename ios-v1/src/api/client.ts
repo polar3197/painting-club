@@ -1,3 +1,4 @@
+import { PixelRatio } from 'react-native';
 import { markBackendUp, markBackendDown } from './backendHealth';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:80/api';
@@ -99,6 +100,53 @@ export function thumbSource(artId: string): { uri: string; headers?: Record<stri
 /** Small JPEG placeholder for a member's profile pic. Served directly from nginx. */
 export function profileThumbUrl(memberId: string): string {
   return `${SERVER_ORIGIN}/static/profile-thumbs/${memberId}.jpg`;
+}
+
+/** Cache key for a signed static URL: the URL minus its `md5`/`expires`
+ *  signature, which rotates every few hours. Keying by the full URL made every
+ *  cold launch after the rotation re-download images already on disk; `?v=`
+ *  (file mtime) is kept, so replaced bytes still bust the cache. */
+export function stableCacheKey(uri: string): string {
+  const [base, query] = uri.split('?');
+  if (!query) return uri;
+  const kept = query.split('&').filter((kv) => !/^(md5|expires)=/.test(kv));
+  return kept.length ? `${base}?${kept.join('&')}` : base;
+}
+
+export type ImageSourceObj = { uri: string; cacheKey: string };
+
+/** expo-image source for a (signed) static path, cache-keyed stably. */
+export function imageSource(path: string | null | undefined): ImageSourceObj | undefined {
+  if (!path) return undefined;
+  const uri = resolveImageUrl(path);
+  return { uri, cacheKey: stableCacheKey(uri) };
+}
+
+type ArtImagePaths = { file_path: string; thumb_url?: string | null; display_url?: string | null };
+
+/** ~1600px copy for full-width viewing — a fraction of the multi-MB original.
+ *  Falls back to the original when the server hasn't generated one (or is an
+ *  older backend that doesn't send display_url). */
+export function artDisplaySource(p: ArtImagePaths) {
+  return imageSource(p.display_url || p.file_path);
+}
+
+/** 512px copy for grid tiles / placeholders; falls back like artDisplaySource. */
+export function artThumbSource(p: ArtImagePaths) {
+  return imageSource(p.thumb_url || p.display_url || p.file_path);
+}
+
+/** Right-sized copy for a tile `widthPt` points wide: the 512px thumb while it
+ *  still covers the tile at the screen's pixel density, else the display copy. */
+export function artTileSource(p: ArtImagePaths, widthPt: number) {
+  return widthPt * PixelRatio.get() <= 560 ? artThumbSource(p) : artDisplaySource(p);
+}
+
+/** Profile pic for avatars and the profile header (512px copy when available). */
+export function profilePicThumbSource(
+  profile: { profile_pic_path: string | null; profile_pic_thumb_path?: string | null },
+) {
+  return imageSource(profile.profile_pic_thumb_path || profile.profile_pic_path);
 }
 
 /** Absolute URL for a member's profile pic — null if none uploaded.

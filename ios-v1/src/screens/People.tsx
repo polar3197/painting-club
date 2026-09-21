@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Fuse from 'fuse.js';
 import Spinner from '../components/Spinner';
 import { useMembers, useDebouncedValue } from '../hooks';
-import { resolveImageUrl, profilePicSrc, Profile } from '../api';
+import { imageSource, profilePicThumbSource, Profile } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import type { SearchStackParamList } from '../navigation/types';
 
@@ -66,8 +66,10 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
       onPress={() => navigation.navigate('UserProfile', { username: item.username })}
     >
       <Image
-        source={{ uri: profilePicSrc(item) ?? resolveImageUrl(`/imgs/${item.id}.png`) }}
-        transition={200}
+        source={profilePicThumbSource(item) ?? imageSource(`/imgs/${item.id}.png`)}
+        recyclingKey={item.id}
+        cachePolicy="memory-disk"
+        transition={150}
         style={[styles.cardImage, { height: cardWidth }]}
         contentFit="cover"
       />

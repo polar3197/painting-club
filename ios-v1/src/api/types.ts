@@ -30,6 +30,8 @@ export interface Profile {
   hidden_media: string[];
   role: string;
   profile_pic_path: string | null;
+  // Signed 512px copy of the pic; absent on older backends / not yet generated.
+  profile_pic_thumb_path?: string | null;
   terms_accepted_at: string | null;
   viewer_blocked_by_owner: boolean;
   blocked_usernames: string[] | null;
@@ -161,6 +163,9 @@ export interface Visual2DOut {
   file_path: string;
   comments_enabled: boolean;
   aspect_ratio: number | null;
+  // Signed resized copies (512px / ~1600px); absent on older backends.
+  thumb_url?: string | null;
+  display_url?: string | null;
   series_id: string | null;
   series_name: string | null;
   order_index: number | null;
@@ -290,6 +295,8 @@ export interface ArtResult {
   creator_username: string;
   creator_city: string | null;
   aspect_ratio: number | null;
+  thumb_url?: string | null;
+  display_url?: string | null;
 }
 
 export interface CommentOut {

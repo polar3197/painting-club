@@ -10,9 +10,7 @@ import {
   get_media,
   get_members,
   get_members_written_form,
-  resolveImageUrl,
-  thumbUrl,
-  thumbSource,
+  artTileSource,
   ArtResult,
   MediaType,
   Profile,
@@ -98,9 +96,10 @@ function VisualCard({ item, cardWidth, onPress }: { item: ArtResult; cardWidth: 
       onPress={onPress}
     >
       <Image
-        source={{ uri: resolveImageUrl(item.file_path) }}
-        placeholder={thumbSource(item.id)}
-        transition={200}
+        source={artTileSource(item, cardWidth)}
+        recyclingKey={item.id}
+        cachePolicy="memory-disk"
+        transition={150}
         style={[styles.cardImage, { height: cardWidth }]}
         contentFit="cover"
       />

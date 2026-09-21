@@ -20,9 +20,7 @@ import {
   list_prompts,
   add_new_visual_2d,
   get_members_visual_2d,
-  resolveImageUrl,
-  thumbUrl,
-  thumbSource,
+  artTileSource,
   PromptDetailOut,
   PromptSummary,
   Visual2DIn,
@@ -161,9 +159,10 @@ export default function WeeklyPromptDetail() {
                   onPress={() => setZoomIndex(index)}
                 >
                   <Image
-                    source={{ uri: resolveImageUrl(item.file_path) }}
-                    placeholder={thumbSource(item.id)}
-                    transition={200}
+                    source={artTileSource(item, cellSize)}
+                    recyclingKey={item.id}
+                    cachePolicy="memory-disk"
+                    transition={150}
                     style={styles.cellImage}
                     contentFit="cover"
                   />

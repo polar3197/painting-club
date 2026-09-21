@@ -8,7 +8,6 @@ import {
   Dimensions,
   LayoutChangeEvent,
   RefreshControl,
-  Image as RNImage,
 } from 'react-native';
 import { appAlert } from '../components/AppAlert';
 import { Image } from 'expo-image';
@@ -26,11 +25,10 @@ import {
   get_members_written_form,
   get_members_audio,
   get_search_options,
-  resolveImageUrl,
   profilePicSrc,
-  thumbUrl,
-  thumbSource,
-  authHeaders,
+  artDisplaySource,
+  artThumbSource,
+  profilePicThumbSource,
   upload_profile_picture,
   get_media,
   open_dm,
@@ -119,9 +117,12 @@ function Visual2DPiece({
   onEdit,
   onZoom,
   onLayout,
+  priority,
 }: {
   isOwner: boolean;
   piece: Visual2DOut;
+  // First pieces on screen: fetch ahead of everything else.
+  priority?: boolean;
   viewerBlockedByOwner: boolean;
   // Art element fill from the owner's profile colors.
   cardBg: string;
@@ -139,32 +140,10 @@ function Visual2DPiece({
   // with the image's real dimensions once it loads. A wrong/stale stored ratio
   // would otherwise letterbox the image (white bars) under contentFit:contain.
   const [measuredRatio, setMeasuredRatio] = useState<number | null>(null);
-  // The ratio we're confident about — stored, or measured from the thumbnail.
-  // Null only for the brief moment before either is known; we hold the image
-  // hidden until then so it never flashes at the wrong (square) shape.
-  const knownRatio = measuredRatio ?? piece.aspect_ratio ?? null;
-  const aspectRatio = knownRatio ?? 1;
-
-  // Older pieces have no stored aspect_ratio, so the card would open as a square
-  // and snap to the real shape when the full-res image lands. Measure the
-  // thumbnail up front (512px, CDN-cached, aspect-preserving — it resolves well
-  // before the full image) so the box takes its true shape first and the full
-  // image swaps in with no reflow. Falls back to the full image's onLoad.
-  useEffect(() => {
-    if (piece.aspect_ratio) return;
-    let cancelled = false;
-    RNImage.getSizeWithHeaders(
-      thumbUrl(piece.id),
-      authHeaders(),
-      (w, h) => {
-        if (!cancelled && w > 0 && h > 0) setMeasuredRatio(w / h);
-      },
-      () => {},
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [piece.id, piece.aspect_ratio]);
+  // The startup aspect_ratio backfill means the stored ratio is ~always there,
+  // so the box takes its true shape on first paint (no hidden-until-measured
+  // gate); a piece still missing one opens square and corrects on load.
+  const aspectRatio = measuredRatio ?? piece.aspect_ratio ?? 1;
 
   const removeArt = async () => {
     await remove_visual_2d(piece.id, token);
@@ -196,10 +175,12 @@ function Visual2DPiece({
         >
           <View style={[styles.artVisualInner, { aspectRatio }]}>
             <Image
-              source={{ uri: resolveImageUrl(piece.file_path) }}
-              placeholder={thumbSource(piece.id)}
-              transition={200}
-              style={[styles.artImage, { opacity: knownRatio ? 1 : 0 }]}
+              source={artDisplaySource(piece)}
+              placeholder={artThumbSource(piece)}
+              cachePolicy="memory-disk"
+              priority={priority ? 'high' : 'normal'}
+              transition={150}
+              style={styles.artImage}
               contentFit="contain"
               onLoad={(e) => {
                 const { width, height } = e.source;
@@ -426,7 +407,8 @@ export default function UserProfile() {
     const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
     // res.profile_pic_path already carries the server's `?v=<mtime>`, so this
     // new URL busts the image cache on every upload — no client version needed.
-    setProfile({ ...profile, profile_pic_path: res.profile_pic_path });
+    // The listing's thumb predates the new pic — drop it so the header shows the upload.
+    setProfile({ ...profile, profile_pic_path: res.profile_pic_path, profile_pic_thumb_path: null });
     setProfileZoom(false);
   };
 
@@ -892,8 +874,9 @@ export default function UserProfile() {
                 {profile.profile_pic_path ? (
                   <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                     <Image
-                      source={{ uri: profilePicSrc(profile) ?? '' }}
-                      transition={200}
+                      source={profilePicThumbSource(profile)}
+                      cachePolicy="memory-disk"
+                      transition={150}
                       priority="high"
                       style={[styles.profilePic, { borderColor: pageColors.picFrame }]}
                       contentFit="cover"
@@ -1061,6 +1044,7 @@ export default function UserProfile() {
                   // in the medium, so zoom by position in filteredArt.
                   onZoom={() => setZoomIndex(filteredArt.indexOf(row.piece))}
                   onLayout={(e) => handleArtLayout(row.piece.id, e)}
+                  priority={filteredArt.indexOf(row.piece) < 2}
                 />
               ) : (
                 <PaintingSeriesRow

@@ -23,8 +23,8 @@ import {
   get_comments,
   post_comment,
   delete_comment,
-  resolveImageUrl,
-  thumbUrl,
+  artDisplaySource,
+  artThumbSource,
   Visual2DOut,
   CommentOut,
 } from '../api';
@@ -85,8 +85,6 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   }, []);
 
   const sectionHeight = keyboardOpen ? IMG_SECTION_HEIGHT_KEYBOARD : IMG_SECTION_HEIGHT_OPEN;
-
-  const imgUri = resolveImageUrl(piece.file_path);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -225,9 +223,10 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             </View>
             <View style={[styles.imageSection, { height: sectionHeight }]}>
               <Image
-                source={{ uri: imgUri }}
-                placeholder={{ uri: thumbUrl(piece.id) }}
-                transition={200}
+                source={artDisplaySource(piece)}
+                placeholder={artThumbSource(piece)}
+                cachePolicy="memory-disk"
+                transition={150}
                 style={[styles.image, computeImgSize(imgRatio, sectionHeight)]}
                 contentFit="contain"
               />
