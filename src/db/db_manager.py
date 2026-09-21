@@ -595,4 +595,15 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE signup_invite ADD COLUMN IF NOT EXISTS instant BOOLEAN NOT NULL DEFAULT FALSE"
         ))
+        # 032: wall pins move from each phone's local storage to the DB so a
+        # member's pinned piece shows for everyone (init_db's create_all makes
+        # the table on fresh DBs; this covers existing ones).
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS wall_pin ("
+            " member_id UUID NOT NULL REFERENCES member(id) ON DELETE CASCADE,"
+            " art_type VARCHAR(20) NOT NULL,"
+            " art_id UUID NOT NULL REFERENCES art(id) ON DELETE CASCADE,"
+            " created_at TIMESTAMP,"
+            " PRIMARY KEY (member_id, art_type))"
+        ))
     print("Migrations applied.")

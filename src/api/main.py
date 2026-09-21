@@ -4155,3 +4155,34 @@ async def get_external_art_image(
         if generate_external_thumb(ext_id, src_abs) is None:
             return FileResponse(src_abs, headers=cache_headers)
     return FileResponse(thumb_path, headers=cache_headers, media_type="image/jpeg")
+
+
+# ====================== WALL PINS =========================
+# A member's pinned piece per wall (visual / written / audio), shared by every
+# client. Replaces the old per-device pins (ios-v1 src/api/walls.ts).
+from db.db_ops.wall_pins import db_list_wall_pins, db_toggle_wall_pin
+
+
+@app.get("/wall-pins")
+async def list_wall_pins(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    return await db_list_wall_pins(db)
+
+
+@app.put("/art/{art_id}/wall-pin")
+async def toggle_wall_pin(
+    art_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    try:
+        pinned = await db_toggle_wall_pin(db, current_member.id, _parse_uuid(art_id, "art"))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"pinned": pinned}

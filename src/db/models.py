@@ -595,3 +595,16 @@ class Inspiration(Base):
         UniqueConstraint("from_art_id", "to_art_id", name="inspiration_unique_art_target"),
         UniqueConstraint("from_art_id", "to_external_id", name="inspiration_unique_external_target"),
     )
+
+
+class WallPin(Base):
+    __tablename__ = "wall_pin"
+
+    # A member's one pinned piece per art type (visual_2d / written_form /
+    # audio): it floats to the top of that type's wall, outlined red, and is the
+    # piece shown for them there. Composite PK = at most one pin per member per
+    # type; re-pinning replaces it. CASCADE drops the pin with the piece/member.
+    member_id = Column(UUID(as_uuid=True), ForeignKey('member.id', ondelete='CASCADE'), primary_key=True)
+    art_type = Column(String(20), primary_key=True)
+    art_id = Column(UUID(as_uuid=True), ForeignKey('art.id', ondelete='CASCADE'), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
