@@ -2,8 +2,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import "../../styles/tab-bar.css";
 
-// The web app's navigation: a bottom tab bar — profile, events, art wall,
-// people — all with the app's own hand drawings (me / writing / art /
+// The web app's navigation: a bottom tab bar — profile, events, home, art
+// wall, people — all with the app's own hand drawings (me / writing / art /
 // profiles.png). Replaced the swipe hub on the web (archived in ui/legacy/).
 export default function TabBar() {
   const navigate = useNavigate();
@@ -14,6 +14,8 @@ export default function TabBar() {
   const tabs = [
     { key: "profile", label: "profile", to: mine, icon: <img src="/imgs/me.png" alt="" />, active: pathname === mine },
     { key: "events", label: "events", to: "/events", icon: <img src="/imgs/writing.png" alt="" />, active: pathname === "/events" },
+    // Home: just the word, no drawing.
+    { key: "home", label: "home", to: "/home", icon: null, active: pathname === "/home" },
     { key: "wall", label: "art wall", to: "/art-wall", icon: <img src="/imgs/art.png" alt="" />, active: pathname === "/art-wall" },
     { key: "people", label: "people", to: "/members", icon: <img src="/imgs/profiles.png" alt="" />, active: pathname === "/members" },
   ];
@@ -30,7 +32,7 @@ export default function TabBar() {
             else navigate(t.to);
           }}
         >
-          <span className="tab-icon">{t.icon}</span>
+          {t.icon && <span className="tab-icon">{t.icon}</span>}
           <span className="tab-label">{t.label}</span>
         </button>
       ))}
