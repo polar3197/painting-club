@@ -10,12 +10,16 @@
 }
 
 .people-strip {
+    /* Column width comes from the strip's own height (cqh), so every card —
+       with or without a photo — is the same size: a quarter of the strip
+       (less padding 24 + gaps 30) minus the name row (~29). */
+    container-type: size;
     flex: 1;
     min-height: 0;
     display: grid;
     grid-auto-flow: column;
     grid-template-rows: repeat(4, minmax(0, 1fr));
-    grid-auto-columns: max-content;
+    grid-auto-columns: max(64px, calc((100cqh - 54px) / 4 - 29px));
     gap: 10px;
     padding: 10px 20px 14px;
     overflow-x: auto;
@@ -26,7 +30,7 @@
 .people-strip::-webkit-scrollbar { display: none; }
 
 .people-card {
-    height: 100%;
+    min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -39,10 +43,9 @@
 }
 .people-card:active { transform: scale(0.97); }
 
-/* square photo whose size comes from the row height */
+/* square photo the width of the column (empty cream square if no photo) */
 .people-card-pic {
-    flex: 1;
-    min-height: 0;
+    width: 100%;
     aspect-ratio: 1 / 1;
     display: block;
     background: rgb(250, 244, 202);
@@ -53,8 +56,7 @@
 .people-card-name {
     flex: 0 0 auto;
     display: block;
-    width: 0;
-    min-width: 100%;
+    width: 100%;
     box-sizing: border-box;
     padding: 6px 8px;
     font-family: Georgia, Cambria, 'Times New Roman', serif;
