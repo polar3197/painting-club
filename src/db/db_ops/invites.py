@@ -18,7 +18,7 @@ def _gen_invite_token() -> str:
     return secrets.token_urlsafe(9)  # 12 chars
 
 
-async def db_create_invite(db: AsyncSession, label: str | None, expires_in_days: int | None, max_uses: int | None) -> SignupInvite:
+async def db_create_invite(db: AsyncSession, label: str | None, expires_in_days: int | None, max_uses: int | None, instant: bool = False) -> SignupInvite:
     for _ in range(5):
         token = _gen_invite_token()
         clash = (await db.execute(select(SignupInvite.id).filter(SignupInvite.token == token))).scalar_one_or_none()
@@ -31,6 +31,7 @@ async def db_create_invite(db: AsyncSession, label: str | None, expires_in_days:
         label=(label or "").strip() or None,
         max_uses=max_uses,
         expires_at=datetime.utcnow() + timedelta(days=expires_in_days) if expires_in_days else None,
+        instant=instant,
     )
     db.add(invite)
     await db.commit()
@@ -48,6 +49,21 @@ async def db_list_invites(db: AsyncSession) -> list[tuple[SignupInvite, list[str
         )).scalars().all()
         out.append((inv, list(members)))
     return out
+
+
+async def db_get_invite_by_token(db: AsyncSession, token: str) -> SignupInvite | None:
+    """Look an invite up by its token without redeeming or validating it.
+
+    Used to record *which* QR an application came in off. Deliberately lenient:
+    a revoked or expired token still resolves here, because the application is
+    being reviewed by a person anyway and knowing the flyer it came from is
+    worth more than refusing the row."""
+    token = (token or "").strip()
+    if not token:
+        return None
+    return (await db.execute(
+        select(SignupInvite).filter(SignupInvite.token == token)
+    )).scalar_one_or_none()
 
 
 async def db_revoke_invite(db: AsyncSession, invite_id: str) -> None:
@@ -71,6 +87,11 @@ async def db_redeem_invite(
 ) -> Member:
     inv = (await db.execute(select(SignupInvite).filter(SignupInvite.token == token.strip()))).scalar_one_or_none()
     if inv is None or inv.revoked:
+        raise InviteDead()
+    # Only the trusted QR creates an account outright. The standing club QR
+    # routes to the application queue, and without this check anyone could lift
+    # its token out of the URL and POST it here to skip review entirely.
+    if not inv.instant:
         raise InviteDead()
     if inv.expires_at and inv.expires_at < datetime.utcnow():
         raise InviteDead()

@@ -38,3 +38,20 @@ def art_display_url(art_id) -> str | None:
 
 def profile_thumb_url(member_id) -> str | None:
     return _versioned_signed(f"/static/profile-thumbs/{member_id}.jpg")
+
+
+def application_art_url(art_path: str | None) -> str | None:
+    """Signed URL for an application piece, from the stored relative path.
+
+    Unlike the art derivatives these are keyed by the draft id chosen on the
+    client (not a row id), so the path is stored rather than derived."""
+    if not art_path:
+        return None
+    return _versioned_signed(art_path if art_path.startswith("/") else f"/{art_path}")
+
+
+def application_thumb_url(draft_id) -> str | None:
+    """512px copy of an application piece — what the review queue and the wall
+    grid load. None until the background job has generated it; callers fall back
+    to application_art_url()."""
+    return _versioned_signed(f"/static/application-thumbs/{draft_id}.jpg")

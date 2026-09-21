@@ -554,4 +554,45 @@ async def run_migrations():
         await conn.execute(text(
             "ALTER TABLE member ADD COLUMN IF NOT EXISTS signup_invite_id UUID REFERENCES signup_invite(id)"
         ))
+        # 030: applications carry their own credentials + an "application piece".
+        # Credentials are chosen by the applicant at submit time and hashed here,
+        # so approval creates the member with them directly — no relayed secret
+        # code, and they log in with what they typed. NULL on pre-030 rows, which
+        # still approve down the legacy temp-password path.
+        await conn.execute(text(
+            "ALTER TABLE application ADD COLUMN IF NOT EXISTS username VARCHAR(50)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE application ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)"
+        ))
+        # Which QR they came in off (NULL for the plain /join application).
+        await conn.execute(text(
+            "ALTER TABLE application ADD COLUMN IF NOT EXISTS signup_invite_id UUID REFERENCES signup_invite(id)"
+        ))
+        # The application piece. Survives approval (it is NOT deleted with the
+        # reviewed row) so it can back the wall of everyone's application pieces.
+        # Deliberately not an art row: no medium, no Media_Members, no labels.
+        # aspect_ratio lets that wall reserve boxes instead of collapsing them.
+        await conn.execute(text(
+            "ALTER TABLE application ADD COLUMN IF NOT EXISTS art_path VARCHAR(500)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE application ADD COLUMN IF NOT EXISTS art_aspect_ratio FLOAT"
+        ))
+        # Login answers "still under review" by looking a pending application up
+        # by username, so that lookup is indexed. Unique among pending rows is a
+        # backstop under the availability check at submit; approval is still
+        # guarded by member.username's own UNIQUE.
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_application_pending_username "
+            "ON application (username) WHERE username IS NOT NULL AND status = 'pending'"
+        ))
+        # 031: two kinds of QR. The standing "club QR" now routes to the review
+        # queue like any other application; `instant` marks the separate trusted
+        # QR that still creates a live account on the spot. Default false, so
+        # every existing token becomes an apply-token on deploy — the safe
+        # direction, and /join/redeem refuses anything without the flag.
+        await conn.execute(text(
+            "ALTER TABLE signup_invite ADD COLUMN IF NOT EXISTS instant BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
     print("Migrations applied.")

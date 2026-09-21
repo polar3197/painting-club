@@ -92,6 +92,30 @@ http {
             add_header Cache-Control "private, max-age=21600, immutable";
         }
 
+        # Application pieces: uploaded before the applicant has an account, read
+        # back by reviewing contributors and (later) the wall of application
+        # pieces. Signed like everything else — the upload route is public, the
+        # bytes are not.
+        location /static/application-art/ {
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/application-art/;
+            # The .seq sidecars are upload bookkeeping, never web content.
+            location ~ \.seq$ { return 404; }
+            add_header Cache-Control "private, max-age=21600, immutable";
+        }
+
+        location /static/application-thumbs/ {
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/application-thumbs/;
+            add_header Cache-Control "private, max-age=21600, immutable";
+        }
+
         location /static/display/ {
             secure_link $arg_md5,$arg_expires;
             secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";

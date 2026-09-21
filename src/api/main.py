@@ -8,6 +8,8 @@ from pathlib import Path
 import asyncio
 import io
 import os
+import re
+import time
 import uuid
 import magic
 from PIL import Image, ImageOps
@@ -82,10 +84,13 @@ from api.models import (
     ApplicationOut,
     ApplicationStatusUpdate,
     ApplicationApproveOut,
+    ApplicationArtOut,
+    UsernameAvailableOut,
     SetupAccountIn,
     SetupCodeIn,
     JoinRedeemIn,
     SignupInviteCreateIn,
+    JoinInviteOut,
     SignupInviteOut,
     ForgotPasswordIn,
     PasswordResetOut,
@@ -110,6 +115,7 @@ from api.models import (
 from api.signed_urls import sign_path
 from db.db_ops.invites import (
     db_create_invite, db_list_invites, db_revoke_invite, db_redeem_invite, InviteDead,
+    db_get_invite_by_token,
 )
 from db.db_ops.wip import (
     db_add_wip_update,
@@ -221,6 +227,10 @@ from db.db_ops.applications import (
     db_update_application_status,
     db_approve_application,
     db_delete_application,
+    db_username_available,
+    db_pending_application_login,
+    db_referenced_application_art,
+    UsernameTaken,
 )
 
 from db.db_ops.media import (
@@ -333,6 +343,8 @@ async def lifespan(app: FastAPI):
     async with AsyncSessionLocal() as db:
         await backfill_visual_2d_aspect_ratios(db)
         await start_image_derivative_backfill(db)
+    # Drafts abandoned before the last restart.
+    await sweep_application_art_drafts()
     yield
     # await empty_db()
 
@@ -406,6 +418,16 @@ async def create_full_member_endpoint(payload: MemberIn, db: AsyncSession = Depe
 async def login_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(get_db)) -> Token:
     member = await db_login_user(db, payload.username, payload.password)
     if not member:
+        # No member owns these credentials — but they may belong to an
+        # application nobody has reviewed yet. Answering "invalid credentials"
+        # there reads as "you typed it wrong" to someone who signed up an hour
+        # ago and is waiting, so a pending row gets its own status the clients
+        # render as the under-review screen.
+        pending = await db_pending_application_login(db, payload.username, payload.password)
+        if pending is not None and pending.status == "pending":
+            raise HTTPException(status_code=403, detail="under_review")
+        # A rejected application answers exactly like a wrong password. The
+        # login box is not where someone should find out they were turned down.
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if member.must_change_password:
         from datetime import datetime as _dt
@@ -422,6 +444,25 @@ async def redeem_setup_code_endpoint(payload: SetupCodeIn, db: AsyncSession = De
         raise HTTPException(status_code=401, detail="Invalid or expired setup code")
     token = create_token(member)
     return Token(access_token=token, must_setup=True)
+
+
+@app.get("/join/invite", response_model=JoinInviteOut)
+async def describe_signup_invite(i: str, db: AsyncSession = Depends(get_db)):
+    """Which kind of QR is this? Public, because /join must decide what to show
+    before the scanner has any account. An unknown, revoked, expired or used-up
+    token answers valid=false, and anything that isn't explicitly the trusted QR
+    is reported as "apply" — the safe direction."""
+    inv = await db_get_invite_by_token(db, i)
+    live = (
+        inv is not None
+        and not inv.revoked
+        and (inv.expires_at is None or inv.expires_at > datetime.utcnow())
+        and (inv.max_uses is None or inv.uses < inv.max_uses)
+    )
+    return JoinInviteOut(
+        valid=bool(live),
+        kind="instant" if (live and inv.instant) else "apply",
+    )
 
 
 @app.post("/join/redeem", response_model=Token)
@@ -445,13 +486,14 @@ def _invite_out(inv, joined: list[str]) -> SignupInviteOut:
     return SignupInviteOut(
         id=inv.id, token=inv.token, label=inv.label, max_uses=inv.max_uses, uses=inv.uses,
         expires_at=inv.expires_at, revoked=inv.revoked, created_at=inv.created_at, joined=joined,
+        instant=bool(inv.instant),
     )
 
 
 @app.post("/admin/signup-invites", response_model=SignupInviteOut, status_code=201)
 async def create_signup_invite(payload: SignupInviteCreateIn, db: AsyncSession = Depends(get_db),
                                _: Member = Depends(get_admin_member)):
-    inv = await db_create_invite(db, payload.label, payload.expires_in_days, payload.max_uses)
+    inv = await db_create_invite(db, payload.label, payload.expires_in_days, payload.max_uses, payload.instant)
     return _invite_out(inv, [])
 
 
@@ -835,7 +877,7 @@ AUDIO_MIME_TO_EXT = {
 }
 AUDIO_EXTS = {"m4a", "mp3", "wav", "aac"}
 
-from api.image_urls import STATIC_ROOT
+from api.image_urls import STATIC_ROOT, application_art_url, application_thumb_url
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 DISPLAY_SIZE = 1600  # mid-res "display" derivative for the main viewer — phones can't show more
 
@@ -2660,18 +2702,243 @@ async def delete_comment(
 
 # ====================== APPLICATIONS =========================
 
-@app.post("/apply", status_code=status.HTTP_201_CREATED)
-async def submit_application(payload: ApplicationIn, db: AsyncSession = Depends(get_db)):
-    await db_submit_application(
-        db=db,
-        firstname=payload.firstname,
-        lastname=payload.lastname,
-        email=payload.email,
-        city=payload.city,
-        state=payload.state,
-        known_member=payload.known_member,
-        reason=payload.reason,
+# --- The application piece --------------------------------------------------
+# Every applicant uploads one image. The form sends it on its "next" press
+# rather than at submit, so the bytes are already here by the time they finish
+# typing — the upload is an optimisation the submit path never depends on.
+#
+# Files are keyed by a client-chosen draft id, one slot per form session: a
+# re-pick overwrites the same slot instead of adding a file, so abandoning the
+# form costs exactly one image no matter how many photos they tried.
+
+APPLICATION_THUMB_DIM = 512
+# The client downscales to ~DISPLAY_SIZE before sending (~300KB), so this cap is
+# only here to stop something pathological — it is not the expected size.
+APPLICATION_ART_MAX_BYTES = 8 * 1024 * 1024
+APPLICATION_ART_MIMES = {"image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif", "image/webp"}
+# How long an unreferenced draft survives before the sweeper takes it.
+APPLICATION_DRAFT_TTL_HOURS = 24
+# Client-chosen, and it lands in a filesystem path — so it is validated to a
+# strict shape rather than sanitised. Anything else is a 400.
+_DRAFT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+# Crude per-IP throttle. This is the only endpoint that accepts bytes with no
+# credential at all (an applicant has no account yet, and the plain "request
+# acc" path carries no invite token either), so it needs *some* ceiling. In
+# memory and reset on restart, which is the right weight for a single Pi: it
+# blunts a scanner, it does not stop a determined attacker.
+APPLICATION_ART_PER_IP_HOURLY = 30
+_APPLICATION_ART_HITS: dict[str, list[float]] = {}
+
+
+def _check_application_art_quota(request: Request) -> None:
+    ip = (request.client.host if request.client else "unknown")
+    now = time.time()
+    hits = [t for t in _APPLICATION_ART_HITS.get(ip, []) if now - t < 3600]
+    if len(hits) >= APPLICATION_ART_PER_IP_HOURLY:
+        raise HTTPException(status_code=429, detail="Too many uploads — try again shortly")
+    hits.append(now)
+    _APPLICATION_ART_HITS[ip] = hits
+    # Opportunistic prune so the dict can't grow without bound.
+    if len(_APPLICATION_ART_HITS) > 2048:
+        for k in [k for k, v in _APPLICATION_ART_HITS.items() if not v or now - v[-1] > 3600]:
+            _APPLICATION_ART_HITS.pop(k, None)
+
+
+def _valid_draft_id(draft_id: str) -> str:
+    if not draft_id or not _DRAFT_ID_RE.match(draft_id):
+        raise HTTPException(status_code=400, detail="bad draft id")
+    return draft_id
+
+
+def application_art_rel(draft_id: str) -> str:
+    return f"/static/application-art/{draft_id}.jpg"
+
+
+def application_thumb_file(draft_id: str) -> Path:
+    return STATIC_ROOT / "static" / "application-thumbs" / f"{draft_id}.jpg"
+
+
+def generate_application_thumb(draft_id: str, src_abs: Path) -> Path | None:
+    """512px copy of an application piece, for the review queue and the wall
+    grid. Same shape as generate_thumbnail; kept separate because these are
+    keyed by draft id and live outside the art tree."""
+    thumb_path = application_thumb_file(draft_id)
+    try:
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src_abs) as img:
+            img.draft("RGB", (APPLICATION_THUMB_DIM * 2, APPLICATION_THUMB_DIM * 2))
+            img = ImageOps.exif_transpose(img)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((APPLICATION_THUMB_DIM, APPLICATION_THUMB_DIM * 4), Image.LANCZOS)
+            img.save(thumb_path, format="JPEG", quality=85, optimize=True, progressive=True)
+        return thumb_path
+    except Exception as e:
+        print(f"[application-thumb] failed for {draft_id}: {type(e).__name__}: {e}")
+        thumb_path.unlink(missing_ok=True)
+        return None
+
+
+async def sweep_application_art_drafts() -> None:
+    """Delete application pieces that no application row points at.
+
+    The form uploads before it submits, so every abandoned form leaves one file
+    behind (one, not one per photo — re-picks overwrite the same slot). Anything
+    unreferenced and older than the TTL was abandoned by definition. Opens its
+    own session: this runs as a background task, after the request's is closed."""
+    root = STATIC_ROOT / "static" / "application-art"
+    if not root.is_dir():
+        return
+    try:
+        async with AsyncSessionLocal() as db:
+            keep = await db_referenced_application_art(db)
+    except Exception as e:
+        print(f"[application-art] sweep skipped: {type(e).__name__}: {e}")
+        return
+    cutoff = time.time() - APPLICATION_DRAFT_TTL_HOURS * 3600
+    removed = 0
+    for f in root.iterdir():
+        if f.suffix == ".seq" or not f.is_file():
+            continue
+        if f"/static/application-art/{f.name}" in keep:
+            continue
+        try:
+            if f.stat().st_mtime > cutoff:
+                continue
+            f.unlink(missing_ok=True)
+            f.with_suffix(".seq").unlink(missing_ok=True)
+            application_thumb_file(f.stem).unlink(missing_ok=True)
+            removed += 1
+        except OSError:
+            continue
+    if removed:
+        print(f"[application-art] swept {removed} abandoned draft(s)")
+
+
+@app.post("/join/application-art", response_model=ApplicationArtOut)
+async def upload_application_art(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    draft_id: str = Form(...),
+    seq: int = Form(0),
+    file: UploadFile = File(...),
+):
+    """Park the application piece ahead of submit. Idempotent per draft id: the
+    newest accepted write wins and re-picking overwrites in place.
+
+    `seq` increments with each pick on the client. A write whose seq is older
+    than what the slot already holds is ignored — without that, a slow upload of
+    a rejected photo can land *after* the one they actually chose and quietly
+    replace it."""
+    _check_application_art_quota(request)
+    draft_id = _valid_draft_id(draft_id)
+
+    contents = await file.read(APPLICATION_ART_MAX_BYTES + 1)
+    if len(contents) > APPLICATION_ART_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Image is too large")
+    mime = magic.from_buffer(contents, mime=True)
+    if mime not in APPLICATION_ART_MIMES:
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {mime}")
+    if mime in HEIC_MIMES:
+        contents = heic_to_jpeg_bytes(contents)
+
+    rel = application_art_rel(draft_id)
+    path = abs_path(rel)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Out-of-order guard. The seq of whatever currently occupies the slot is
+    # kept beside it; a stale write is accepted-but-discarded so the client
+    # can't tell the difference and won't retry into a loop.
+    seq_file = path.with_suffix(".seq")
+    try:
+        held = int(seq_file.read_text())
+    except (OSError, ValueError):
+        held = -1
+    if seq < held:
+        return ApplicationArtOut(draft_id=draft_id, seq=held)
+
+    path.write_bytes(contents)
+    try:
+        seq_file.write_text(str(seq))
+    except OSError:
+        pass
+
+    # Resize off the request path: doing it inline is what makes uploads time
+    # out on the Pi (see BACKEND_HANDOFF.md #1), and this upload in particular
+    # is racing the applicant's typing.
+    background_tasks.add_task(generate_application_thumb, draft_id, path)
+    return ApplicationArtOut(draft_id=draft_id, seq=seq)
+
+
+@app.get("/join/username-available", response_model=UsernameAvailableOut)
+async def check_username_available(u: str, db: AsyncSession = Depends(get_db)):
+    """Live check behind the form's username field, so a clash is caught while
+    they're typing rather than at submit."""
+    uname = (u or "").strip().lower()
+    return UsernameAvailableOut(
+        username=uname,
+        available=await db_username_available(db, uname) if uname else False,
     )
+
+
+@app.post("/apply", status_code=status.HTTP_201_CREATED)
+async def submit_application(
+    payload: ApplicationIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit an application.
+
+    Two shapes share this route. With `username`/`password` the applicant has
+    chosen their own credentials and approval will make them live directly. The
+    older shape (neither field) still works and still approves down the
+    temp-password path."""
+    art_path = None
+    if payload.art_draft_id:
+        draft_id = _valid_draft_id(payload.art_draft_id)
+        rel = application_art_rel(draft_id)
+        if not abs_path(rel).exists():
+            # The pre-submit upload didn't land (dead zone at the meeting). The
+            # client's fallback is to retry the upload and submit again, so this
+            # is a clear, actionable answer rather than a silently art-less row.
+            raise HTTPException(status_code=409, detail="art_missing")
+        art_path = rel
+
+    invite_id = None
+    if payload.invite_token:
+        inv = await db_get_invite_by_token(db, payload.invite_token)
+        if inv is not None:
+            invite_id = inv.id
+
+    if payload.username:
+        if not payload.password or len(payload.password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        # Art is required on the new form. Enforced here and not only in the UI,
+        # so an application can never reach the wall-backed queue without one.
+        if art_path is None:
+            raise HTTPException(status_code=400, detail="an application piece is required")
+
+    try:
+        await db_submit_application(
+            db=db,
+            firstname=payload.firstname,
+            lastname=payload.lastname,
+            email=payload.email,
+            city=payload.city,
+            state=payload.state,
+            known_member=payload.known_member,
+            reason=payload.reason,
+            username=payload.username,
+            password=payload.password,
+            signup_invite_id=invite_id,
+            art_path=art_path,
+            art_aspect_ratio=payload.art_aspect_ratio,
+        )
+    except UsernameTaken as e:
+        raise HTTPException(status_code=409, detail=f"username '{e}' is taken — pick another")
+    background_tasks.add_task(sweep_application_art_drafts)
     return {"ok": True}
 
 @app.get("/admin/password-resets", response_model=list[PasswordResetOut])
@@ -2720,6 +2987,12 @@ async def get_applications(db: AsyncSession = Depends(get_db), _: Member = Depen
             created_at=app.created_at,
             temp_username=temp_username,
             temp_password=temp_password,
+            username=app.username,
+            art_url=application_art_url(app.art_path),
+            art_thumb_url=(
+                application_thumb_url(Path(app.art_path).stem) if app.art_path else None
+            ),
+            art_aspect_ratio=app.art_aspect_ratio,
         ))
     return out
 
@@ -2733,6 +3006,13 @@ async def update_application_status(
     if payload.status == "approved":
         try:
             app, member, temp_password = await db_approve_application(db, application_id)
+        except UsernameTaken as e:
+            # Free when they applied, taken by the time a human got to it. The
+            # account is NOT created; the applicant has to pick another name.
+            raise HTTPException(
+                status_code=409,
+                detail=f"the username '{e}' was taken since they applied — they'll need to pick another",
+            )
         except ValueError as e:
             # "already exists" = a completed member owns this email → 409 so the
             # admin sees a clear conflict instead of a generic failure.
@@ -2741,12 +3021,16 @@ async def update_application_status(
                 status_code=409 if "already exists" in detail else 404,
                 detail=detail,
             )
+        # temp_password is None when the applicant chose their own credentials:
+        # the account is already usable and there is no code to send.
         return ApplicationApproveOut(
             application_id=app.id,
             status=app.status,
-            temp_username=member.username,
+            temp_username=member.username if temp_password else None,
             temp_password=temp_password,
-            temp_password_expires_at=member.temp_password_expires_at,
+            temp_password_expires_at=member.temp_password_expires_at if temp_password else None,
+            account_ready=temp_password is None,
+            username=member.username,
         )
     try:
         await db_update_application_status(db, application_id, payload.status)
@@ -2762,9 +3046,15 @@ async def delete_application_endpoint(
     _: Member = Depends(get_admin_member),
 ):
     try:
-        await db_delete_application(db, application_id)
+        art_path = await db_delete_application(db, application_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    if art_path:
+        # Deleting the row is the only thing that retires a piece from the wall,
+        # so the bytes go with it.
+        abs_path(art_path).unlink(missing_ok=True)
+        abs_path(art_path).with_suffix(".seq").unlink(missing_ok=True)
+        application_thumb_file(Path(art_path).stem).unlink(missing_ok=True)
     return {"ok": True}
 
 

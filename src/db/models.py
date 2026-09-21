@@ -367,6 +367,10 @@ class SignupInvite(Base):
     expires_at = Column(DateTime)
     revoked = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # False (default): scanning leads to the application form and a human
+    # reviews it. True: the separate trusted QR, which still creates a live
+    # account immediately. db_redeem_invite refuses a token without this.
+    instant = Column(Boolean, nullable=False, default=False)
 
 
 class Application(Base):
@@ -383,6 +387,19 @@ class Application(Base):
     status = Column(String(20), nullable=False, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     member_id = Column(UUID(as_uuid=True), ForeignKey('member.id'))
+    # Credentials the applicant chose on the form. Approval creates the member
+    # with these, so there is no secret code to relay — they log in with what
+    # they typed. NULL on pre-030 rows (legacy temp-password approval path).
+    username = Column(String(50))
+    password_hash = Column(String(255))
+    # Which QR they scanned, when they came in off one.
+    signup_invite_id = Column(UUID(as_uuid=True), ForeignKey("signup_invite.id"))
+    # The application piece: one image, required at submit. Kept after approval
+    # to back the wall of application pieces. Not an art row — no medium, no
+    # Media_Members, no labels. aspect_ratio is stored so that wall can reserve
+    # each box before the image lands.
+    art_path = Column(String(500))
+    art_aspect_ratio = Column(Float)
 
 
 class MediaRequest(Base):

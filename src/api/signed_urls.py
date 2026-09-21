@@ -36,6 +36,9 @@ DEFAULT_TTL = int(os.environ.get("STATIC_URL_TTL", str(6 * 3600)))  # 6 hours
 SIGNED_PREFIXES = (
     "/static/art/", "/static/written-form/", "/static/audio/", "/static/profile/",
     "/static/thumbs/", "/static/display/", "/static/profile-thumbs/",
+    # Application pieces: uploaded before the applicant has any account, read
+    # back by reviewing contributors and (later) the wall of application pieces.
+    "/static/application-art/", "/static/application-thumbs/",
 )
 
 # Signed URLs are STABLE within a bucket window: a given piece yields the SAME

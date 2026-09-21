@@ -117,6 +117,10 @@ class SignupInviteCreateIn(BaseModel):
     label: str | None = None
     expires_in_days: int | None = None  # None = never expires
     max_uses: int | None = None         # None = unlimited
+    # False (default) = the standing club QR: scanning leads to the application
+    # form and a human reviews it. True = the trusted QR, which creates a live
+    # account on the spot. Only /join/redeem honours the True case.
+    instant: bool = False
 
 
 class SignupInviteOut(BaseModel):
@@ -128,8 +132,16 @@ class SignupInviteOut(BaseModel):
     expires_at: datetime | None = None
     revoked: bool
     created_at: datetime
+    instant: bool = False
     # Usernames created through this invite (after-the-fact review).
     joined: list[str] = []
+
+
+class JoinInviteOut(BaseModel):
+    """What /join needs to know about a scanned token before rendering, with
+    nothing else disclosed — no label, no usage counts."""
+    valid: bool
+    kind: str  # "apply" | "instant"
 
 
 class SetupCodeIn(BaseModel):
@@ -331,6 +343,21 @@ class ApplicationIn(BaseModel):
     state: str | None = None
     known_member: str | None = None
     reason: str | None = None
+    # --- post-030 self-serve fields (the QR form) ---------------------------
+    # Credentials the applicant picks up front. When both are present, approval
+    # creates the account with them and there's no secret code to relay. Absent
+    # = the legacy application shape, which still works.
+    username: str | None = None
+    password: str | None = None
+    # Which QR they scanned, for after-the-fact review of who came in off what.
+    invite_token: str | None = None
+    # Handle for the piece they already uploaded (see /join/application-art).
+    # The upload happens on the form's "next" press, so by submit the bytes are
+    # normally already on the server and this is just the reference.
+    art_draft_id: str | None = None
+    # Measured client-side off the picked image so the review queue and the
+    # wall can reserve each box before the image lands.
+    art_aspect_ratio: float | None = None
 
 class PasswordResetOut(BaseModel):
     username: str
@@ -351,8 +378,17 @@ class ApplicationOut(BaseModel):
     reason: str | None
     status: str
     created_at: datetime
+    # Only ever set on legacy (pre-030) rows, which still approve down the
+    # temp-password path and need the code relayed by hand.
     temp_username: str | None = None
     temp_password: str | None = None
+    # The username they chose; becomes their real one at approval.
+    username: str | None = None
+    # The application piece. thumb is what the queue and the wall grid should
+    # load; art falls back to it until the background resize has run.
+    art_url: str | None = None
+    art_thumb_url: str | None = None
+    art_aspect_ratio: float | None = None
 
 class ApplicationStatusUpdate(BaseModel):
     status: str  # "approved" or "rejected"
@@ -360,9 +396,28 @@ class ApplicationStatusUpdate(BaseModel):
 class ApplicationApproveOut(BaseModel):
     application_id: uuid.UUID
     status: str
-    temp_username: str
-    temp_password: str
-    temp_password_expires_at: datetime
+    # All three are None on the self-serve path: the member already has the
+    # username and password they chose, so approval hands back nothing to relay.
+    temp_username: str | None = None
+    temp_password: str | None = None
+    temp_password_expires_at: datetime | None = None
+    # True when approval created a directly-usable account (no code to send).
+    account_ready: bool = False
+    username: str | None = None
+
+
+class UsernameAvailableOut(BaseModel):
+    """Live availability check behind the QR form's username field."""
+    username: str
+    available: bool
+
+
+class ApplicationArtOut(BaseModel):
+    """Answer to the pre-submit upload: the handle the form sends at submit."""
+    draft_id: str
+    # Echoed so a stale response (an upload superseded by a later pick) can be
+    # recognised and discarded by the client.
+    seq: int
 
 class CommentIn(BaseModel):
     text: str
