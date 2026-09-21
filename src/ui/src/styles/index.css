@@ -32,5 +32,9 @@ html, body, #root {
    everything anyway, in case a browser still overscrolls. */
 html, body {
     overscroll-behavior-y: none;
+    /* never pan sideways: nothing on the site scrolls horizontally at the
+       document level (carousels scroll inside themselves) */
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
     background-color: rgb(255, 250, 245);
 }

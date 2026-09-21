@@ -22,14 +22,40 @@
 }
 
 /* events */
-.events-page { padding: 12px 16px 24px; max-width: 720px; margin: 0 auto; box-sizing: border-box; width: 100%; }
+/* Fixed layout: the "+" and the calendar stay put; only the list below
+   scrolls, and only vertically. */
+.events-page {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px 0;
+    max-width: 720px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    width: 100%;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+.events-page-head, .events-page-cal { flex: 0 0 auto; }
 .events-page-head { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 /* full-size calendar: square day cells (~50px rows on a phone); capped on
    wide screens so it doesn't fill the whole page */
 .events-page-cal { border-bottom: 1px solid #000; padding-bottom: 12px; }
 .events-page-cal .mcal { max-width: 520px; margin: 0 auto; }
 .events-page-cal .mcal-day { font-size: 16px; }
-.events-page-list { padding-top: 12px; display: flex; flex-direction: column; gap: 14px; }
+.events-page-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    padding: 12px 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.events-page-list > * { flex: 0 0 auto; min-width: 0; }
 .events-page-day { display: flex; flex-direction: column; gap: 8px; scroll-margin-top: 8px; }
 .events-page-date { font-family: 'Courier New', Courier, monospace; font-size: 12px; letter-spacing: 1px; }
 .events-page-date.on { text-decoration: underline; }
