@@ -11,16 +11,19 @@
 
 .people-strip {
     /* Column width comes from the strip's own height (cqh), so every card —
-       with or without a photo — is the same size: a quarter of the strip
-       (less padding 24 + gaps 30) minus the name row (~29). */
+       with or without a photo — is the same size: sized as a quarter of the
+       strip (less padding 24 + gaps 30) minus the name row (~29), but only
+       three rows shown; half the freed row goes to the gaps between rows. */
     container-type: size;
     flex: 1;
     min-height: 0;
     display: grid;
     grid-auto-flow: column;
-    grid-template-rows: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(3, max-content);
+    align-content: start;
+    row-gap: calc(10px + ((100cqh - 54px) / 4 + 10px) / 4);
+    column-gap: 10px;
     grid-auto-columns: max(64px, calc((100cqh - 54px) / 4 - 29px));
-    gap: 10px;
     padding: 10px 20px 14px;
     overflow-x: auto;
     overflow-y: hidden;
