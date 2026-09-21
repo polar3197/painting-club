@@ -30,10 +30,13 @@ SECRET = os.environ.get("STATIC_URL_SECRET", "")
 DEFAULT_TTL = int(os.environ.get("STATIC_URL_TTL", str(6 * 3600)))  # 6 hours
 
 # Only these path prefixes are gated by nginx secure_link and therefore signed —
-# the art bytes (visual / written / audio) and member profile pictures.
-# Thumbnails (/static/thumbs, /static/profile-thumbs) are served/denied at nginx
-# and not signed here.
-SIGNED_PREFIXES = ("/static/art/", "/static/written-form/", "/static/audio/", "/static/profile/")
+# the art bytes (visual / written / audio), member profile pictures, and their
+# resized derivatives (art thumbs + display copies, profile-pic thumbs), which
+# clients load directly via the URLs in api/image_urls.py.
+SIGNED_PREFIXES = (
+    "/static/art/", "/static/written-form/", "/static/audio/", "/static/profile/",
+    "/static/thumbs/", "/static/display/", "/static/profile-thumbs/",
+)
 
 # Signed URLs are STABLE within a bucket window: a given piece yields the SAME
 # URL for the whole window, so the phone's image cache (keyed by URL) hits across

@@ -23,8 +23,7 @@ http {
         server_name localhost;
 
         # Profile pics are member-only too: signed like art (the API signs
-        # Profile.profile_pic_path). Profile thumbnails are unused by the app, so
-        # direct access is blocked.
+        # Profile.profile_pic_path).
         location /static/profile/ {
             secure_link $arg_md5,$arg_expires;
             secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
@@ -33,8 +32,16 @@ http {
             alias /app/static/profile/;
             add_header Cache-Control "private, max-age=21600";
         }
+
+        # 256px profile-pic thumbs, signed (Profile.profile_pic_thumb_path).
         location /static/profile-thumbs/ {
-            return 403;
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/profile-thumbs/;
+            # URL carries ?v=<mtime> + signature, so its bytes never change.
+            add_header Cache-Control "private, max-age=21600, immutable";
         }
 
         # --- Member-only art bytes -------------------------------------------
@@ -66,15 +73,28 @@ http {
             add_header Cache-Control "private, max-age=21600";
         }
 
-        # Thumbnails are reachable only through the auth-gated /art/{id}/thumb
-        # API route; block direct file access.
+        # Resized art derivatives (512px thumb, ~1600px display copy), signed
+        # like the originals — the API embeds thumb_url/display_url so browsers
+        # and the app load them directly. The gated /art/{id}/thumb|display
+        # routes remain for older app builds.
         location /static/thumbs/ {
-            return 403;
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/thumbs/;
+            # URL carries ?v=<mtime> + signature, so its bytes never change.
+            add_header Cache-Control "private, max-age=21600, immutable";
         }
 
-        # Display derivatives likewise only via the gated /art/{id}/display route.
         location /static/display/ {
-            return 403;
+            secure_link $arg_md5,$arg_expires;
+            secure_link_md5 "$secure_link_expires$uri ${STATIC_URL_SECRET}";
+            if ($secure_link = "")  { return 403; }
+            if ($secure_link = "0") { return 410; }
+            alias /app/static/display/;
+            # URL carries ?v=<mtime> + signature, so its bytes never change.
+            add_header Cache-Control "private, max-age=21600, immutable";
         }
 
         # Inspiration-web external art is member-gated: the api's

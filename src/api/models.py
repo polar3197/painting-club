@@ -1,10 +1,11 @@
-from pydantic import BaseModel, field_validator, field_serializer
+from pydantic import BaseModel, computed_field, field_validator, field_serializer
 from datetime import date as Date, datetime, time as TimeOfDay
 from typing import List
 import re
 import uuid
 
 from api.signed_urls import sign_path
+from api.image_urls import art_display_url, art_thumb_url, profile_thumb_url
 
 # Recolorable profile page components — mirrors PROFILE_COLOR_ELEMENTS in
 # ios-v1/src/constants/profileColors.ts. Unknown keys are rejected so clients
@@ -64,6 +65,13 @@ class Profile(BaseModel):
     @field_serializer("profile_pic_path")
     def _sign_profile_pic(self, v):
         return sign_path(v)
+
+    # Signed 512px pic for avatars/headers; None until generated (client falls
+    # back to profile_pic_path).
+    @computed_field
+    @property
+    def profile_pic_thumb_path(self) -> str | None:
+        return profile_thumb_url(self.id) if self.profile_pic_path else None
 
 class ProfileUpdate(BaseModel):
     firstname: str | None
@@ -303,6 +311,18 @@ class ArtResult(BaseModel):
     def _sign_file_path(self, v):
         return sign_path(v)
 
+    # Signed resized copies (see api/image_urls.py); None when not generated
+    # yet, so clients fall back to file_path.
+    @computed_field
+    @property
+    def thumb_url(self) -> str | None:
+        return art_thumb_url(self.id)
+
+    @computed_field
+    @property
+    def display_url(self) -> str | None:
+        return art_display_url(self.id)
+
 class ApplicationIn(BaseModel):
     firstname: str
     lastname: str
@@ -429,6 +449,18 @@ class Visual2DOut(BaseModel):
     @field_serializer("file_path")
     def _sign_file_path(self, v):
         return sign_path(v)
+
+    # Signed resized copies (see api/image_urls.py); None when not generated
+    # yet, so clients fall back to file_path.
+    @computed_field
+    @property
+    def thumb_url(self) -> str | None:
+        return art_thumb_url(self.id)
+
+    @computed_field
+    @property
+    def display_url(self) -> str | None:
+        return art_display_url(self.id)
 
 
 class WipUpdateOut(BaseModel):
@@ -664,6 +696,18 @@ class BookmarkedArtOut(BaseModel):
     @field_serializer("file_path", "cover_image_path")
     def _sign_paths(self, v):
         return sign_path(v)
+
+    # Signed resized copies (see api/image_urls.py); None when not generated
+    # yet, so clients fall back to file_path.
+    @computed_field
+    @property
+    def thumb_url(self) -> str | None:
+        return art_thumb_url(self.art_id)
+
+    @computed_field
+    @property
+    def display_url(self) -> str | None:
+        return art_display_url(self.art_id)
 
 
 # --- Events --------------------------------------------------------------------

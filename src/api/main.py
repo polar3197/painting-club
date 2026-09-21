@@ -5,11 +5,12 @@ from datetime import date, datetime
 from contextlib import asynccontextmanager
 from typing import Optional, List
 from pathlib import Path
+import asyncio
 import io
 import os
 import uuid
 import magic
-from PIL import Image
+from PIL import Image, ImageOps
 import pillow_heif
 pillow_heif.register_heif_opener()
 
@@ -331,6 +332,7 @@ async def lifespan(app: FastAPI):
     # touches NULL rows — so it's safe to leave here and run on every boot.
     async with AsyncSessionLocal() as db:
         await backfill_visual_2d_aspect_ratios(db)
+        await start_image_derivative_backfill(db)
     yield
     # await empty_db()
 
@@ -833,8 +835,7 @@ AUDIO_MIME_TO_EXT = {
 }
 AUDIO_EXTS = {"m4a", "mp3", "wav", "aac"}
 
-# Container default; overridable so the API can run outside Docker (tests).
-STATIC_ROOT = Path(os.environ.get("STATIC_ROOT", "/app"))
+from api.image_urls import STATIC_ROOT
 THUMB_SIZE = 512  # single-size thumbnail, used as low-fi placeholder before full-res loads
 DISPLAY_SIZE = 1600  # mid-res "display" derivative for the main viewer — phones can't show more
 
@@ -866,10 +867,11 @@ def generate_thumbnail(art_id: str, src_abs: Path) -> Path | None:
         thumb_path.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src_abs) as img:
             img.draft("RGB", (THUMB_SIZE * 2, THUMB_SIZE * 2))
+            img = ImageOps.exif_transpose(img)
             if img.mode != "RGB":
                 img = img.convert("RGB")
             img.thumbnail((THUMB_SIZE, THUMB_SIZE * 4), Image.LANCZOS)
-            img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+            img.save(thumb_path, format="JPEG", quality=85, optimize=True, progressive=True)
         return thumb_path
     except Exception as e:
         print(f"[thumb] generation failed for {art_id}: {type(e).__name__}: {e}")
@@ -889,10 +891,11 @@ def generate_display(art_id: str, src_abs: Path) -> Path | None:
         out.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src_abs) as img:
             img.draft("RGB", (DISPLAY_SIZE, DISPLAY_SIZE))
+            img = ImageOps.exif_transpose(img)
             if img.mode != "RGB":
                 img = img.convert("RGB")
             img.thumbnail((DISPLAY_SIZE, DISPLAY_SIZE * 4), Image.LANCZOS)
-            img.save(out, format="JPEG", quality=88, optimize=True)
+            img.save(out, format="JPEG", quality=85, optimize=True, progressive=True)
         return out
     except Exception as e:
         print(f"[display] generation failed for {art_id}: {type(e).__name__}: {e}")
@@ -938,6 +941,53 @@ async def backfill_visual_2d_aspect_ratios(db: AsyncSession) -> None:
     print(f"[backfill] aspect_ratio set on {changed} of {len(rows)} NULL rows")
 
 
+DERIVATIVE_SOURCE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".heic", ".heif"}
+
+
+def _is_current_derivative(path: Path) -> bool:
+    """True when the file exists and is a progressive JPEG (the current encoding).
+    Baseline copies from before the switch paint top-to-bottom in Safari."""
+    try:
+        with Image.open(path) as img:
+            return bool(img.info.get("progressive") or img.info.get("progression"))
+    except Exception:
+        return False
+
+
+def backfill_image_derivatives(art_rows: list[tuple[str, str]], pic_rows: list[tuple[str, str]]) -> None:
+    """Startup data repair (blocking; run in a thread): make sure every image
+    piece has a progressive thumb + display copy and every profile pic has a
+    progressive 256px thumb, since clients now load these directly by URL (see
+    api/image_urls.py) rather than through the lazy-generating API routes.
+    Idempotent — current files are only header-read, so later boots are cheap."""
+    made = 0
+    for art_id, rel in art_rows:
+        src = abs_path(rel)
+        if src.suffix.lower() not in DERIVATIVE_SOURCE_EXTS or not src.exists():
+            continue
+        if not _is_current_derivative(thumb_file(art_id)):
+            made += generate_thumbnail(art_id, src) is not None
+        if not _is_current_derivative(display_file(art_id)):
+            made += generate_display(art_id, src) is not None
+    for member_id, rel in pic_rows:
+        src = abs_path(rel.partition("?")[0])
+        if src.exists() and not _is_current_derivative(profile_thumb_file(member_id)):
+            made += generate_profile_thumb(member_id, src) is not None
+    print(f"[backfill] image derivatives (re)generated: {made}")
+
+
+async def start_image_derivative_backfill(db: AsyncSession) -> None:
+    art_rows = [(str(i), p) for i, p in (await db.execute(
+        select(Art.id, Art.file_path).filter(Art.file_path.is_not(None))
+    )).all()]
+    pic_rows = [(str(i), p) for i, p in (await db.execute(
+        select(Member.id, Member.profile_pic_path).filter(Member.profile_pic_path.is_not(None))
+    )).all()]
+    # Fire-and-forget: the first run re-encodes every piece, which takes a while
+    # on the Pi — don't hold up boot for it.
+    asyncio.create_task(asyncio.to_thread(backfill_image_derivatives, art_rows, pic_rows))
+
+
 def heic_to_jpeg_bytes(contents: bytes) -> bytes:
     img = Image.open(io.BytesIO(contents))
     if img.mode != "RGB":
@@ -965,7 +1015,7 @@ async def read_cover_image(cover: UploadFile) -> tuple[bytes, str]:
     return contents, COVER_MIME_TO_EXT[mime]
 
 
-PROFILE_THUMB_DIM = 256  # tiny placeholder for instant first paint; original stays full-res
+PROFILE_THUMB_DIM = 512  # covers the ~180px profile-header pic at 3x and the roster cards; original stays full-res (zoom)
 
 
 def profile_thumb_file(member_id: str) -> Path:
@@ -978,10 +1028,11 @@ def generate_profile_thumb(member_id: str, src_abs: Path) -> Path | None:
     try:
         thumb_path.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src_abs) as img:
+            img = ImageOps.exif_transpose(img)
             if img.mode != "RGB":
                 img = img.convert("RGB")
             img.thumbnail((PROFILE_THUMB_DIM, PROFILE_THUMB_DIM), Image.LANCZOS)
-            img.save(thumb_path, format="JPEG", quality=82, optimize=True)
+            img.save(thumb_path, format="JPEG", quality=82, optimize=True, progressive=True)
         return thumb_path
     except Exception as e:
         print(f"[profile-thumb] failed for {member_id}: {type(e).__name__}: {e}")
