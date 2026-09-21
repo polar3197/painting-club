@@ -57,7 +57,7 @@ const People = () => {
   });
 
   return (
-    <>
+    <div className="people-page">
       <CentralFilter
         header="members"
         options={peopleOptions}
@@ -68,16 +68,16 @@ const People = () => {
         placeholder="search people..."
         bannerSrc="/imgs/profiles.png"
       />
-      {/* Uniform cards like the iOS People grid: columns grow ~√n, max 4 —
-          a full roster is 4-up, a narrowed search gets fewer, larger cards. */}
+      {/* iOS People pane: uniform cards four rows tall, scrolling sideways
+          under the search bar; card size follows the space left. */}
       {filtered.length > 0 ? (
-        <div className="people-grid" style={{ gridTemplateColumns: `repeat(${Math.min(4, Math.max(1, Math.ceil(Math.sqrt(ordered.length))))}, minmax(0, 1fr))` }}>
+        <div className="people-strip">
           {ordered.map(m => <MemberCard key={m.username} member={m} />)}
         </div>
       ) : (
         <p className="people-empty">No people found :(</p>
       )}
-    </>
+    </div>
   );
 };
 

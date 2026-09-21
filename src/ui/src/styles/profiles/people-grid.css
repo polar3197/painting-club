@@ -1,19 +1,35 @@
-/* People grid (iOS People twin): uniform cards — a square photo and the
-   username — in 1-4 equal columns set inline from the result count. */
-.people-grid {
-    display: grid;
-    gap: 10px;
-    padding: 12px 20px 24px;
-    box-sizing: border-box;
-    width: 100%;
-    max-width: 960px;
-    margin: 0 auto;
-}
-
-.people-card {
+/* People (iOS People pane twin): search on top, then uniform cards — square
+   photo + username — four rows tall, scrolling sideways. The page itself
+   doesn't scroll; the strip fills what's left under the search. */
+.people-page {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    min-width: 0;
+    overflow: hidden;
+}
+
+.people-strip {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    grid-auto-columns: max-content;
+    gap: 10px;
+    padding: 10px 20px 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+}
+.people-strip::-webkit-scrollbar { display: none; }
+
+.people-card {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     padding: 0;
     border: 1px solid #000;
     background: rgb(255, 250, 230);
@@ -23,18 +39,24 @@
 }
 .people-card:active { transform: scale(0.97); }
 
+/* square photo whose size comes from the row height */
 .people-card-pic {
-    display: block;
-    width: 100%;
+    flex: 1;
+    min-height: 0;
     aspect-ratio: 1 / 1;
+    display: block;
     background: rgb(250, 244, 202);
     overflow: hidden;
 }
 .people-card-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .people-card-name {
+    flex: 0 0 auto;
     display: block;
-    padding: 8px;
+    width: 0;
+    min-width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
     font-family: Georgia, Cambria, 'Times New Roman', serif;
     font-size: 14px;
     font-weight: 600;
