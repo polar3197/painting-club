@@ -101,6 +101,60 @@ export default function Hub() {
     return () => window.removeEventListener("keydown", onKey);
   }, [go]);
 
+  // ---- swiping back to Home, by intent -------------------------------------
+  // Side panels are touch-action: pan-y, so the browser only ever scrolls them
+  // vertically and hands horizontal motion to us: once a drag is clearly
+  // sideways toward Home we take it and drive the row (the page follows the
+  // finger), then settle Home or spring back. The art wall — vertical against
+  // its own columns — does the same for a swipe up from its bottom edge zone.
+  const drag = useRef<{ side: Side; x0: number; y0: number; t0: number; claimed: boolean } | null>(null);
+  const startDrag = (side: Side) => (e: React.PointerEvent) => {
+    if (e.pointerType === "mouse") return;
+    // things inside a panel with their own sideways swipes keep them
+    if ((e.target as HTMLElement).closest(".carousel-backdrop, .statement-strip.swipeable, .series-page")) return;
+    drag.current = { side, x0: e.clientX, y0: e.clientY, t0: performance.now(), claimed: false };
+  };
+  const moveDrag = (e: React.PointerEvent) => {
+    const d = drag.current, v = vRef.current, h = hRef.current;
+    if (!d || !v || !h) return;
+    const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+    const horizontal = d.side === "left" || d.side === "right";
+    const toward = d.side === "left" ? -dx : d.side === "right" ? dx : -dy;
+    const along = horizontal ? Math.abs(dx) : Math.abs(dy);
+    const across = horizontal ? Math.abs(dy) : Math.abs(dx);
+    if (!d.claimed) {
+      if (across > 12 && across > along) { drag.current = null; return; } // it's a scroll
+      if (toward < 12) return;
+      d.claimed = true;
+      (horizontal ? h : v).style.scrollSnapType = "none";
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    }
+    const W = h.clientWidth, H = v.clientHeight;
+    if (d.side === "left") h.scrollLeft = Math.min(W, Math.max(0, toward));
+    else if (d.side === "right") h.scrollLeft = Math.max(W, Math.min(2 * W, 2 * W - toward));
+    else v.scrollTop = Math.min(H, Math.max(0, toward));
+  };
+  const endDrag = (e: React.PointerEvent) => {
+    const d = drag.current, v = vRef.current, h = hRef.current;
+    drag.current = null;
+    if (!d || !d.claimed || !v || !h) return;
+    const horizontal = d.side === "left" || d.side === "right";
+    const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+    const toward = d.side === "left" ? -dx : d.side === "right" ? dx : -dy;
+    const speed = toward / Math.max(1, performance.now() - d.t0); // px/ms
+    const size = horizontal ? h.clientWidth : v.clientHeight;
+    const el = horizontal ? h : v;
+    go(toward > size * 0.25 || speed > 0.6 ? "home" : d.side);
+    // put snapping back once the smooth scroll has landed
+    window.setTimeout(() => { el.style.scrollSnapType = ""; }, 450);
+  };
+  const dragProps = (side: Side) => ({
+    onPointerDown: startDrag(side),
+    onPointerMove: moveDrag,
+    onPointerUp: endDrag,
+    onPointerCancel: () => { drag.current = null; },
+  });
+
   // Clicking a band: from Home it opens that panel; on the panel it returns.
   const tapBand = (side: Side) => {
     const v = vRef.current, h = hRef.current;
@@ -122,10 +176,12 @@ export default function Hub() {
       <div className="hub" ref={vRef} onScroll={onScroll}>
         <section className="hub-panel hub-panel-artwall">
           <div className="hub-panel-scroll"><ArtWall /></div>
+          {/* bottom-edge return zone, just above the band */}
+          <div className="hub-edge-zone" {...dragProps("top")} />
         </section>
 
         <div className="hub-row" ref={hRef} onScroll={onScroll}>
-          <section className="hub-panel hub-panel-profile">
+          <section className="hub-panel hub-panel-profile hub-side" {...dragProps("left")}>
             <div className="hub-panel-scroll">
               {currentUser ? <UserProfile username={currentUser} /> : null}
             </div>
@@ -135,7 +191,7 @@ export default function Hub() {
             <button className="hub-title" onClick={() => navigate("/about")}>paint club</button>
           </section>
 
-          <section className="hub-panel hub-panel-people">
+          <section className="hub-panel hub-panel-people hub-side" {...dragProps("right")}>
             <div className="hub-panel-scroll"><People /></div>
           </section>
         </div>

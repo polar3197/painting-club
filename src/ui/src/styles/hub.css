@@ -168,3 +168,22 @@
    floating add button, viewers, dialogs), so those stay on their own panel
    instead of floating over the whole hub. */
 .hub-panel { transform: translateZ(0); }
+
+/* Side panels: the browser only scrolls them vertically; horizontal drags
+   come to Hub.tsx, which returns Home when the swipe is clearly sideways. */
+.hub-side, .hub-side * { touch-action: pan-y; }
+/* ...except what swipes sideways (or pinches) on its own */
+.hub-side .carousel-backdrop, .hub-side .carousel-backdrop *,
+.hub-side .statement-strip.swipeable, .hub-side .statement-strip.swipeable *,
+.hub-side .series-page, .hub-side .series-page * { touch-action: auto; }
+
+/* Art wall: a swipe up from just above its band returns Home. */
+.hub-edge-zone {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 18px;
+    height: 44px;
+    touch-action: none;
+    z-index: 5;
+}
