@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
 import "../../styles/profiles/members-display.css";
+import "../../styles/profiles/people-grid.css";
 
 const MemberCard = ({ member }: { member: Profile }) => {
   const navigate = useNavigate();
@@ -17,19 +18,12 @@ const MemberCard = ({ member }: { member: Profile }) => {
   const src = profilePicThumbSrc(member, versions);
 
   return (
-    <div className='display-card member-card' onClick={() => navigate(`/members/${member.username}/profile`)}>
-      <div className='member-deets'>
-        <p>@{member.username}</p>
-        <p>{member.firstname} {member.lastname}</p>
-        <p>{member.city}, {member.state}</p>
-        {member.media && member.media.length > 0 && (
-          <p className="member-mediums">{member.media.join(", ")}</p>
-        )}
-      </div>
-      <div className='member-pic'>
-        {src ? <img src={src} width="130" height="155" decoding="async" /> : <div className="member-pic-empty" />}
-      </div>
-    </div>
+    <button className="people-card" onClick={() => navigate(`/members/${member.username}/profile`)}>
+      <span className="people-card-pic">
+        {src && <img src={src} alt="" loading="lazy" decoding="async" />}
+      </span>
+      <span className="people-card-name">{member.username}</span>
+    </button>
   );
 };
 
@@ -74,12 +68,15 @@ const People = () => {
         placeholder="search people..."
         bannerSrc="/imgs/profiles.png"
       />
-      <div className='members-display'>
-        {filtered.length > 0
-          ? ordered.map(m => <MemberCard key={m.username} member={m} />)
-          : <p>No people found :(</p>
-        }
-      </div>
+      {/* Uniform cards like the iOS People grid: columns grow ~√n, max 4 —
+          a full roster is 4-up, a narrowed search gets fewer, larger cards. */}
+      {filtered.length > 0 ? (
+        <div className="people-grid" style={{ gridTemplateColumns: `repeat(${Math.min(4, Math.max(1, Math.ceil(Math.sqrt(ordered.length))))}, minmax(0, 1fr))` }}>
+          {ordered.map(m => <MemberCard key={m.username} member={m} />)}
+        </div>
+      ) : (
+        <p className="people-empty">No people found :(</p>
+      )}
     </>
   );
 };
