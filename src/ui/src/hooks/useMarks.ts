@@ -99,3 +99,10 @@ export function usePinnedId(username: string, type: WallType): string | null {
   useEffect(loadPins, []);
   return pins[pinKey(username, type)] ?? null;
 }
+
+/** Everyone's pins, for the art wall: (username, type) -> pinned art id. */
+export function useAllPins(): (username: string, type: WallType) => string | null {
+  useStore();
+  useEffect(loadPins, []);
+  return (username, type) => pins[pinKey(username, type)] ?? null;
+}

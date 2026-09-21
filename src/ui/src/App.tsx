@@ -30,7 +30,7 @@ import Privacy from "./components/Pages/Privacy";
 import Support from "./components/Pages/Support";
 import SetupAccount from "./components/Pages/SetupAccount";
 import "./styles/app-layout.css";
-import Home from "./components/Pages/Home";
+import Hub from "./components/Hub/Hub";
 import WeeklyPromptGrid from "./components/Pages/WeeklyPromptGrid";
 
 function PromptRedirect() {
@@ -55,9 +55,10 @@ export default function App() {
         <Route path="/join" element={<Join />} />
 
         {/* All sidebar pages live here */}
+        {/* Home is the swipe hub (iOS parity): full screen, no sidebar. */}
+        <Route path="/home" element={<Hub />} />
         <Route element={<PageLayout />}>
           <Route path="/not-a-member" element={<NotMember />} />
-          <Route path="/home" element={<Home />} />
           {/* The grid page is the prompt page; old links land there too. */}
           <Route path="/prompts/:id" element={<PromptRedirect />} />
           <Route path="/prompts/:id/grid" element={<WeeklyPromptGrid />} />

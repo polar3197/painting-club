@@ -1,0 +1,195 @@
+/* The swipe hub (components/Hub/Hub.tsx): a 3-row vertical snap scroller whose
+   middle row is a 3-panel horizontal snap scroller. Each panel is exactly one
+   viewport; panel content scrolls inside it with overscroll contained so it
+   never chains into a hub swipe. */
+
+.hub {
+    --hub-green: rgb(216, 237, 138);
+    --hub-band: 18px;
+    position: fixed;
+    inset: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    overscroll-behavior: none;
+    scrollbar-width: none;
+    background: rgb(255, 250, 245);
+}
+.hub::-webkit-scrollbar,
+.hub-row::-webkit-scrollbar { display: none; }
+
+.hub-row {
+    height: 100dvh;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    overscroll-behavior: none;
+    scrollbar-width: none;
+}
+
+.hub-panel {
+    position: relative;
+    flex: 0 0 100vw;
+    width: 100vw;
+    height: 100dvh;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    overflow: hidden;
+}
+
+.hub-panel-scroll {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+}
+
+/* ---- Home: just the title, at the golden-ratio line ---------------------- */
+.hub-home { background: var(--hub-green); }
+
+.hub-title {
+    position: absolute;
+    top: 38.2%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 8px 16px;
+    border: 2px solid #E30022;
+    background: rgb(250, 244, 202);
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 700;
+    font-size: 30px;
+    color: #1a1a1a;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.hub-edge {
+    position: absolute;
+    background: none;
+    border: none;
+    padding: 4px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #000;
+    cursor: pointer;
+}
+.hub-edge-top { top: calc(env(safe-area-inset-top, 0px) + 6px); left: 50%; transform: translateX(-50%); }
+.hub-edge-bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); left: 50%; transform: translateX(-50%); }
+.hub-edge-left { left: 4px; top: 50%; transform: translateY(-50%); letter-spacing: 0; }
+.hub-edge-right { right: 4px; top: 50%; transform: translateY(-50%); letter-spacing: 0; }
+
+.hub-stacked { display: inline-flex; flex-direction: column; align-items: center; line-height: 13px; }
+
+/* ---- the green band on each panel's Home-facing edge -------------------- */
+.hub-band {
+    position: absolute;
+    z-index: 20;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: var(--hub-green);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.hub-band .hub-stacked { letter-spacing: 0; }
+.hub-band-left { left: 0; top: 0; bottom: 0; width: var(--hub-band); }
+.hub-band-right { right: 0; top: 0; bottom: 0; width: var(--hub-band); }
+.hub-band-bottom {
+    left: 0; right: 0; bottom: 0;
+    height: calc(var(--hub-band) + env(safe-area-inset-bottom, 0px));
+    align-items: flex-start;
+    padding-top: 2px;
+}
+/* the top band also fills the status-bar / notch area in Home green */
+.hub-band-top {
+    left: 0; right: 0; top: 0;
+    height: calc(var(--hub-band) + env(safe-area-inset-top, 0px));
+    align-items: flex-end;
+    padding-bottom: 2px;
+}
+
+/* keep panel content clear of its band */
+.hub-panel-scroll { padding: 0; }
+.hub-people { padding-left: var(--hub-band); }
+.hub-panel:has(.hub-band-right) .hub-panel-scroll { padding-right: var(--hub-band); }
+.hub-panel:has(.hub-band-bottom) .hub-panel-scroll { padding-bottom: calc(var(--hub-band) + env(safe-area-inset-bottom, 0px)); }
+.hub-events { padding: calc(var(--hub-band) + env(safe-area-inset-top, 0px) + 12px) 12px 12px; }
+
+/* events panel: the home events box, stacked like on phones */
+.hub-events .home-events { height: 100%; box-shadow: none; }
+.hub-events .home-events-body { flex-direction: column; }
+.hub-events .home-events-cal { height: auto; width: 100%; aspect-ratio: auto; }
+.hub-events .home-day { border-left: none; padding-left: 0; border-top: 1px solid #000; padding-top: 12px; }
+
+/* profile inside a panel: its page wrapper no longer owns the viewport */
+.hub .profile-page { display: block; }
+
+/* ---- art wall ---------------------------------------------------------- */
+.art-wall {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+    box-sizing: border-box;
+}
+.art-wall-title { font-family: Georgia, Cambria, 'Times New Roman', serif; font-size: 22px; margin-bottom: 12px; }
+.art-wall-row { flex: 1; min-height: 0; align-self: stretch; display: flex; justify-content: space-evenly; }
+.art-wall-col { display: flex; flex-direction: column; align-items: center; min-height: 0; }
+.art-wall-label { font-family: 'Courier New', Courier, monospace; font-size: 12px; letter-spacing: 1px; margin-bottom: 6px; }
+.art-wall-scroll {
+    flex: 1;
+    min-height: 0;
+    width: 120px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.22);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.22);
+    scrollbar-width: none;
+}
+.art-wall-scroll::-webkit-scrollbar { display: none; }
+.art-wall-tile {
+    flex: 0 0 108px;
+    width: 108px;
+    height: 108px;
+    padding: 0;
+    border: 1px solid #000;
+    background: rgb(250, 244, 202);
+    overflow: hidden;
+    cursor: pointer;
+}
+.art-wall-tile.pinned { border: 2px solid #E30022; }
+.art-wall-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.art-wall-glyph { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 8px; box-sizing: border-box; }
+.art-wall-glyph img { width: 40px; height: 40px; object-fit: contain; }
+.art-wall-glyph span { font-family: 'Courier New', Courier, monospace; font-size: 10px; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.art-wall-empty { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #888; margin-top: 24px; }
+.art-wall-all {
+    margin: 10px 0 12px;
+    padding: 11px 22px;
+    border: 1px solid #000;
+    background: rgb(238, 190, 100);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Panels are containing blocks for position:fixed children (the profile's
+   floating add button, viewers, dialogs), so those stay on their own panel
+   instead of floating over the whole hub. */
+.hub-panel { transform: translateZ(0); }

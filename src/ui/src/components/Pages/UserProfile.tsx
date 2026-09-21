@@ -64,8 +64,11 @@ function ProfileSkeleton({ colors }: { colors: Record<string, string> | null }) 
   );
 }
 
-const UserProfile = () => {
-  const { username } = useParams();
+// `username` is passed when embedded (the hub's profile panel shows yours);
+// otherwise it comes from the route.
+const UserProfile = ({ username: embeddedUsername }: { username?: string } = {}) => {
+  const params = useParams();
+  const username = embeddedUsername ?? params.username;
   const [searchParams] = useSearchParams();
   const [profile, setProfile, error, loading] = useProfile(username);
 
