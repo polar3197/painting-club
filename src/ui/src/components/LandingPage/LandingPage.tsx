@@ -1,8 +1,9 @@
+import { useState } from "react";
 import Login from "./Login";
 import "../../styles/app-layout.css";
 
 const MiltonAvery = {
-  "image": "imgs/ma.png",
+  "image": "imgs/ma.jpg",
   // coords are measured in rem from bottom left
   "login_left": 4,
   "login_bottom": 3,
@@ -16,7 +17,7 @@ const MiltonAvery = {
 }
 
 const Hopper = {
-  "image": "imgs/hopper-barn.png",
+  "image": "imgs/hopper-barn.jpg",
   // coords are measured in rem from bottom left
   "login_left": 18,
   "login_bottom": 13,
@@ -30,7 +31,7 @@ const Hopper = {
 }
 
 const Diebenkorn = {
-  "image": "imgs/diebenkorn.png",
+  "image": "imgs/diebenkorn.jpg",
   // coords are measured in rem from bottom left
   "login_left": 62,
   "login_bottom": 3,
@@ -44,7 +45,7 @@ const Diebenkorn = {
 }
 
 const Klimpt = {
-  "image": "imgs/klimpt.png",
+  "image": "imgs/klimpt.jpg",
   // coords are measured in rem from bottom left
   "login_left": 38,
   "login_bottom": 22,
@@ -59,17 +60,17 @@ const Klimpt = {
 
 const Themes = [MiltonAvery, Hopper, Diebenkorn, Klimpt];
 
-// const image = "imgs/ma.png";
+// const image = "imgs/ma.jpg";
 
 export default function LandingPage() {
-  // pick a random number
-  const randomIndex = Math.floor(Math.random() * Themes.length);
-  const theme = Themes[randomIndex];
+  // Pick once per mount so a re-render never swaps the painting mid-login.
+  const [theme] = useState(() => Themes[Math.floor(Math.random() * Themes.length)]);
 
   return (
     <main className="page">
       <img
         src={theme.image}
+        fetchPriority="high"
         className="page-background"
         style={{ border: "1px black solid" }}
       />

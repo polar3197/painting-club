@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Fuse from "fuse.js";
 import { useMembers } from "../../hooks/useMembers";
 import { useOptions } from "../../hooks/useOptions";
-import { Profile, profilePicSrc } from "../../api";
+import { Profile, profilePicThumbSrc } from "../../api";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
@@ -14,7 +14,7 @@ const MemberCard = ({ member }: { member: Profile }) => {
   const versions = auth?.profilePicVersions ?? {};
   // No fallback image: a member without a picture gets blank space, not a
   // broken-image box.
-  const src = profilePicSrc(member, versions);
+  const src = profilePicThumbSrc(member, versions);
 
   return (
     <div className='display-card member-card' onClick={() => navigate(`/members/${member.username}/profile`)}>
@@ -27,7 +27,7 @@ const MemberCard = ({ member }: { member: Profile }) => {
         )}
       </div>
       <div className='member-pic'>
-        {src ? <img src={src} width="130" height="155" /> : <div className="member-pic-empty" />}
+        {src ? <img src={src} width="130" height="155" decoding="async" /> : <div className="member-pic-empty" />}
       </div>
     </div>
   );

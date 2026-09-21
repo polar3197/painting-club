@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "../../styles/weekly-prompt.css";
 import { get_prompt, list_prompts, add_new_visual_2d, get_members_visual_2d, get_media, PromptDetailOut, PromptSummary, Visual2DIn, Visual2DOut, MediaType } from "../../api";
-import ArtImage from "../Utils/ArtImage";
+import ArtImage, { GRID_SIZES } from "../Utils/ArtImage";
 import AddArtDialog from "../Utils/AddArtDialog";
 import ProposePromptDialog from "../Utils/ProposePromptDialog";
 import SubmissionLightbox from "../Utils/SubmissionLightbox";
@@ -115,7 +115,7 @@ const WeeklyPromptGrid = () => {
         <div className="wp-strip">
           {subs.length > 0 ? subs.map((s, i) => (
             <button key={s.id} className="wp-thumb" onClick={() => setZoom(i)}>
-              <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="wp-thumb-img" />
+              <ArtImage piece={s} sizes={GRID_SIZES} priority={i < 6} className="wp-thumb-img" />
             </button>
           )) : <p className="weekly-prompt-empty">no submissions yet{prompt.is_active ? " — be the first" : ""}.</p>}
         </div>

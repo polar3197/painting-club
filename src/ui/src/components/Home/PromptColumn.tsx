@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { get_active_prompt, get_prompt, PromptOut, PromptDetailOut } from "../../api";
 import { swr } from "../../cache";
-import ArtImage from "../Utils/ArtImage";
+import ArtImage, { GRID_SIZES } from "../Utils/ArtImage";
 
 // The week's prompt as a row: one bordered box with the title on top and the
 // submissions as a strip of images scrolled sideways. Clicking anything
@@ -55,9 +55,9 @@ export default function PromptColumn() {
           <div className="hp-empty">no submissions yet</div>
         ) : (
           <div className="hp-strip">
-            {submissions.map((s) => (
+            {submissions.map((s, i) => (
               <span key={s.id} className="hp-cell">
-                <ArtImage artId={s.id} fullSrc={s.file_path} alt={s.title} className="hp-cell-img" />
+                <ArtImage piece={s} sizes={GRID_SIZES} priority={i < 6} className="hp-cell-img" />
               </span>
             ))}
           </div>

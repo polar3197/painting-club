@@ -2,13 +2,13 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { get_members_visual_2d, Visual2DOut } from "../../api";
 import { swr } from "../../cache";
 import ArtZoomIn from "../Utils/ArtZoomIn";
-import ArtImage from "../Utils/ArtImage";
+import ArtImage, { GRID_SIZES } from "../Utils/ArtImage";
 import "../../styles/portfolio.css";
 
 const ROW_SIZE = 1;  // matches grid-auto-rows in CSS
 const GAP = 4;        // matches gap in CSS
 
-const PortfolioCell = ({ piece, onClick }: { piece: Visual2DOut; onClick: () => void }) => {
+const PortfolioCell = ({ piece, priority, onClick }: { piece: Visual2DOut; priority: boolean; onClick: () => void }) => {
   const cellRef = useRef<HTMLDivElement>(null);
   const [colSpan, setColSpan] = useState(1);
   const [rowSpan, setRowSpan] = useState(10);
@@ -33,7 +33,7 @@ const PortfolioCell = ({ piece, onClick }: { piece: Visual2DOut; onClick: () => 
 
   return (
     <div ref={cellRef} className="portfolio-cell" style={{ gridColumn: `span ${colSpan}`, gridRow: `span ${rowSpan}` }} onClick={onClick}>
-      <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
+      <ArtImage piece={piece} sizes={GRID_SIZES} priority={priority} />
       <div className="portfolio-cell-overlay">
         <p>{piece.title}</p>
         {piece.date && <p>{piece.date}</p>}
@@ -63,7 +63,7 @@ export default function PortfolioGrid({ username, medium, keywords }: { username
   return (
     <>
       <div className="portfolio-grid">
-        {art.map((piece) => <PortfolioCell key={piece.id} piece={piece} onClick={() => setZoomedImg(piece.file_path)} />)}
+        {art.map((piece, i) => <PortfolioCell key={piece.id} piece={piece} priority={i < 8} onClick={() => setZoomedImg(piece.file_path)} />)}
       </div>
       {zoomedImg && <ArtZoomIn isOwner={false} imgPath={zoomedImg} setIsZoomedIn={() => setZoomedImg(null)} />}
     </>

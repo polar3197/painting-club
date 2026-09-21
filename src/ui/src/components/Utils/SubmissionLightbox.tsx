@@ -31,7 +31,7 @@ export default function SubmissionLightbox({ pieces, index, onIndex, onClose }: 
   useEffect(() => {
     for (const i of [index - 1, index + 1]) {
       const p = pieces[(i + pieces.length) % pieces.length];
-      if (p) { const img = new Image(); img.src = p.file_path; }
+      if (p) { const img = new Image(); img.src = p.display_url || p.file_path; }
     }
   }, [index, pieces]);
 
@@ -42,7 +42,7 @@ export default function SubmissionLightbox({ pieces, index, onIndex, onClose }: 
     <div className="lb-backdrop" onClick={onClose}>
       {many && <button className="lb-arrow lb-prev" aria-label="previous" onClick={(e) => { e.stopPropagation(); prev(); }}>‹</button>}
       <figure className="lb-figure" onClick={(e) => e.stopPropagation()}>
-        <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} className="lb-img" />
+        <ArtImage piece={piece} sizes="90vw" priority className="lb-img" />
         <figcaption className="lb-caption">
           <span className="lb-title">{piece.title}</span>
           <button className="lb-creator" onClick={() => navigate(`/members/${piece.creator_username}/profile?artId=${piece.id}&medium=${encodeURIComponent(piece.medium)}`)}>

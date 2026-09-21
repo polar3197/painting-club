@@ -7,10 +7,10 @@ import "../../styles/app-layout.css";
 
 // Mirror the landing-page backdrop themes so the setup flow feels continuous.
 const Themes = [
-  { image: "imgs/ma.png",          card_left: 4,  card_bottom: 3,  title_left: 52, title_bottom: 29, card_bg: "transparent" },
-  { image: "imgs/hopper-barn.png", card_left: 18, card_bottom: 13, title_left: 44, title_bottom: 31, card_bg: "rgb(216, 64, 25)" },
-  { image: "imgs/diebenkorn.png",  card_left: 62, card_bottom: 3,  title_left: 55, title_bottom: 32, card_bg: "rgb(238, 114, 72)" },
-  { image: "imgs/klimpt.png",      card_left: 38, card_bottom: 22, title_left: 3,  title_bottom: 13, card_bg: "lightgreen" },
+  { image: "imgs/ma.jpg",          card_left: 4,  card_bottom: 3,  title_left: 52, title_bottom: 29, card_bg: "transparent" },
+  { image: "imgs/hopper-barn.jpg", card_left: 18, card_bottom: 13, title_left: 44, title_bottom: 31, card_bg: "rgb(216, 64, 25)" },
+  { image: "imgs/diebenkorn.jpg",  card_left: 62, card_bottom: 3,  title_left: 55, title_bottom: 32, card_bg: "rgb(238, 114, 72)" },
+  { image: "imgs/klimpt.jpg",      card_left: 38, card_bottom: 22, title_left: 3,  title_bottom: 13, card_bg: "lightgreen" },
 ];
 
 export default function SetupAccount() {

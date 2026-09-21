@@ -6,12 +6,6 @@ export function thumbUrl(artId: string): string {
   return `${API_BASE}/art/${artId}/thumb`;
 }
 
-/** Small JPEG placeholder for a member's profile pic. Served directly by nginx from
- *  /static/profile-thumbs/. Falls back silently (404) for members without a pic uploaded. */
-export function profileThumbUrl(memberId: string): string {
-  return `/static/profile-thumbs/${memberId}.jpg`;
-}
-
 /** Cache-busted URL for a member's profile pic — null if none uploaded.
  *  `versions` comes from AuthContext; it bumps when the current user re-uploads,
  *  so re-uploads of the same extension still force the browser to refetch. */
@@ -22,6 +16,17 @@ export function profilePicSrc(
   if (!profile.profile_pic_path) return null;
   const v = versions[profile.id];
   return `${profile.profile_pic_path}${v ? `?v=${v}` : ''}`;
+}
+
+/** Profile pic for small boxes (≤ ~200px CSS): the signed 512px copy, falling back to
+ *  the full pic when it isn't generated yet or the current user just re-uploaded
+ *  (the listing's thumb URL predates the new pic until the next fetch). */
+export function profilePicThumbSrc(
+  profile: { id: string; profile_pic_path: string | null; profile_pic_thumb_path?: string | null },
+  versions: Record<string, number> = {},
+): string | null {
+  if (profile.profile_pic_thumb_path && !versions[profile.id]) return profile.profile_pic_thumb_path;
+  return profilePicSrc(profile, versions);
 }
 
 interface RequestOptions extends RequestInit {
@@ -155,6 +160,8 @@ export interface Profile {
   hidden_media: string[];
   role: string;
   profile_pic_path: string | null;
+  // Signed 512px copy for avatars/headers; null until generated.
+  profile_pic_thumb_path?: string | null;
   viewer_blocked_by_owner?: boolean;
   blocked_usernames?: string[] | null;
   // Component-key -> color from the edit-profile color tab; null = never customized.
@@ -266,6 +273,9 @@ export interface Visual2DOut {
   file_path: string;
   comments_enabled: boolean;
   aspect_ratio: number | null;
+  // Signed resized copies; null until generated (fall back to file_path).
+  thumb_url?: string | null;
+  display_url?: string | null;
 }
 
 export function getHealth(): Promise<unknown> {
@@ -421,6 +431,8 @@ export interface ArtResult {
   creator_username: string;
   creator_city: string | null;
   aspect_ratio: number | null;
+  thumb_url?: string | null;
+  display_url?: string | null;
 }
 
 export function get_search_options(medium?: string, username?: string): Promise<SearchOptions> {

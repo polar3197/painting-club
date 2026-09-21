@@ -1,4 +1,4 @@
-import { Profile, upload_profile_picture, profilePicSrc } from "../../api";
+import { Profile, upload_profile_picture, profilePicSrc, profilePicThumbSrc } from "../../api";
 import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import { useAuth } from "../../context/AuthContext";
 import ArtZoomIn from "../Utils/ArtZoomIn";
@@ -19,7 +19,7 @@ const UserDetails = (
   const auth = useAuth();
   const token = auth?.token ?? null;
   const versions = auth?.profilePicVersions ?? {};
-  const src = profilePicSrc(profile, versions);
+  const src = profilePicThumbSrc(profile, versions);
   const hasPic = !!src;
 
   const handleUpload = async (file: File) => {
@@ -40,7 +40,7 @@ const UserDetails = (
     {isZoomedIn && src &&
       <ArtZoomIn
         isOwner={profile.is_owner}
-        imgPath={src}
+        imgPath={profilePicSrc(profile, versions)!}
         setIsZoomedIn={setIsZoomedIn}
         onChangePic={profile.is_owner ? handleUpload : undefined}
         blockableUsername={!profile.is_owner ? profile.username : undefined}

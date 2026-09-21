@@ -21,5 +21,3 @@ export function invalidateCached(prefix: string): void {
   for (const k of responses.keys()) if (k.startsWith(prefix)) responses.delete(k);
 }
 
-/** Full-res art URLs that have finished loading at least once this page load. */
-export const loadedImages = new Set<string>();

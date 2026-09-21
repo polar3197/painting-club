@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Visual2DOut, CommentOut, get_comments, post_comment, delete_comment, thumbUrl } from "../../api";
+import { Visual2DOut, CommentOut, get_comments, post_comment, delete_comment } from "../../api";
+import ArtImage from "./ArtImage";
 import { useNavigate } from "react-router-dom";
 import ArtZoomIn from "./ArtZoomIn";
 import ContextPopup from "./ContextPopup";
@@ -14,8 +15,6 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
     const [comments, setComments] = useState<CommentOut[]>([]);
     const [input, setInput] = useState("");
     const [isZoomedIn, setIsZoomedIn] = useState(false);
-    // Start with the thumb for instant paint, swap to full-res once it finishes preloading.
-    const [imgSrc, setImgSrc] = useState(thumbUrl(piece.id));
 
     // Kebab / report state. Block lives on the user's profile-pic flip, not in the comment menu.
     const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -25,13 +24,6 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
     useEffect(() => {
         get_comments(piece.id, token).then(setComments).catch(() => {});
     }, [piece.id, token]);
-
-    useEffect(() => {
-        setImgSrc(thumbUrl(piece.id));
-        const full = new Image();
-        full.onload = () => setImgSrc(piece.file_path);
-        full.src = piece.file_path;
-    }, [piece.id, piece.file_path]);
 
     const submit = async () => {
         const text = input.trim();
@@ -62,7 +54,7 @@ const ArtComments = ({ piece, setIsOpen }: { piece: Visual2DOut; setIsOpen: (v: 
         <div className="art-comments-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}>
             <div className="art-comments-panel">
                 <div className="art-comments-image" onClick={() => setIsZoomedIn(true)} style={{ cursor: "pointer" }}>
-                    <img src={imgSrc} alt={piece.title} />
+                    <ArtImage piece={piece} sizes="(max-width: 640px) 100vw, 50vw" priority />
                 </div>
                 <div className="art-comments-section">
                     <div className="art-comments-header">

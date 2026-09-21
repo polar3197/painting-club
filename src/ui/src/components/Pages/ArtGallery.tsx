@@ -5,15 +5,15 @@ import { ArtResult, search_art } from "../../api";
 import { swr, getCached } from "../../cache";
 import { useNavigate } from "react-router-dom";
 import CentralFilter from "../Profiles/CentralFilter";
-import ArtImage from "../Utils/ArtImage";
+import ArtImage, { GRID_SIZES } from "../Utils/ArtImage";
 import "../../styles/profiles/members-display.css";
 
-const ArtCard = ({ piece }: { piece: ArtResult }) => {
+const ArtCard = ({ piece, priority }: { piece: ArtResult; priority: boolean }) => {
   const navigate = useNavigate();
   return (
     <div className='display-card art-card' onClick={() => navigate(`/members/${piece.creator_username}/profile?artId=${piece.id}&medium=${encodeURIComponent(piece.medium)}`)}>
       <div className='art-card-img'>
-        <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
+        <ArtImage piece={piece} sizes={GRID_SIZES} priority={priority} />
       </div>
       <div className='art-card-deets'>
         <p><b>{piece.title}</b></p>
@@ -67,7 +67,7 @@ const ArtGallery = () => {
       />
       <div className='members-display'>
         {filtered.length > 0
-          ? filtered.map(a => <ArtCard key={a.id} piece={a} />)
+          ? filtered.map((a, i) => <ArtCard key={a.id} piece={a} priority={i < 8} />)
           : <p>No art found :(</p>
         }
       </div>

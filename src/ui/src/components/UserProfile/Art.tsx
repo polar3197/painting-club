@@ -21,9 +21,11 @@ const Visual2DPiece = ({
     viewerBlockedByOwner,
     onRemove,
     onEdit,
+    priority,
 }: {
     isOwner: boolean;
     piece: Visual2DOut;
+    priority: boolean;
     viewerBlockedByOwner: boolean;
     onRemove: () => void;
     onEdit: () => void;
@@ -62,7 +64,7 @@ const Visual2DPiece = ({
         }
         <div id={`art-${piece.id}`} className="art-element">
             <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
-                <ArtImage artId={piece.id} fullSrc={piece.file_path} alt={piece.title} />
+                <ArtImage piece={piece} priority={priority} />
             </div>
             <div className="art-right">
                 <div className="art-details">
@@ -258,7 +260,7 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                             </div>
                         ))}
                         {(selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art)
-                            .map(piece => <Visual2DPiece key={piece.id} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)}
+                            .map((piece, i) => <Visual2DPiece key={piece.id} priority={i < 2} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)}
                     </>
                 ) : isWrittenForm ? (
                     (() => {

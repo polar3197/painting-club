@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Profile, MemberRole, get_profile, set_member_role, profilePicSrc } from "../../api";
+import { Profile, MemberRole, get_profile, set_member_role, profilePicThumbSrc } from "../../api";
 import { ToolsPage } from "../Utils/ToolsPage";
 
 const ROLES: MemberRole[] = ["member", "admin", "contributor"];
@@ -50,7 +50,7 @@ export default function UserRoleDetail() {
   const name = profile
     ? (profile.firstname || profile.lastname ? `${profile.firstname || ""} ${profile.lastname || ""}`.trim() : profile.username)
     : "";
-  const pic = profile ? profilePicSrc(profile) : null;
+  const pic = profile ? profilePicThumbSrc(profile) : null;
 
   return (
     <ToolsPage title="role" onBack={() => navigate("/user-roles")}>
