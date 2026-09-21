@@ -27,14 +27,3 @@
 .tab-icon { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
 .tab-icon img { width: 100%; height: 100%; object-fit: contain; }
 .tab-label { font-family: 'Courier New', Courier, monospace; font-size: 11px; letter-spacing: 1px; }
-
-/* Home's mark: the title box in miniature (cream, red border, bold mono). */
-.tab-home-mark {
-    padding: 1px 4px;
-    border: 1.5px solid #E30022;
-    background: rgb(250, 244, 202);
-    font-family: 'Courier New', Courier, monospace;
-    font-weight: 700;
-    font-size: 13px;
-    line-height: 1.2;
-}
