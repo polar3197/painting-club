@@ -353,7 +353,8 @@
         top: auto;
         right: auto;
         left: 20px;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+        /* just above the bottom tab bar */
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 66px);
         z-index: 50;
     }
     .add button {

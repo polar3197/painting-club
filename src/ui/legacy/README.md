@@ -1,8 +1,7 @@
 # Legacy web navigation (archived 2026-09-20)
 
-The web app now navigates exclusively through the swipe hub at `/home`
-(`src/components/Hub/Hub.tsx`), the same model as the iOS app. Pages outside
-the hub get a green "home" band on their left edge (`PageLayout.tsx`).
+The web app navigates with a bottom tab bar (`src/components/Pages/TabBar.tsx`:
+profile / events / art wall / people); `/home` is the title page.
 
 Archived here, unbuilt and unlinted (outside `src/`, in eslint's ignores):
 
@@ -14,3 +13,7 @@ Archived here, unbuilt and unlinted (outside `src/`, in eslint's ignores):
 
 Their relative imports assume their original locations under `src/`; move a
 file back there to revive it.
+- `components/Hub/Hub.tsx` + `styles/hub.css` — the web swipe hub (iOS-style
+  4-way cross with seam-riding label bands). Retired 2026-09-20: swipes fought
+  panel scrolling in mobile Safari. `ArtWall.tsx` stays in `src/` (the art wall
+  tab uses it).
