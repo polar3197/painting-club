@@ -3,11 +3,36 @@
     display: flex;
     width: 100%;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
 }
 
+/* The green band back to the hub (replaces the old sidebar). */
+.home-band {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: rgb(216, 237, 138);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.home-band-word {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    line-height: 13px;
+    color: #000;
+}
+
 .page-body {
-    flex: 1; /* balances out with sidebar */
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -38,7 +63,7 @@
     background-color: rgb(250, 244, 202);
 }
 
-/* Every "+ …" button on the site: sidebar cream, the site's darker gold on
+/* Every "+ …" button on the site: cream, the site's darker gold on
    hover. Same shape as the back button. */
 .add-btn {
     font-family: 'Courier New', Courier, monospace;
