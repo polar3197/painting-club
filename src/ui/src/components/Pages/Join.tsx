@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { redeem_signup_invite, setup_account } from "../../api";
-import ApplicationForm from "../Utils/ApplicationForm";
+import { redeem_signup_invite, setup_account, get_join_invite } from "../../api";
+import ApplicationFlow from "../Utils/ApplicationFlow";
 import "../../styles/join.css";
 
-// Flyer QR landing (/join). Two modes:
-// - /join?i=<token>: the QR fast path — one combined form (name, email,
-//   username, password) that redeems the invite and completes account setup
-//   in the browser, then offers the app. No admin code involved.
-// - /join with no token: the original request-an-account application that
-//   feeds the admin review queue.
+// QR landing (/join). There are two QRs and they mean different things, so the
+// page asks the server which one was scanned before it renders anything:
+//
+// - the standing CLUB QR (kind "apply", the default): the application form.
+//   A member reviews it; the applicant picks their own username and password
+//   on the form, so approval makes the account live with nothing to relay.
+// - the TRUSTED QR (kind "instant"): an account on the spot, no review.
+//
+// The kind is never inferred from the URL — /join/redeem refuses any token
+// that isn't marked instant server-side, so a club token pasted into the
+// instant path gets nowhere.
 const APP_STORE_URL = "https://apps.apple.com/app/id6762710261";
 
 // iPadOS 13+ reports itself as a Mac; the touch-points check catches it.
@@ -24,7 +29,7 @@ const AppStoreLink = ({ extraClass = "" }: { extraClass?: string }) => (
   </a>
 );
 
-// The QR fast path: redeem + setup behind one submit.
+// The trusted QR: redeem + setup behind one submit, no review.
 const InviteSignup = ({ inviteToken, onDead }: { inviteToken: string; onDead: (msg: string) => void }) => {
   const navigate = useNavigate();
   const { login } = useAuth()!;
@@ -52,7 +57,7 @@ const InviteSignup = ({ inviteToken, onDead }: { inviteToken: string; onDead: (m
       setDone(result.username);
     } catch (err) {
       const msg = (err as Error).message || "something went wrong";
-      // A dead invite drops the visitor back to the application path.
+      // A dead (or non-instant) token drops the visitor to the application.
       if (/no longer valid/i.test(msg)) onDead(msg);
       else setError(msg);
     } finally {
@@ -99,9 +104,10 @@ export default function Join() {
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("i");
   const [inviteDead, setInviteDead] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  // null until the server says which QR this is. Rendering before it answers
+  // would flash the wrong form.
+  const [kind, setKind] = useState<"apply" | "instant" | null>(inviteToken ? null : "apply");
   const ios = isIOS();
-  const inviteMode = !!inviteToken && !inviteDead;
 
   useEffect(() => {
     const prev = document.title;
@@ -109,42 +115,50 @@ export default function Join() {
     return () => { document.title = prev; };
   }, []);
 
+  useEffect(() => {
+    if (!inviteToken) return;
+    let cancelled = false;
+    get_join_invite(inviteToken)
+      // An unknown or dead token still gets the application — being turned
+      // away at the door because a flyer went stale is the worst outcome here.
+      .then((r) => { if (!cancelled) setKind(r.valid ? r.kind : "apply"); })
+      .catch(() => { if (!cancelled) setKind("apply"); });
+    return () => { cancelled = true; };
+  }, [inviteToken]);
+
+  if (kind === null) {
+    return (
+      <main className="join-wrapper">
+        <div className="join-card">
+          <div className="join-header">
+            <div className="join-title">-• Painting Club •-</div>
+            <p className="join-tagline">one moment…</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // The application takes the whole screen — it is the first impression, and
+  // it has nothing to share the surface with.
+  if (kind === "apply" || inviteDead) {
+    return <ApplicationFlow inviteToken={inviteToken} />;
+  }
+
   return (
     <main className="join-wrapper">
       <div className="join-card">
         <div className="join-header">
           <div className="join-title">-• Painting Club •-</div>
-          <p className="join-tagline">
-            {inviteMode
-              ? "You found us. Make an account and you're in."
-              : submitted
-              ? "Thanks for reaching out."
-              : "A club for people who make things. Request an account to join."}
-          </p>
+          <p className="join-tagline">You found us. Make an account and you're in.</p>
           {inviteDead && <p className="join-invite-dead">{inviteDead}</p>}
         </div>
-
-        {inviteMode ? (
-          <InviteSignup inviteToken={inviteToken} onDead={setInviteDead} />
-        ) : (
-          <>
-            {/* On iOS the app is the better home for a member, so lead with it —
-                the web form stays right below as the always-available path. */}
-            {ios && !submitted && (
-              <div className="join-app-first">
-                <AppStoreLink extraClass="primary" />
-                <span className="join-or">or request an account below</span>
-              </div>
-            )}
-            <ApplicationForm onSubmitted={() => setSubmitted(true)} />
-          </>
-        )}
-
-        {!inviteMode && (
+        <InviteSignup inviteToken={inviteToken as string} onDead={setInviteDead} />
+        {ios && (
           <div className="join-footer">
-            {!(ios && !submitted) && <AppStoreLink />}
+            <AppStoreLink />
             <button className="join-login-link" onClick={() => navigate("/landing-page")}>
-              {submitted ? "back to log in" : "already a member? log in"}
+              already a member? log in
             </button>
           </div>
         )}

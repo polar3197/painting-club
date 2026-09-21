@@ -1,16 +1,10 @@
-import ApplicationForm from "./ApplicationForm";
-import "../../styles/utils/dialog.css";
-import "../../styles/utils/application-dialog.css";
+import ApplicationFlow from "./ApplicationFlow";
 
-const ApplicationDialog = ({ onClose }: { onClose: () => void }) => {
-    return (
-        <div className="dialog application-dialog">
-            <div className="exit">
-                <button onClick={onClose}>x</button>
-            </div>
-            <ApplicationForm />
-        </div>
-    );
-};
+// "request acc" on the landing page. The application is the same full-screen
+// flow the club QR leads to — one form everywhere, so the two entry points
+// can't drift. It brings its own surface, so there's no dialog chrome here.
+const ApplicationDialog = ({ onClose }: { onClose: () => void }) => (
+    <ApplicationFlow onClose={onClose} />
+);
 
 export default ApplicationDialog;

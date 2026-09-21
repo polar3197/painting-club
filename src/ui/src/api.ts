@@ -189,6 +189,15 @@ export interface ApplicationIn {
   state?: string;
   known_member?: string;
   reason?: string;
+  /** Credentials chosen on the form. With these, approval makes the account
+   *  live directly and there is no secret code to relay. */
+  username?: string;
+  password?: string;
+  /** Which QR they scanned, when they scanned one. */
+  invite_token?: string;
+  /** Handle for the piece already uploaded via upload_application_art. */
+  art_draft_id?: string;
+  art_aspect_ratio?: number;
 }
 
 export interface ApplicationOut {
@@ -204,14 +213,25 @@ export interface ApplicationOut {
   created_at: string;
   temp_username?: string | null;
   temp_password?: string | null;
+  /** The username they chose; becomes their real one at approval. */
+  username?: string | null;
+  /** The application piece. Prefer the thumb; art_url is the fallback until
+   *  the background resize has run. */
+  art_url?: string | null;
+  art_thumb_url?: string | null;
+  art_aspect_ratio?: number | null;
 }
 
 export interface ApplicationApproveOut {
   application_id: string;
   status: string;
-  temp_username: string;
-  temp_password: string;
-  temp_password_expires_at: string;
+  /** All null on the self-serve path — the account already works. */
+  temp_username: string | null;
+  temp_password: string | null;
+  temp_password_expires_at: string | null;
+  /** True when approval produced a directly usable account. */
+  account_ready?: boolean;
+  username?: string | null;
 }
 
 export function submit_application(payload: ApplicationIn): Promise<unknown> {
@@ -219,6 +239,44 @@ export function submit_application(payload: ApplicationIn): Promise<unknown> {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+/** Park the application piece ahead of submit. One slot per draft id: a
+ *  re-pick overwrites in place rather than adding a file. `seq` increments per
+ *  pick so a slow upload of a replaced photo can't land on top of the chosen
+ *  one. Pass `signal` so navigating back can abort an upload in flight. */
+export function upload_application_art(
+  draftId: string,
+  seq: number,
+  file: Blob,
+  signal?: AbortSignal,
+): Promise<{ draft_id: string; seq: number }> {
+  const body = new FormData();
+  body.append("draft_id", draftId);
+  body.append("seq", String(seq));
+  body.append("file", file, `${draftId}.jpg`);
+  return request("/join/application-art", { method: "POST", body, signal }) as Promise<{
+    draft_id: string;
+    seq: number;
+  }>;
+}
+
+/** Live availability behind the username field, so a clash surfaces while
+ *  they type instead of at submit. */
+export function check_username_available(u: string, signal?: AbortSignal): Promise<{ username: string; available: boolean }> {
+  return request(`/join/username-available?u=${encodeURIComponent(u)}`, { signal }) as Promise<{
+    username: string;
+    available: boolean;
+  }>;
+}
+
+/** Which kind of QR was scanned: "apply" (the standing club QR — application
+ *  + review) or "instant" (the trusted QR — account on the spot). */
+export function get_join_invite(token: string): Promise<{ valid: boolean; kind: "apply" | "instant" }> {
+  return request(`/join/invite?i=${encodeURIComponent(token)}`) as Promise<{
+    valid: boolean;
+    kind: "apply" | "instant";
+  }>;
 }
 
 export function get_applications(token: string | null): Promise<ApplicationOut[]> {

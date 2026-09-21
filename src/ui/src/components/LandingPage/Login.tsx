@@ -17,9 +17,9 @@ const SecretPanel = ({ label, onClose, children }: { label: string; onClose: () 
   </div>
 );
 
-// The login unit, mirroring the iOS LandingPage: un/pw + login, then a split
-// row of the two onboarding paths (request acc / secret code?), then the
-// forgot-password link.
+// The login unit, mirroring the iOS LandingPage: un/pw + login, then
+// "request acc", then the forgot-password link — which also holds the
+// secret-code redemption, the only thing setup codes are still used for.
 export default function Login(
   { bottom, left, background_color } : { bottom : number; left: number; background_color: string; }
 ) {
@@ -27,10 +27,16 @@ export default function Login(
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showApplication, setShowApplication] = useState(false);
-  const [showSecretCode, setShowSecretCode] = useState(false);
   const [setupCode, setSetupCode] = useState("");
   const [showForgot, setShowForgot] = useState(false);
   const [forgotUname, setForgotUname] = useState("");
+  // The forgot panel has two steps: ask for a code, then redeem the one an
+  // admin sends back. Redemption used to live behind its own "secret code?"
+  // button on this screen; it moved in here because the only people who ever
+  // need it are the people who just asked for a code.
+  const [forgotStep, setForgotStep] = useState<"ask" | "redeem">("ask");
+  // Someone whose application hasn't been reviewed yet.
+  const [underReview, setUnderReview] = useState(false);
   const { login } = useAuth()!;
   const navigate = useNavigate();
 
@@ -50,6 +56,15 @@ export default function Login(
       login(normalized, response.access_token, profile.role);
       navigate(`/members/${normalized}/profile`);
     } catch (err) {
+      // The backend answers "under_review" for credentials that belong to an
+      // application nobody has got to yet. Telling those people their login is
+      // invalid is the one thing guaranteed to make them think they typed it
+      // wrong, so they get a screen of their own.
+      if ((err as Error).message === "under_review") {
+        setUnderReview(true);
+        setPassword("");
+        return;
+      }
       alert((err as Error).message);
     }
   };
@@ -62,7 +77,7 @@ export default function Login(
     if (!code) return;
     try {
       const res = await redeem_setup_code(code);
-      setShowSecretCode(false);
+      closeForgot();
       login("", res.access_token, "member");
       navigate("/setup");
     } catch (err) {
@@ -70,53 +85,77 @@ export default function Login(
     }
   };
 
-  // Fire-and-forget, like iOS: the endpoint always answers ok; the admin
-  // sends a fresh secret code manually.
+  const closeForgot = () => {
+    setShowForgot(false);
+    setForgotStep("ask");
+    setForgotUname("");
+    setSetupCode("");
+  };
+
+  // Fire-and-forget, like iOS: the endpoint always answers ok. Then stay open
+  // on the redeem step, so the code has somewhere to go when it arrives.
   const handleForgotSubmit = (e: FormEvent) => {
     e.preventDefault();
     const uname = forgotUname.trim().toLowerCase();
     if (!uname) return;
     forgot_password(uname).catch(() => {});
-    setShowForgot(false);
-    setForgotUname("");
+    setForgotStep("redeem");
   };
 
   return (
     <>
     {showApplication && <ApplicationDialog onClose={() => setShowApplication(false)} />}
 
-    {showSecretCode && (
-      <SecretPanel label="secret code" onClose={() => setShowSecretCode(false)}>
-        <form className="secret-code-row" onSubmit={handleSetupCode}>
-          <input
-            className="secret-code-input"
-            placeholder="paste it"
-            autoCapitalize="none"
-            autoCorrect="off"
-            autoFocus
-            value={setupCode}
-            onChange={(e) => setSetupCode(e.target.value)}
-          />
-          <button type="submit" className="secret-code-btn" aria-label="redeem code">→</button>
-        </form>
+    {underReview && (
+      <SecretPanel label="still under review" onClose={() => setUnderReview(false)}>
+        <p className="forgot-body">
+          Your application hasn't been looked at yet. A member reads every one. Once you're
+          approved, this same username and password will just work — there's nothing else to do
+          and no code to wait for. Try again in a day.
+        </p>
       </SecretPanel>
     )}
 
     {showForgot && (
-      <SecretPanel label="forgot password" onClose={() => { setShowForgot(false); setForgotUname(""); }}>
-        <p className="forgot-body">type your username and we'll send you a new secret code asap</p>
-        <form className="secret-code-row" onSubmit={handleForgotSubmit}>
-          <input
-            className="secret-code-input"
-            placeholder="username"
-            autoCapitalize="none"
-            autoCorrect="off"
-            autoFocus
-            value={forgotUname}
-            onChange={(e) => setForgotUname(e.target.value.toLowerCase())}
-          />
-          <button type="submit" className="secret-code-btn" aria-label="send request">✓</button>
-        </form>
+      <SecretPanel label="forgot password" onClose={closeForgot}>
+        {forgotStep === "ask" ? (
+          <>
+            <p className="forgot-body">type your username and we'll send you a new secret code asap</p>
+            <form className="secret-code-row" onSubmit={handleForgotSubmit}>
+              <input
+                className="secret-code-input"
+                placeholder="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoFocus
+                value={forgotUname}
+                onChange={(e) => setForgotUname(e.target.value.toLowerCase())}
+              />
+              <button type="submit" className="secret-code-btn" aria-label="send request">✓</button>
+            </form>
+            <button type="button" className="forgot-have-code" onClick={() => setForgotStep("redeem")}>
+              already have a code?
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="forgot-body">
+              a member will send you a secret code. paste it here when it lands.
+            </p>
+            <form className="secret-code-row" onSubmit={handleSetupCode}>
+              <input
+                className="secret-code-input"
+                placeholder="paste it"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoFocus
+                value={setupCode}
+                onChange={(e) => setSetupCode(e.target.value)}
+              />
+              <button type="submit" className="secret-code-btn" aria-label="redeem code">→</button>
+            </form>
+          </>
+        )}
       </SecretPanel>
     )}
 
@@ -167,11 +206,10 @@ export default function Login(
             </div>
           </div>
           <button type="submit">login</button>
-          {/* Split row: direct access to both onboarding paths, equally weighted. */}
-          <div className="login-split-row">
-            <button type="button" onClick={() => setShowApplication(true)}>request acc</button>
-            <button type="button" onClick={() => setShowSecretCode(true)}>secret code?</button>
-          </div>
+          {/* One onboarding path now. Setup codes only exist for password
+              resets, so redeeming one lives inside the forgot-password panel
+              rather than sitting here confusing people who never needed it. */}
+          <button type="button" onClick={() => setShowApplication(true)}>request acc</button>
           <button
             type="button"
             className="login-forgot-link"
