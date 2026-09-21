@@ -6,11 +6,12 @@ import UserInfo from "./UserInfo";
 import "../../styles/user-profile/user-deets.css";
 
 const UserDetails = (
-  { profile, setProfile }
+  { profile, setProfile, onOpenComment }
   :
   {
     profile: Profile,
     setProfile: Dispatch<SetStateAction<Profile | null>>;
+    onOpenComment?: (artId: string, medium: string) => void;
   }
   ) => {
 
@@ -49,7 +50,7 @@ const UserDetails = (
 
     <div className="user-deets">
       <div className="user-body">
-        <UserInfo profile={profile} />
+        <UserInfo profile={profile} onOpenComment={onOpenComment} />
 
         {hasPic ? (
             <div className="user-profile-pic" onClick={() => setIsZoomedIn(true)}>

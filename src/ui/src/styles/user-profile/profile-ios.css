@@ -1,0 +1,367 @@
+/* Profile pieces shared with the iOS app (all widths), then the phone layout
+   (≤640px) matched to ios-v1 UserProfile.tsx. Loaded after the other profile
+   stylesheets so it wins ties. RN points = CSS px. */
+
+:root {
+    --ios-serif: Georgia, Cambria, 'Times New Roman', serif;
+    --ios-mono: 'Courier New', Courier, monospace;
+    --ios-cream: rgb(250, 244, 202);
+    --ios-gold: rgb(238, 190, 100);
+    --ios-grey: rgb(100, 100, 100);
+}
+
+/* ---- statement strip: plain wrapper on desktop ------------------------- */
+.statement-strip { display: contents; }
+.statement-comments { display: none; }
+
+/* ---- card pieces (all widths) ------------------------------------------ */
+.art-element--pinned { outline: 2px solid #E30022; outline-offset: -2px; }
+
+.art-date-badge {
+    align-self: flex-start;
+    flex-shrink: 0;
+    margin-top: 4px;
+    padding: 1px 6px;
+    border: 1px solid #000;
+    font-family: var(--ios-mono);
+    font-size: 12px;
+}
+
+.art-footer {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 10px;
+}
+.art-footer-main {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    min-width: 0;
+}
+
+.art-btn {
+    padding: 6px 12px;
+    border: 1px solid #000;
+    background: var(--ios-cream);
+    font-family: var(--ios-serif);
+    font-size: 14px;
+    color: #000;
+    cursor: pointer;
+}
+.art-btn:disabled { opacity: 0.35; cursor: default; }
+.art-btn-comments {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+}
+.art-btn-comments img { width: 26px; height: 22px; object-fit: contain; }
+.art-btn-wall.on { background: rgb(255, 175, 175); }
+
+.bookmark-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #000;
+    background: var(--ios-cream);
+    cursor: pointer;
+}
+.bookmark-btn.on { background: var(--ios-gold); }
+
+.art-empty {
+    font-family: var(--ios-serif);
+    font-size: 16px;
+    color: var(--ios-grey);
+    padding: 20px;
+}
+
+/* painting series card */
+.series-cover { position: relative; cursor: pointer; }
+.series-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 1px 6px;
+    border: 1px solid #000;
+    background: var(--ios-gold);
+    font-family: var(--ios-mono);
+    font-size: 12px;
+}
+.series-caption { font-family: var(--ios-serif); font-size: 14px; color: rgb(80, 80, 80); }
+.series-edit-btn { align-self: flex-start; padding: 5px 14px; margin-top: 8px; }
+
+/* series page */
+.series-page {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    overflow-y: auto;
+    background: var(--pc-bg, rgb(255, 250, 245));
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    box-sizing: border-box;
+}
+.series-page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.series-page-name {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--ios-serif);
+    font-size: 24px;
+    border: none;
+    border-bottom: 1px solid #000;
+    background: transparent;
+    padding: 2px 0;
+}
+.series-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.series-cell { display: flex; flex-direction: column; gap: 6px; }
+.series-cell-img { aspect-ratio: 1; border: 1px solid #000; cursor: pointer; overflow: hidden; }
+.series-cell-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.series-cell-title {
+    font-family: var(--ios-serif);
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.series-cell-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.series-cell-btns .art-btn { padding: 3px 7px; font-size: 12px; }
+
+/* audio */
+.audio-card { flex-direction: column; background-color: #fff; cursor: pointer; }
+.audio-head { display: flex; align-items: center; gap: 8px; }
+.audio-titles { flex: 1; min-width: 0; }
+.audio-artist { font-family: var(--ios-serif); font-size: 14px; color: rgb(80, 80, 80); margin-top: 2px; }
+.audio-play {
+    flex-shrink: 0;
+    border: 1px solid #000;
+    background: var(--ios-gold);
+    padding: 0;
+    cursor: pointer;
+    line-height: 1;
+}
+.audio-expanded { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; cursor: default; }
+.audio-date { font-family: var(--ios-serif); font-size: 14px; }
+.audio-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border: 2px solid #000;
+    background: var(--ios-cream);
+}
+.audio-scrub { flex: 1; min-width: 0; accent-color: #000; }
+.audio-times { font-family: var(--ios-mono); font-size: 10px; white-space: nowrap; }
+.album-count { font-family: var(--ios-mono); font-size: 14px; margin-top: 2px; }
+.album-chevron { font-size: 22px; padding: 0 4px; }
+.album-tracks { border-top: 1px solid #000; margin-top: 10px; }
+.album-track {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    font-family: var(--ios-serif);
+    font-size: 16px;
+}
+.album-track-n { width: 22px; flex-shrink: 0; }
+.album-track-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.album-track-dur { font-family: var(--ios-mono); font-size: 12px; }
+
+/* comments received */
+.comments-received {
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
+    box-sizing: border-box;
+}
+.comment-received-row {
+    flex: 0 0 max(36px, calc((100% - 12px) / 4));
+    padding: 4px 8px;
+    border: 1px solid #000;
+    background: var(--ios-cream);
+    font-family: var(--ios-serif);
+    font-size: 14px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    color: #000;
+}
+.comment-received-row.unseen { background: var(--ios-gold); }
+.comments-received-empty {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 10px;
+    font-family: var(--ios-serif);
+    font-size: 14px;
+    color: var(--ios-grey);
+}
+
+/* loading mock-up */
+.sk-bar {
+    display: block;
+    background: var(--pc-tab, var(--ios-cream));
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    margin-bottom: 8px;
+}
+.sk-art { aspect-ratio: 1; background: var(--pc-bg, rgb(255, 250, 245)); border: 2px solid #000; }
+
+/* ======================= phones: match iOS ============================== */
+@media (max-width: 640px) {
+    /* header: 20px outer + 10px inner = content 30px from the edge */
+    .user-deets { padding: 10px 20px; }
+    .user-body {
+        grid-template-columns: 1fr 32vw;
+        column-gap: 12px;
+        row-gap: 0;
+        padding: 10px;
+        align-items: stretch;
+    }
+    .user-col { display: flex; flex-direction: column; }
+    .user-identity { gap: 4px; }
+    .user-name { font-family: var(--ios-serif); font-size: 24px; font-weight: 400; line-height: 1.2; }
+    .user-location { font-family: var(--ios-serif); font-size: 14px; margin-top: 2px; line-height: 1.2; }
+
+    /* action buttons centred between the location and the picture's bottom */
+    .owner-actions,
+    .owner-actions-single {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        margin-top: 0;
+    }
+    .owner-action-btn,
+    .owner-actions-single .owner-action-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 0;
+        background-color: var(--pc-btn, #fff);
+    }
+    .owner-action-btn:hover { background-color: var(--pc-btn, #fff); }
+    .owner-action-btn svg { width: 22px; height: 22px; }
+    .owner-action-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: rgb(246, 110, 110);
+    }
+
+    .user-profile-pic {
+        width: 32vw;
+        aspect-ratio: 1 / 1;
+        box-shadow: none;
+        align-self: start;
+    }
+    .add-pic-plus { font-size: 14px; }
+
+    /* statement: pages inset 22px from the screen edge (8px outside the 30px
+       content inset); the owner's strip swipes to the comments page */
+    .statement-strip {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: flex;
+        gap: 16px;
+        margin: 12px -8px 0;
+        overflow-x: hidden;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+    .statement-strip::-webkit-scrollbar { display: none; }
+    .statement-strip.swipeable { overflow-x: auto; }
+    .statement-strip .user-field-element {
+        flex: 0 0 100%;
+        box-sizing: border-box;
+        scroll-snap-align: start;
+        margin: 0;
+        min-height: 88px;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        overflow: visible;
+        background-color: var(--pc-statement, rgb(255, 250, 245));
+    }
+    .statement-comments { display: block; padding: 0; overflow: hidden; }
+    .artist-statement-label { font-family: var(--ios-serif); font-size: 20px; font-weight: 400; margin-bottom: 4px; }
+    .user-field-element hr { margin: 0 0 8px; }
+    .user-bio { font-family: system-ui, sans-serif; font-size: 14px; font-weight: 300; line-height: 22px; margin: 0; }
+
+    /* media tabs: two 48% columns, only a rule underneath */
+    .media-bar-wrapper { padding: 8px 20px 18px; margin-top: -10px; border-bottom: 1px solid #000; }
+    .media-bar-box { border: none; }
+    .media-bar {
+        flex-wrap: wrap;
+        justify-content: space-between;
+        row-gap: 6px;
+        column-gap: 0;
+        padding: 0;
+        border-bottom: none;
+    }
+    .media-element,
+    .add-media {
+        flex: 0 0 48%;
+        box-sizing: border-box;
+        padding: 6px 12px;
+        font-family: var(--ios-serif);
+        font-size: 14px;
+    }
+    .media-element:hover { background-color: var(--pc-tab, var(--ios-cream)); }
+    .media-element.selected:hover { background-color: var(--pc-tab-selected, var(--ios-gold)); }
+    .add-media { font-weight: 600; }
+    .add-media--full { flex-basis: 100%; }
+    /* no keyword filter or portfolio toggle on phones (iOS has neither) */
+    .keywords-bar { display: none; }
+
+    /* art list */
+    .art { padding: 16px 16px 56px; gap: 0; }
+    .art-element {
+        margin-bottom: 16px;
+        padding: 12px;
+        gap: 0;
+        border: 1px solid #000;
+        background-color: var(--pc-art, #fff);
+    }
+    .art-visual { margin-bottom: 10px; }
+    .art-visual img { border: 2px solid #000; }
+    .art-details { gap: 0; padding: 0 4px; }
+    .art-details-header { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; }
+    .art-details-title { flex: 1; min-width: 0; font-family: var(--ios-serif); font-size: 24px; }
+    .art-details-element { font-family: system-ui, sans-serif; font-size: 14px; margin-bottom: 4px; }
+    .art-detail-icon { width: 24px; height: 24px; margin-right: 6px; }
+    .art-keywords { display: none; }
+    .art-btn-full { flex: 1; }
+    .audio-card { background-color: #fff; }
+
+    /* add: 52px gold circle floating bottom-left */
+    .add {
+        position: fixed;
+        top: auto;
+        right: auto;
+        left: 20px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+        z-index: 50;
+    }
+    .add button {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background-color: var(--ios-gold);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+        font-family: var(--ios-mono);
+        font-size: 28px;
+        line-height: 1;
+    }
+}

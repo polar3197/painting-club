@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Profile } from "../../api";
 import AddArtDialog from "../Utils/AddArtDialog";
@@ -12,6 +12,15 @@ import { useAuth } from "../../context/AuthContext";
 import { get_members_visual_2d, remove_visual_2d, add_new_visual_2d, Visual2DOut, Visual2DIn, get_members_written_form, add_new_written_form, WrittenFormOut, WrittenFormIn, get_media, MediaType } from "../../api";
 import WrittenFormPiece from "./WrittenForm";
 import CollectionRow from "./CollectionRow";
+import BookmarkButton from "../Utils/BookmarkButton";
+import ArtCarousel from "../Utils/ArtCarousel";
+import PaintingSeriesRow from "./PaintingSeriesRow";
+import { SeriesPiece, seriesOrder } from "./seriesOrder";
+import { AudioPiece, AlbumTile } from "./AudioPieces";
+import { AudioOut, get_members_audio } from "../../profileApi";
+
+const isPhone = () => window.matchMedia("(max-width: 640px)").matches;
+import { useWallPin, usePinnedId } from "../../hooks/useMarks";
 
 import '../../styles/user-profile/art.css';
 
@@ -22,7 +31,12 @@ const Visual2DPiece = ({
     onRemove,
     onEdit,
     priority,
+    ownerUsername,
+    onZoom,
 }: {
+    ownerUsername: string;
+    // Phones open the shared swipe viewer instead of this card's own zoom.
+    onZoom?: () => void;
     isOwner: boolean;
     piece: Visual2DOut;
     priority: boolean;
@@ -32,6 +46,7 @@ const Visual2DPiece = ({
 }) => {
     const auth = useAuth();
     const currentUser = auth?.currentUser ?? null;
+    const [pinned, togglePin] = useWallPin(ownerUsername, "visual_2d", piece.id);
     const token = auth?.token ?? null;
     const [isZoomedIn, setIsZoomedIn] = useState(false);
     const [showComments, setShowComments] = useState(false);
@@ -62,45 +77,47 @@ const Visual2DPiece = ({
                 onCancel={() => setShowRemoveConfirm(false)}
             />
         }
-        <div id={`art-${piece.id}`} className="art-element">
-            <div className="art-visual" onClick={() => setIsZoomedIn(true)}>
+        <div id={`art-${piece.id}`} className={`art-element${pinned ? " art-element--pinned" : ""}`}>
+            <div className="art-visual" onClick={() => (onZoom && isPhone() ? onZoom() : setIsZoomedIn(true))}>
                 <ArtImage piece={piece} priority={priority} />
             </div>
             <div className="art-right">
                 <div className="art-details">
                     <div className="art-details-header">
                         <div className="art-details-title">{piece.title}</div>
-                        {piece.date && <div className="art-details-element">{piece.date}</div>}
+                        {piece.date && <div className="art-date-badge">{piece.date}</div>}
                     </div>
                     <div className="art-details-elements">
                         {piece.location && <div className="art-details-element"><img className="art-detail-icon" src="/imgs/location.png" />{piece.location}</div>}
                         {piece.song && <div className="art-details-element"><img className="art-detail-icon" src="/imgs/music.png" />{[piece.song, piece.song_artist].filter(Boolean).join(", ")}</div>}
                         {piece.width && piece.height && <div className="art-details-element"><img className="art-detail-icon dimensions" src="/imgs/dimensions.png" />{piece.width}"x{piece.height}"</div>}
-                        {piece.keywords && <div className="art-details-element"><b>keywords: </b>{piece.keywords.join(", ")}</div>}
+                        {piece.keywords && <div className="art-details-element art-keywords"><b>keywords: </b>{piece.keywords.join(", ")}</div>}
                     </div>
                 </div>
-                <div className="art-details-footer">
-                    {isOwner ? (
-                        <div className="art-element-buttons">
-                            <div className="edit">
-                                <button onClick={() => onEdit()}>edit</button>
-                            </div>
-                            {piece.comments_enabled && (
-                                <div className="comments-toggle">
-                                    <button onClick={() => setShowComments(true)}>comments</button>
-                                </div>
-                            )}
-                            <div className="remove">
-                                <button onClick={() => setShowRemoveConfirm(true)}>remove</button>
-                            </div>
-                        </div>
-                    ) : piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
-                        <div className="art-element-buttons art-element-buttons--centered">
-                            <div className="comments-toggle">
-                                <button onClick={() => setShowComments(true)}>comments</button>
-                            </div>
-                        </div>
-                    )}
+                {/* iOS order: remove · comments (fills) · edit · wall, with the
+                    bookmark square always pinned at the far right. */}
+                <div className="art-details-footer art-footer">
+                    <div className="art-footer-main">
+                        {isOwner ? (
+                            <>
+                                <button className="art-btn" onClick={() => setShowRemoveConfirm(true)}>remove</button>
+                                {piece.comments_enabled && (
+                                    <button className="art-btn art-btn-comments" aria-label="comments" onClick={() => setShowComments(true)}>
+                                        <img src="/imgs/comment-bubble.png" alt="" />
+                                    </button>
+                                )}
+                                <button className="art-btn" onClick={() => onEdit()}>edit</button>
+                                <button className={`art-btn art-btn-wall${pinned ? " on" : ""}`} onClick={togglePin}>
+                                    {pinned ? "walled" : "wall"}
+                                </button>
+                            </>
+                        ) : piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
+                            <button className="art-btn art-btn-comments art-btn-full" aria-label="comments" onClick={() => setShowComments(true)}>
+                                <img src="/imgs/comment-bubble.png" alt="" />
+                            </button>
+                        )}
+                    </div>
+                    <BookmarkButton artIds={[piece.id]} size={32} />
                 </div>
             </div>
         </div>
@@ -160,6 +177,8 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
     const selectedMediumType = selectedMedium ? allMedia.find(m => m.name === selectedMedium)?.type ?? null : null;
     const isVisual2D = selectedMediumType === "visual_2d";
     const isWrittenForm = selectedMediumType === "written_form";
+    const isAudio = selectedMediumType === "audio";
+    const [audio, setAudio] = useState<AudioOut[]>([]);
 
     // Cached lists paint immediately on remount; the fetch then refreshes them.
     useEffect(() => {
@@ -174,17 +193,24 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                     setWrittenForms(data);
                     onKeywordsLoaded([...new Set(data.flatMap(p => p.keywords ?? []))]);
                 });
+            } else if (selectedMedium && isAudio) {
+                await swr(`audio:${profile.username}:${selectedMedium}`, () => get_members_audio(profile.username, selectedMedium), (data) => {
+                    setAudio(data);
+                    onKeywordsLoaded([]);
+                });
             } else {
                 onKeywordsLoaded([]);
             }
         }
 
         getArt();
-    }, [profile.username, selectedMedium, refresh, isVisual2D, isWrittenForm]);
+    }, [profile.username, selectedMedium, refresh, isVisual2D, isWrittenForm, isAudio]);
 
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [pendingScrollId, setPendingScrollId] = useState(scrollToArtId ?? null);
+    // A later jump request (e.g. tapping a received comment) re-arms the scroll.
+    useEffect(() => { if (scrollToArtId) setPendingScrollId(scrollToArtId); }, [scrollToArtId]);
 
     useEffect(() => {
         if (!pendingScrollId || art.length === 0) return;
@@ -198,6 +224,31 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
             navigate(`?${next.toString()}`, { replace: true });
         }
     }, [art, pendingScrollId]);
+
+    // iOS order: keyword filter, the member's wall-pinned piece floated to the
+    // top, then each painting series collapsed into one row at its first
+    // piece's position.
+    const pinnedId = usePinnedId(profile.username, "visual_2d");
+    const visualRows = useMemo(() => {
+        type Row = { kind: "piece"; piece: SeriesPiece } | { kind: "series"; id: string; name: string; pieces: SeriesPiece[] };
+        let list = (selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art) as SeriesPiece[];
+        if (pinnedId) {
+            const hit = list.find(p => p.id === pinnedId);
+            if (hit) list = [hit, ...list.filter(p => p !== hit)];
+        }
+        const rows: Row[] = [];
+        const bySeries = new Map<string, Extract<Row, { kind: "series" }>>();
+        for (const p of list) {
+            if (!p.series_id) { rows.push({ kind: "piece", piece: p }); continue; }
+            const existing = bySeries.get(p.series_id);
+            if (existing) { existing.pieces.push(p); continue; }
+            const row = { kind: "series" as const, id: p.series_id, name: p.series_name ?? "series", pieces: [p] };
+            bySeries.set(p.series_id, row);
+            rows.push(row);
+        }
+        return rows;
+    }, [art, selectedKeywords, pinnedId]);
+    const [zoomIndex, setZoomIndex] = useState<number | null>(null);
 
     return (
         <div className='art-wrapper'>
@@ -259,8 +310,21 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                                 </div>
                             </div>
                         ))}
-                        {(selectedKeywords.length > 0 ? art.filter(p => selectedKeywords.every(k => p.keywords?.includes(k))) : art)
-                            .map((piece, i) => <Visual2DPiece key={piece.id} priority={i < 2} isOwner={profile.is_owner} piece={piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(piece)} />)}
+                        {visualRows.map((row, i) => row.kind === "piece"
+                            ? <Visual2DPiece key={row.piece.id} priority={i < 2} ownerUsername={profile.username} isOwner={profile.is_owner} piece={row.piece} viewerBlockedByOwner={!!profile.viewer_blocked_by_owner} onRemove={onRefresh} onEdit={() => setEditingPiece(row.piece)} onZoom={() => setZoomIndex(i)} />
+                            : <PaintingSeriesRow key={row.id} isOwner={profile.is_owner} seriesId={row.id} seriesName={row.name} pieces={row.pieces} username={profile.username} selectedMedium={selectedMedium!} onRefresh={onRefresh} />
+                        )}
+                        {zoomIndex !== null && visualRows[zoomIndex] && (
+                            <ArtCarousel
+                                slots={visualRows.map((r) => r.kind === "piece"
+                                    ? { kind: "piece" as const, piece: r.piece }
+                                    : { kind: "collection" as const, pieces: seriesOrder(r.pieces) })}
+                                initialIndex={zoomIndex}
+                                creatorUsername={profile.username}
+                                isOwner={profile.is_owner}
+                                onClose={() => setZoomIndex(null)}
+                            />
+                        )}
                     </>
                 ) : isWrittenForm ? (
                     (() => {
@@ -328,8 +392,26 @@ const Art = ({ profile, selectedMedium, selectedKeywords, refresh, onRefresh, on
                             )}
                         </>;
                     })()
+                ) : isAudio && audio.length > 0 ? (
+                    (() => {
+                        // Albums collapse into one tracklist tile at their first track's spot.
+                        type Row = { kind: "piece"; piece: AudioOut } | { kind: "album"; id: string; name: string; pieces: AudioOut[] };
+                        const rows: Row[] = [];
+                        const albums = new Map<string, Extract<Row, { kind: "album" }>>();
+                        for (const p of audio) {
+                            if (!p.series_id) { rows.push({ kind: "piece", piece: p }); continue; }
+                            const a = albums.get(p.series_id);
+                            if (a) { a.pieces.push(p); continue; }
+                            const row = { kind: "album" as const, id: p.series_id, name: p.series_name ?? "album", pieces: [p] };
+                            albums.set(p.series_id, row);
+                            rows.push(row);
+                        }
+                        return rows.map(r => r.kind === "piece"
+                            ? <AudioPiece key={r.piece.id} piece={r.piece} isOwner={profile.is_owner} onRemove={onRefresh} />
+                            : <AlbumTile key={r.id} name={r.name} pieces={r.pieces} />);
+                    })()
                 ) : (
-                    `${selectedMedium} is empty atm`
+                    <div className="art-empty">{selectedMedium} is empty atm</div>
                 )}
             </div>
         </div>
