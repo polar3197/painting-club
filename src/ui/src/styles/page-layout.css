@@ -64,3 +64,19 @@
     opacity: 0.55;
     cursor: default;
 }
+
+/* ---- never wider than the phone ----------------------------------------
+   Pages scroll vertically only: anything a few px too wide used to let the
+   whole page slide left/right under your thumb. */
+.page-body { overflow-x: hidden; }
+
+/* width:100% + padding + border overflowed the screen by ~26px */
+.art-element { box-sizing: border-box; }
+
+/* fixed-width dialogs (420-520px) fit the screen on phones */
+.dialog,
+.application-dialog,
+.add-media-dialog {
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+}
