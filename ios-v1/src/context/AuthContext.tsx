@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { clearCached } from '../utils/jsonCache';
 import { get_blocks, refresh_token, get_profile, setAuthToken } from '../api';
 import { setObservabilityToken, recordLogin } from '../api/observability';
 
@@ -132,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    clearCached();
     await SecureStore.deleteItemAsync('token');
     await SecureStore.deleteItemAsync('username');
     await SecureStore.deleteItemAsync('role');

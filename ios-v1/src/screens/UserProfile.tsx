@@ -17,6 +17,7 @@ import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useProfile, useAdminPending } from '../hooks';
+import { readCached, writeCached } from '../utils/jsonCache';
 import * as ImagePicker from 'expo-image-picker';
 import {
   get_members_visual_2d,
@@ -275,6 +276,8 @@ function Visual2DPiece({
 // Flip back to true when we want it surfaced again.
 const SHOW_KEYWORDS_BAR = false;
 
+const v2dCacheKey = (username: string, medium: string) => `v2d:${username.toLowerCase()}:${medium}`;
+
 // --- Main UserProfile screen ---
 export default function UserProfile() {
   const insets = useSafeAreaInsets();
@@ -295,10 +298,16 @@ export default function UserProfile() {
     () => ({ ...DEFAULT_PROFILE_COLORS, ...decodeStoredColors(profile?.profile_colors) }),
     [profile?.profile_colors]
   );
-  const [selectedMedium, setSelectedMedium] = useState<string | null>(mediumParam ?? null);
+  // profile may already be here from the last-launch cache — start on its
+  // first tab so the art (below) can render on the first frame too.
+  const [selectedMedium, setSelectedMedium] = useState<string | null>(
+    mediumParam ?? profile?.media?.[0] ?? null,
+  );
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<string[]>([]);
-  const [art, setArt] = useState<Visual2DOut[]>([]);
+  const [art, setArt] = useState<Visual2DOut[]>(
+    () => (username && selectedMedium ? readCached<Visual2DOut[]>(v2dCacheKey(username, selectedMedium)) : undefined) ?? [],
+  );
   const [writtenArt, setWrittenArt] = useState<WrittenFormOut[]>([]);
   const [audioArt, setAudioArt] = useState<AudioOut[]>([]);
   const [refresh, setRefresh] = useState(0);
@@ -473,9 +482,14 @@ export default function UserProfile() {
     return unsubscribe;
   }, [navigation, refetchProfile]);
 
-  const [allMedia, setAllMedia] = useState<MediaType[]>([]);
+  const [allMedia, setAllMedia] = useState<MediaType[]>(() => readCached<MediaType[]>('media') ?? []);
   useEffect(() => {
-    get_media().then(setAllMedia).catch(() => {});
+    get_media()
+      .then((m) => {
+        setAllMedia(m);
+        writeCached('media', m);
+      })
+      .catch(() => {});
   }, []);
   const selectedMediumType = selectedMedium
     ? allMedia.find((m) => m.name === selectedMedium)?.type ?? null
@@ -495,9 +509,13 @@ export default function UserProfile() {
   useEffect(() => {
     if (!selectedMedium || !username) return;
     if (isV2d) {
+      const key = v2dCacheKey(username, selectedMedium);
+      const cached = readCached<Visual2DOut[]>(key);
+      if (cached) setArt(cached);
       get_members_visual_2d(username, selectedMedium)
         .then((data) => {
           setArt(data);
+          writeCached(key, data);
           setWrittenArt([]);
           setAudioArt([]);
           const unique = [...new Set(data.flatMap((p) => p.keywords ?? []))];
