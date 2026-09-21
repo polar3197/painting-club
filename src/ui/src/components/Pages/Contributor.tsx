@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import QRCode from "qrcode";
 import { AnnouncementOut, get_announcements, delete_announcement, get_signup_invites, create_signup_invite } from "../../api";
 import { ToolsPage } from "../Utils/ToolsPage";
 import ConfirmDialog from "../Utils/ConfirmDialog";
@@ -34,6 +33,7 @@ export default function Contributor() {
           (i.max_uses === null || i.uses < i.max_uses)
         ) ?? await create_signup_invite({ label: "club qr" }, token);
         const url = `${window.location.origin}/join?i=${live.token}`;
+        const { default: QRCode } = await import("qrcode");
         const data = await QRCode.toDataURL(url, { margin: 1, width: 480 });
         if (!cancelled) setQr(data);
       } catch {

@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import heic2any from "heic2any";
 import { Visual2DOut } from "../../api";
 
 const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Record<string, any>) => void; initialData?: Visual2DOut }) => {
@@ -59,6 +58,8 @@ const PaintingForm = ({ onDataChange, initialData }: { onDataChange: (data: Reco
             setConverting(true);
             setPreviewUrl(null);
             try {
+                // 1.3MB converter — loaded only when a HEIC is actually picked.
+                const { default: heic2any } = await import("heic2any");
                 const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
                 const blob = Array.isArray(result) ? result[0] : result;
                 setPreviewUrl(URL.createObjectURL(blob as Blob));

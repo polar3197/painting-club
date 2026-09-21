@@ -13,6 +13,7 @@ Full-stack template: PostgreSQL + FastAPI + React + nginx, all containerized wit
 docker compose up --build      # Start all services
 docker compose down            # Stop all services
 docker compose logs -f api     # Tail API logs
+docker compose up -d --build frontend   # Deploy UI changes (rebuilds the bundle)
 ```
 
 ### Backend (FastAPI)
@@ -27,7 +28,7 @@ pytest tests/test_api.py -v                # Run specific test file
 ```bash
 cd src/ui
 npm install          # Install dependencies
-npm run dev          # Start dev server (port 5173)
+npm run dev          # Start dev server (port 5173; prod serves the built bundle)
 npm run build        # Production build
 npm run lint         # Run ESLint
 ```
@@ -37,7 +38,7 @@ npm run lint         # Run ESLint
 ```
 Browser → nginx:80
             ├── /api/* → api:8000 (FastAPI)
-            └── /*     → frontend:5173 (Vite)
+            └── /*     → frontend:80 (built bundle on nginx; see src/ui/Dockerfile)
 
 api:8000 → db:5432 (PostgreSQL)
 ```
@@ -63,5 +64,5 @@ PG_USER, PG_PASSWORD, PG_NAME, PG_HOST, PG_PORT
 
 - 80: nginx (external entry point)
 - 8000: FastAPI (internal)
-- 5173: Vite dev server (internal)
+- 5173: Vite dev server (local `npm run dev` only)
 - 5432: PostgreSQL (internal)

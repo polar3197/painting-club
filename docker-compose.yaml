@@ -68,14 +68,14 @@ services:
       timeout: 5s
       retries: 5
 
+  # Built bundle served by its own nginx (see src/ui/Dockerfile). UI changes
+  # deploy with `docker compose up -d --build frontend`; a failed build
+  # leaves the running container untouched.
   frontend:
     build: ./src/ui
     container_name: frontend
     expose:
-      - "5173"
-    volumes:
-      - ./src/ui:/app
-      - /app/node_modules
+      - "80"
     restart: unless-stopped
 
 volumes:
