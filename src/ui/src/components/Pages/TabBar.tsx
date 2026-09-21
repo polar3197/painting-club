@@ -1,11 +1,10 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { CalendarIcon } from "../Utils/Icons";
 import "../../styles/tab-bar.css";
 
 // The web app's navigation: a bottom tab bar — profile, events, art wall,
-// people — using the app's own drawings (me / art / profiles.png) where they
-// exist. Replaced the swipe hub on the web (archived in ui/legacy/).
+// people — all with the app's own hand drawings (me / writing / art /
+// profiles.png). Replaced the swipe hub on the web (archived in ui/legacy/).
 export default function TabBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -14,7 +13,7 @@ export default function TabBar() {
 
   const tabs = [
     { key: "profile", label: "profile", to: mine, icon: <img src="/imgs/me.png" alt="" />, active: pathname === mine },
-    { key: "events", label: "events", to: "/events", icon: <CalendarIcon />, active: pathname === "/events" },
+    { key: "events", label: "events", to: "/events", icon: <img src="/imgs/writing.png" alt="" />, active: pathname === "/events" },
     { key: "wall", label: "art wall", to: "/art-wall", icon: <img src="/imgs/art.png" alt="" />, active: pathname === "/art-wall" },
     { key: "people", label: "people", to: "/members", icon: <img src="/imgs/profiles.png" alt="" />, active: pathname === "/members" },
   ];

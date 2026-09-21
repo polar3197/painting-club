@@ -51,11 +51,3 @@ export const RowsIcon = () => (
     <path d="M11 18h10" />
   </svg>
 );
-
-export const CalendarIcon = () => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="3.5" y="5" width="17" height="15.5" />
-    <path d="M3.5 9.5h17M8 3v4M16 3v4" />
-    <path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2" />
-  </svg>
-);

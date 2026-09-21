@@ -17,12 +17,10 @@
     gap: 2px;
     padding: 6px 0 5px;
     border: none;
-    border-right: 1px solid #000;
     background: transparent;
     color: #000;
     cursor: pointer;
 }
-.tab:last-child { border-right: none; }
 .tab.on { background: rgb(238, 190, 100); }
 .tab:hover:not(.on) { background: rgb(252, 219, 121); }
 
