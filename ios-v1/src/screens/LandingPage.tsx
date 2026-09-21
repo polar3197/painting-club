@@ -23,9 +23,22 @@ import type { AuthStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, 'LandingPage'>;
 
+// Same four paintings the web landing page rotates through, each with the
+// panel color the web pairs with it (Avery's is transparent on web; cream here
+// so the form stays readable). Static requires so Metro bundles all four.
+const LANDING_THEMES = [
+  { image: require('../../assets/imgs/klimpt.jpg'), accent: 'lightgreen' },
+  { image: require('../../assets/imgs/hopper-barn.jpg'), accent: 'rgb(216, 64, 25)' },
+  { image: require('../../assets/imgs/diebenkorn.jpg'), accent: 'rgb(238, 114, 72)' },
+  { image: require('../../assets/imgs/ma.jpg'), accent: 'rgb(250, 244, 202)' },
+];
+
 export default function LandingPage() {
   const navigation = useNavigation<Nav>();
   const auth = useAuth();
+  // Picked once per mount so typing (re-renders) never swaps the painting.
+  const [theme] = useState(() => LANDING_THEMES[Math.floor(Math.random() * LANDING_THEMES.length)]);
+  const accent = { backgroundColor: theme.accent };
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -121,7 +134,7 @@ export default function LandingPage() {
 
   return (
     <ImageBackground
-      source={require('../../assets/imgs/klimpt.png')}
+      source={theme.image}
       style={styles.bg}
       resizeMode="cover"
     >
@@ -134,7 +147,7 @@ export default function LandingPage() {
             padding-bottom animates with the keyboard, content slides smoothly
             instead of recentering every frame (which produces visible twitch). */}
         <View style={styles.flexSpacer} />
-        <View style={styles.titleWrap}>
+        <View style={[styles.titleWrap, accent]}>
           <Text
             style={styles.title}
             numberOfLines={1}
@@ -145,7 +158,7 @@ export default function LandingPage() {
           </Text>
         </View>
 
-        <View style={styles.loginContainer}>
+        <View style={[styles.loginContainer, accent]}>
           <View style={styles.inputRow}>
             <Text style={styles.inputLabel}>un:</Text>
             <TextInput
@@ -213,7 +226,7 @@ export default function LandingPage() {
             style={StyleSheet.absoluteFill}
             onPress={() => setShowSecretCode(false)}
           />
-          <View style={styles.secretPanel}>
+          <View style={[styles.secretPanel, accent]}>
             <Text style={styles.secretLabel}>secret code</Text>
             <View style={styles.secretCodeRow}>
               <TextInput
@@ -244,7 +257,7 @@ export default function LandingPage() {
       >
         <View style={styles.secretBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeForgot} />
-          <View style={styles.secretPanel}>
+          <View style={[styles.secretPanel, accent]}>
             <Text style={styles.secretLabel}>forgot password</Text>
             <Text style={styles.forgotBody}>
               type your username and we'll send you a new secret code asap
