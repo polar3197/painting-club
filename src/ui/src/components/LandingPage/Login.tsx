@@ -3,7 +3,6 @@ import "../../styles/login.css";
 import { login_user, get_profile, redeem_setup_code, forgot_password } from "../../api";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import ApplicationDialog from "../Utils/ApplicationDialog";
 
 // Small overlay panel shared by the secret-code and forgot-password dialogs —
 // the web twin of the iOS landing page's secretBackdrop/secretPanel modals.
@@ -26,7 +25,6 @@ export default function Login(
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showApplication, setShowApplication] = useState(false);
   const [setupCode, setSetupCode] = useState("");
   const [showForgot, setShowForgot] = useState(false);
   const [forgotUname, setForgotUname] = useState("");
@@ -104,7 +102,6 @@ export default function Login(
 
   return (
     <>
-    {showApplication && <ApplicationDialog onClose={() => setShowApplication(false)} />}
 
     {underReview && (
       <SecretPanel label="still under review" onClose={() => setUnderReview(false)}>
@@ -209,7 +206,7 @@ export default function Login(
           {/* One onboarding path now. Setup codes only exist for password
               resets, so redeeming one lives inside the forgot-password panel
               rather than sitting here confusing people who never needed it. */}
-          <button type="button" onClick={() => setShowApplication(true)}>request acc</button>
+          <button type="button" onClick={() => navigate("/apply")}>request acc</button>
           <button
             type="button"
             className="login-forgot-link"

@@ -7,6 +7,7 @@ import ArtGallery from "./components/Pages/ArtGallery";
 import Portfolio from "./components/Pages/Portfolio";
 import NotMember from "./components/Pages/NotMember";
 import Join from "./components/Pages/Join";
+import Apply from "./components/Pages/Apply";
 import Admin from "./components/Pages/Admin";
 import Settings from "./components/Pages/Settings";
 import EditProfile from "./components/Pages/EditProfile";
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/landing-page" element={<LandingPage />} />
         {/* Flyer QR target: a standalone full-page request-account form. */}
         <Route path="/join" element={<Join />} />
+        <Route path="/apply" element={<Apply />} />
 
         {/* All sidebar pages live here */}
         <Route element={<PageLayout />}>
