@@ -16,7 +16,8 @@ const dayLabel = (iso: string) => {
 
 // The events page (iOS Events twin): the month calendar, then every upcoming
 // event in the member's calendar sectioned by date. Picking a day jumps the
-// list to it. The tab bar names the page, so there's no heading — just "+".
+// list to it. The tab bar names the page, so there's no header; adding is the
+// floating "+".
 export default function EventsBox() {
   const navigate = useNavigate();
   const { token } = useAuth()!;
@@ -43,9 +44,6 @@ export default function EventsBox() {
 
   return (
     <div className="events-page">
-      <div className="events-page-head">
-        <button className="add-btn" onClick={() => navigate("/events/new")}>+</button>
-      </div>
       <div className="events-page-cal">
         <MonthCalendar cursor={cursor} onStep={(d) => setCursor((c) => stepMonth(c, d))} selected={selected} onSelect={pick} marks={marks} />
       </div>
@@ -61,6 +59,8 @@ export default function EventsBox() {
           ))
         )}
       </div>
+      {/* add an event: the same floating gold circle as the profile's "+" */}
+      <button className="events-add-fab" onClick={() => navigate("/events/new")} aria-label="new event">+</button>
     </div>
   );
 }

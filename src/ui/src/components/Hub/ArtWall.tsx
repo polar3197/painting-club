@@ -93,7 +93,6 @@ export default function ArtWall() {
 
   return (
     <div className="art-wall">
-      <div className="art-wall-title">art wall</div>
       <div className="art-wall-row">
         {COLUMNS.map(({ type, label }) => (
           <div key={type} className="art-wall-col">

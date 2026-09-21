@@ -37,8 +37,7 @@
     overflow: hidden;
     touch-action: pan-y;
 }
-.events-page-head, .events-page-cal { flex: 0 0 auto; }
-.events-page-head { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.events-page-cal { flex: 0 0 auto; }
 /* full-size calendar: square day cells (~50px rows on a phone); capped on
    wide screens so it doesn't fill the whole page */
 .events-page-cal { border-bottom: 1px solid #000; padding-bottom: 12px; }
@@ -50,7 +49,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
-    padding: 12px 0 24px;
+    padding: 12px 0 80px; /* room for the floating "+" */
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -116,3 +115,22 @@
     cursor: pointer;
 }
 
+
+/* floating add-event button — same as the profile's "+" (profile-ios.css) */
+.events-add-fab {
+    position: fixed;
+    left: 20px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 66px); /* above the tab bar */
+    z-index: 50;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 1px solid #000;
+    background-color: rgb(238, 190, 100);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 28px;
+    line-height: 1;
+    color: #000;
+    cursor: pointer;
+}
