@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   Modal,
   Pressable,
   FlatList,
-  KeyboardAvoidingView,
   Keyboard,
   Platform,
   StyleSheet,
   Dimensions,
   Animated,
+  Easing,
   PanResponder,
 } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
@@ -23,8 +24,9 @@ import {
   get_comments,
   post_comment,
   delete_comment,
-  artDisplaySource,
-  artThumbSource,
+  resolveImageUrl,
+  stableCacheKey,
+  thumbUrl,
   Visual2DOut,
   CommentOut,
 } from '../api';
@@ -65,7 +67,45 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   const imgRatio = piece.aspect_ratio ?? 1;
   const [pendingDelete, setPendingDelete] = useState<CommentOut | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const translateY = useRef(new Animated.Value(0)).current;
+  // Own the open/close animation instead of Modal's animationType="slide":
+  // that slid the dark backdrop up WITH the sheet. Here the backdrop fades in
+  // place while only the panel slides.
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [backdropOpacity, translateY]);
+
+  const close = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  }, [backdropOpacity, translateY, onClose]);
+  // The pan responder is created once (useRef) — route it through a ref so it
+  // always calls the current close.
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  // Lift the sheet above the keyboard by padding the container's bottom to the
+  // live keyboard height (replacing KeyboardAvoidingView). useAnimatedKeyboard
+  // tracks the real frame on the UI thread, so the sheet rises welded to the
+  // keyboard instead of a beat behind it.
+  const keyboard = useAnimatedKeyboard();
+  const containerKbStyle = useAnimatedStyle(() => ({ paddingBottom: keyboard.height.value }));
 
   // Kebab / report state per active comment. Block lives on the user's profile-pic flip,
   // not in the comment menu.
@@ -86,6 +126,8 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
 
   const sectionHeight = keyboardOpen ? IMG_SECTION_HEIGHT_KEYBOARD : IMG_SECTION_HEIGHT_OPEN;
 
+  const imgUri = resolveImageUrl(piece.file_path);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -95,7 +137,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
       },
       onPanResponderRelease: (_, g) => {
         if (g.dy > 100) {
-          Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 200, useNativeDriver: true }).start(onClose);
+          closeRef.current();
         } else {
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
         }
@@ -178,7 +220,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
   };
 
   return (
-    <Modal transparent visible animationType="slide" onRequestClose={onClose}>
+    <Modal transparent visible animationType="none" onRequestClose={close}>
       <ConfirmDialog
         visible={pendingDelete !== null}
         title="delete cmt?"
@@ -211,11 +253,14 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
         targetId={activeComment?.id ?? null}
         onClose={() => setShowReport(false)}
       />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={styles.backdrop} onPress={onClose} />
+      <Reanimated.View style={[styles.container, containerKbStyle]}>
+        {/* Dark layer fades in place behind the sheet instead of riding up
+            with it (it lives outside the sliding panel). */}
+        <Animated.View
+          style={[styles.backdropFill, { opacity: backdropOpacity }]}
+          pointerEvents="none"
+        />
+        <Pressable style={styles.backdrop} onPress={close} />
         <Animated.View style={[styles.panel, { transform: [{ translateY }] }]}>
           <View {...panResponder.panHandlers}>
             <View style={styles.swipeHandle}>
@@ -223,10 +268,9 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             </View>
             <View style={[styles.imageSection, { height: sectionHeight }]}>
               <Image
-                source={artDisplaySource(piece)}
-                placeholder={artThumbSource(piece)}
-                cachePolicy="memory-disk"
-                transition={150}
+                source={{ uri: imgUri, cacheKey: stableCacheKey(imgUri) }}
+                placeholder={{ uri: thumbUrl(piece.id) }}
+                transition={200}
                 style={[styles.image, computeImgSize(imgRatio, sectionHeight)]}
                 contentFit="contain"
               />
@@ -235,7 +279,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
           <View style={styles.commentsSection}>
             <View style={styles.headerRow}>
               <Text style={styles.header}>{piece.title}</Text>
-              <Pressable style={styles.closeBtn} onPress={onClose}>
+              <Pressable style={styles.closeBtn} onPress={close}>
                 <Text style={styles.closeBtnText}>x</Text>
               </Pressable>
             </View>
@@ -252,7 +296,6 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
               <TextInput
                 style={styles.input}
                 value={input}
-                placeholder="go for it. comment..."
                 placeholderTextColor={Colors.textMuted}
                 autoCapitalize="none"
                 onChangeText={setInput}
@@ -265,7 +308,7 @@ export default function ArtComments({ piece, onClose }: ArtCommentsProps) {
             </View>
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </Reanimated.View>
     </Modal>
   );
 }
@@ -274,9 +317,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // Full-screen dark layer behind the sheet; fades independently of the
+  // panel's slide.
+  backdropFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.overlay,
+  },
+  // Transparent tap-to-dismiss strip above the panel (the dark comes from
+  // backdropFill now).
   backdrop: {
     height: 40,
-    backgroundColor: Colors.overlay,
   },
   panel: {
     flex: 1,

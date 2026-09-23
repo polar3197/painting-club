@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useContext } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { HubPagerLock } from '../context/HubPagerLock';
+import { togglePinnedArt, isPinned, subscribeWalls, getPinnedArtId, WallType } from '../api/walls';
 import { useProfile, useAdminPending } from '../hooks';
 import { readCached, writeCached } from '../utils/jsonCache';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,24 +28,30 @@ import {
   get_members_written_form,
   get_members_audio,
   get_search_options,
+  imageSource,
   profilePicSrc,
-  artDisplaySource,
-  artThumbSource,
-  profilePicThumbSource,
+  profilePicSource,
+  thumbSource,
+  displaySource,
   upload_profile_picture,
   get_media,
   open_dm,
   get_unread_count,
+  get_wip_updates,
+  add_wip_update,
   Visual2DOut,
   WrittenFormOut,
   AudioOut,
   Profile,
   MediaType,
+  WipUpdateOut,
 } from '../api';
 import Dropdown from '../components/Dropdown';
 import ArtZoomIn from '../components/ArtZoomIn';
-import ArtCarousel from '../components/ArtCarousel';
+import ArtCarousel, { CarouselElement } from '../components/ArtCarousel';
 import ArtComments from '../components/ArtComments';
+import BookmarkButton from '../components/BookmarkButton';
+import { registerArt } from '../api/inspiration';
 import AddArtDialog from '../components/AddArtDialog';
 import WrittenFormPiece from '../components/WrittenFormPiece';
 import AudioPiece from '../components/AudioPiece';
@@ -51,7 +59,6 @@ import AlbumTile from '../components/AlbumTile';
 import PaintingSeriesRow from '../components/PaintingSeriesRow';
 import SeriesRow from '../components/SeriesRow';
 import AddMediaDialog from '../components/AddMediaDialog';
-import ShareMediaDialog from '../components/ShareMediaDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Spinner from '../components/Spinner';
 import { useUploads } from '../context/UploadContext';
@@ -70,7 +77,15 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // auto-sizes to its content; this floor guarantees the comments page (which
 // always wants to show ~4 rows) isn't squished when a bio is very short.
 // Bumped to give each comment row more vertical room while still showing 4.
-const BIO_PAGE_MIN_HEIGHT = 180;
+// Floor for the artist-statement / comments carousel — sized to one line of
+// statement text (page padding 20 + border 2 + label ~26 + divider ~9 + one
+// 22px line). The box hugs its content and only grows once the statement wraps
+// past a single line. On your own profile the statement shares this row height
+// with the comments page, so a short statement also shortens that page (it still
+// scrolls).
+// The statement box hugs its text; empty, it still holds two bio lines:
+// padding 10+10, label ~24 + 4, rule 1 + 8, 2 × 22 line height.
+const BIO_PAGE_MIN_HEIGHT = 20 + 24 + 4 + 1 + 8 + 2 * 22;
 // Visual gap between the two bordered pages of the carousel so the swipe feels
 // like moving to a separate frame rather than sliding content under one.
 const BIO_PAGE_GAP = 40;
@@ -85,24 +100,67 @@ type ProfileRoute = RouteProp<
 >;
 
 // --- Placeholder tile shown while an upload is in flight ---
-function PendingPiece({ uri, title, aspectRatio, cardBg }: { uri: string; title: string; aspectRatio: number; cardBg: string }) {
+// While a piece uploads: a plain card, details on the left and the loader on
+// the right. Deliberately NOT a faded preview of the image — a ghosted version
+// of the real piece reads as something broken rather than something in
+// progress, and it can't be told apart from a half-loaded image.
+function PendingPiece({ title, cardBg }: { title: string; cardBg: string }) {
   return (
-    <View style={[styles.artElement, { backgroundColor: cardBg }]}>
-      <View style={styles.artVisual}>
-        <View style={[styles.artVisualInner, { aspectRatio }]}>
-          <Image
-            source={{ uri }}
-            style={[styles.artImage, { opacity: 0.35 }]}
-            contentFit="contain"
-          />
-          <View style={styles.pendingOverlay}>
-            <Spinner size={64} />
+    <View style={[styles.pendingCard, { backgroundColor: cardBg }]}>
+      <View style={styles.pendingCardText}>
+        <Text style={styles.pendingCardTitle} numberOfLines={2}>{title || 'untitled'}</Text>
+        <Text style={styles.artDetailText}>uploading…</Text>
+      </View>
+      <Spinner size={28} />
+    </View>
+  );
+}
+
+// --- Loading mock-up ---
+// The profile page's frame drawn in the member's colors (defaults when we've
+// never loaded them): header + pic frame, statement box, medium tabs, two art
+// cards. Placeholder text is bars in the tab color — no grey shimmer.
+function ProfileSkeleton({ colors, topInset }: { colors: ProfilePageColors; topInset: number }) {
+  const bar = (width: number | `${number}%`, height: number) => (
+    <View style={{ width, height, backgroundColor: colors.mediaTab, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' }} />
+  );
+  return (
+    <View style={[styles.container, { paddingTop: topInset, backgroundColor: colors.bg }]}>
+      <View style={styles.userDetails}>
+        <View style={styles.userFields}>
+          <View style={styles.userTopRow}>
+            <View style={[styles.userIdentity, { gap: 10 }]}>
+              {bar('80%', 24)}
+              {bar('50%', 14)}
+            </View>
+            <View style={styles.profilePicContainer}>
+              <View style={[styles.profilePic, styles.profilePicEmpty, { borderColor: colors.picFrame }]} />
+            </View>
+          </View>
+          <View style={[styles.bioPage, { marginTop: 12, minHeight: BIO_PAGE_MIN_HEIGHT, backgroundColor: colors.statementBox }]}>
+            <Text style={styles.bioLabel}>Artist Statement</Text>
+            <View style={styles.bioHr} />
+            <View style={{ gap: 8 }}>
+              {bar('100%', 10)}
+              {bar('90%', 10)}
+              {bar('60%', 10)}
+            </View>
           </View>
         </View>
       </View>
-      <View style={styles.artDetails}>
-        <Text style={styles.artTitle}>{title || 'uploading…'}</Text>
-        <Text style={styles.artDetailText}>uploading…</Text>
+      <View style={styles.mediaBar}>
+        <View style={styles.mediaTabs}>
+          <View style={[styles.mediaTab, { backgroundColor: colors.mediaTabSelected, height: 30 }]} />
+          <View style={[styles.mediaTab, { backgroundColor: colors.mediaTab, height: 30 }]} />
+        </View>
+      </View>
+      <View style={[styles.artSection, { backgroundColor: colors.bg }]}>
+        {[0, 1].map((i) => (
+          <View key={i} style={[styles.artElement, { backgroundColor: colors.artCardBg }]}>
+            <View style={[styles.artVisual, { aspectRatio: 1, backgroundColor: colors.bg }]} />
+            {bar('55%', 20)}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -117,13 +175,12 @@ function Visual2DPiece({
   onRemove,
   onEdit,
   onZoom,
+  onRefresh,
+  wipHistory,
   onLayout,
-  priority,
 }: {
   isOwner: boolean;
   piece: Visual2DOut;
-  // First pieces on screen: fetch ahead of everything else.
-  priority?: boolean;
   viewerBlockedByOwner: boolean;
   // Art element fill from the owner's profile colors.
   cardBg: string;
@@ -132,19 +189,73 @@ function Visual2DPiece({
   // Open the shared zoom viewer on this piece. Zoom state lives on the screen
   // so the viewer can swipe across all the profile's pieces.
   onZoom: () => void;
+  // Refetch the piece list (used after posting a WIP update).
+  onRefresh: () => void;
+  // The piece's archived WIP images, oldest first (empty for non-WIP pieces).
+  wipHistory: WipUpdateOut[];
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const { token, currentUser } = useAuth();
+  const webNav = useNavigation<any>();
+  const webRoute = useRoute<any>();
+  // Whose profile this piece renders on — the Me tab has no route param.
+  const profileUsername = piece.username || webRoute.params?.username || currentUser || '';
   const [showComments, setShowComments] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   // Start from the server-provided ratio captured at upload, but override it
   // with the image's real dimensions once it loads. A wrong/stale stored ratio
   // would otherwise letterbox the image (white bars) under contentFit:contain.
   const [measuredRatio, setMeasuredRatio] = useState<number | null>(null);
-  // The startup aspect_ratio backfill means the stored ratio is ~always there,
-  // so the box takes its true shape on first paint (no hidden-until-measured
-  // gate); a piece still missing one opens square and corrects on load.
-  const aspectRatio = measuredRatio ?? piece.aspect_ratio ?? 1;
+  // The ratio we're confident about — stored, or measured from the thumbnail.
+  // Null only for the brief moment before either is known; we hold the image
+  // hidden until then so it never flashes at the wrong (square) shape.
+  const knownRatio = measuredRatio ?? piece.aspect_ratio ?? null;
+  const aspectRatio = knownRatio ?? 1;
+
+  // Mid-res display derivative (~1600px) instead of the multi-MB original —
+  // this is what kills the placeholder linger. On any load error (backend
+  // predates the route, gen failed) fall back to the original, so this is safe
+  // to ship before OR after the backend deploys.
+  const [displayFailed, setDisplayFailed] = useState(false);
+
+  // WIP: superseded images (oldest first), fetched at the screen level so the
+  // carousel's vertical collection and this in-frame pager share one source.
+  const [wipIndex, setWipIndex] = useState(wipHistory.length);
+  const [frameW, setFrameW] = useState(0);
+  const [postingUpdate, setPostingUpdate] = useState(false);
+  // Wall pin (device-local): is this the piece pinned to the visual wall for
+  // this artist? Pinned pieces get a red outline here and sort to the wall's top.
+  const [pinned, setPinned] = useState(() => isPinned(profileUsername, 'visual_2d', piece.id));
+  useEffect(() => {
+    const sync = () => setPinned(isPinned(profileUsername, 'visual_2d', piece.id));
+    sync();
+    return subscribeWalls(sync);
+  }, [profileUsername, piece.id]);
+  const wipPages = wipHistory.length + 1;
+  const showWipPager = false; // WIP display removed from the FE for now
+  useEffect(() => {
+    // Land on the current image whenever the history set changes.
+    setWipIndex(wipHistory.length);
+  }, [wipHistory.length]);
+
+  const postWipUpdate = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const a = result.assets[0];
+    setPostingUpdate(true);
+    try {
+      await add_wip_update(piece.id, token, {
+        uri: a.uri,
+        name: a.uri.split('/').pop() || 'update.jpg',
+        type: a.mimeType || 'image/jpeg',
+      });
+      onRefresh();
+    } catch (err: any) {
+      appAlert('Error', err?.message || 'Something went wrong');
+    } finally {
+      setPostingUpdate(false);
+    }
+  };
 
   const removeArt = async () => {
     await remove_visual_2d(piece.id, token);
@@ -169,20 +280,89 @@ function Visual2DPiece({
       {showComments && (
         <ArtComments piece={piece} onClose={() => setShowComments(false)} />
       )}
-      <View style={[styles.artElement, { backgroundColor: cardBg }]} onLayout={onLayout}>
+      <View style={[styles.artElement, { backgroundColor: cardBg }, pinned && styles.artElementPinned]} onLayout={onLayout}>
+        {showWipPager ? (
+          // WIP: the frame itself pages through the piece's history — older
+          // states first, the current image last (where it starts). The frame
+          // keeps the CURRENT image's aspect; older states letterbox inside it.
+          <View
+            style={styles.artVisual}
+            onLayout={(e) => setFrameW(e.nativeEvent.layout.width)}
+          >
+            <View style={[styles.artVisualInner, { aspectRatio }]}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                contentOffset={{ x: wipHistory.length * frameW, y: 0 }}
+                onMomentumScrollEnd={(e) =>
+                  setWipIndex(Math.round(e.nativeEvent.contentOffset.x / Math.max(1, frameW)))
+                }
+              >
+                {wipHistory.map((upd) => (
+                  <Pressable
+                    key={upd.id}
+                    style={[styles.wipPage, { width: frameW }]}
+                    onPress={onZoom}
+                  >
+                    <Image
+                      source={imageSource(upd.file_path)}
+                      style={styles.artImage}
+                      contentFit="contain"
+                    />
+                  </Pressable>
+                ))}
+                <Pressable
+                  style={[styles.wipPage, { width: frameW }]}
+                  onPress={onZoom}
+                >
+                  <Image
+                    source={
+                      displayFailed
+                        ? imageSource(piece.file_path)
+                        : displaySource(piece.id, piece.file_path)
+                    }
+                    placeholder={thumbSource(piece.id, piece.file_path)}
+                    transition={450}
+                    style={styles.artImage}
+                    contentFit="contain"
+                    placeholderContentFit="contain"
+                    onError={() => setDisplayFailed(true)}
+                  />
+                </Pressable>
+              </ScrollView>
+              <View style={styles.wipBadge} pointerEvents="none">
+                <Text style={styles.wipBadgeText}>{wipIndex + 1}/{wipPages}</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
         <Pressable
           style={({ pressed }) => [styles.artVisual, pressed && { opacity: 0.9 }]}
           onPress={onZoom}
         >
-          <View style={[styles.artVisualInner, { aspectRatio }]}>
+          <View
+            style={[styles.artVisualInner, { aspectRatio }]}
+            onLayout={(e) => setFrameW(e.nativeEvent.layout.width)}
+          >
             <Image
-              source={artDisplaySource(piece)}
-              placeholder={artThumbSource(piece)}
-              cachePolicy="memory-disk"
-              priority={priority ? 'high' : 'normal'}
-              transition={150}
-              style={styles.artImage}
+              source={
+                displayFailed
+                  ? imageSource(piece.file_path)
+                  : displaySource(piece.id, piece.file_path)
+              }
+              placeholder={thumbSource(piece.id, piece.file_path)}
+              // Slower crossfade so the thumb→display change reads as a gentle
+              // sharpen rather than a snap.
+              transition={450}
+              style={[styles.artImage, { opacity: knownRatio ? 1 : 0 }]}
               contentFit="contain"
+              // Match the placeholder's fit to the image's. Its default is
+              // 'scale-down' (and the source default is 'cover'), so without this
+              // the thumb paints cropped/zoomed for a frame and then snaps to the
+              // contained fit — the "starts zoomed then flashes" glitch.
+              placeholderContentFit="contain"
+              onError={() => setDisplayFailed(true)}
               onLoad={(e) => {
                 const { width, height } = e.source;
                 if (width > 0 && height > 0) setMeasuredRatio(width / height);
@@ -190,6 +370,7 @@ function Visual2DPiece({
             />
           </View>
         </Pressable>
+        )}
         <View style={styles.artDetails}>
           <View style={styles.titleRow}>
             <Text style={styles.artTitle}>{piece.title}</Text>
@@ -231,41 +412,62 @@ function Visual2DPiece({
             </Text>
           )}
           <View style={styles.artFooter}>
-            {isOwner ? (
-              <View style={styles.artButtons}>
-                <Pressable style={[styles.artBtn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
-                  <Text style={styles.artBtnText}>remove</Text>
-                </Pressable>
-                {piece.comments_enabled && (
-                  // Middle button flexes to fill the remaining width — paired
-                  // with the row's stretch layout this puts the three buttons
-                  // span the full art-element width with the same edge inset
-                  // on both sides.
+            {/* The existing action buttons flex to fill the row; the bookmark
+                square is pinned to the right and always present, whether or not
+                the comments button is shown. */}
+            <View style={styles.artFooterMain}>
+              {isOwner ? (
+                <View style={styles.artButtons}>
+                  <Pressable style={[styles.artBtn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+                    <Text style={styles.artBtnText}>remove</Text>
+                  </Pressable>
+                  {piece.comments_enabled && (
+                    // Middle button flexes to fill the remaining width — paired
+                    // with the row's stretch layout this puts the three buttons
+                    // span the full art-element width with the same edge inset
+                    // on both sides.
+                    <Pressable
+                      style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnStretch, styles.commentsBtnIconWrap]}
+                      onPress={() => setShowComments(true)}
+                    >
+                      <Image
+                        source={require('../../assets/imgs/comment-bubble.png')}
+                        style={styles.commentsBtnIcon}
+                        contentFit="contain"
+                      />
+                    </Pressable>
+                  )}
+                  <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
+                    <Text style={styles.artBtnText}>edit</Text>
+                  </Pressable>
                   <Pressable
-                    style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnStretch]}
+                    style={[styles.artBtn, pinned ? styles.wallBtnOn : styles.wallBtn]}
+                    onPress={() => togglePinnedArt(profileUsername, 'visual_2d', piece.id)}
+                  >
+                    <Text style={styles.artBtnText}>{pinned ? 'walled' : 'wall'}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
+                  // Single button when viewing someone else's piece — stretch to
+                  // the full row width so it reads as the primary (only) action,
+                  // matching the visual weight of the owner-side three-button row.
+                  <Pressable
+                    style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnFull, styles.commentsBtnIconWrap]}
                     onPress={() => setShowComments(true)}
                   >
-                    <Text style={styles.artBtnText}>comments</Text>
+                    <Image
+                      source={require('../../assets/imgs/comment-bubble.png')}
+                      style={styles.commentsBtnIcon}
+                      contentFit="contain"
+                    />
                   </Pressable>
-                )}
-                <Pressable style={[styles.artBtn, styles.editBtn]} onPress={onEdit}>
-                  <Text style={styles.artBtnText}>edit</Text>
-                </Pressable>
-              </View>
-            ) : (
-              piece.comments_enabled && currentUser && !viewerBlockedByOwner && (
-                // Single button when viewing someone else's piece — stretch to
-                // the full row width so it reads as the primary (only) action,
-                // matching the visual weight of the owner-side three-button row.
-                <Pressable
-                  style={[styles.artBtn, styles.commentsBtn, styles.commentsBtnFull]}
-                  onPress={() => setShowComments(true)}
-                >
-                  <Text style={styles.artBtnText}>comments</Text>
-                </Pressable>
-              )
-            )}
+                )
+              )}
+            </View>
+            <BookmarkButton artId={piece.id} size={32} style={styles.artBookmarkBtn} />
           </View>
+
         </View>
       </View>
     </>
@@ -275,6 +477,8 @@ function Visual2DPiece({
 // Temp feature flag — hide the keyword dropdown without removing the wiring.
 // Flip back to true when we want it surfaced again.
 const SHOW_KEYWORDS_BAR = false;
+
+const BOOKMARK_ICON = require('../../assets/imgs/bookmark.png');
 
 const v2dCacheKey = (username: string, medium: string) => `v2d:${username.toLowerCase()}:${medium}`;
 
@@ -286,8 +490,30 @@ export default function UserProfile() {
   const isFocused = useIsFocused();
   const { currentUser, token } = useAuth();
 
+  // True only when this was pushed as its own screen (from the art wall, the
+  // people wall or the everything grid). Inside the hub it's the profile panel
+  // and in the Me tab it's your own page — neither has anywhere to go back to.
+  // Drives both the floating back button and the top padding that keeps the
+  // content from sitting underneath it.
+  const showBackBtn = route.name === 'UserProfile' && navigation.canGoBack();
+
   const params = route.params as { username?: string; artId?: string; medium?: string } | undefined;
   const username = params?.username || currentUser || '';
+  // Bump when wall pins change so the medium lists re-float the pinned piece.
+  const [pinsVersion, setPinsVersion] = useState(0);
+  useEffect(() => subscribeWalls(() => setPinsVersion((n) => n + 1)), []);
+  // Float this user's wall-pinned piece to the top of its medium list.
+  const floatPinned = useCallback(<T extends { id: string }>(list: T[], artType: WallType): T[] => {
+    const pid = getPinnedArtId(username, artType);
+    if (!pid) return list;
+    const i = list.findIndex((p) => p.id === pid);
+    if (i <= 0) return list;
+    const copy = list.slice();
+    const [p] = copy.splice(i, 1);
+    copy.unshift(p);
+    return copy;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, pinsVersion]);
   const scrollToArtId = params?.artId;
   const mediumParam = params?.medium;
 
@@ -345,12 +571,16 @@ export default function UserProfile() {
   // Captured from onLayout so each page of the bio/comments carousel can size
   // to match the container exactly (paging snaps cleanly to that width).
   const [bioPageWidth, setBioPageWidth] = useState(0);
-  // The bio/comments carousel: wrapper has a static minHeight so short bios
-  // still leave room for the comments rows. Both pages auto-stretch to the
-  // tallest one via the ScrollView's default cross-axis alignment, so we don't
-  // need a measured height feeding back into the layout (previous attempts at
-  // that produced a recursive growth loop because the page border kept adding
-  // 2px to the measured value each cycle).
+  // The bio/comments carousel row height. This is measured ONLY from the artist
+  // statement page (a stable content measurement, floored by a constant
+  // minHeight so it can't feed back on itself) and then applied as a fixed
+  // height to the comments page. The comments page's FlatList is unbounded, so
+  // if we let the ScrollView's default `stretch` cross-axis alignment size the
+  // row off the tallest child, the list's content height would drive the row —
+  // and because the panel derived its own row height from that measurement, it
+  // ran away and made the one-line statement box oscillate. Statement drives,
+  // comments follow.
+  const [bioPageHeight, setBioPageHeight] = useState(BIO_PAGE_MIN_HEIGHT);
 
 
   const onRefresh = useCallback(async () => {
@@ -365,8 +595,14 @@ export default function UserProfile() {
   const [editingWritten, setEditingWritten] = useState<WrittenFormOut | null>(null);
   const [editingAudio, setEditingAudio] = useState<AudioOut | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
   const [profileZoom, setProfileZoom] = useState(false);
+  // Server mtime of the just-uploaded profile pic — busts the avatar's (otherwise
+  // stable) cache key so a change shows immediately. Null until this session's
+  // first upload; a natural refetch keeps whatever the server last returned.
+  const [picBust, setPicBust] = useState<string | null>(null);
+  // True from "picked a new profile pic" until the refetched profile lands —
+  // drives the spinner in the zoom (and the page overlay when zoom is closed).
+  const [picBusy, setPicBusy] = useState(false);
   // Index into filteredArt of the piece shown in the zoom viewer (null = closed).
   // Held here (not per-tile) so the viewer can swipe across the whole gallery.
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
@@ -404,21 +640,38 @@ export default function UserProfile() {
   }, [profile, selectedMedium]);
 
   const pickAndUploadProfilePic = async () => {
-    if (!profile) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-    });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
-    const name = asset.uri.split('/').pop() || 'pic.jpg';
-    const type = asset.mimeType || 'image/jpeg';
-    const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
-    // res.profile_pic_path already carries the server's `?v=<mtime>`, so this
-    // new URL busts the image cache on every upload — no client version needed.
-    // The listing's thumb predates the new pic — drop it so the header shows the upload.
-    setProfile({ ...profile, profile_pic_path: res.profile_pic_path, profile_pic_thumb_path: null });
-    setProfileZoom(false);
+    // Busy from the very first tap: the system picker takes a beat to present,
+    // and with no reaction people tap again (queueing duplicate pickers) — the
+    // spinner shows instantly and the guard swallows re-taps.
+    if (!profile || picBusy) return;
+    setPicBusy(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        // Square crop so the pic fills the profile's 1:1 avatar box as framed.
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const name = asset.uri.split('/').pop() || 'pic.jpg';
+      const type = asset.mimeType || 'image/jpeg';
+      const res = await upload_profile_picture({ uri: asset.uri, name, type }, token);
+      // The upload endpoint returns an UNSIGNED /static/profile path. Under the
+      // member-only lockdown nginx rejects unsigned /static/profile URLs (403), so
+      // showing that path directly fails — refetch the profile to get a SIGNED URL.
+      // The signed URL drops the ?v=<mtime> tag, so grab the version here and pass
+      // it as a cache-bust (see profilePicSource) or the old photo stays cached.
+      // The zoom (if open) stays open: ArtZoomIn holds the old image until the
+      // new one loads, then swaps in place.
+      setPicBust(res.profile_pic_path?.match(/[?&]v=(\d+)/)?.[1] ?? String(Date.now()));
+      await refetchProfile();
+    } catch (err: any) {
+      appAlert('Upload failed', err?.message || 'Try again');
+    } finally {
+      setPicBusy(false);
+    }
   };
 
   const scrollRef = useRef<ScrollView>(null);
@@ -427,11 +680,35 @@ export default function UserProfile() {
   const mediaBarY = useRef(0);
   const keywordsBarY = useRef(0);
   const [pendingScroll, setPendingScroll] = useState<string | null>(scrollToArtId ?? null);
+  // A gallery tap can point at a piece that lives inside a collapsed series/
+  // collection/album row. Once we resolve which row contains it, we retarget the
+  // scroll to that row and (for gallery nav) auto-open it. `pendingOpenSeriesId`
+  // flips the matching row's `autoOpen` after the scroll settles.
+  const [pendingOpenSeriesId, setPendingOpenSeriesId] = useState<string | null>(null);
+  // Only auto-open the collection for gallery navigation (a route artId). The
+  // comments-panel tap reuses the same scroll mechanism but should just scroll.
+  const autoOpenSeriesRef = useRef<boolean>(!!scrollToArtId);
+  // The series row id to open once the scroll to it lands (set during resolution).
+  const openAfterScrollRef = useRef<string | null>(null);
+
+  // Scroll to a resolved target, then (if it's a series we deep-linked into)
+  // open its collection once the scroll settles. Shared by the layout callback
+  // and the already-laid-out fallback below.
+  const finishPendingScroll = useCallback((y: number, id: string) => {
+    scrollRef.current?.scrollTo({ y, animated: true });
+    setPendingScroll(null);
+    if (openAfterScrollRef.current === id) {
+      openAfterScrollRef.current = null;
+      setTimeout(() => setPendingOpenSeriesId(id), 350);
+    }
+  }, []);
 
   // Tap a row in the comments-received panel: route to that art piece by reusing
   // the existing scrollToArtId mechanism. Setting the medium triggers art refetch;
   // when the piece mounts and fires handleArtLayout, the page scrolls to it.
   const handleTapReceivedComment = useCallback((c: CommentReceivedOut) => {
+    // Comments-panel taps scroll to the piece/row but don't pop the collection open.
+    autoOpenSeriesRef.current = false;
     setSelectedMedium(c.art_medium);
     setSelectedKeywords([]);
     setPendingScroll(c.art_id);
@@ -497,6 +774,10 @@ export default function UserProfile() {
   const isV2d = selectedMediumType === 'visual_2d';
   const isWritten = selectedMediumType === 'written_form';
   const isAudio = selectedMediumType === 'audio';
+  // Short/long form of the active written tab (null → reader defaults long).
+  const writtenFormat = isWritten
+    ? allMedia.find((m) => m.name === selectedMedium)?.written_format ?? null
+    : null;
 
   // Keep the medium tab in sync when navigated here with a medium param — e.g.
   // landing from the Add flow on the piece's medium, even if this profile was
@@ -566,19 +847,19 @@ export default function UserProfile() {
   }, [username, selectedMedium, refresh, uploadVersion, isV2d, isWritten, isAudio]);
 
   const filteredArt = useMemo(() => {
-    if (selectedKeywords.length === 0) return art;
-    return art.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
-  }, [art, selectedKeywords]);
+    const base = selectedKeywords.length === 0 ? art : art.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
+    return floatPinned(base, 'visual_2d');
+  }, [art, selectedKeywords, floatPinned]);
 
   const filteredWrittenArt = useMemo(() => {
-    if (selectedKeywords.length === 0) return writtenArt;
-    return writtenArt.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
-  }, [writtenArt, selectedKeywords]);
+    const base = selectedKeywords.length === 0 ? writtenArt : writtenArt.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
+    return floatPinned(base, 'written_form');
+  }, [writtenArt, selectedKeywords, floatPinned]);
 
   const filteredAudioArt = useMemo(() => {
-    if (selectedKeywords.length === 0) return audioArt;
-    return audioArt.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
-  }, [audioArt, selectedKeywords]);
+    const base = selectedKeywords.length === 0 ? audioArt : audioArt.filter((p) => selectedKeywords.every((k) => p.keywords?.includes(k)));
+    return floatPinned(base, 'audio');
+  }, [audioArt, selectedKeywords, floatPinned]);
 
   // Group filtered written pieces into rows: standalone pieces render
   // individually, pieces sharing a series_id collapse into one SeriesRow.
@@ -641,6 +922,63 @@ export default function UserProfile() {
     return rows;
   }, [filteredArt]);
 
+  // The zoom viewer opens over these same collapsed slots (solo pieces + series),
+  // so swiping left/right in the viewer matches the grid. A series becomes one
+  // vertical-scroll slot; its pieces are ordered like PaintingSeriesRow (explicit
+  // order_index first, then fetch order).
+  // WIP histories, keyed by art id — fetched once per piece-list refresh and
+  // shared by the card pagers and the carousel's vertical collections.
+  const [wipMap, setWipMap] = useState<Record<string, WipUpdateOut[]>>({});
+  useEffect(() => {
+    const wips = visualRows
+      .flatMap((r) => (r.kind === 'piece' ? [r.piece] : r.pieces))
+      .filter((p) => p.is_wip);
+    if (wips.length === 0) { setWipMap({}); return; }
+    let cancelled = false;
+    Promise.all(
+      wips.map((p) =>
+        get_wip_updates(p.id)
+          .then((rows) => [p.id, rows] as const)
+          .catch(() => [p.id, [] as WipUpdateOut[]] as const),
+      ),
+    ).then((entries) => { if (!cancelled) setWipMap(Object.fromEntries(entries)); });
+    return () => { cancelled = true; };
+  }, [visualRows]);
+
+  const visualElements = useMemo<CarouselElement[]>(
+    () =>
+      visualRows.map((row) => {
+        if (row.kind !== 'piece') {
+          return {
+            kind: 'collection' as const,
+            pieces: [...row.pieces]
+              .sort(
+                (a, b) =>
+                  (a.order_index ?? Number.MAX_SAFE_INTEGER) -
+                  (b.order_index ?? Number.MAX_SAFE_INTEGER),
+              )
+              .map((p) => ({ id: p.id, file_path: p.file_path })),
+          };
+        }
+        const history = row.piece.is_wip ? wipMap[row.piece.id] ?? [] : [];
+        if (history.length > 0) {
+          // WIP piece: a vertical collection — current image first (the slot's
+          // face), then the archive newest-to-oldest, so scrolling down walks
+          // back in time. Horizontal swipes still move to adjacent pieces.
+          return {
+            kind: 'collection' as const,
+            reverseIndex: true,
+            pieces: [
+              { id: row.piece.id, file_path: row.piece.file_path },
+              ...[...history].reverse().map((u) => ({ id: u.id, file_path: u.file_path })),
+            ],
+          };
+        }
+        return { kind: 'piece' as const, piece: { id: row.piece.id, file_path: row.piece.file_path } };
+      }),
+    [visualRows, wipMap],
+  );
+
   // ...and for audio — an album shows as one tracklist tile.
   const audioRows = useMemo(() => {
     type Row =
@@ -674,49 +1012,64 @@ export default function UserProfile() {
     const y = e.nativeEvent.layout.y + artSectionY.current;
     artPositions.current[pieceId] = y;
     if (pendingScroll && pieceId === pendingScroll) {
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({ y, animated: true });
-        setPendingScroll(null);
-      }, 300);
+      setTimeout(() => finishPendingScroll(y, pieceId), 300);
     }
-  }, [pendingScroll]);
+  }, [pendingScroll, finishPendingScroll]);
 
-  // Fallback path for the comments-panel tap-to-nav: when the target piece is
-  // already laid out (typical when the comment is on a piece in the medium
-  // you're currently viewing), handleArtLayout won't re-fire so it would never
-  // consume pendingScroll. This effect scrolls directly using the cached y.
+  // A gallery/comments target can point at a piece that lives inside a collapsed
+  // series row — only the row lays out (under its series id), never the piece,
+  // so a piece-id scroll target would never match. Resolve it to the containing
+  // row's id (and, for gallery nav, mark that row to auto-open once scrolled to).
+  useEffect(() => {
+    if (!pendingScroll) return;
+    const seriesRows = isV2d ? visualRows : isWritten ? writtenRows : isAudio ? audioRows : [];
+    for (const row of seriesRows) {
+      if (row.kind === 'series' && row.pieces.some((p) => p.id === pendingScroll)) {
+        if (autoOpenSeriesRef.current) openAfterScrollRef.current = row.id;
+        setPendingScroll(row.id);
+        return;
+      }
+    }
+  }, [pendingScroll, visualRows, writtenRows, audioRows, isV2d, isWritten, isAudio]);
+
+  // Fallback path: when the target row is already laid out (typical when it's in
+  // the medium you're already viewing, or after the resolution above retargets
+  // to an already-measured series row), handleArtLayout won't re-fire so it would
+  // never consume pendingScroll. This scrolls directly using the cached y.
   useEffect(() => {
     if (!pendingScroll) return;
     const y = artPositions.current[pendingScroll];
     if (y == null) return;
-    const t = setTimeout(() => {
-      scrollRef.current?.scrollTo({ y, animated: true });
-      setPendingScroll(null);
-    }, 100);
+    const t = setTimeout(() => finishPendingScroll(y, pendingScroll), 100);
     return () => clearTimeout(t);
-  }, [pendingScroll]);
+  }, [pendingScroll, finishPendingScroll]);
 
-  if (loading) {
-    return (
-      <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
-  if (error || !profile) {
-    return (
-      <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <Text style={[styles.loadingText, { paddingHorizontal: 24, textAlign: 'center' }]}>
-          Sorry guys, the power source to the raspberry pi this app runs on is weak and it keeps dying. Will be getting it more power soon.
-        </Text>
-      </View>
-    );
+  // No profile yet (first visit, or the Pi is unreachable with nothing
+  // cached): show the page's own layout in its palette rather than a message.
+  // A cached profile renders normally below even if the refresh failed.
+  if (!profile) {
+    return <ProfileSkeleton colors={pageColors} topInset={insets.top} />;
   }
 
   return (
+    <View style={styles.rootFill}>
+    {/* A real bar rather than a floating button: it occupies its own space at
+        the top, so it is always visible and never sits over the profile. */}
+    {showBackBtn && (
+      <View style={[styles.profileBackBar, { paddingTop: insets.top + 8, backgroundColor: pageColors.bg }]}>
+        <Pressable style={styles.profileBackBtn} hitSlop={10} onPress={() => navigation.goBack()}>
+          <Text style={styles.profileBackBtnText}>‹ back</Text>
+        </Pressable>
+      </View>
+    )}
     <ScrollView
       ref={scrollRef}
-      style={[styles.container, { paddingTop: insets.top, backgroundColor: pageColors.bg }]}
+      style={[
+        styles.container,
+        // When the back bar is present it owns the safe-area top, so the scroll
+        // starts flush beneath it instead of insetting twice.
+        { paddingTop: showBackBtn ? 0 : insets.top, backgroundColor: pageColors.bg },
+      ]}
       contentContainerStyle={styles.contentContainer}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
@@ -730,7 +1083,7 @@ export default function UserProfile() {
         />
       }
     >
-      {refreshing && (
+      {(refreshing || picBusy) && (
         <View style={styles.refreshSpinnerOverlay} pointerEvents="none">
           <Spinner size={48} />
         </View>
@@ -743,14 +1096,18 @@ export default function UserProfile() {
           onClose={() => setProfileZoom(false)}
           onChangePic={profile.is_owner ? pickAndUploadProfilePic : undefined}
           blockableUsername={!profile.is_owner ? profile.username : undefined}
+          busy={picBusy}
         />
       )}
 
       {/* Shared 2D-art zoom viewer: a paged carousel you can swipe through to
           see every piece in the current (filtered) medium without closing. */}
-      {zoomIndex !== null && filteredArt[zoomIndex] && (
+      {zoomIndex !== null && visualElements[zoomIndex] && (
         <ArtCarousel
           pieces={filteredArt}
+          // Element mode: solo pieces + collections (vertical-scroll slots). The
+          // index is into visualElements, matching the grid's collapsed order.
+          elements={visualElements}
           initialIndex={zoomIndex}
           isOwner={profile.is_owner}
           creatorUsername={profile.username}
@@ -814,12 +1171,6 @@ export default function UserProfile() {
           onClose={() => setShowAddMedia(false)}
         />
       )}
-      <ShareMediaDialog
-        visible={showShareDialog}
-        username={username}
-        media={profile.media ?? []}
-        onClose={() => setShowShareDialog(false)}
-      />
 
       {/* ---- UserDetails ---- */}
       <View style={styles.userDetails}>
@@ -880,11 +1231,13 @@ export default function UserProfile() {
                         <Ionicons name="mail-outline" size={22} color={Colors.black} />
                         {unreadMessages > 0 && <View style={styles.unreadDot} />}
                       </Pressable>
+                      {/* Saved pieces — the same hand-drawn bookmark as the
+                          per-piece save button. */}
                       <Pressable
                         style={[styles.ownerActionBtn, { backgroundColor: pageColors.actionBtn }]}
-                        onPress={() => setShowShareDialog(true)}
+                        onPress={() => navigation.navigate('Bookmarks')}
                       >
-                        <Ionicons name="paper-plane-outline" size={22} color={Colors.black} />
+                        <Image source={BOOKMARK_ICON} style={styles.ownerActionIcon} contentFit="contain" />
                       </Pressable>
                     </View>
                   )}
@@ -892,9 +1245,8 @@ export default function UserProfile() {
                 {profile.profile_pic_path ? (
                   <Pressable onPress={() => setProfileZoom(true)} style={styles.profilePicContainer}>
                     <Image
-                      source={profilePicThumbSource(profile)}
-                      cachePolicy="memory-disk"
-                      transition={150}
+                      source={profilePicSource(profile, picBust) ?? { uri: '' }}
+                      transition={200}
                       priority="high"
                       style={[styles.profilePic, { borderColor: pageColors.picFrame }]}
                       contentFit="cover"
@@ -914,14 +1266,20 @@ export default function UserProfile() {
               </View>
               {/* Paged carousel: page 1 = artist statement, page 2 = comments
                   received. Only the user's OWN profile shows the comments page
-                  (you can't see others' received-comments). The carousel auto-
-                  sizes to the bio content with a floor of BIO_PAGE_MIN_HEIGHT
-                  so the comments page is never too small. Using minHeight (not
-                  height) is important — a fixed height would constrain the bio
-                  page's onLayout measurement and prevent growth past the floor. */}
+                  (you can't see others' received-comments). The row height is
+                  measured from the statement page (see bioPageHeight) and the
+                  comments page is pinned to it — the comments FlatList is
+                  unbounded, so it must never be allowed to drive the row. */}
               <View
                 style={[styles.bioCarouselWrap, { minHeight: BIO_PAGE_MIN_HEIGHT }]}
-                onLayout={(e) => setBioPageWidth(e.nativeEvent.layout.width)}
+                // Only update on a real width change. Firing setState on every
+                // layout pass (incl. subpixel-identical ones) churned re-renders
+                // and, combined with the width-0 first pass below, made the
+                // statement box flash oversized then snap back.
+                onLayout={(e) => {
+                  const w = e.nativeEvent.layout.width;
+                  setBioPageWidth((prev) => (Math.abs(prev - w) < 0.5 ? prev : w));
+                }}
               >
                 {/* Each page keeps its prior visible inset (BIO_PAGE_INSET on
                     each side) via paddingHorizontal on the ScrollView's
@@ -932,7 +1290,7 @@ export default function UserProfile() {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   decelerationRate="fast"
-                  snapToInterval={(bioPageWidth - BIO_PAGE_INSET * 2) + BIO_PAGE_GAP}
+                  snapToInterval={Math.max(1, (bioPageWidth - BIO_PAGE_INSET * 2) + BIO_PAGE_GAP)}
                   snapToAlignment="start"
                   nestedScrollEnabled
                   // Only your own profile has a second (comments) page to swipe
@@ -940,16 +1298,35 @@ export default function UserProfile() {
                   // card can't drag/bounce around.
                   scrollEnabled={profile.is_owner}
                   bounces={profile.is_owner}
-                  contentContainerStyle={{ paddingHorizontal: BIO_PAGE_INSET }}
+                  // flex-start (not the default `stretch`) keeps each page at
+                  // its own height so the unbounded comments FlatList can't
+                  // stretch the statement page up to its content height.
+                  contentContainerStyle={{ paddingHorizontal: BIO_PAGE_INSET, alignItems: 'flex-start' }}
                 >
-                  <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, marginRight: BIO_PAGE_GAP, backgroundColor: pageColors.statementBox }]}>
-                    <Text style={styles.bioLabel}>Artist Statement</Text>
-                    <View style={styles.bioHr} />
-                    {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
-                  </View>
+                  {/* Both pages wait for a real width. At the initial width of 0
+                      the page width would be negative (clamped to 0) and the bio
+                      text would wrap one character per line — a giant box that
+                      then snapped small once onLayout resolved the width. */}
+                  {bioPageWidth > 0 && (
+                    <View
+                      style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, minHeight: BIO_PAGE_MIN_HEIGHT, marginRight: BIO_PAGE_GAP, backgroundColor: pageColors.statementBox }]}
+                      // Sole height source for the carousel row. The constant
+                      // minHeight floors it, so this measurement can't feed back
+                      // on itself; the comments page below is pinned to the
+                      // result rather than the other way around.
+                      onLayout={(e) => {
+                        const h = e.nativeEvent.layout.height;
+                        setBioPageHeight((prev) => (Math.abs(prev - h) < 0.5 ? prev : h));
+                      }}
+                    >
+                      <Text style={styles.bioLabel}>Artist Statement</Text>
+                      <View style={styles.bioHr} />
+                      {!!profile.bio && <Text style={styles.bioText}>{profile.bio}</Text>}
+                    </View>
+                  )}
                   {profile.is_owner && bioPageWidth > 0 && (
-                    <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, padding: 0 }]}>
-                      <CommentsReceivedPanel onTapComment={handleTapReceivedComment} />
+                    <View style={[styles.bioPage, { width: bioPageWidth - BIO_PAGE_INSET * 2, height: bioPageHeight, padding: 0 }]}>
+                      <CommentsReceivedPanel height={bioPageHeight} onTapComment={handleTapReceivedComment} />
                     </View>
                   )}
                 </ScrollView>
@@ -1040,15 +1417,9 @@ export default function UserProfile() {
             {pendingPieces
               .filter((p) => p.medium === selectedMedium && p.username === username)
               .map((p) => (
-                <PendingPiece
-                  key={p.tempId}
-                  uri={p.uri}
-                  title={p.title}
-                  aspectRatio={p.aspectRatio}
-                  cardBg={pageColors.artCardBg}
-                />
+                <PendingPiece key={p.tempId} title={p.title} cardBg={pageColors.artCardBg} />
               ))}
-            {visualRows.map((row) =>
+            {visualRows.map((row, ri) =>
               row.kind === 'piece' ? (
                 <Visual2DPiece
                   key={row.piece.id}
@@ -1058,11 +1429,12 @@ export default function UserProfile() {
                   cardBg={pageColors.artCardBg}
                   onRemove={() => setRefresh((r) => r + 1)}
                   onEdit={() => setEditingPiece(row.piece)}
-                  // The profile-wide carousel still swipes across every piece
-                  // in the medium, so zoom by position in filteredArt.
-                  onZoom={() => setZoomIndex(filteredArt.indexOf(row.piece))}
+                  onRefresh={() => setRefresh((r) => r + 1)}
+                  wipHistory={row.piece.is_wip ? wipMap[row.piece.id] ?? [] : []}
+                  // Open the zoom viewer at this slot; it swipes across all
+                  // visualElements (collapsed like the grid).
+                  onZoom={() => setZoomIndex(ri)}
                   onLayout={(e) => handleArtLayout(row.piece.id, e)}
-                  priority={filteredArt.indexOf(row.piece) < 2}
                 />
               ) : (
                 <PaintingSeriesRow
@@ -1081,6 +1453,11 @@ export default function UserProfile() {
                     setSelectedKeywords([]);
                   }}
                   onLayout={(e) => handleArtLayout(row.id, e)}
+                  // Tapping the card opens the vertical-scroll zoom at this slot;
+                  // the owner-only edit button (inside the card) opens the grid.
+                  onOpenZoom={() => setZoomIndex(ri)}
+                  autoOpen={pendingOpenSeriesId === row.id}
+                  onAutoOpened={() => setPendingOpenSeriesId(null)}
                 />
               )
             )}
@@ -1090,10 +1467,7 @@ export default function UserProfile() {
             {pendingWritten
               .filter((p) => p.medium === selectedMedium && p.username === username)
               .map((p) => (
-                <View key={p.tempId} style={styles.pendingWrittenTile}>
-                  <Text style={styles.artTitle}>{p.title}</Text>
-                  <Text style={styles.artDetailText}>uploading…</Text>
-                </View>
+                <PendingPiece key={p.tempId} title={p.title} cardBg={pageColors.artCardBg} />
               ))}
             {writtenRows.map((row) =>
               row.kind === 'piece' ? (
@@ -1101,6 +1475,7 @@ export default function UserProfile() {
                   key={row.piece.id}
                   isOwner={profile.is_owner}
                   piece={row.piece}
+                  writtenFormat={writtenFormat}
                   onRemove={() => setRefresh((r) => r + 1)}
                   onEdit={() => setEditingWritten(row.piece)}
                   onLayout={(e) => handleArtLayout(row.piece.id, e)}
@@ -1114,6 +1489,7 @@ export default function UserProfile() {
                   pieces={row.pieces}
                   selectedMedium={selectedMedium!}
                   username={username}
+                  writtenFormat={writtenFormat}
                   onRefresh={() => setRefresh((r) => r + 1)}
                   onMediumMove={(newMedium) => {
                     setProfile((p) => (p && !p.media.includes(newMedium) ? { ...p, media: [...p.media, newMedium] } : p));
@@ -1121,6 +1497,8 @@ export default function UserProfile() {
                     setSelectedKeywords([]);
                   }}
                   onLayout={(e) => handleArtLayout(row.id, e)}
+                  autoOpen={pendingOpenSeriesId === row.id}
+                  onAutoOpened={() => setPendingOpenSeriesId(null)}
                 />
               )
             )}
@@ -1130,10 +1508,7 @@ export default function UserProfile() {
             {pendingAudio
               .filter((p) => p.medium === selectedMedium && p.username === username)
               .map((p) => (
-                <View key={p.tempId} style={styles.pendingWrittenTile}>
-                  <Text style={styles.artTitle}>{p.title}</Text>
-                  <Text style={styles.artDetailText}>uploading…</Text>
-                </View>
+                <PendingPiece key={p.tempId} title={p.title} cardBg={pageColors.artCardBg} />
               ))}
             {audioRows.map((row) =>
               row.kind === 'piece' ? (
@@ -1160,6 +1535,8 @@ export default function UserProfile() {
                   }}
                   onRefresh={() => setRefresh((r) => r + 1)}
                   onLayout={(e) => handleArtLayout(row.id, e)}
+                  autoOpen={pendingOpenSeriesId === row.id}
+                  onAutoOpened={() => setPendingOpenSeriesId(null)}
                 />
               )
             )}
@@ -1169,10 +1546,68 @@ export default function UserProfile() {
         )}
       </View>
     </ScrollView>
+    {profile.is_owner && (
+      <Pressable
+        style={[styles.addFab, { bottom: insets.bottom + 6 }]}
+        onPress={() => navigation.navigate('AddArt')}
+        hitSlop={8}
+      >
+        <Text style={styles.addFabPlus}>+</Text>
+      </Pressable>
+    )}
+    {/* Only when this was PUSHED as its own screen (tapping someone from the
+        art wall or the people wall). Inside the hub this same component is the
+        profile panel and inside the Me tab it's your own page, neither of which
+        has anywhere to go back to — route.name is 'SwipeHub' / 'Me' there, and
+        'UserProfile' only here. Floating rather than in-flow so it stays
+        reachable without scrolling back to the top. */}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  rootFill: { flex: 1 },
+  profileBackBar: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  // Same look as the About page's back button.
+  profileBackBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    ...Shadows.card,
+  },
+  profileBackBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+  addFab: {
+    position: 'absolute',
+    left: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: Colors.black,
+    backgroundColor: Colors.primaryGold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.card,
+  },
+  addFabPlus: {
+    fontFamily: Fonts.mono,
+    fontSize: 28,
+    lineHeight: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    color: Colors.black,
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.mainBg,
@@ -1268,6 +1703,10 @@ const styles = StyleSheet.create({
     // space — vertically midway between the location and the pic bottom.
     flex: 1,
     alignItems: 'center',
+  },
+  ownerActionIcon: {
+    width: 22,
+    height: 22,
   },
   ownerActionBtn: {
     width: 38,
@@ -1457,6 +1896,16 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#fff',
   },
+  artElementPinned: {
+    borderColor: '#E30022',
+    borderWidth: 2,
+  },
+  wallBtn: {
+    backgroundColor: Colors.secondary,
+  },
+  wallBtnOn: {
+    backgroundColor: Colors.redLight,
+  },
   artVisual: {
     width: '100%',
     marginBottom: 10,
@@ -1470,18 +1919,56 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  // One page of a WIP piece's in-frame history pager.
+  wipPage: {
+    height: '100%',
+  },
+  wipBadge: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  wipBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+  addUpdateBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingVertical: 6,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginTop: 8,
+  },
+  addUpdateBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+  },
   pendingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pendingWrittenTile: {
+  pendingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 24,
     borderWidth: 2,
     borderColor: '#000',
-    backgroundColor: Colors.secondary,
     padding: 16,
-    opacity: 0.7,
+  },
+  pendingCardText: { flex: 1 },
+  pendingCardTitle: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
   },
   refreshSpinnerOverlay: {
     position: 'absolute',
@@ -1543,6 +2030,31 @@ const styles = StyleSheet.create({
   },
   artFooter: {
     marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  artFooterMain: {
+    // Holds the existing owner/viewer action buttons and absorbs the width the
+    // bookmark square doesn't, so those buttons keep their full-width layout.
+    flex: 1,
+  },
+  artWebBtn: {
+    width: 32,
+    height: 32,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  artWebIcon: {
+    width: 24,
+    height: 24,
+  },
+  artBookmarkBtn: {
+    alignSelf: 'stretch',
   },
   artButtons: {
     flexDirection: 'row',
@@ -1568,6 +2080,16 @@ const styles = StyleSheet.create({
   },
   commentsBtn: {
     backgroundColor: Colors.secondary,
+  },
+  // Icon variant of the comments button (Charlie's hand-drawn bubble).
+  commentsBtnIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  commentsBtnIcon: {
+    width: 26,
+    height: 22,
   },
   commentsBtnFull: {
     alignSelf: 'stretch',

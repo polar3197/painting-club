@@ -10,9 +10,12 @@ const tabIcons = {
   me: require('../../assets/imgs/me.png'),
   people: require('../../assets/imgs/profiles.png'),
   art: require('../../assets/imgs/art.png'),
+  bookmark: require('../../assets/imgs/bookmark.png'),
 };
 
 import LandingPage from '../screens/LandingPage';
+import ApplicationFlow from '../screens/ApplicationFlow';
+import WebScreen from '../screens/WebScreen';
 import SetupAccount from '../screens/SetupAccount';
 import NotMember from '../screens/NotMember';
 import UserProfile from '../screens/UserProfile';
@@ -20,10 +23,15 @@ import Admin from '../screens/Admin';
 import Ethos from '../screens/Ethos';
 import Portfolio from '../screens/Portfolio';
 import SearchStack from './SearchStack';
+import BookmarkStack from './BookmarkStack';
 import HomeStack from './HomeStack';
 import SwipeStack from './SwipeStack';
+import SwipeBStack from './SwipeBStack';
 import AddArt from '../screens/AddArt';
 import Settings from '../screens/Settings';
+import NotificationSettings from '../screens/NotificationSettings';
+import SignupQrCodes from '../screens/SignupQrCodes';
+import AccountManagement from '../screens/AccountManagement';
 import UserStats from '../screens/UserStats';
 import InfraStats from '../screens/InfraStats';
 import UserRoles from '../screens/UserRoles';
@@ -102,6 +110,11 @@ const AddArtGated = () => (
     <AddArt />
   </BackendGate>
 );
+const BookmarkStackGated = () => (
+  <BackendGate>
+    <BookmarkStack />
+  </BackendGate>
+);
 const MeScreenGated = () => (
   <BackendGate>
     <MeScreen />
@@ -112,16 +125,30 @@ const SwipeStackGated = () => (
     <SwipeStack />
   </BackendGate>
 );
+const SwipeBStackGated = () => (
+  <BackendGate>
+    <SwipeBStack />
+  </BackendGate>
+);
 
-// The "Main" surface picks its shell from the nav-model preference: the shipped
-// bottom tabs by default, or a swipe prototype when a contributor has toggled
-// one on (NavPrefContext). Until the persisted value is read we render tabs so
-// there's no first-frame flash of the wrong shell for members.
-function MainShell() {
+// The Home tab picks its content from the nav-model preference: the shipped
+// HomeStack by default, or a swipe prototype when a contributor has toggled one
+// on (NavPrefContext). Keeping this switch at the Home-tab level (not the root)
+// means the bottom tab bar stays put in every mode. Until the persisted value
+// is read we render the normal HomeStack so there's no flash for members.
+function HomeTabHost() {
   const { navModel, ready } = useNavPref();
-  if (ready && (navModel === 'swipeA' || navModel === 'swipeB')) {
-    return <SwipeStackGated />;
-  }
+  if (ready && navModel === 'swipeA') return <SwipeStackGated />;
+  return <HomeStackGated />;
+}
+
+// swipe B (the 4-directional hub) is the default for everyone — chosen at the
+// root, bypassing MainTabs' bottom bar. navModel's initial value is already
+// 'swipeB', so this renders the hub on the first frame with no tab-bar flash;
+// MainTabs only appears for a device that has a stored 'tabs'/'swipeA' pref.
+function MainShell() {
+  const { navModel } = useNavPref();
+  if (navModel === 'swipeB') return <SwipeBStackGated />;
   return <MainTabs />;
 }
 
@@ -146,6 +173,9 @@ function MainTabs() {
           if (route.name === 'AddTab') {
             return <AddIcon size={size} />;
           }
+          if (route.name === 'Bookmark') {
+            return <Image source={tabIcons.bookmark} style={{ width: size, height: size }} />;
+          }
           return <Ionicons name="home-outline" size={size} color={color} />;
         },
         tabBarActiveTintColor: Colors.darkerGold,
@@ -154,8 +184,9 @@ function MainTabs() {
         tabBarInactiveTintColor: Colors.darkerGold,
         tabBarStyle: {
           backgroundColor: Colors.secondary,
-          borderTopWidth: 1,
-          borderTopColor: '#000',
+          // Bottom border removed per design — the tab bar now blends into the
+          // page above it (the swipe hub draws its own directional frame).
+          borderTopWidth: 0,
           height: 90,
           paddingTop: 8,
         },
@@ -163,7 +194,7 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeStackGated}
+        component={HomeTabHost}
         options={{
           // Render an empty (space) label so this tab reserves the same label
           // height as the others — that keeps the PC icon on the same line as
@@ -171,11 +202,16 @@ function MainTabs() {
           tabBarLabel: ' ',
         }}
       />
-      <Tab.Screen name="SearchTab" component={SearchStackGated} options={{ tabBarLabel: 'stuff' }} />
+      <Tab.Screen name="SearchTab" component={SearchStackGated} options={{ tabBarLabel: 'everything' }} />
       <Tab.Screen
         name="AddTab"
         component={AddArtGated}
         options={{ tabBarLabel: 'share' }}
+      />
+      <Tab.Screen
+        name="Bookmark"
+        component={BookmarkStackGated}
+        options={{ tabBarLabel: 'saved' }}
       />
       <Tab.Screen
         name="Me"
@@ -204,6 +240,14 @@ export default function RootNavigator() {
     >
       <RootStack.Screen name="Main" component={MainShell} />
       <RootStack.Screen name="LandingPage" component={LandingPage} />
+      {/* The application. Full-screen rather than a dialog: it is the first
+          thing anyone sees of the club and has nothing to share a surface
+          with. Opened from the landing page and from a scanned club QR. */}
+      <RootStack.Screen
+        name="ApplicationFlow"
+        component={ApplicationFlow}
+        options={{ animation: 'slide_from_bottom' }}
+      />
       <RootStack.Screen
         name="SetupAccount"
         component={SetupAccount}
@@ -214,7 +258,11 @@ export default function RootNavigator() {
         options={{ animation: 'fade' }}
       />
       <RootStack.Screen name="Ethos" component={Ethos} />
+      <RootStack.Screen name="Web" component={WebScreen} />
       <RootStack.Screen name="Settings" component={Settings} />
+      <RootStack.Screen name="NotificationSettings" component={NotificationSettings} />
+      <RootStack.Screen name="SignupQrCodes" component={SignupQrCodes} />
+      <RootStack.Screen name="AccountManagement" component={AccountManagement} />
       <RootStack.Screen name="UserStats" component={UserStats} />
       <RootStack.Screen name="InfraStats" component={InfraStats} />
       <RootStack.Screen name="UserRoles" component={UserRoles} />

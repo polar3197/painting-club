@@ -8,7 +8,6 @@ import {
   Dimensions,
   Animated,
   Keyboard,
-  Platform,
 } from 'react-native';
 import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
@@ -16,8 +15,10 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useNavPref } from '../context/NavPrefContext';
 import { useUploads } from '../context/UploadContext';
 import { useProfile } from '../hooks';
 import {
@@ -51,15 +52,35 @@ const GRID_SQUARE = (SCREEN_WIDTH - 40 - GRID_GAP) / 2;
 
 type PickedFile = { uri: string; name: string; type: string } | null;
 
+// The footer either rides the keyboard (details step) or sits at the bottom.
+function FooterHost({ sticky, stickyKey, children }: { sticky: boolean; stickyKey: number; children: React.ReactNode }) {
+  if (!sticky) return <View style={styles.footerSticky}>{children}</View>;
+  return (
+    <KeyboardStickyView key={stickyKey} style={styles.footerSticky}>
+      {children}
+    </KeyboardStickyView>
+  );
+}
+
 export default function AddArt() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute();
   const preseededMedium = (route.params as { medium?: string } | undefined)?.medium ?? null;
 
-  const { currentUser, token } = useAuth();
+  const { currentUser, token, myMedia, setMyMedia } = useAuth();
+  const { navModel } = useNavPref();
   const { startUpload, startWrittenUpload, startAudioUpload } = useUploads();
   const [profile, setProfile] = useProfile(currentUser ?? '');
+
+  // The medium grid reads `myMedia` from context so it paints on the first frame
+  // (prefetched at launch) instead of flashing empty while useProfile resolves.
+  // useProfile still fetches on focus and on every media mutation (which flow
+  // through setProfile) — syncing its result back here keeps the cache fresh, so
+  // that focus-refetch doubles as the revalidate.
+  useEffect(() => {
+    if (profile?.media) setMyMedia(profile.media);
+  }, [profile?.media, setMyMedia]);
   const [showAddMedia, setShowAddMedia] = useState(false);
 
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
@@ -77,10 +98,33 @@ export default function AddArt() {
   // stub builds (1.0.3) are pinned to text.
   const [writeMode, setWriteMode] = useState<'file' | 'text'>(PICKER_IS_STUB ? 'text' : 'file');
   const [pastedText, setPastedText] = useState('');
+  // Optional cover image for written pieces — shown on the card instead of the
+  // text snippet.
+  const [coverFile, setCoverFile] = useState<{ uri: string; name: string; type: string } | null>(null);
   // Measured length of a picked audio file (via the preview player) — sent as
   // duration_seconds so tiles can show a duration without loading the file.
   const [pickedDuration, setPickedDuration] = useState<number | null>(null);
   const [posting, setPosting] = useState(false);
+  // The footer needs safe-area clearance when it's resting at the bottom of the
+  // screen, but NOT when KeyboardStickyView has lifted it onto the keyboard —
+  // the keyboard already occupies that space, and padding there just leaves a
+  // gap between the buttons and the keys.
+  const [keyboardH, setKeyboardH] = useState(0);
+  const keyboardUp = keyboardH > 0;
+  // The add-media dialog is a Modal with its own TextInput. Dismissing it with
+  // the keyboard up hides the keyboard without KeyboardStickyView noticing, so
+  // the footer stayed translated up the screen — mid-page, with the list
+  // showing through beneath it. Bumping this key remounts the sticky view at
+  // rest, which is the only way back from that state.
+  const [footerKey, setFooterKey] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', (e) => setKeyboardH(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardH(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Horizontal position of the stage pager (slides between medium/details/post).
   const slideX = useRef(new Animated.Value(0)).current;
@@ -121,14 +165,24 @@ export default function AddArt() {
     () => allMedia.find((m) => m.name === selectedMedium)?.type ?? null,
     [allMedia, selectedMedium],
   );
+
+  // Step-0 medium list as rows: the mediums shown on the user's page first
+  // (in their page order), then every other available medium.
+  const displayedMediums = useMemo(
+    () => (profile?.media ?? []).filter((m) => !(profile?.hidden_media ?? []).includes(m)),
+    [profile?.media, profile?.hidden_media],
+  );
+  const orderedMediums = useMemo(() => {
+    const shown = new Set(displayedMediums);
+    const rest = allMedia.map((m) => m.name).filter((n) => !shown.has(n));
+    return [...displayedMediums, ...rest];
+  }, [displayedMediums, allMedia]);
   const isVisual = mediumType === 'visual_2d';
   const isWritten = mediumType === 'written_form';
   const isAudio = mediumType === 'audio';
 
-  const myMedia = profile?.media ?? [];
-
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
       setPickedFile({ uri: a.uri, name: a.uri.split('/').pop() || 'image.jpg', type: a.mimeType || 'image/jpeg' });
@@ -181,6 +235,13 @@ export default function AddArt() {
     setPickedFile({ uri: asset.uri, name, type: asset.mimeType || mimeByExt[ext] || 'application/octet-stream' });
   };
 
+  const pickCover = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
+    if (result.canceled || !result.assets[0]) return;
+    const a = result.assets[0];
+    setCoverFile({ uri: a.uri, name: a.uri.split('/').pop() || 'cover.jpg', type: a.mimeType || 'image/jpeg' });
+  };
+
   // When everything required for the current medium is present, the user can
   // advance past the details step.
   const detailsReady = useMemo(() => {
@@ -197,6 +258,7 @@ export default function AddArt() {
     setFormData(null);
     setPickedFile(null);
     setPastedText('');
+    setCoverFile(null);
     setWriteMode(PICKER_IS_STUB ? 'text' : 'file');
     setPickedDuration(null);
     setStep(1);
@@ -242,8 +304,18 @@ export default function AddArt() {
   const goToDestination = useCallback((medium: string) => {
     // Jump to the user's profile at the medium the piece landed in; the
     // optimistic spinner tile (from UploadContext) shows there while it uploads.
-    navigation.navigate('Me', { medium, username: currentUser });
-  }, [navigation, currentUser]);
+    //
+    // WHICH route depends on the shell. 'Me' is a tab inside MainTabs, and
+    // under navModel 'swipeB' MainShell renders SwipeBStack INSTEAD of
+    // MainTabs — so 'Me' does not exist there at all. React Navigation treats
+    // a navigate to an unknown route as a silent no-op (console warning, no
+    // throw), so this simply did nothing: the flow never left the share step,
+    // the catch never ran, and the button sat on "sharing..." indefinitely
+    // while the upload quietly succeeded in the background. Both swipe shells
+    // register 'UserProfile', which takes the same username/medium params.
+    if (navModel === 'swipeB') navigation.navigate('UserProfile', { username: currentUser, medium });
+    else navigation.navigate('Me', { medium, username: currentUser });
+  }, [navigation, currentUser, navModel]);
 
   const submit = useCallback(async () => {
     if (!selectedMedium || !currentUser || !formData) return;
@@ -303,6 +375,7 @@ export default function AddArt() {
           series_name: formData.series || undefined,
           // Exactly one of file / text, per the API contract.
           ...(useFile ? { file: pickedFile! } : { text: trimmedText }),
+          ...(coverFile ? { cover: coverFile } : {}),
         };
         startWrittenUpload(payload);
       } else if (isAudio) {
@@ -326,6 +399,11 @@ export default function AddArt() {
       goToDestination(selectedMedium);
     } catch (err: any) {
       appAlert('Error', err?.message || 'Something went wrong');
+    } finally {
+      // Always, not only on error. By this point the upload is fire-and-forget
+      // (UploadContext owns it and shows its own tile on the profile), so the
+      // button has nothing left to wait on — and leaving the reset to the
+      // success path is what let a navigation misfire strand it on "sharing...".
       setPosting(false);
     }
   }, [selectedMedium, currentUser, formData, myMedia, token, isVisual, isWritten, isAudio, pickedFile, pastedText, writeMode, startUpload, startWrittenUpload, startAudioUpload, goToDestination, profile, setProfile]);
@@ -349,16 +427,18 @@ export default function AddArt() {
           {/* Stage 1 — medium: a top-aligned 2-per-row grid of square tiles,
               ending with a "new" + square that opens the media picker. */}
           <View style={styles.mediumPage}>
-            <ScrollView style={styles.gridScroll} contentContainerStyle={styles.squareGrid} showsVerticalScrollIndicator={false}>
-              {myMedia.map((m) => (
-                <Pressable key={m} style={styles.gridSquare} onPress={() => chooseMedium(m)}>
-                  <Text style={styles.mediumSquareText} numberOfLines={3}>{m}</Text>
+            <ScrollView style={styles.gridScroll} contentContainerStyle={styles.mediumRowsContent} showsVerticalScrollIndicator={false}>
+              {orderedMediums.map((m) => (
+                <Pressable key={m} style={styles.mediumRow} onPress={() => chooseMedium(m)}>
+                  <Text style={styles.mediumRowText} numberOfLines={1}>{m}</Text>
                 </Pressable>
               ))}
-              <Pressable style={[styles.gridSquare, styles.newSquare]} onPress={() => setShowAddMedia(true)}>
-                <Text style={styles.newSquarePlus}>+</Text>
-              </Pressable>
             </ScrollView>
+            <View style={styles.proposeFooterWrap}>
+              <Pressable style={[styles.mediumRow, styles.proposeRow]} onPress={() => setShowAddMedia(true)}>
+                <Text style={styles.mediumRowText}>propose new medium</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Stage 2 — details. automaticallyAdjustKeyboardInsets lets iOS
@@ -367,12 +447,25 @@ export default function AddArt() {
               reach a field no longer nukes the keyboard (was "on-drag"). */}
           <ScrollView
             style={styles.page}
-            contentContainerStyle={styles.body}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
-            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            // NOT automaticallyAdjustKeyboardInsets: that is a native
+            // UIScrollView calculation, and this scroll view sits inside the
+            // step pager's Animated.View, which carries a translateX. A
+            // transformed ancestor throws that calculation off, so the inset
+            // either never arrived or arrived wrong and the lower fields stayed
+            // unreachable. The padding below is computed explicitly instead.
+            contentContainerStyle={[
+              styles.body,
+              // The keyboard hides the bottom `keyboardH` of this scroll view:
+              // it covers the screen's lower `keyboardH`, and KeyboardStickyView
+              // lifts the footer up into the region just above it. Padding by
+              // that much makes every field reachable.
+              keyboardUp && { paddingBottom: 24 + keyboardH },
+            ]}
             showsVerticalScrollIndicator={false}
           >
+            <View style={styles.bodySpacer} />
             {isVisual && (
               <Pressable style={styles.dropbox} onPress={pickImage}>
                 {pickedFile ? (
@@ -429,6 +522,22 @@ export default function AddArt() {
                 multiline
                 textAlignVertical="top"
               />
+            )}
+            {isWritten && (
+              <View style={styles.coverRow}>
+                <Pressable style={styles.coverSlot} onPress={pickCover}>
+                  {coverFile ? (
+                    <Image source={{ uri: coverFile.uri }} style={styles.coverImg} contentFit="cover" />
+                  ) : (
+                    <Text style={styles.coverSlotText}>cover</Text>
+                  )}
+                </Pressable>
+                {!!coverFile && (
+                  <Pressable style={styles.coverRemove} onPress={() => setCoverFile(null)} hitSlop={6}>
+                    <Text style={styles.coverRemoveText}>×</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
             {isAudio && (
               <>
@@ -487,6 +596,7 @@ export default function AddArt() {
 
           {/* Stage 3 — share */}
           <ScrollView style={styles.page} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            <View style={styles.bodySpacer} />
             {isVisual && pickedFile && (
               <Image source={{ uri: pickedFile.uri }} style={styles.reviewImage} contentFit="cover" />
             )}
@@ -510,17 +620,34 @@ export default function AddArt() {
 
       {/* --- Footer: progress + step nav --- */}
       {/* Footer sits just above the (still-visible) bottom tab bar, which
-          already covers the home-indicator inset — so a small fixed pad here. */}
-      <View style={styles.footer}>
+          already covers the home-indicator inset — so a small fixed pad here.
+          KeyboardStickyView lifts it above the keyboard on the details step so
+          "next" is always reachable while typing. */}
+      {/* Only the details step types, so only it needs the sticky lift. The
+          medium step used to be wrapped too, and the propose dialog (a Modal
+          with its own TextInput) left the library's keyboard state stale when
+          it closed — stranding this footer mid-screen with the list showing
+          through underneath. Off the details step it's a plain footer. */}
+      <FooterHost sticky={step === 1} stickyKey={footerKey}>
+      <View style={[styles.footer, { paddingBottom: keyboardUp && step === 1 ? 12 : insets.bottom + 16 }]}>
         <SegmentedProgress steps={STEPS} currentIndex={step} />
         <View style={styles.navRow}>
-          {step > 0 ? (
-            <Pressable style={styles.navBtn} onPress={() => { Keyboard.dismiss(); setStep((s) => s - 1); }}>
-              <Text style={styles.navBtnText}>back</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.navBtnSpacer} />
-          )}
+          {/* Step 0 has nowhere further back inside the flow, so its back
+              button leaves the flow entirely — otherwise the first page is the
+              one screen here with no way out. Pushed onto a stack that's
+              goBack(); as the "share" TAB there is no history to pop, so fall
+              back to the Home tab. */}
+          <Pressable
+            style={styles.navBtn}
+            onPress={() => {
+              Keyboard.dismiss();
+              if (step > 0) setStep((s) => s - 1);
+              else if (navigation.canGoBack()) navigation.goBack();
+              else navigation.navigate('Home');
+            }}
+          >
+            <Text style={styles.navBtnText}>back</Text>
+          </Pressable>
           {step === 1 && (
             <Pressable
               style={[styles.navBtn, styles.navBtnPrimary, !detailsReady && styles.navBtnDisabled]}
@@ -541,6 +668,7 @@ export default function AddArt() {
           )}
         </View>
       </View>
+      </FooterHost>
 
       {showAddMedia && (
         <AddMediaDialog
@@ -549,7 +677,12 @@ export default function AddArt() {
           hidden={profile?.hidden_media ?? []}
           onAdd={handleAddMedia}
           onVisibilityChange={handleMediaVisibilityChange}
-          onClose={() => setShowAddMedia(false)}
+          onClose={() => {
+            Keyboard.dismiss();
+            setKeyboardH(0);
+            setFooterKey((k) => k + 1);
+            setShowAddMedia(false);
+          }}
         />
       )}
     </View>
@@ -563,12 +696,25 @@ const styles = StyleSheet.create({
   },
   body: {
     flexGrow: 1,
-    // Bottom-align the form/content when it's shorter than the available height.
-    justifyContent: 'flex-end',
+    // NOT justifyContent: 'flex-end'. With content taller than the viewport,
+    // flex-end pushes the overflow off the TOP, and a ScrollView cannot scroll
+    // above its content origin — so those fields become permanently
+    // unreachable, which is exactly what happened once the keyboard shrank the
+    // viewport (the oil form's width/height rows). The bodySpacer below
+    // bottom-aligns short content instead: it expands when there is room and
+    // shrinks to nothing when there isn't, so nothing is ever pushed out of
+    // reach.
     paddingTop: 12,
     paddingHorizontal: 20,
     paddingBottom: 24,
     gap: 12,
+  },
+  // Grows to fill spare height so a short form still sits at the bottom;
+  // collapses when the form is taller than the viewport.
+  bodySpacer: {
+    flex: 1,
+    // gap on the parent would otherwise add 12pt even when this is collapsed.
+    marginBottom: -12,
   },
   pagerViewport: {
     flex: 1,
@@ -586,9 +732,47 @@ const styles = StyleSheet.create({
   },
   mediumPage: {
     width: SCREEN_WIDTH,
+    flexDirection: 'column',
+  },
+  mediumRowsContent: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 12,
+    // No gap here: the last card's marginBottom scrolls away with the list,
+    // so the gap above the propose button lives on its wrap instead.
+    paddingBottom: 0,
+  },
+  mediumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  mediumRowText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
+    color: Colors.textPrimary,
+    flexShrink: 1,
+  },
+  proposeFooterWrap: {
+    paddingHorizontal: 20,
+    // A rule across the top, separating the propose button from the list.
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    // The same card gap (8) above and below, both outside the scroll view so
+    // neither depends on where the list happens to be scrolled. The safe area
+    // belongs to the footer bar underneath, not to this gap.
+    paddingTop: 8,
+    paddingBottom: 8,
+    backgroundColor: Colors.mainBg,
+  },
+  proposeRow: {
+    marginBottom: 0,
+    backgroundColor: Colors.secondary,
   },
   newSquare: {
     // Same square as the media tiles, distinguished by the cream fill + big +.
@@ -750,10 +934,15 @@ const styles = StyleSheet.create({
   navBtnShare: {
     backgroundColor: Colors.greenBright,
   },
+  footerSticky: {
+    backgroundColor: Colors.mainBg,
+  },
   footer: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 12,
+    // paddingBottom is supplied inline: insets.bottom + 16 at rest so the
+    // buttons clear the home indicator and the curved corners, 12 when the
+    // keyboard has lifted the footer.
     borderTopWidth: 1,
     borderTopColor: '#000',
     backgroundColor: Colors.mainBg,
@@ -781,9 +970,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
   },
-  navBtnSpacer: {
-    width: 1,
-  },
   guardText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.md,
@@ -800,5 +986,45 @@ const styles = StyleSheet.create({
   guardBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
+  },
+  coverRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    marginTop: 8,
+  },
+  coverSlot: {
+    width: 56,
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  coverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  coverSlotText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.textTertiary,
+  },
+  coverRemove: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverRemoveText: {
+    fontFamily: Fonts.serif,
+    fontSize: 13,
+    lineHeight: 15,
+    color: Colors.black,
   },
 });

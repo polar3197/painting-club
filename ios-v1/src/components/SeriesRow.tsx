@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,11 @@ import {
   StyleSheet,
   LayoutChangeEvent,
 } from 'react-native';
-import { WrittenFormOut } from '../api';
+import { Image } from 'expo-image';
+import { WrittenFormOut, WrittenFormat, imageSource } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import SeriesZoomIn from './SeriesZoomIn';
+import BookmarkButton from './BookmarkButton';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 const THUMB_PREVIEW_LINES = 6;
@@ -39,9 +41,15 @@ interface SeriesRowProps {
   // edit sheet) — these props are what the dialog needs to function.
   selectedMedium: string;
   username: string;
+  // The tab's short/long form, forwarded through the gallery to the reader.
+  writtenFormat?: WrittenFormat | null;
   onRefresh: () => void;
   onMediumMove?: (newMedium: string) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
+  // Set by the profile when a gallery tap landed on a piece inside this series:
+  // opens the collection automatically once the row has scrolled into view.
+  autoOpen?: boolean;
+  onAutoOpened?: () => void;
 }
 
 export default function SeriesRow({
@@ -51,13 +59,25 @@ export default function SeriesRow({
   seriesName,
   selectedMedium,
   username,
+  writtenFormat,
   onRefresh,
   onMediumMove,
   onLayout,
+  autoOpen,
+  onAutoOpened,
 }: SeriesRowProps) {
   const ordered = sortPieces(pieces);
   const topPiece = ordered[ordered.length - 1] ?? pieces[0];
   const [isZoomedIn, setIsZoomedIn] = useState(false);
+
+  // Open the collection when the profile requests it (deep-link from the search
+  // gallery). Cleared via onAutoOpened so it fires once, not on every render.
+  useEffect(() => {
+    if (autoOpen) {
+      setIsZoomedIn(true);
+      onAutoOpened?.();
+    }
+  }, [autoOpen]);
 
   const ext = extFromPath(topPiece.file_path);
   const textContent = useWrittenFormText(topPiece.file_path);
@@ -78,6 +98,7 @@ export default function SeriesRow({
           pieces={ordered}
           selectedMedium={selectedMedium}
           username={username}
+          writtenFormat={writtenFormat}
           onClose={() => setIsZoomedIn(false)}
           onRefresh={onRefresh}
           onMediumMove={onMediumMove}
@@ -103,7 +124,13 @@ export default function SeriesRow({
               );
             })}
             <View style={styles.stackTop}>
-              {isText && snippet ? (
+              {topPiece.cover_image_path ? (
+                <Image
+                  source={imageSource(topPiece.cover_image_path)}
+                  style={styles.thumbCover}
+                  contentFit="cover"
+                />
+              ) : isText && snippet ? (
                 <Text style={styles.thumbSnippet} numberOfLines={THUMB_PREVIEW_LINES}>
                   {snippet}
                 </Text>
@@ -115,6 +142,12 @@ export default function SeriesRow({
             <Text style={styles.detailText}>
               {ordered.length} piece{ordered.length === 1 ? '' : 's'}
             </Text>
+            {/* Collection-level save: bookmarks every piece in the series. */}
+            <BookmarkButton
+              artIds={ordered.map((p) => p.id)}
+              size={30}
+              style={styles.seriesBookmarkBtn}
+            />
           </View>
         </Pressable>
       </View>
@@ -171,10 +204,21 @@ const styles = StyleSheet.create({
     lineHeight: 10,
     color: Colors.black,
   },
+  // Cover image fills the page frame edge-to-edge (cancel the top padding).
+  thumbCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   details: {
     flex: 1,
     alignItems: 'flex-start',
     gap: 4,
+  },
+  seriesBookmarkBtn: {
+    marginTop: 8,
   },
   seriesTitle: {
     fontFamily: Fonts.serif,

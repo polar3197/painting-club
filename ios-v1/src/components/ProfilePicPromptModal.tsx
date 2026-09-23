@@ -33,6 +33,9 @@ export default function ProfilePicPromptModal() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 1,
+        // Square crop so the pic fills the profile's 1:1 avatar box as framed.
+        allowsEditing: true,
+        aspect: [1, 1],
       });
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];

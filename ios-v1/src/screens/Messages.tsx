@@ -27,7 +27,7 @@ import {
   ConversationOut,
   MemberDirectoryEntry,
 } from '../api';
-import { Colors, Fonts, FontSizes } from '../constants/theme';
+import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
 type Mode = '1:1' | 'groups';
 
@@ -184,11 +184,13 @@ export default function Messages() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      {navigation.canGoBack() && (
+        <Pressable style={styles.backBtn} hitSlop={10} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>‹ back</Text>
+        </Pressable>
+      )}
       <View style={styles.titleRow}>
         <Text style={styles.pageTitle}>messages</Text>
-        <Pressable style={styles.addBtn} hitSlop={12} onPress={openCompose}>
-          <Text style={styles.addBtnText}>+</Text>
-        </Pressable>
       </View>
 
       <View style={styles.toggle}>
@@ -219,7 +221,7 @@ export default function Messages() {
               <View key={m} style={[styles.page, { height: pageHeight }]}>
                 <ScrollView
                   style={styles.pageScroll}
-                  contentContainerStyle={[styles.pageContent, { paddingBottom: insets.bottom + 24 }]}
+                  contentContainerStyle={[styles.pageContent, { paddingBottom: insets.bottom + 80 }]}
                 >
                   {convos.length === 0 ? (
                     <View style={styles.empty}>
@@ -255,6 +257,15 @@ export default function Messages() {
           })}
         </Animated.ScrollView>
       </View>
+
+      {/* New message: same floating circle as add-art / add-event. */}
+      <Pressable
+        style={[styles.addFab, { bottom: insets.bottom + 6 }]}
+        onPress={openCompose}
+        hitSlop={8}
+      >
+        <Text style={styles.addFabPlus}>+</Text>
+      </Pressable>
 
       {/* ---- Compose: member picker (single-tap dm / multi-select + title group) ---- */}
       <Modal visible={showCompose} transparent animationType="none" onRequestClose={closeCompose}>
@@ -330,22 +341,51 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 12,
     marginBottom: 12,
+  },
+  // Same bordered button the other screens use, above the title.
+  backBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginLeft: 12,
+    marginBottom: 10,
+  },
+  backBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
+  // New message: the floating gold circle used by add-art and add-event.
+  addFab: {
+    position: 'absolute',
+    left: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: Colors.black,
+    backgroundColor: Colors.primaryGold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.card,
+  },
+  addFabPlus: {
+    fontFamily: Fonts.mono,
+    fontSize: 28,
+    lineHeight: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    color: Colors.black,
   },
   pageTitle: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xxl,
-    color: Colors.black,
-  },
-  addBtn: {
-    paddingHorizontal: 4,
-  },
-  addBtnText: {
-    fontFamily: Fonts.serif,
-    fontSize: 34,
-    lineHeight: 36,
     color: Colors.black,
   },
   toggle: {

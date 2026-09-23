@@ -1,5 +1,5 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
-import { View, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, Text, StyleSheet, Keyboard } from 'react-native';
 import { TextInput } from './AppTextInput';
 import { useFocusEffect } from '@react-navigation/native';
 import Fuse from 'fuse.js';
@@ -11,6 +11,13 @@ interface DropdownProps {
   onSelect: (value: string) => void;
   onInputChange?: (value: string) => void;
   onFocus?: () => void;
+  // Open the option list ABOVE the input — for dropdowns pinned near the
+  // bottom of a sheet, where a downward list would clip off-panel.
+  openUp?: boolean;
+  // Hold the list until the keyboard has finished sliding up. Without this a
+  // dropdown that rides a keyboard-anchored sheet shows its list immediately,
+  // gets overlaid by the arriving keyboard, then jumps into place.
+  showAfterKeyboard?: boolean;
 }
 
 export interface DropdownHandle {
@@ -18,7 +25,7 @@ export interface DropdownHandle {
 }
 
 const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
-  { placeholder, options, onSelect, onInputChange, onFocus },
+  { placeholder, options, onSelect, onInputChange, onFocus, openUp, showAfterKeyboard },
   ref,
 ) {
   const [query, setQuery] = useState('');
@@ -31,10 +38,34 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
     fuseRef.current = new Fuse(options, { threshold: 0.4 });
   }, [options]);
 
+  // Pending "show the list once the keyboard settles" subscription + fallback
+  // (fallback covers hardware keyboards, where no keyboard ever slides up).
+  const deferredShow = useRef<{ sub?: { remove: () => void }; timer?: ReturnType<typeof setTimeout> }>({});
+  const cancelDeferredShow = React.useCallback(() => {
+    deferredShow.current.sub?.remove();
+    if (deferredShow.current.timer) clearTimeout(deferredShow.current.timer);
+    deferredShow.current = {};
+  }, []);
+
+  const openList = React.useCallback(() => {
+    if (!showAfterKeyboard || Keyboard.isVisible()) {
+      setShowList(true);
+      return;
+    }
+    cancelDeferredShow();
+    const reveal = () => {
+      cancelDeferredShow();
+      setShowList(true);
+    };
+    deferredShow.current.sub = Keyboard.addListener('keyboardDidShow', reveal);
+    deferredShow.current.timer = setTimeout(reveal, 500);
+  }, [showAfterKeyboard, cancelDeferredShow]);
+
   const close = React.useCallback(() => {
+    cancelDeferredShow();
     setShowList(false);
     inputRef.current?.blur();
-  }, []);
+  }, [cancelDeferredShow]);
 
   useImperativeHandle(ref, () => ({ close }), [close]);
 
@@ -73,13 +104,20 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(
         autoCorrect={false}
         onChangeText={handleChange}
         onFocus={() => {
-          setShowList(true);
+          openList();
           onFocus?.();
         }}
-        onBlur={() => setTimeout(() => setShowList(false), 150)}
+        onBlur={() => {
+          cancelDeferredShow();
+          setTimeout(() => setShowList(false), 150);
+        }}
       />
       {showList && filtered.length > 0 && (
-        <ScrollView style={styles.list} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+        <ScrollView
+          style={[styles.list, openUp ? styles.listUp : styles.listDown]}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        >
           {filtered.map((item, i) => (
             <Pressable key={`${item}-${i}`} style={styles.item} onPress={() => handleSelect(item)}>
               <Text style={styles.itemText}>{item}</Text>
@@ -108,7 +146,6 @@ const styles = StyleSheet.create({
   },
   list: {
     position: 'absolute',
-    top: 31,
     left: 0,
     right: 0,
     maxHeight: 200,
@@ -117,6 +154,8 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     zIndex: 20,
   },
+  listDown: { top: 31 },
+  listUp: { bottom: 31 },
   item: {
     backgroundColor: Colors.white,
     borderWidth: 1,

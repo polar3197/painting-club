@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, Image, Pressable, StyleSheet, Dimensions, Animated, Easing, LayoutChangeEvent } from 'react-native';
+import { View, Text, ScrollView, Image, Pressable, StyleSheet, Dimensions, Animated, Easing, LayoutChangeEvent, StyleProp, TextStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue,
@@ -12,10 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
-import { useAuth } from '../context/AuthContext';
-import { useAdminPending } from '../hooks';
 import Announcements from '../components/Announcements';
-import { get_active_prompt, PromptOut } from '../api';
+import { PromptOut } from '../api';
 import { parseUtc } from '../utils/date';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { HomeStackParamList } from '../navigation/types';
@@ -37,6 +35,12 @@ const SHOW_FIDGET = false;
 // ships with (so they render without embedding). The Google picks (Jost,
 // Chakra Petch, Space Mono, …) need a font file + rebuild to preview.
 const SHOW_FONT_SAMPLES = false;
+
+// Temporarily hidden 2026-08-28 (kept intact for reuse soon): the "about the
+// app" + "request something" corner buttons and the Announcements banner. Flip
+// back to true to restore all three.
+const SHOW_HOME_LINKS = false;
+
 const FONT_SAMPLES: { label: string; family: string; weight?: 'normal' | 'bold' }[] = [
   { label: 'Futura', family: 'Futura' },
   { label: 'Avenir Next', family: 'Avenir Next' },
@@ -80,6 +84,10 @@ const SPARKLE_MAX_RADIUS = CIRCLE_SIZE / 2 - 14;
 // overlap vertically by DIAMOND_OVERLAP, so the right vertex of one meets the
 // left vertex of the next — a corner-to-corner zigzag.
 const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
+// Golden-ratio focal line from the top of the screen (φ⁻¹ ≈ 0.382) — where the
+// "paint club" title sits so it reads as an intentional focal point.
+const TITLE_GOLDEN_TOP = SCREEN_H * 0.382;
 const DIAMOND_CELL = Math.min(SCREEN_W * 0.78, 320);
 const DIAMOND_INNER = DIAMOND_CELL / Math.SQRT2; // side of the un-rotated square
 const DIAMOND_OFFSET = (DIAMOND_CELL - DIAMOND_INNER) / 2;
@@ -154,7 +162,7 @@ const REST_DAMPING = 0.7;       // per-second exponential velocity decay (light)
 const MIN_SPEED = 24;           // px/s below which the ball is treated as at rest
 
 const PROMPT_RED = '#E30022';
-const RING_THICKNESS = 6;      // matches styles.ball's borderWidth
+const RING_THICKNESS = 6;      // lifespan ring (prompt ball, unused now); the title ball's border is 2
 const PROMPT_LIFESPAN_DAYS = 7;
 
 // Fraction of the prompt's 7-day life still left, 1 → 0. Null when the backend
@@ -169,9 +177,16 @@ function promptRemaining(activatedAt: string | null | undefined): number | null 
   return Math.max(0, Math.min(1, 1 - elapsedDays / PROMPT_LIFESPAN_DAYS));
 }
 
-// The prompt ball's ring as a depleting 7-day gauge: the remaining fraction is
-// a solid red arc sweeping clockwise from 12 o'clock; spent days leave a white
-// band outlined in hairline red.
+// Whole-day chunks still lit, floored at 1: as long as the prompt is active it
+// keeps its last chunk (and reads "1 day left"), even if it has outlived the
+// nominal 7 days — an active prompt never shows a dead-empty ring.
+function litDayChunks(remaining: number): number {
+  return Math.max(1, Math.min(PROMPT_LIFESPAN_DAYS, Math.ceil(remaining * PROMPT_LIFESPAN_DAYS)));
+}
+
+// The prompt ball's ring as a depleting 7-day gauge: the fill moves in
+// whole-day steps (ceil of the remaining days), drawn as one solid red arc
+// from 12 o'clock. Spent days leave a white band outlined in hairline red.
 //
 // Drawn with plain Views because the project has no react-native-svg, and adding
 // it would mean a native rebuild (no OTA). The arc is the standard two-half-disc
@@ -181,7 +196,8 @@ function promptRemaining(activatedAt: string | null | undefined): number | null 
 // annulus. Purely decorative — pointerEvents none keeps the slingshot grabbable.
 function PromptLifespanRing({ remaining }: { remaining: number }) {
   const S = BALL_SIZE;
-  const deg = remaining * 360;
+  const lit = litDayChunks(remaining);
+  const deg = (lit / PROMPT_LIFESPAN_DAYS) * 360;
   // Right window shows 0–180°, left shows 180–360°. Each half-disc sits flush
   // against the circle's center and rotates about it, so its trailing edge lands
   // exactly on `deg` and the window clips away everything past its own half.
@@ -254,8 +270,9 @@ function PromptLifespanRing({ remaining }: { remaining: number }) {
 // physics loop can resolve ball-to-ball collisions. Grab it (freezes it), drag
 // to stretch from its rest anchor, release and it launches OPPOSITE the pull. A
 // clean tap fires onOpen. Fully separate from SpinningPromptDiamond.
-function Ball({ label, sublabel, accent, lifespanRemaining, onOpen, W, H, posX, posY, velX, velY, dragging }: {
+function Ball({ label, labelStyle, sublabel, accent, lifespanRemaining, onOpen, W, H, posX, posY, velX, velY, dragging }: {
   label: string;
+  labelStyle?: StyleProp<TextStyle>;
   sublabel?: string | null;
   accent: string;
   // 1 → 0: draw the depleting lifespan ring instead of a plain border. Null/
@@ -355,8 +372,13 @@ function Ball({ label, sublabel, accent, lifespanRemaining, onOpen, W, H, posX, 
         ]}
       >
         {hasRing ? <PromptLifespanRing remaining={lifespanRemaining!} /> : null}
-        <Text style={styles.diamondHeading}>{label}</Text>
+        <Text style={[styles.diamondHeading, labelStyle]} numberOfLines={1} adjustsFontSizeToFit>{label}</Text>
         {sublabel ? <Text style={styles.diamondSub} numberOfLines={2}>{sublabel}</Text> : null}
+        {hasRing ? (
+          <Text style={styles.ballDaysLeft}>
+            ({litDayChunks(lifespanRemaining!)} day{litDayChunks(lifespanRemaining!) === 1 ? '' : 's'} left)
+          </Text>
+        ) : null}
       </Reanimated.View>
     </GestureDetector>
   );
@@ -368,11 +390,12 @@ function Ball({ label, sublabel, accent, lifespanRemaining, onOpen, W, H, posX, 
 // so they share one set of walls. box-none lets touches on empty space fall
 // through; each ball grabs only its own circle. Bounded to the Home area (above
 // the tab bar), so a ball can never reach the nav bar.
-function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
-  prompt: PromptOut | null;
-  onOpenPrompt: () => void;
-  onOpenEvent?: () => void;
-  topInset: number;
+function BounceArena({ label, labelStyle, onOpen, restRatio, restY }: {
+  label: string;
+  labelStyle?: StyleProp<TextStyle>;
+  onOpen: () => void;
+  restRatio: number;
+  restY?: number;
 }) {
   const W = useSharedValue(0);
   const H = useSharedValue(0);
@@ -384,9 +407,6 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
   const p0x = useSharedValue(0), p0y = useSharedValue(0);
   const v0x = useSharedValue(0), v0y = useSharedValue(0);
   const d0 = useSharedValue(false);
-  const p1x = useSharedValue(0), p1y = useSharedValue(0);
-  const v1x = useSharedValue(0), v1y = useSharedValue(0);
-  const d1 = useSharedValue(false);
   const inited = useSharedValue(false);
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -400,14 +420,13 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
     const maxX = W.value - BALL_SIZE;
     const maxY = H.value - BALL_SIZE;
 
-    // Lazy init: drop both balls at well-separated (non-overlapping) spots at
-    // REST — the big vertical gap keeps their centers > BALL_SIZE apart on any
-    // screen; the collision pass below is a safety net regardless.
+    // Lazy init: drop both balls at REST in the lower half of the arena —
+    // thumb-reachable — roughly centered as a pair, with enough diagonal gap
+    // to keep their centers apart; the collision pass below is a safety net
+    // on cramped screens regardless.
     if (!inited.value) {
-      p0x.value = maxX * 0.16;
-      p0y.value = maxY * 0.06;
-      p1x.value = maxX * 0.64;
-      p1y.value = maxY * 0.78;
+      p0x.value = maxX / 2;
+      p0y.value = restY != null ? Math.min(Math.max(8, restY), maxY) : maxY * restRatio;
       inited.value = true;
     }
 
@@ -427,50 +446,6 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
       if (Math.hypot(v0x.value, v0y.value) < MIN_SPEED) { v0x.value = 0; v0y.value = 0; }
       p0x.value = x; p0y.value = y;
     }
-    // Integrate ball 1.
-    if (!d1.value) {
-      let x = p1x.value + v1x.value * dt;
-      let y = p1y.value + v1y.value * dt;
-      if (x < 0) { x = 0; v1x.value = -v1x.value * WALL_RESTITUTION; }
-      else if (x > maxX) { x = maxX; v1x.value = -v1x.value * WALL_RESTITUTION; }
-      if (y < 0) { y = 0; v1y.value = -v1y.value * WALL_RESTITUTION; }
-      else if (y > maxY) { y = maxY; v1y.value = -v1y.value * WALL_RESTITUTION; }
-      v1x.value *= damp; v1y.value *= damp;
-      if (Math.hypot(v1x.value, v1y.value) < MIN_SPEED) { v1x.value = 0; v1y.value = 0; }
-      p1x.value = x; p1y.value = y;
-    }
-
-    // Ball-to-ball collision (equal mass, elastic with the wall restitution).
-    // Separate any overlap, then exchange normal velocity if approaching.
-    const r = BALL_SIZE / 2;
-    const c0x = p0x.value + r, c0y = p0y.value + r;
-    const c1x = p1x.value + r, c1y = p1y.value + r;
-    let dx = c1x - c0x, dy = c1y - c0y;
-    let dist = Math.hypot(dx, dy);
-    if (dist === 0) { dx = 0.01; dist = 0.01; }  // guard exact overlap
-    if (dist < BALL_SIZE) {
-      const nx = dx / dist, ny = dy / dist;
-      const overlap = BALL_SIZE - dist;
-      // A held ball stays put; the free one takes the full push.
-      if (d0.value && !d1.value) {
-        p1x.value = Math.max(0, Math.min(p1x.value + nx * overlap, maxX));
-        p1y.value = Math.max(0, Math.min(p1y.value + ny * overlap, maxY));
-      } else if (d1.value && !d0.value) {
-        p0x.value = Math.max(0, Math.min(p0x.value - nx * overlap, maxX));
-        p0y.value = Math.max(0, Math.min(p0y.value - ny * overlap, maxY));
-      } else if (!d0.value && !d1.value) {
-        p0x.value = Math.max(0, Math.min(p0x.value - nx * overlap / 2, maxX));
-        p0y.value = Math.max(0, Math.min(p0y.value - ny * overlap / 2, maxY));
-        p1x.value = Math.max(0, Math.min(p1x.value + nx * overlap / 2, maxX));
-        p1y.value = Math.max(0, Math.min(p1y.value + ny * overlap / 2, maxY));
-      }
-      const rvn = (v0x.value - v1x.value) * nx + (v0y.value - v1y.value) * ny;
-      if (rvn > 0) {  // approaching → exchange normal component
-        const j = (1 + WALL_RESTITUTION) * rvn / 2;
-        v0x.value -= j * nx; v0y.value -= j * ny;
-        v1x.value += j * nx; v1y.value += j * ny;
-      }
-    }
   }, false);
 
   // Only integrate while this screen is focused — no physics off-screen.
@@ -480,24 +455,39 @@ function BounceArena({ prompt, onOpenPrompt, onOpenEvent, topInset }: {
   }, [isFocused, frame]);
 
   return (
-    <View style={[styles.bounceLayer, { top: topInset }]} onLayout={onLayout} pointerEvents="box-none">
+    <View
+      // Fills its parent: the hub lays it over Home at full-frame size, so the
+      // walls are the phone's own edges.
+      style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
+      onLayout={onLayout}
+      pointerEvents="box-none"
+    >
       <Ball
-        label={"week's\nprompt"}
-        sublabel={prompt?.title ?? null}
+        label={label}
+        labelStyle={labelStyle}
         accent={PROMPT_RED}
-        lifespanRemaining={promptRemaining(prompt?.activated_at)}
-        onOpen={prompt ? onOpenPrompt : undefined}
+        onOpen={onOpen}
         W={W} H={H}
         posX={p0x} posY={p0y} velX={v0x} velY={v0y} dragging={d0}
       />
-      <Ball
-        label="events"
-        accent="#1E73BE"
-        onOpen={onOpenEvent}
-        W={W} H={H}
-        posX={p1x} posY={p1y} velX={v1x} velY={v1y} dragging={d1}
-      />
     </View>
+  );
+}
+
+// Home's title ball: "paint club" in the slingshot ball, resting where the
+// title box sat; tap opens the docs. Rendered by SwipeHub over the Home cell,
+// full frame, so it bounces off the phone's edges and passes over the seam
+// bands' green but under their labels.
+export function HomeTitleBall() {
+  const navigation = useNavigation<Nav>();
+  return (
+    <BounceArena
+      label={'paint club'}
+      labelStyle={styles.ballTitle}
+      onOpen={() => navigation.navigate('About')}
+      restRatio={0.62}
+      restY={Math.max(8, TITLE_GOLDEN_TOP + 24 - BALL_SIZE / 2)}
+    />
   );
 }
 
@@ -570,10 +560,6 @@ function SpinningPromptDiamond({ prompt, onOpen }: { prompt: PromptOut | null; o
               ))}
             </View>
           )}
-          <View style={styles.diamondContent}>
-            <Text style={styles.diamondHeading}>week's{'\n'}prompt</Text>
-            {prompt && <Text style={styles.diamondSub}>{prompt.title}</Text>}
-          </View>
         </Reanimated.View>
       </Reanimated.View>
     </GestureDetector>
@@ -583,64 +569,22 @@ function SpinningPromptDiamond({ prompt, onOpen }: { prompt: PromptOut | null; o
 export default function Home() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
-  const { token } = useAuth();
-  const [prompt, setPrompt] = useState<PromptOut | null>(null);
-  // Distinguish "still fetching" (show the skeleton circle so it appears in
-  // sync with the rest of the page) from "resolved, no active prompt" (render
-  // nothing). Starts true so the banner shell paints on the first frame.
-  const [promptLoading, setPromptLoading] = useState(true);
 
-  // Home toy mode: 'fidget' (spinning diamond, the default) or 'bounce'
-  // (slingshot ball). Persisted so it reopens in the last-used mode.
-  const [mode, setMode] = useState<'fidget' | 'bounce'>('fidget');
-  useEffect(() => {
-    SecureStore.getItemAsync('home_toy_mode')
-      .then((v) => { if (v === 'bounce' || v === 'fidget') setMode(v); })
-      .catch(() => {});
-  }, []);
-  const changeMode = (m: 'fidget' | 'bounce') => {
-    setMode(m);
-    SecureStore.setItemAsync('home_toy_mode', m).catch(() => {});
-  };
+  // The Home toy is the spinning-diamond fidget, framed around the title. The
+  // bouncing "add art" ball was removed; adding art is the "+" on the profile.
+  // The title lives in the slingshot ball: it rests where the title box sat,
+  // flings when pulled, and a tap opens the docs.
+  // The ball now lives in SwipeHub (between the seam bands' green and their
+  // labels), so it's not rendered here — see HomeTitleBall below.
+  const showBounce = false;
+  const showFidget = true;
 
-  // Fidget spinner is hidden for now (SHOW_FIDGET). When it's off, the Home toy
-  // is always the bouncing balls and the ∗/○ toggle disappears.
-  const showBounce = !SHOW_FIDGET || mode === 'bounce';
-  const showFidget = SHOW_FIDGET && mode === 'fidget';
-
-  // Admin-only: pending account/media requests. total > 0 only for admins, so
-  // the alert below is implicitly admin-gated.
-  const adminPending = useAdminPending();
-  const adminAlertLabel = (() => {
-    const parts: string[] = [];
-    if (adminPending.applications > 0) parts.push(`${adminPending.applications} account`);
-    if (adminPending.media > 0) parts.push(`${adminPending.media} media`);
-    return `${parts.join(' + ')} request${adminPending.total === 1 ? '' : 's'} to review`;
-  })();
-
-  useEffect(() => {
-    let cancelled = false;
-    setPromptLoading(true);
-    get_active_prompt(token)
-      .then((p) => { if (!cancelled) setPrompt(p); })
-      .catch(() => { if (!cancelled) setPrompt(null); })
-      .finally(() => { if (!cancelled) setPromptLoading(false); });
-    return () => { cancelled = true; };
-  }, [token]);
 
   return (
     <View style={[styles.gradient, styles.homeBg]}>
     {/* The bouncing balls ride a full-bleed layer BEHIND everything below, so
         they pass behind the title and the corner buttons. Bounded to the Home
         area (which sits above the tab bar), so they never reach the nav bar. */}
-    {showBounce && (
-      <BounceArena
-        prompt={prompt}
-        topInset={insets.top}
-        onOpenPrompt={() => prompt && navigation.navigate('WeeklyPromptDetail', { promptId: prompt.id })}
-        onOpenEvent={() => navigation.navigate('Events')}
-      />
-    )}
     {/* Fixed (non-scrollable) so vertical flicks spin the diamond instead of
         being captured by a scroll view. box-none in bounce mode lets touches on
         empty areas fall through to the balls behind. */}
@@ -648,14 +592,6 @@ export default function Home() {
       style={[styles.container, styles.content, { paddingTop: insets.top + 20 }]}
       pointerEvents={showBounce ? 'box-none' : 'auto'}
     >
-      <Text style={styles.homeTitle}>paint club</Text>
-
-      {adminPending.total > 0 && (
-        <Pressable style={styles.adminAlert} onPress={() => (navigation as any).navigate('Admin')}>
-          <View style={styles.adminAlertDot} />
-          <Text style={styles.adminAlertText}>{adminAlertLabel}</Text>
-        </Pressable>
-      )}
 
       {SHOW_INTRO && (
         <>
@@ -685,12 +621,6 @@ export default function Home() {
         style={styles.diamondsWrap}
         pointerEvents={showBounce ? 'none' : 'auto'}
       >
-        {showFidget && (
-          <SpinningPromptDiamond
-            prompt={prompt}
-            onOpen={() => prompt && navigation.navigate('WeeklyPromptDetail', { promptId: prompt.id })}
-          />
-        )}
       </View>
 
       {SHOW_FONT_SAMPLES && (
@@ -707,41 +637,28 @@ export default function Home() {
       {/* Announcements banner pinned to the bottom of the Home area, above the
           corner buttons. marginTop:auto drops it to the bottom of the column;
           the card itself renders nothing until there's an announcement. */}
-      <View style={styles.announcementsSlot}>
-        <Announcements />
-      </View>
+      {SHOW_HOME_LINKS && (
+        <View style={styles.announcementsSlot}>
+          <Announcements />
+        </View>
+      )}
+
 
     </View>
 
-    {/* fidget (∗) / bounce (○) toggle — hidden while SHOW_FIDGET is off. */}
-    {SHOW_FIDGET && (
-      <View style={styles.modeToggle}>
-        <Pressable
-          style={[styles.modeChip, mode === 'fidget' && styles.modeChipOn]}
-          onPress={() => changeMode('fidget')}
-          hitSlop={6}
-        >
-          <Text style={styles.modeChipIcon}>∗</Text>
+    {SHOW_HOME_LINKS && (
+      <>
+        {/* Pinned to the bottom-left corner of the screen. */}
+        <Pressable style={styles.aboutBtn} onPress={() => navigation.navigate('About')}>
+          <Text style={styles.aboutBtnText}>about the app</Text>
         </Pressable>
-        <Pressable
-          style={[styles.modeChip, styles.modeChipBottom, mode === 'bounce' && styles.modeChipOn]}
-          onPress={() => changeMode('bounce')}
-          hitSlop={6}
-        >
-          <Text style={styles.modeChipIcon}>○</Text>
+
+        {/* Pinned to the bottom-right corner, mirroring "about the app". */}
+        <Pressable style={styles.requestBtn} onPress={() => navigation.navigate('RequestFeature')}>
+          <Text style={styles.requestBtnText}>request something for the app</Text>
         </Pressable>
-      </View>
+      </>
     )}
-
-    {/* Pinned to the bottom-left corner of the screen. */}
-    <Pressable style={styles.aboutBtn} onPress={() => navigation.navigate('About')}>
-      <Text style={styles.aboutBtnText}>about the app</Text>
-    </Pressable>
-
-    {/* Pinned to the bottom-right corner, mirroring "about the app". */}
-    <Pressable style={styles.requestBtn} onPress={() => navigation.navigate('RequestFeature')}>
-      <Text style={styles.requestBtnText}>request something for the app</Text>
-    </Pressable>
     </View>
   );
 }
@@ -754,12 +671,73 @@ const styles = StyleSheet.create({
   homeBg: {
     backgroundColor: 'rgb(216, 237, 138)',
   },
+  // the title inside the ball: the old title box's bold Courier New, one line
+  ballTitle: {
+    fontFamily: 'CourierNewPS-BoldMT',
+    // 10 mono chars across the 150px ball's ~118px inner width
+    fontSize: 19,
+    lineHeight: 22,
+    color: '#1a1a1a',
+  },
   homeTitle: {
     fontFamily: 'CourierNewPS-BoldMT',
     fontSize: 30,
     color: '#1a1a1a',
     textAlign: 'center',
-    marginTop: 8,
+  },
+  titleBox: {
+    alignSelf: 'center',
+    backgroundColor: Colors.secondary,
+    borderWidth: 2,
+    borderColor: '#E30022',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  titleBtnRow: {
+    flex: 1,
+    alignSelf: 'stretch',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    marginTop: 10,
+  },
+  titleBtn: {
+    width: 170,
+    backgroundColor: Colors.secondary,
+    borderWidth: 2,
+    borderColor: '#E30022',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  titleBtnText: {
+    fontFamily: 'CourierNewPS-BoldMT',
+    fontSize: 14,
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  titleDiamond: {
+    width: DIAMOND_CELL,
+    height: DIAMOND_CELL,
+    alignSelf: 'center',
+    position: 'relative',
+  },
+  titleOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promptCaption: {
+    alignSelf: 'center',
+    marginTop: 14,
+    paddingHorizontal: 12,
+    maxWidth: 320,
+  },
+  promptCaptionText: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    color: Colors.darkerGold,
+    textAlign: 'center',
   },
   aboutBtn: {
     position: 'absolute',
@@ -877,19 +855,16 @@ const styles = StyleSheet.create({
     height: BALL_SIZE,
     borderRadius: BALL_SIZE / 2,
     backgroundColor: Colors.secondary,
-    borderWidth: 6,
+    // thin red border (a touch heavier than the old title box's 2px), no shadow
+    borderWidth: 3,
     borderColor: '#E30022',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    ...Shadows.card,
   },
   diamondsWrap: {
-    // Fill the space below the title and center the chain vertically so the
-    // zigzag sits evenly in the available height rather than bunching at top.
-    flex: 1,
+    // Empty now (diamond removed); no flex so the title buttons own the space.
     justifyContent: 'center',
-    marginTop: 8,
   },
   announcementsSlot: {
     // Sit low in the content column, a bit further down (closer to the corner
@@ -944,6 +919,13 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     textAlign: 'center',
     marginTop: 4,
+  },
+  ballDaysLeft: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: PROMPT_RED,
+    textAlign: 'center',
+    marginTop: 3,
   },
   diamondMuted: {
     fontFamily: Fonts.mono,

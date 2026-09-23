@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Home from '../screens/Home';
+import AddArt from '../screens/AddArt';
 import WeeklyPromptDetail from '../screens/WeeklyPromptDetail';
 import About from '../screens/About';
 import AboutSection from '../screens/AboutSection';
@@ -28,6 +29,7 @@ export default function HomeStack() {
       }}
     >
       <Stack.Screen name="HomeFeed" component={Home} />
+      <Stack.Screen name="AddArt" component={AddArt} />
       <Stack.Screen name="About" component={About} />
       <Stack.Screen name="AboutSection" component={AboutSection} />
       <Stack.Screen name="AboutPost" component={AboutPost} />

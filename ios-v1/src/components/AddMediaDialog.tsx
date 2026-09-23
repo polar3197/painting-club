@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
   LayoutChangeEvent,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -19,7 +20,7 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
-import { get_media, submit_media_request, set_media_visibility, reorder_media, MediaType, MediaTypeKind } from '../api';
+import { get_media, submit_media_request, set_media_visibility, set_media_format, reorder_media, MediaType, MediaTypeKind, WrittenFormat } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 
@@ -41,10 +42,13 @@ type Tab = 'hide-show' | 'new';
 
 // The requester classifies their proposed media form so the admin doesn't have
 // to. Labels are the human-facing names; values match the backend discriminator.
-const TYPE_OPTIONS: { value: MediaTypeKind; label: string }[] = [
+// Written splits into short form (poetry/thoughts — scroll reader) and long
+// form (stories/essays — paged reader); the format rides along on the request.
+const TYPE_OPTIONS: { value: MediaTypeKind; format?: WrittenFormat; label: string }[] = [
   { value: 'visual_2d', label: '2d-visual' },
-  { value: 'written_form', label: 'written-form' },
   { value: 'audio', label: 'audio' },
+  { value: 'written_form', format: 'short', label: 'written (short form)' },
+  { value: 'written_form', format: 'long', label: 'written (long form)' },
 ];
 
 export default function AddMediaDialog({
@@ -56,13 +60,15 @@ export default function AddMediaDialog({
   onReorder,
   onlyNew = false,
 }: AddMediaDialogProps) {
-  const { token } = useAuth();
+  const { token, currentRole } = useAuth();
   const [tab, setTab] = useState<Tab>(onlyNew ? 'new' : 'hide-show');
   const [media, setMedia] = useState<MediaType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestName, setRequestName] = useState('');
-  const [requestType, setRequestType] = useState<MediaTypeKind | null>(null);
+  const [requestOption, setRequestOption] = useState<(typeof TYPE_OPTIONS)[number] | null>(null);
   const [requestSent, setRequestSent] = useState(false);
+  // Local short/long overrides so a contributor's flip shows immediately.
+  const [formatOverrides, setFormatOverrides] = useState<Record<string, WrittenFormat>>({});
 
   // Row order, seeded from the server's (position, name) ordering at mount.
   // Toggling hide/show doesn't reshuffle it; hold-and-drag rewrites it.
@@ -167,15 +173,44 @@ export default function AddMediaDialog({
 
   const handleRequest = async () => {
     const name = requestName.trim();
-    if (!name || !requestType) return;
+    if (!name || !requestOption) return;
     try {
-      await submit_media_request(name, requestType, token);
+      await submit_media_request(name, requestOption.value, token, requestOption.format);
       setRequestName('');
-      setRequestType(null);
+      setRequestOption(null);
+      // In the create-post flow proposing is the whole dialog, so sending it
+      // finishes the job — close rather than leave an empty form open.
+      if (onlyNew) {
+        Keyboard.dismiss();
+        onClose();
+        return;
+      }
       setRequestSent(true);
       setTimeout(() => setRequestSent(false), 2000);
     } catch (err: any) {
       appAlert('Error', err.message || 'request failed');
+    }
+  };
+
+  // Contributor-only: written media are shared rows, so flipping short/long is
+  // a curation action rather than a per-profile setting.
+  const isContributor = currentRole === 'contributor';
+  const formatFor = (name: string): WrittenFormat | null => {
+    const m = (media ?? []).find((x) => x.name === name);
+    if (!m || m.type !== 'written_form') return null;
+    return formatOverrides[name] ?? m.written_format ?? 'long';
+  };
+  const flipFormat = async (name: string) => {
+    const next: WrittenFormat = formatFor(name) === 'short' ? 'long' : 'short';
+    setFormatOverrides((prev) => ({ ...prev, [name]: next }));
+    try {
+      await set_media_format(name, next, token);
+    } catch (err: any) {
+      setFormatOverrides((prev) => {
+        const { [name]: _, ...rest } = prev;
+        return rest;
+      });
+      appAlert('Error', err?.message || 'failed to change format');
     }
   };
 
@@ -199,10 +234,15 @@ export default function AddMediaDialog({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.dialog} onStartShouldSetResponder={() => true}>
+        <View style={[styles.dialog, onlyNew && styles.dialogFit]} onStartShouldSetResponder={() => true}>
           <View style={styles.titleRow}>
             {onlyNew ? (
-              <Text numberOfLines={1} style={styles.title}>new</Text>
+              <>
+                <Text numberOfLines={1} style={styles.title}>new</Text>
+                <Pressable style={styles.closeBox} hitSlop={8} onPress={onClose}>
+                  <Text style={styles.closeBoxX}>×</Text>
+                </Pressable>
+              </>
             ) : (
               <>
                 <Pressable onPress={() => setTab('hide-show')}>
@@ -225,7 +265,7 @@ export default function AddMediaDialog({
             )}
           </View>
 
-          <View style={styles.panelArea}>
+          <View style={[styles.panelArea, onlyNew && styles.panelAreaFit]}>
             {tab === 'hide-show' ? (
               order.length === 0 ? (
                 <Text style={styles.empty}>you've got to add an art form before you can hide them. click new. top right.</Text>
@@ -243,18 +283,14 @@ export default function AddMediaDialog({
                       <View>
                         {order.map((name) => {
                           const isHidden = hiddenSet.has(name);
-                          // 1-based position among the shown (green) tabs only —
-                          // matches the tab order on the profile.
-                          const shownRank = isHidden
-                            ? null
-                            : order.filter((n) => !hiddenSet.has(n)).indexOf(name) + 1;
                           return (
                             <ToggleRow
                               key={name}
                               name={name}
                               hidden={isHidden}
-                              positionNumber={shownRank}
                               dragging={draggingName === name}
+                              writtenFormat={isContributor ? formatFor(name) : null}
+                              onFlipFormat={() => flipFormat(name)}
                               onHeight={(h) => heightsRef.current.set(name, h)}
                               onToggle={() => toggle(name, !hiddenSet.has(name))}
                             />
@@ -265,6 +301,42 @@ export default function AddMediaDialog({
                   </ScrollView>
                 </>
               )
+            ) : onlyNew ? (
+              /* Create-post flow: proposing is the whole point here, so it's
+                 just the name, the kind of art, and the request. */
+              <View style={styles.proposePanelFit}>
+                <TextInput
+                  style={styles.proposeInput}
+                  value={requestName}
+                  placeholder="artform name"
+                  placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="none"
+                  onChangeText={setRequestName}
+                />
+                <View style={styles.proposeTypes}>
+                  {TYPE_OPTIONS.map((opt) => {
+                    const selected = requestOption?.label === opt.label;
+                    return (
+                      <Pressable
+                        key={opt.label}
+                        style={[styles.proposeType, selected && styles.typeChipSelected]}
+                        onPress={() => setRequestOption(opt)}
+                      >
+                        <Text style={styles.typeChipText}>{opt.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Pressable
+                  style={[styles.proposeBtn, (!requestName.trim() || !requestOption) && styles.requestBtnDisabled]}
+                  onPress={handleRequest}
+                  disabled={!requestName.trim() || !requestOption}
+                >
+                  <Text style={styles.requestBtnText}>request</Text>
+                </Pressable>
+                {error && <Text style={styles.error}>{error}</Text>}
+                {requestSent && <Text style={styles.requestSentMsg}>request sent</Text>}
+              </View>
             ) : (
               <>
                 <ScrollView style={styles.panelScroll}>
@@ -305,21 +377,21 @@ export default function AddMediaDialog({
                       onChangeText={setRequestName}
                     />
                     <Pressable
-                      style={[styles.requestBtn, (!requestName.trim() || !requestType) && styles.requestBtnDisabled]}
+                      style={[styles.requestBtn, (!requestName.trim() || !requestOption) && styles.requestBtnDisabled]}
                       onPress={handleRequest}
-                      disabled={!requestName.trim() || !requestType}
+                      disabled={!requestName.trim() || !requestOption}
                     >
                       <Text style={styles.requestBtnText}>request</Text>
                     </Pressable>
                   </View>
                   <View style={styles.typeRow}>
                     {TYPE_OPTIONS.map((opt) => {
-                      const selected = requestType === opt.value;
+                      const selected = requestOption?.label === opt.label;
                       return (
                         <Pressable
-                          key={opt.value}
+                          key={opt.label}
                           style={[styles.typeChip, selected && styles.typeChipSelected]}
-                          onPress={() => setRequestType(opt.value)}
+                          onPress={() => setRequestOption(opt)}
                         >
                           <Text style={styles.typeChipText}>
                             {opt.label}
@@ -334,11 +406,14 @@ export default function AddMediaDialog({
             )}
           </View>
 
-          <View style={styles.buttons}>
-            <Pressable style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>close</Text>
-            </Pressable>
-          </View>
+          {/* Propose-only closes from the × in the title row. */}
+          {!onlyNew && (
+            <View style={styles.buttons}>
+              <Pressable style={styles.cancelBtn} onPress={onClose}>
+                <Text style={styles.cancelText}>close</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </Pressable>
       </KeyboardAvoidingView>
@@ -356,16 +431,18 @@ const CHIP_GUTTER = 4;
 function ToggleRow({
   name,
   hidden,
-  positionNumber,
   dragging,
+  writtenFormat,
+  onFlipFormat,
   onHeight,
   onToggle,
 }: {
   name: string;
   hidden: boolean;
-  // 1-based tab position among the shown (green) rows, or null when hidden.
-  positionNumber: number | null;
   dragging: boolean;
+  // Contributor-only short/long pill on written media (null hides it).
+  writtenFormat: WrittenFormat | null;
+  onFlipFormat: () => void;
   onHeight: (h: number) => void;
   onToggle: () => void;
 }) {
@@ -407,10 +484,12 @@ function ToggleRow({
         dragging && styles.toggleRowDragging,
       ]}
     >
-      {/* Tab-order number on shown rows only — matches the profile ordering,
-          renumbering live as rows are dragged or toggled. */}
-      {positionNumber != null && (
-        <Text style={styles.positionBadge}>{positionNumber}</Text>
+      {/* Contributor-only: written media's short/long form. Shown rows only —
+          on hidden rows the name chip slides over this spot. */}
+      {writtenFormat != null && !hidden && (
+        <Pressable style={styles.formatPill} onPress={onFlipFormat} hitSlop={6}>
+          <Text style={styles.formatPillText}>{writtenFormat} form</Text>
+        </Pressable>
       )}
       {rowWidth > 0 && (
         <Animated.View
@@ -500,6 +579,62 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
   },
+  // Propose-only (create-post flow): the box hugs its three controls instead
+  // of holding the tall hide/show list's height.
+  dialogFit: {
+    height: undefined,
+  },
+  panelAreaFit: {
+    flex: 0,
+  },
+  proposePanelFit: {
+    paddingTop: 18,
+    gap: 18,
+  },
+  closeBox: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBoxX: {
+    fontFamily: Fonts.serif,
+    fontSize: 18,
+    lineHeight: 20,
+    color: Colors.black,
+  },
+  proposeInput: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: FontSizes.base,
+  },
+  proposeTypes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  proposeType: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  proposeBtn: {
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   requestSection: {
     marginTop: 8,
     borderTopWidth: 1,
@@ -542,11 +677,15 @@ const styles = StyleSheet.create({
   },
   typeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 8,
   },
   typeChip: {
-    flex: 1,
+    // Four options now (written splits into short/long) — 2×2 grid instead of
+    // one cramped row.
+    flexGrow: 1,
+    flexBasis: '47%',
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.white,
@@ -605,18 +744,21 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     ...Shadows.card,
   },
-  positionBadge: {
-    // Sits in the green area to the right of the name chip (shown rows only).
+  formatPill: {
     position: 'absolute',
-    right: 14,
-    top: 0,
-    bottom: 0,
-    lineHeight: 40,
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    fontWeight: '700',
-    color: '#000',
+    right: 36,
+    top: 8,
+    bottom: 8,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 8,
     zIndex: 1,
+  },
+  formatPillText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xxs,
   },
   toggleChip: {
     position: 'absolute',

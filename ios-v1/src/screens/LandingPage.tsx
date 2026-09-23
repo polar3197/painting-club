@@ -16,7 +16,6 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { login_user, redeem_setup_code, get_profile, accept_terms, forgot_password } from '../api';
-import ApplicationDialog from '../components/ApplicationDialog';
 import TermsModal from '../components/TermsModal';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { AuthStackParamList } from '../navigation/types';
@@ -43,13 +42,18 @@ export default function LandingPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [setupCode, setSetupCode] = useState('');
-  const [showApplication, setShowApplication] = useState(false);
-  const [showSecretCode, setShowSecretCode] = useState(false);
   // Forgot-password: single dialog — type username, tap the check, done.
   // The request lodges in the admin panel; the admin sends the code manually
   // and it's redeemed via the "secret code?" flow.
   const [showForgot, setShowForgot] = useState(false);
   const [forgotUname, setForgotUname] = useState('');
+  // The forgot panel has two steps: ask for a code, then redeem the one an
+  // admin sends back. Redemption used to be its own "secret code?" button on
+  // this screen; it moved in here because the only people who ever need it are
+  // the people who just asked for a code.
+  const [forgotStep, setForgotStep] = useState<'ask' | 'redeem'>('ask');
+  // Someone whose application hasn't been reviewed yet.
+  const [underReview, setUnderReview] = useState(false);
 
   const handleForgotPress = () => {
     // Seed from the login box when they've already typed it there.
@@ -62,12 +66,14 @@ export default function LandingPage() {
     if (!uname) return;
     // Fire-and-forget: the endpoint always answers ok.
     forgot_password(uname).catch(() => {});
-    closeForgot();
+    setForgotStep('redeem');
   };
 
   const closeForgot = () => {
     setShowForgot(false);
+    setForgotStep('ask');
     setForgotUname('');
+    setSetupCode('');
   };
   const [pendingTerms, setPendingTerms] = useState<{
     username: string;
@@ -96,6 +102,14 @@ export default function LandingPage() {
       await auth.login(profile.username, res.access_token, profile.role);
       (navigation as any).reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
+      // The backend answers "under_review" when the credentials belong to an
+      // application nobody has got to yet. Saying "invalid credentials" there
+      // is the one thing guaranteed to make them think they mistyped.
+      if (err?.message === 'under_review') {
+        setUnderReview(true);
+        setPassword('');
+        return;
+      }
       appAlert('Login failed', err.message || 'Invalid credentials');
     }
   };
@@ -105,7 +119,7 @@ export default function LandingPage() {
     if (!code) return;
     try {
       const res = await redeem_setup_code({ code });
-      setShowSecretCode(false);
+      closeForgot();
       (navigation as any).navigate('SetupAccount', { token: res.access_token });
     } catch (err: any) {
       appAlert('Setup failed', err.message || 'Invalid or expired setup code');
@@ -184,23 +198,15 @@ export default function LandingPage() {
           <Pressable style={styles.actionBtn} onPress={handleLogin}>
             <Text style={styles.actionBtnText}>login</Text>
           </Pressable>
-          {/* Split row: direct access to both onboarding paths. Each button
-              flexes to half the row so the labels read as equally-weighted
-              alternatives. */}
-          <View style={styles.splitRow}>
-            <Pressable
-              style={[styles.actionBtn, styles.splitBtn]}
-              onPress={() => setShowApplication(true)}
-            >
-              <Text style={styles.actionBtnText}>request acc</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.actionBtn, styles.splitBtn]}
-              onPress={() => setShowSecretCode(true)}
-            >
-              <Text style={styles.actionBtnText}>secret code?</Text>
-            </Pressable>
-          </View>
+          {/* One onboarding path now. Setup codes only exist for password
+              resets, so redeeming one lives inside the forgot-password panel
+              instead of sitting here confusing people who never needed one. */}
+          <Pressable
+            style={styles.actionBtn}
+            onPress={() => (navigation as any).navigate('ApplicationFlow')}
+          >
+            <Text style={styles.actionBtnText}>request acc</Text>
+          </Pressable>
           <Pressable onPress={handleForgotPress} hitSlop={6}>
             <Text style={styles.forgotLink}>forgot password?</Text>
           </Pressable>
@@ -208,43 +214,23 @@ export default function LandingPage() {
         <View style={styles.flexSpacer} />
       </KeyboardAvoidingView>
 
-      {showApplication && (
-        <ApplicationDialog onClose={() => setShowApplication(false)} />
-      )}
-
+      {/* Someone who applied and hasn't been reviewed yet. Reuses the secret
+          panel chrome so it reads as part of the same surface. */}
       <Modal
         transparent
-        visible={showSecretCode}
+        visible={underReview}
         animationType="fade"
-        onRequestClose={() => setShowSecretCode(false)}
+        onRequestClose={() => setUnderReview(false)}
       >
         <View style={styles.secretBackdrop}>
-          {/* Backdrop dismiss layer behind the panel — same pattern as the
-              written-form reader, so tapping outside closes but taps on the
-              panel itself don't propagate. */}
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setShowSecretCode(false)}
-          />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setUnderReview(false)} />
           <View style={[styles.secretPanel, accent]}>
-            <Text style={styles.secretLabel}>secret code</Text>
-            <View style={styles.secretCodeRow}>
-              <TextInput
-                style={styles.secretCodeInput}
-                value={setupCode}
-                onChangeText={setSetupCode}
-                placeholder="paste it"
-                placeholderTextColor={Colors.textMuted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="go"
-                autoFocus
-                onSubmitEditing={handleSetupCode}
-              />
-              <Pressable style={styles.secretCodeBtn} onPress={handleSetupCode}>
-                <Text style={styles.secretCodeBtnArrow}>→</Text>
-              </Pressable>
-            </View>
+            <Text style={styles.secretLabel}>still under review</Text>
+            <Text style={styles.forgotBody}>
+              Your application hasn't been looked at yet. A member reads every one. Once you're
+              approved this same username and password will just work. There's nothing else to
+              do and no code to wait for. Try again in a day.
+            </Text>
           </View>
         </View>
       </Modal>
@@ -259,26 +245,56 @@ export default function LandingPage() {
           <Pressable style={StyleSheet.absoluteFill} onPress={closeForgot} />
           <View style={[styles.secretPanel, accent]}>
             <Text style={styles.secretLabel}>forgot password</Text>
-            <Text style={styles.forgotBody}>
-              type your username and we'll send you a new secret code asap
-            </Text>
-            <View style={styles.secretCodeRow}>
-              <TextInput
-                style={styles.secretCodeInput}
-                value={forgotUname}
-                onChangeText={(v) => setForgotUname(v.toLowerCase())}
-                placeholder="username"
-                placeholderTextColor={Colors.textMuted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="send"
-                autoFocus
-                onSubmitEditing={handleForgotSubmit}
-              />
-              <Pressable style={styles.secretCodeBtn} onPress={handleForgotSubmit}>
-                <Text style={styles.secretCodeBtnArrow}>✓</Text>
-              </Pressable>
-            </View>
+            {forgotStep === 'ask' ? (
+              <>
+                <Text style={styles.forgotBody}>
+                  type your username and we'll send you a new secret code asap
+                </Text>
+                <View style={styles.secretCodeRow}>
+                  <TextInput
+                    style={styles.secretCodeInput}
+                    value={forgotUname}
+                    onChangeText={(v) => setForgotUname(v.toLowerCase())}
+                    placeholder="username"
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="send"
+                    autoFocus
+                    onSubmitEditing={handleForgotSubmit}
+                  />
+                  <Pressable style={styles.secretCodeBtn} onPress={handleForgotSubmit}>
+                    <Text style={styles.secretCodeBtnArrow}>✓</Text>
+                  </Pressable>
+                </View>
+                <Pressable onPress={() => setForgotStep('redeem')} hitSlop={6}>
+                  <Text style={styles.forgotLink}>already have a code?</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.forgotBody}>
+                  a member will send you a secret code. paste it here when it lands.
+                </Text>
+                <View style={styles.secretCodeRow}>
+                  <TextInput
+                    style={styles.secretCodeInput}
+                    value={setupCode}
+                    onChangeText={setSetupCode}
+                    placeholder="paste it"
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="go"
+                    autoFocus
+                    onSubmitEditing={handleSetupCode}
+                  />
+                  <Pressable style={styles.secretCodeBtn} onPress={handleSetupCode}>
+                    <Text style={styles.secretCodeBtnArrow}>→</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>

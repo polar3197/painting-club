@@ -11,9 +11,11 @@ interface AudioFormProps {
   // Seed the album field on create (e.g. "+" inside an album's page).
   initialSeries?: string;
   rightSlot?: React.ReactNode;
+  // The dialog renders toggles + submit in its pinned footer instead.
+  hideToggles?: boolean;
 }
 
-export default function AudioForm({ onDataChange, initialData, initialSeries, rightSlot }: AudioFormProps) {
+export default function AudioForm({ onDataChange, initialData, initialSeries, rightSlot, hideToggles }: AudioFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
     date: initialData ? initialData.date ?? '' : todayLocalISO(),
@@ -70,19 +72,21 @@ export default function AudioForm({ onDataChange, initialData, initialSeries, ri
         onChangeText={(v) => update({ series: v })}
       />
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>comments</Text>
-        <Pressable
-          style={[
-            styles.toggleTrack,
-            { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
-          ]}
-          onPress={toggleComments}
-        >
-          <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
-        </Pressable>
-        {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
-      </View>
+      {!hideToggles && (
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>comments</Text>
+          <Pressable
+            style={[
+              styles.toggleTrack,
+              { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
+            ]}
+            onPress={toggleComments}
+          >
+            <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
+          </Pressable>
+          {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
+        </View>
+      )}
     </View>
   );
 }

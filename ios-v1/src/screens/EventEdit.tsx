@@ -5,14 +5,21 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Switch,
   Image,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { appAlert } from '../components/AppAlert';
+import AppToggle from '../components/AppToggle';
 import { TextInput } from '../components/AppTextInput';
+import CalendarPicker from '../components/CalendarPicker';
+
+function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -49,6 +56,9 @@ export default function EventEdit() {
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(todayLocalISO());
   const [time, setTime] = useState('');
+  const [showCal, setShowCal] = useState(false);
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [repeatWeeks, setRepeatWeeks] = useState('4'); // additional weekly copies
   const [isPublic, setIsPublic] = useState(false);
   const [picked, setPicked] = useState<Picked>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
@@ -122,6 +132,12 @@ export default function EventEdit() {
       if (picked && id) {
         await upload_event_image(id, picked, token);
       }
+      if (!isEdit && repeatWeekly) {
+        const weeks = Math.max(0, Math.min(52, parseInt(repeatWeeks || '0', 10) || 0));
+        for (let i = 1; i <= weeks; i++) {
+          await create_event({ ...body, event_date: addDaysISO(date, 7 * i) }, token);
+        }
+      }
       if (isEdit) {
         navigation.goBack();
       } else {
@@ -148,16 +164,16 @@ export default function EventEdit() {
   const previewUri = picked?.uri || (existingImage ? resolveImageUrl(existingImage) : null);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 },
+          { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 },
         ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{isEdit ? 'edit event' : 'new event'}</Text>
@@ -184,15 +200,9 @@ export default function EventEdit() {
         <View style={styles.rowTwo}>
           <View style={styles.half}>
             <Text style={styles.label}>date</Text>
-            <TextInput
-              style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="numbers-and-punctuation"
-            />
+            <Pressable style={styles.input} onPress={() => setShowCal(true)}>
+              <Text style={date ? styles.inputValue : styles.inputPlaceholder}>{date || 'pick a date'}</Text>
+            </Pressable>
           </View>
           <View style={styles.half}>
             <Text style={styles.label}>time</Text>
@@ -215,12 +225,30 @@ export default function EventEdit() {
               {isPublic ? 'anyone in the club can see it' : 'only hosts + invited members'}
             </Text>
           </View>
-          <Switch
-            value={isPublic}
-            onValueChange={setIsPublic}
-            trackColor={{ true: Colors.greenHover, false: Colors.textMuted }}
-          />
+          <AppToggle value={isPublic} onValueChange={setIsPublic} />
         </View>
+
+        {!isEdit && (
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>repeat weekly</Text>
+              <Text style={styles.hint}>
+                {repeatWeekly ? `also creates the next ${repeatWeeks || '0'} weeks` : 'one-off event'}
+              </Text>
+            </View>
+            {repeatWeekly && (
+              <TextInput
+                style={styles.weeksInput}
+                value={repeatWeeks}
+                onChangeText={(t) => setRepeatWeeks(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                keyboardType="number-pad"
+                placeholder="4"
+                placeholderTextColor={Colors.textMuted}
+              />
+            )}
+            <AppToggle value={repeatWeekly} onValueChange={setRepeatWeekly} />
+          </View>
+        )}
 
         <Text style={styles.label}>cover image</Text>
         <Pressable style={styles.cover} onPress={pickImage}>
@@ -238,8 +266,15 @@ export default function EventEdit() {
         >
           <Text style={styles.saveBtnText}>{saving ? 'saving…' : isEdit ? 'save' : 'create event'}</Text>
         </Pressable>
+
+        <CalendarPicker
+          visible={showCal}
+          value={date}
+          onSelect={setDate}
+          onClose={() => setShowCal(false)}
+        />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -248,27 +283,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.mainBg,
   },
+  scroll: {
+    flex: 1,
+  },
   center: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     paddingHorizontal: 24,
-    gap: 6,
+    gap: 4,
   },
   title: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xl,
-    marginBottom: 12,
+    marginBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   label: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
     color: Colors.textSecondary,
-    marginTop: 14,
+    marginTop: 8,
     marginBottom: 4,
   },
   hint: {
@@ -281,13 +319,35 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     backgroundColor: Colors.white,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.black,
   },
+  inputValue: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.base,
+    color: Colors.textPrimary,
+  },
+  inputPlaceholder: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.base,
+    color: Colors.textMuted,
+  },
+  weeksInput: {
+    width: 46,
+    borderWidth: 1,
+    borderColor: Colors.black,
+    backgroundColor: Colors.white,
+    textAlign: 'center',
+    paddingVertical: 6,
+    marginRight: 10,
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.base,
+    color: Colors.textPrimary,
+  },
   multiline: {
-    height: 96,
+    height: 72,
     textAlignVertical: 'top',
   },
   rowTwo: {
@@ -300,11 +360,11 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
     gap: 12,
   },
   cover: {
-    height: 160,
+    height: 104,
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.secondary,
@@ -322,11 +382,11 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   saveBtn: {
-    marginTop: 28,
+    marginTop: 14,
     borderWidth: 1,
     borderColor: '#000',
     backgroundColor: Colors.primaryGold,
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   saveBtnDisabled: {

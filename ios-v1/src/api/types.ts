@@ -30,8 +30,6 @@ export interface Profile {
   hidden_media: string[];
   role: string;
   profile_pic_path: string | null;
-  // Signed 512px copy of the pic; absent on older backends / not yet generated.
-  profile_pic_thumb_path?: string | null;
   terms_accepted_at: string | null;
   viewer_blocked_by_owner: boolean;
   blocked_usernames: string[] | null;
@@ -59,6 +57,37 @@ export interface ApplicationIn {
   state?: string;
   known_member?: string;
   reason?: string;
+  // Credentials chosen on the form: with these, approval makes the account
+  // live directly and there is no secret code to relay.
+  username?: string;
+  password?: string;
+  invite_token?: string;
+  // Handle for the piece already uploaded via upload_application_art.
+  art_draft_id?: string;
+  art_aspect_ratio?: number;
+}
+
+export interface NotificationPrefsOut {
+  /** Every category this member may set, resolved to an explicit bool. */
+  prefs: Record<string, boolean>;
+  /** Which categories the member's role allows; 'admin' only for staff. */
+  available: string[];
+}
+
+export interface ApplicationArtOut {
+  draft_id: string;
+  seq: number;
+}
+
+export interface UsernameAvailableOut {
+  username: string;
+  available: boolean;
+}
+
+export interface JoinInviteOut {
+  valid: boolean;
+  /** "apply" = club QR (application + review). "instant" = trusted QR. */
+  kind: 'apply' | 'instant';
 }
 
 export interface PasswordResetOut {
@@ -163,12 +192,20 @@ export interface Visual2DOut {
   file_path: string;
   comments_enabled: boolean;
   aspect_ratio: number | null;
-  // Signed resized copies (512px / ~1600px); absent on older backends.
-  thumb_url?: string | null;
-  display_url?: string | null;
   series_id: string | null;
   series_name: string | null;
   order_index: number | null;
+  // Work-in-progress: file_path is the latest image; superseded images are
+  // fetched via get_wip_updates and shown as a swipeable history in the card.
+  is_wip?: boolean;
+}
+
+// One archived (superseded) image of a WIP piece.
+export interface WipUpdateOut {
+  id: string;
+  file_path: string;
+  aspect_ratio: number | null;
+  created_at: string;
 }
 
 export interface Visual2DUpdatePayload {
@@ -184,6 +221,8 @@ export interface Visual2DUpdatePayload {
   medium?: string | null;
   series_name?: string | null;
   clear_series?: boolean;
+  // Omit to leave the WIP mark untouched.
+  is_wip?: boolean;
   // When set, the on-disk file (and thumbnail) gets replaced.
   file?: { uri: string; name: string; type: string } | null;
 }
@@ -196,9 +235,13 @@ export interface WrittenFormIn {
   keywords?: string;
   comments_enabled?: boolean;
   series_name?: string;
+  // Weekly-prompt submission target (art.collection_id).
+  collection_id?: string | null;
   // Provide exactly one of file or text.
   file?: { uri: string; name: string; type: string };
   text?: string;
+  // Optional cover image shown on the piece's card instead of the text snippet.
+  cover?: { uri: string; name: string; type: string };
 }
 
 export interface WrittenFormOut {
@@ -210,6 +253,8 @@ export interface WrittenFormOut {
   comments_enabled: boolean;
   series_id: string | null;
   series_name: string | null;
+  // Optional image rendered as the piece's card instead of the text snippet.
+  cover_image_path?: string | null;
 }
 
 export interface WrittenFormUpdatePayload {
@@ -223,6 +268,9 @@ export interface WrittenFormUpdatePayload {
   // Optional file replacement (mutually exclusive with text).
   file?: { uri: string; name: string; type: string } | null;
   text?: string | null;
+  // Cover image: send `cover` to set/replace, or clear_cover to remove.
+  cover?: { uri: string; name: string; type: string } | null;
+  clear_cover?: boolean;
 }
 
 export interface AudioIn {
@@ -238,6 +286,8 @@ export interface AudioIn {
   duration_seconds?: number | null;
   // Album name — the audio flavour of a series (created server-side on demand).
   series_name?: string;
+  // Weekly-prompt submission target (art.collection_id).
+  collection_id?: string | null;
   file: { uri: string; name: string; type: string };
 }
 
@@ -295,8 +345,32 @@ export interface ArtResult {
   creator_username: string;
   creator_city: string | null;
   aspect_ratio: number | null;
-  thumb_url?: string | null;
-  display_url?: string | null;
+  // Written pieces: optional card cover image (rendered instead of the snippet).
+  cover_image_path?: string | null;
+}
+
+// A member's saved piece (any medium), shaped like a gallery card. Mirrors the
+// backend BookmarkedArtOut — enough to render the tile plus who made it and when
+// it was saved.
+export interface BookmarkedArtOut {
+  art_id: string;
+  title: string;
+  // 'visual_2d' | 'written_form' | 'audio' (Art.type discriminator).
+  art_type: string;
+  medium: string;
+  file_path: string | null;
+  date: string | null;
+  creator_username: string;
+  aspect_ratio: number | null;
+  // Set when the piece belongs to a collection/album/series (absent on older
+  // backends until the series-fields change deploys). Lets the saved page
+  // regroup pieces into one collection tile.
+  series_id?: string | null;
+  series_name?: string | null;
+  // Written pieces: optional card cover (absent on older backends until the
+  // bookmarks cover change deploys — cards fall back to the snippet).
+  cover_image_path?: string | null;
+  bookmarked_at: string;
 }
 
 export interface CommentOut {
@@ -327,10 +401,16 @@ export interface CommentsReceivedPage {
   previous_view_at: string | null;
 }
 
+// Written media split: short form (poetry/thoughts — the reader scrolls) vs
+// long form (stories/essays — the reader pages).
+export type WrittenFormat = 'short' | 'long';
+
 export interface MediaType {
   id: string;
   name: string;
   type?: string | null;
+  // Written media only; null/absent (incl. older backends) reads as long form.
+  written_format?: WrittenFormat | null;
 }
 
 // The three medium categories a piece can belong to. Used when a requester
@@ -416,6 +496,9 @@ export interface MediaRequest {
   // What the requester picked at submission ("visual_2d" | "written_form" |
   // "audio"). Null on rows created before requesters chose their own type.
   requested_type: string | null;
+  // Written requests only: the requester's short/long pick (absent on older
+  // backends and non-written requests).
+  requested_format?: WrittenFormat | null;
   resolved_type: string | null;
   created_at: string;
 }
@@ -560,8 +643,6 @@ export interface InfraHealthOut {
   content: { path: string | null; bytes: number | null; files: number | null; truncated: boolean };
 }
 
-// --- Signup invites (contributor page's standing club QR) ---------------------
-
 export interface SignupInviteOut {
   id: string;
   token: string;
@@ -572,4 +653,6 @@ export interface SignupInviteOut {
   revoked: boolean;
   created_at: string;
   joined: string[];
+  /** false = club QR (application + review). true = trusted QR (instant). */
+  instant?: boolean;
 }

@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import ApplicationDialog from '../components/ApplicationDialog';
 import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import type { AuthStackParamList } from '../navigation/types';
 
@@ -10,7 +9,6 @@ type Nav = NativeStackNavigationProp<AuthStackParamList, 'NotMember'>;
 
 export default function NotMember() {
   const navigation = useNavigation<Nav>();
-  const [showApplication, setShowApplication] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -21,7 +19,7 @@ export default function NotMember() {
         </Text>
         <Pressable
           style={[styles.btn, { backgroundColor: Colors.primaryGold }]}
-          onPress={() => setShowApplication(true)}
+          onPress={() => (navigation as any).navigate('ApplicationFlow')}
         >
           <Text style={styles.btnText}>request access</Text>
         </Pressable>
@@ -32,10 +30,6 @@ export default function NotMember() {
           <Text style={styles.btnText}>login</Text>
         </Pressable>
       </View>
-
-      {showApplication && (
-        <ApplicationDialog onClose={() => setShowApplication(false)} />
-      )}
     </View>
   );
 }

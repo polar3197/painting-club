@@ -11,8 +11,16 @@ export type MainTabParamList = {
   Home: undefined;
   SearchTab: undefined;
   AddTab: undefined;
+  Bookmark: undefined;
   Me: undefined;
   Admin: undefined;
+};
+
+// The Bookmark tab is its own stack so a saved piece opens the creator's profile
+// (scoped to the tapped piece) without leaving the tab — mirrors SearchStack.
+export type BookmarkStackParamList = {
+  Bookmarks: undefined;
+  UserProfile: { username: string; artId?: string; medium?: string };
 };
 
 // Art + People search now live behind a single tab. The two galleries are
@@ -25,7 +33,7 @@ export type SearchStackParamList = {
 
 export type HomeStackParamList = {
   HomeFeed: undefined;
-  WeeklyPromptDetail: { promptId: string };
+  WeeklyPromptDetail: { promptId: string; autoSubmit?: boolean };
   About: undefined;
   AboutSection: { section: AboutSectionKey };
   AboutPost: { section: AboutSectionKey; postIndex: number };
@@ -36,6 +44,7 @@ export type HomeStackParamList = {
   AnnouncementDetail: { id: string };
   // focusDate (YYYY-MM-DD): open the calendar on that day/month — a freshly
   // created event hands its own date back so you land on it.
+  AddArt: undefined;
   Events: { focusDate?: string } | undefined;
   EventDetail: { eventId: string };
   EventEdit: { eventId?: string };

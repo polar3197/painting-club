@@ -29,6 +29,7 @@ import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
 import ContextPopup from './ContextPopup';
 import DeleteAccountDialog from './DeleteAccountDialog';
+import Spinner from './Spinner';
 import { Colors, Fonts } from '../constants/theme';
 
 interface ArtZoomInProps {
@@ -44,6 +45,12 @@ interface ArtZoomInProps {
   // owner/report/block UI is suppressed and this node is rendered instead.
   // Used by the weekly-prompt grid to show creator + title on the back.
   backContent?: React.ReactNode;
+  // External in-flight work on this image (e.g. a profile-pic upload before the
+  // new imgPath arrives) — shows the spinner while true.
+  busy?: boolean;
+  // Extra request headers for the image fetch — auth-gated routes (e.g. the
+  // inspiration web's external-art images) need the bearer attached.
+  headers?: Record<string, string>;
 }
 
 const MIN_SCALE = 1;
@@ -57,6 +64,8 @@ export default function ArtZoomIn({
   reportArtId,
   blockableUsername,
   backContent,
+  busy = false,
+  headers,
 }: ArtZoomInProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
@@ -126,7 +135,23 @@ export default function ArtZoomIn({
 
   const uri = resolveImageUrl(imgPath);
 
-  const contentWidth = screenW * 0.9;
+  // Load-then-swap when imgPath changes while open (owner replacing their
+  // profile pic from this view): keep the outgoing image as the placeholder so
+  // the old one holds until the new bytes arrive, then crossfade — no blank
+  // frame, no need to close and reopen. The ref updates after render, so during
+  // the render where `uri` changes it still holds the previous uri.
+  const prevUriRef = useRef<string | null>(null);
+  const placeholderUri = prevUriRef.current !== uri ? prevUriRef.current : null;
+  // Spinner from the moment the uri swaps until the incoming image is on
+  // screen (onLoad/onError below) — the old image alone reads as "nothing
+  // happened" while the new bytes download.
+  const [swapLoading, setSwapLoading] = useState(false);
+  useEffect(() => {
+    if (prevUriRef.current && prevUriRef.current !== uri) setSwapLoading(true);
+    prevUriRef.current = uri;
+  }, [uri]);
+
+  const contentWidth = screenW;  // full-bleed: the piece spans the screen edge-to-edge at rest
   const contentHeight = aspectRatio ? contentWidth / aspectRatio : screenH * 0.85;
   const cappedHeight = Math.min(contentHeight, screenH * 0.85);
   const cappedWidth = aspectRatio ? Math.min(contentWidth, cappedHeight * aspectRatio) : contentWidth;
@@ -276,13 +301,36 @@ export default function ArtZoomIn({
         savedTranslationX.value = 0;
         savedTranslationY.value = 0;
       } else {
-        // At identity: flip the card (owner's "change pic" affordance).
-        runOnJS(handleFlip)();
+        // At identity: zoom all the way to the pinch maximum, keeping the
+        // tapped point under the finger. Same transform model as pinch:
+        // screenX = center + imageX·scale + translation.
+        const target = MAX_SCALE;
+        const imageX = e.x - wrapperW.value / 2;
+        const imageY = e.y - wrapperH.value / 2;
+        const maxX = Math.max(0, (wrapperW.value * target - wrapperW.value) / 2);
+        const maxY = Math.max(0, (wrapperH.value * target - wrapperH.value) / 2);
+        const tx = Math.min(maxX, Math.max(-maxX, imageX * (1 - target)));
+        const ty = Math.min(maxY, Math.max(-maxY, imageY * (1 - target)));
+        scale.value = withTiming(target, { duration: 220 });
+        translationX.value = withTiming(tx, { duration: 220 });
+        translationY.value = withTiming(ty, { duration: 220 });
+        savedScale.value = target;
+        savedTranslationX.value = tx;
+        savedTranslationY.value = ty;
       }
     });
 
+  // Flip (back face: change-pic / kebab) moved off double-tap — that now means
+  // zoom. Long-press is the flip gesture; the owner's explicit "change pic"
+  // button below the card is unaffected.
+  const longPressFlip = Gesture.LongPress()
+    .minDuration(400)
+    .onStart(() => {
+      runOnJS(handleFlip)();
+    });
+
   // Pinch and pan must coexist. Double-tap races both; it wins if it completes first.
-  const composed = Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
+  const composed = Gesture.Race(doubleTap, longPressFlip, Gesture.Simultaneous(pinch, pan));
 
   // Tap anywhere outside the artwork to close. Gesture-handler tap (not a RN
   // Pressable) so it can't be starved by the card's composed gestures.
@@ -324,6 +372,12 @@ export default function ArtZoomIn({
           </View>
         </GestureDetector>
 
+        {(busy || swapLoading) && (
+          <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="none">
+            <Spinner size={48} />
+          </View>
+        )}
+
         <View style={styles.imageWrapper} pointerEvents="box-none">
           <GestureDetector gesture={composed}>
             <Animated.View
@@ -351,15 +405,19 @@ export default function ArtZoomIn({
                 ]}
               >
                 <Image
-                  source={{ uri, cacheKey: stableCacheKey(uri) }}
-                  cachePolicy="memory-disk"
+                  source={{ uri, cacheKey: stableCacheKey(uri), headers }}
+                  placeholder={placeholderUri ? { uri: placeholderUri, cacheKey: stableCacheKey(placeholderUri), headers } : undefined}
+                  placeholderContentFit="contain"
+                  transition={250}
                   style={{ width: '100%', height: '100%' }}
                   contentFit="contain"
                   onLoad={(e) => {
+                    setSwapLoading(false);
                     const w = (e as any)?.source?.width;
                     const h = (e as any)?.source?.height;
                     if (w && h) setAspectRatio(w / h);
                   }}
+                  onError={() => setSwapLoading(false)}
                 />
               </RNAnimated.View>
               <RNAnimated.View
@@ -402,8 +460,13 @@ export default function ArtZoomIn({
               flip/zoom mechanics stay isolated to the picture itself. */}
           {isOwner && onChangePic && (
             <Pressable
-              style={[styles.changePicBelow, { width: cappedWidth }]}
+              style={({ pressed }) => [
+                styles.changePicBelow,
+                { width: cappedWidth },
+                pressed && { opacity: 0.4 },
+              ]}
               onPress={onChangePic}
+              disabled={busy}
             >
               <Text style={styles.changePicBelowText}>change pic</Text>
             </Pressable>

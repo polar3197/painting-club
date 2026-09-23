@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, Keyboard, Platform } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
 import { Image } from 'expo-image';
@@ -8,6 +9,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
 import {
   update_visual_2d,
+  remove_visual_2d,
   update_written_form,
   update_audio,
   Visual2DOut,
@@ -20,7 +22,15 @@ import {
   AudioUpdatePayload,
   get_media,
   MediaType,
+  thumbSource,
+  imageSource,
+  get_wip_updates,
+  remove_wip_update,
+  remove_wip_current,
+  add_wip_update,
+  WipUpdateOut,
 } from '../api';
+import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import PaintingForm from './PaintingForm';
 import WrittenFormForm from './WrittenFormForm';
 import AudioForm from './AudioForm';
@@ -79,6 +89,8 @@ export default function AddArtDialog({
   const { token } = useAuth();
   const [allMedia, setAllMedia] = useState<MediaType[]>([]);
   const [newMedium, setNewMedium] = useState<string | null>(null);
+  // Two-step inline confirm for the weekly-prompt "remove" action (see handleRemove).
+  const [removeConfirm, setRemoveConfirm] = useState(false);
 
   useEffect(() => {
     get_media().then(setAllMedia).catch(() => {});
@@ -147,14 +159,136 @@ export default function AddArtDialog({
   // Written-form-only: choose between picking a file and pasting text. Pasted
   // text exists so users can pull from Notes / Google Docs / anywhere a file
   // picker can't reach.
-  const [writeMode, setWriteMode] = useState<'file' | 'text'>('file');
+  // Editing a text-backed piece opens on the text tab, prefilled below — the
+  // "edit text" tab is a lie otherwise (it showed an empty paste box).
+  const [writeMode, setWriteMode] = useState<'file' | 'text'>(
+    writtenPiece && isTextExt(extFromPath(writtenPiece.file_path)) ? 'text' : 'file'
+  );
   const [pastedText, setPastedText] = useState('');
+  // The piece's current text (null for pdf/docx or while fetching). Prefills
+  // the edit box once; the original is kept so an untouched box doesn't send a
+  // pointless rewrite on update (which would also convert .md → .txt).
+  const existingText = useWrittenFormText(writtenPiece?.file_path ?? '');
+  const originalTextRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (existingText == null || originalTextRef.current != null) return;
+    originalTextRef.current = existingText;
+    setPastedText((prev) => (prev === '' ? existingText : prev));
+  }, [existingText]);
+
+  // Optional cover image for written pieces — shown on the card instead of the
+  // text snippet. `coverCleared` marks an existing cover for removal on save.
+  const [coverFile, setCoverFile] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [coverCleared, setCoverCleared] = useState(false);
+  const existingCoverPath = writtenPiece?.cover_image_path ?? null;
+  const shownCover = coverFile
+    ? { uri: coverFile.uri }
+    : existingCoverPath && !coverCleared
+    ? imageSource(existingCoverPath)
+    : null;
+  const pickCover = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setCoverFile({
+      uri: asset.uri,
+      name: asset.uri.split('/').pop() || 'cover.jpg',
+      type: asset.mimeType || 'image/jpeg',
+    });
+    setCoverCleared(false);
+  };
+  const removeCover = () => {
+    setCoverFile(null);
+    if (existingCoverPath) setCoverCleared(true);
+  };
+
+  // Toggles live in the pinned footer (not inside the scrolling forms), so the
+  // dialog owns their state; the forms' internal copies are hidden and the
+  // submit paths read these instead.
+  const [commentsEnabled, setCommentsEnabled] = useState<boolean>(
+    editingPiece?.comments_enabled ?? true
+  );
+  const [isWipToggle, setIsWipToggle] = useState<boolean>(piece?.is_wip ?? false);
+  const commentsThumb = useRef(new Animated.Value((editingPiece?.comments_enabled ?? true) ? 18 : 0)).current;
+  const wipThumb = useRef(new Animated.Value(piece?.is_wip ? 18 : 0)).current;
+  const toggleComments = () => {
+    const next = !commentsEnabled;
+    Animated.timing(commentsThumb, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
+    setCommentsEnabled(next);
+  };
+  const toggleWip = () => {
+    const next = !isWipToggle;
+    Animated.timing(wipThumb, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
+    setIsWipToggle(next);
+  };
+
+  // WIP edit mode: for a WIP piece the big dropbox is replaced by a horizontal
+  // strip of cards — the whole collection (archived states then the current
+  // image) plus a square + at the end that posts a new update. × removes an
+  // archived state IMMEDIATELY (server call on tap, no deferred save).
+  const wipMode = false; // WIP removed from the FE for now
+  const [wipRows, setWipRows] = useState<WipUpdateOut[]>([]);
+  // The piece's current image — updated in place when + posts a new update
+  // (the parent's piece prop is a stale snapshot until the profile refetches).
+  const [wipCurrentPath, setWipCurrentPath] = useState(piece?.file_path ?? '');
+  const [wipPosting, setWipPosting] = useState(false);
+  useEffect(() => {
+    if (!piece?.is_wip) return;
+    let cancelled = false;
+    get_wip_updates(piece.id)
+      .then((rows) => { if (!cancelled) setWipRows(rows); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [piece?.id, piece?.is_wip]);
+  const removeWipRow = (updateId: string) => {
+    remove_wip_update(piece!.id, updateId, token)
+      .then(() => {
+        setWipRows((rows) => rows.filter((r) => r.id !== updateId));
+        onSuccess();
+      })
+      .catch((err: any) => appAlert('Error', err?.message || 'Something went wrong'));
+  };
+  const removeWipCurrent = () => {
+    remove_wip_current(piece!.id, token)
+      .then((resp) => {
+        if (resp?.file_path) setWipCurrentPath(resp.file_path);
+        // The promoted image left the archive — refetch for truth.
+        return get_wip_updates(piece!.id).then(setWipRows);
+      })
+      .then(() => onSuccess())
+      .catch((err: any) => appAlert('Error', err?.message || 'Something went wrong'));
+  };
+
+  const addWipPiece = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const a = result.assets[0];
+    setWipPosting(true);
+    try {
+      const resp: any = await add_wip_update(piece!.id, token, {
+        uri: a.uri,
+        name: a.uri.split('/').pop() || 'update.jpg',
+        type: a.mimeType || 'image/jpeg',
+      });
+      if (resp?.file_path) setWipCurrentPath(resp.file_path);
+      const rows = await get_wip_updates(piece!.id);
+      setWipRows(rows);
+      onSuccess();
+    } catch (err: any) {
+      appAlert('Error', err?.message || 'Something went wrong');
+    } finally {
+      setWipPosting(false);
+    }
+  };
 
   // Track the keyboard height so the panel can shrink (rather than being
   // pushed off the top of the screen by KeyboardAvoidingView's padding hack).
   // We anchor the panel above the keyboard via modalRoot's paddingBottom and
   // cap the panel's height to what's left of the screen so the swipe handle
-  // and dropbox stay reachable when an input is focused.
+  // and dropbox stay reachable when an input is focused. The `kbHeight` state
+  // drives only the height cap (a discrete jump is fine there); the anchor
+  // *padding* is animated by useAnimatedKeyboard below so the panel rises welded
+  // to the keyboard frame instead of jumping a render behind it.
   const [kbHeight, setKbHeight] = useState(0);
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -163,6 +297,8 @@ export default function AddArtDialog({
     const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
+  const keyboard = useAnimatedKeyboard();
+  const modalRootStyle = useAnimatedStyle(() => ({ paddingBottom: keyboard.height.value }));
 
   const pickImage = async () => {
     const creating = !piece; // multi-select only for new pieces, not file swaps
@@ -313,11 +449,12 @@ export default function AddArtDialog({
               .map((k: string) => k.trim())
               .filter(Boolean)
           : null,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         medium: moving,
         series_name: formData.series ? formData.series : null,
         // Clear the series if the field was emptied while editing.
         clear_series: !formData.series && !!piece.series_name,
+        is_wip: isWipToggle,
         file: pickedFile,
       };
       onClose();
@@ -358,7 +495,7 @@ export default function AddArtDialog({
         width: formData.width,
         height: formData.height,
         keywords: formData.keywords,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         series_name: (formData.series || '').trim() || undefined,
       };
       onClose();
@@ -376,7 +513,10 @@ export default function AddArtDialog({
       const moving = newMedium && newMedium !== selectedMedium ? newMedium : null;
       const trimmedText = pastedText.trim();
       const replacingFile = writeMode === 'file' && pickedFile != null;
-      const replacingText = writeMode === 'text' && !!trimmedText;
+      const replacingText =
+        writeMode === 'text' &&
+        !!trimmedText &&
+        trimmedText !== (originalTextRef.current ?? '').trim();
       const updatePayload: WrittenFormUpdatePayload = {
         title: formData.title,
         date: formData.date || null,
@@ -386,13 +526,18 @@ export default function AddArtDialog({
               .map((k: string) => k.trim())
               .filter(Boolean)
           : null,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         medium: moving,
         series_name: formData.series ? formData.series : null,
         // Clear the series if the field was emptied while editing.
         clear_series: !formData.series && !!writtenPiece.series_name,
         ...(replacingFile ? { file: pickedFile } : {}),
         ...(replacingText ? { text: trimmedText } : {}),
+        ...(coverFile
+          ? { cover: coverFile }
+          : coverCleared && existingCoverPath
+          ? { clear_cover: true }
+          : {}),
       };
       onClose();
       update_written_form(writtenPiece.id, token, updatePayload)
@@ -424,9 +569,10 @@ export default function AddArtDialog({
         title,
         date: formData.date || undefined,
         keywords: formData.keywords,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         series_name: formData.series || undefined,
         ...(writeMode === 'file' && pickedFile ? { file: pickedFile } : { text: trimmedText }),
+        ...(coverFile ? { cover: coverFile } : {}),
       };
       onClose();
       onCreateWritten?.(createPayload);
@@ -442,7 +588,7 @@ export default function AddArtDialog({
               .map((k: string) => k.trim())
               .filter(Boolean)
           : null,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         medium: moving,
         series_name: formData.series ? formData.series : null,
         clear_series: !formData.series && !!audioPiece.series_name,
@@ -476,7 +622,7 @@ export default function AddArtDialog({
         artist: formData.artist || undefined,
         date: formData.date || undefined,
         keywords: formData.keywords,
-        comments_enabled: formData.comments_enabled,
+        comments_enabled: commentsEnabled,
         duration_seconds: pickedDuration ?? undefined,
         series_name: formData.series || undefined,
         file: pickedFile,
@@ -484,6 +630,20 @@ export default function AddArtDialog({
       onClose();
       onCreateAudio?.(createPayload);
     }
+  };
+
+  // Remove (delete) the piece being edited. Only surfaced for weekly-prompt
+  // submissions (the minimal editor) — deleting the piece is what takes it out
+  // of the prompt. The confirm is INLINE (a two-step tap via removeConfirm)
+  // rather than an appAlert: appAlert renders its own Modal, and a Modal fired
+  // from inside this open sheet mounts behind it on iOS (tap does nothing).
+  // Same reason DeleteAccountDialog confirms inline instead of via appAlert.
+  const handleRemove = () => {
+    if (!piece) return;
+    onClose();
+    remove_visual_2d(piece.id, token)
+      .then(() => onSuccess())
+      .catch((err: any) => appAlert('Error', err?.message || 'Could not remove'));
   };
 
   // Hard cap = 80% of screen. When the keyboard is up we further cap so the
@@ -496,7 +656,7 @@ export default function AddArtDialog({
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.modalRoot, { paddingBottom: kbHeight }]}>
+      <Reanimated.View style={[styles.modalRoot, modalRootStyle]}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <Animated.View
           style={[styles.panel, { maxHeight: panelMaxHeight, transform: [{ translateY }] }]}
@@ -512,7 +672,7 @@ export default function AddArtDialog({
                 outer View holding panHandlers, the inner Pressable handles tap,
                 and a real downward drag is captured by the parent (capture
                 phase wins over the child) and dismisses the sheet. */}
-            {isVisual2D && (
+            {isVisual2D && !wipMode && (
               <View {...dropboxPanResponder.panHandlers}>
                 <Pressable style={styles.dropbox} onPress={pickImage}>
                   {pickedFile ? (
@@ -524,23 +684,71 @@ export default function AddArtDialog({
                         </View>
                       )}
                     </>
+                  ) : piece ? (
+                    // Editing with nothing newly picked: show the piece's
+                    // current image (cached thumb — instant) so the edit view
+                    // reflects what's there; picking still replaces it.
+                    <Image
+                      source={thumbSource(piece.id, piece.file_path)}
+                      style={styles.dropboxImage}
+                      contentFit="contain"
+                    />
                   ) : (
                     <Text style={styles.dropboxText}>{dropboxPlaceholder ?? 'tap to select art'}</Text>
                   )}
                 </Pressable>
               </View>
             )}
+            {wipMode && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.wipStrip}
+                contentContainerStyle={styles.wipStripContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {wipRows.map((r) => (
+                  <View key={r.id} style={styles.wipCard}>
+                    <Image source={imageSource(r.file_path)} style={styles.wipCardImg} contentFit="cover" />
+                    <Pressable
+                      style={styles.wipCardRemove}
+                      onPress={() => removeWipRow(r.id)}
+                      hitSlop={6}
+                    >
+                      <Text style={styles.wipCardRemoveText}>×</Text>
+                    </Pressable>
+                  </View>
+                ))}
+                {/* The current image. Its × pops it — the newest archived state
+                    is promoted to be the face. Hidden when it's the only image
+                    (a piece can't have none). */}
+                <View style={styles.wipCard}>
+                  <Image source={imageSource(wipCurrentPath)} style={styles.wipCardImg} contentFit="cover" />
+                  {wipRows.length > 0 && (
+                    <Pressable style={styles.wipCardRemove} onPress={removeWipCurrent} hitSlop={6}>
+                      <Text style={styles.wipCardRemoveText}>×</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <Pressable
+                  style={[styles.wipAddBtn, wipPosting && { opacity: 0.5 }]}
+                  onPress={wipPosting ? undefined : addWipPiece}
+                >
+                  <Text style={styles.wipAddBtnText}>+</Text>
+                </Pressable>
+              </ScrollView>
+            )}
             {isWrittenForm && (
               <View style={styles.modeTabs}>
                 <Pressable
                   style={[styles.modeTab, writeMode === 'file' && styles.modeTabActive]}
-                  onPress={() => { setWriteMode('file'); setPastedText(''); Keyboard.dismiss(); }}
+                  onPress={() => { setWriteMode('file'); Keyboard.dismiss(); }}
                 >
                   <Text style={styles.modeTabText}>{writtenPiece ? 'replace file' : 'upload .txt'}</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.modeTab, writeMode === 'text' && styles.modeTabActive]}
-                  onPress={() => { setWriteMode('text'); setPickedFile(null); }}
+                  onPress={() => setWriteMode('text')}
                 >
                   <Text style={styles.modeTabText}>{writtenPiece ? 'edit text' : 'paste text'}</Text>
                 </Pressable>
@@ -558,10 +766,35 @@ export default function AddArtDialog({
                       </View>
                       <Text style={styles.docFilename} numberOfLines={2}>{pickedFile.name}</Text>
                     </View>
+                  ) : writtenPiece ? (
+                    <View style={styles.docPreview}>
+                      <View style={styles.docBadge}>
+                        <Text style={styles.docBadgeText}>
+                          {extFromPath(writtenPiece.file_path).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.docFilename} numberOfLines={2}>{writtenPiece.title}</Text>
+                    </View>
                   ) : (
                     <Text style={styles.dropboxText}>tap to select writing</Text>
                   )}
                 </Pressable>
+              </View>
+            )}
+            {isWrittenForm && (
+              <View style={styles.coverRow}>
+                <Pressable style={styles.coverSlot} onPress={pickCover}>
+                  {shownCover ? (
+                    <Image source={shownCover} style={styles.coverImg} contentFit="cover" />
+                  ) : (
+                    <Text style={styles.coverSlotText}>cover</Text>
+                  )}
+                </Pressable>
+                {!!shownCover && (
+                  <Pressable style={styles.coverRemove} onPress={removeCover} hitSlop={6}>
+                    <Text style={styles.coverRemoveText}>×</Text>
+                  </Pressable>
+                )}
               </View>
             )}
             {isAudio && (
@@ -608,10 +841,7 @@ export default function AddArtDialog({
                 taps on Pressables register without first dismissing the keyboard. */}
             <ScrollView
               style={styles.scrollArea}
-              contentContainerStyle={[
-                styles.formContent,
-                moveToReserve ? { paddingBottom: 20 + moveToReserve } : null,
-              ]}
+              contentContainerStyle={styles.formContent}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
@@ -640,6 +870,22 @@ export default function AddArtDialog({
                   <Pressable style={styles.submitBtn} onPress={submit}>
                     <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
                   </Pressable>
+                  {piece && (
+                    removeConfirm ? (
+                      <View style={styles.removeConfirmRow}>
+                        <Pressable style={styles.removeBtn} onPress={handleRemove}>
+                          <Text style={styles.removeBtnText}>remove for real</Text>
+                        </Pressable>
+                        <Pressable style={styles.removeBtn} onPress={() => setRemoveConfirm(false)}>
+                          <Text style={styles.removeCancelText}>cancel</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Pressable style={styles.removeBtn} onPress={() => setRemoveConfirm(true)}>
+                        <Text style={styles.removeBtnText}>remove</Text>
+                      </Pressable>
+                    )
+                  )}
                 </View>
               )}
               {isVisual2D && !minimal && (
@@ -647,22 +893,14 @@ export default function AddArtDialog({
                   onDataChange={setFormData}
                   initialData={piece}
                   initialSeries={initialSeries}
-                  rightSlot={
-                    <Pressable style={styles.submitBtn} onPress={submit}>
-                      <Text style={styles.submitBtnText}>{piece ? 'update' : 'submit'}</Text>
-                    </Pressable>
-                  }
+                  hideToggles
                 />
               )}
               {isWrittenForm && (
                 <WrittenFormForm
                   onDataChange={setFormData}
                   initialData={writtenPiece}
-                  rightSlot={
-                    <Pressable style={styles.submitBtn} onPress={submit}>
-                      <Text style={styles.submitBtnText}>{writtenPiece ? 'update' : 'submit'}</Text>
-                    </Pressable>
-                  }
+                  hideToggles
                 />
               )}
               {isAudio && (
@@ -670,28 +908,61 @@ export default function AddArtDialog({
                   onDataChange={setFormData}
                   initialData={audioPiece}
                   initialSeries={initialSeries}
-                  rightSlot={
-                    <Pressable style={styles.submitBtn} onPress={submit}>
-                      <Text style={styles.submitBtnText}>{audioPiece ? 'update' : 'submit'}</Text>
-                    </Pressable>
-                  }
+                  hideToggles
                 />
               )}
-              {moveToVisible && (
-                <View style={styles.moveToRow}>
-                  <Text style={styles.moveToLabel}>move to:</Text>
-                  <View style={styles.moveToDropdown}>
-                    <Dropdown
-                      placeholder={newMedium ?? selectedMedium}
-                      options={compatibleMedia}
-                      onSelect={setNewMedium}
-                    />
-                  </View>
-                </View>
-              )}
             </ScrollView>
+            {!minimal && (
+              <View style={styles.footerBar}>
+                {moveToVisible && (
+                  <View style={styles.moveToRow}>
+                    <Text style={styles.moveToLabel}>move to:</Text>
+                    <View style={styles.moveToDropdown}>
+                      <Dropdown
+                        placeholder={newMedium ?? selectedMedium}
+                        options={compatibleMedia}
+                        onSelect={setNewMedium}
+                        openUp
+                        showAfterKeyboard
+                      />
+                    </View>
+                  </View>
+                )}
+                <View style={styles.footerActions}>
+                  {false && (
+                    <View style={styles.footerToggle}>
+                      <Text style={styles.footerToggleLabel}>wip</Text>
+                      <Pressable
+                        style={[
+                          styles.toggleTrack,
+                          { backgroundColor: isWipToggle ? Colors.greenBright : Colors.redLight },
+                        ]}
+                        onPress={toggleWip}
+                      >
+                        <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: wipThumb }] }]} />
+                      </Pressable>
+                    </View>
+                  )}
+                  <View style={styles.footerToggle}>
+                    <Text style={styles.footerToggleLabel}>comments</Text>
+                    <Pressable
+                      style={[
+                        styles.toggleTrack,
+                        { backgroundColor: commentsEnabled ? Colors.greenBright : Colors.redLight },
+                      ]}
+                      onPress={toggleComments}
+                    >
+                      <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: commentsThumb }] }]} />
+                    </Pressable>
+                  </View>
+                  <Pressable style={[styles.submitBtn, styles.footerSubmit]} onPress={submit}>
+                    <Text style={styles.submitBtnText}>{editingPiece ? 'update' : 'submit'}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
         </Animated.View>
-      </View>
+      </Reanimated.View>
     </Modal>
   );
 }
@@ -868,6 +1139,26 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
   },
+  removeBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  removeConfirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  removeBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.redCoral,
+    textDecorationLine: 'underline',
+  },
+  removeCancelText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.textSecondary,
+  },
   moveToRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -883,5 +1174,140 @@ const styles = StyleSheet.create({
   },
   moveToDropdown: {
     flex: 1,
+  },
+  coverRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    marginTop: 8,
+  },
+  coverSlot: {
+    width: 56,
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  coverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  coverSlotText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.textTertiary,
+  },
+  coverRemove: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverRemoveText: {
+    fontFamily: Fonts.serif,
+    fontSize: 13,
+    lineHeight: 15,
+    color: Colors.black,
+  },
+  // Pinned footer: move-to + toggles + update stay visible while the form
+  // scrolls above them.
+  footerBar: {
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 10,
+  },
+  footerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  footerToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  footerToggleLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+  },
+  toggleTrack: {
+    width: 36,
+    height: 18,
+    borderWidth: 1,
+    borderColor: '#000',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleThumb: {
+    width: 12,
+    height: 12,
+    backgroundColor: Colors.accentGolden,
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  footerSubmit: {
+    marginLeft: 'auto',
+  },
+  // Strip of a WIP piece's archived images (edit mode) — each removable.
+  wipStrip: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    flexGrow: 0,
+  },
+  wipStripContent: {
+    gap: 10,
+    paddingVertical: 8,
+    paddingRight: 16,
+  },
+  wipCard: {
+    width: 110,
+    height: 110,
+  },
+  wipCardImg: {
+    width: '100%',
+    height: '100%',
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+  },
+  wipCardRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wipCardRemoveText: {
+    fontFamily: Fonts.serif,
+    fontSize: 14,
+    lineHeight: 16,
+    color: Colors.black,
+  },
+  wipAddBtn: {
+    width: 110,
+    height: 110,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wipAddBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: 34,
+    color: Colors.black,
   },
 });

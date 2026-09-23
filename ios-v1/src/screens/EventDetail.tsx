@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
+  Animated,
+  Keyboard,
+  Platform,
+  Dimensions,
+  Image,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { appAlert } from '../components/AppAlert';
 import { TextInput } from '../components/AppTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Colors, Fonts, FontSizes } from '../constants/theme';
+import { Colors, Fonts, FontSizes, Shadows } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import {
@@ -30,6 +35,9 @@ import {
 } from '../api';
 import { formatEventWhen } from '../utils/date';
 
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const COVER_H = 220; // matches styles.cover height
+
 type AddMode = 'invite' | 'host';
 
 // Full event view. Hosts get edit/delete plus guest management (invite members
@@ -44,10 +52,23 @@ export default function EventDetail() {
   const [event, setEvent] = useState<EventOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDelete, setShowDelete] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false); // top-right kebab (edit/delete)
   const [pickerMode, setPickerMode] = useState<AddMode | null>(null);
+  // Staged member set the picker edits locally. Seeded from the server on open;
+  // nothing is sent until "done" (which commits the diff). "cancel" discards it,
+  // so cancelling makes no changes at all.
+  const [working, setWorking] = useState<string[]>([]);
   const [directory, setDirectory] = useState<MemberDirectoryEntry[]>([]);
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
+  // Picker sheet animation. We drive the entrance + keyboard-ride ourselves
+  // (Modal animationType="none") so the backdrop FADES in instead of the whole
+  // dark scrim wiping up the screen, and the sheet rides the keyboard 1:1.
+  // pickerMounted keeps the Modal in the tree through the exit animation.
+  const [pickerMounted, setPickerMounted] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
+  const openAnim = useRef(new Animated.Value(0)).current; // 0 closed → 1 open
+  const scrollY = useRef(new Animated.Value(0)).current; // for the stretchy cover
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +90,9 @@ export default function EventDetail() {
   const openPicker = async (mode: AddMode) => {
     setPickerMode(mode);
     setSearch('');
+    setWorking(mode === 'host' ? event?.hosts ?? [] : event?.invited ?? []);
+    setPickerMounted(true);
+    Animated.timing(openAnim, { toValue: 1, duration: 260, useNativeDriver: true }).start();
     if (directory.length === 0) {
       try {
         setDirectory(await get_member_directory(token));
@@ -78,21 +102,63 @@ export default function EventDetail() {
     }
   };
 
-  const addMember = async (username: string) => {
-    if (busy || !event) return;
-    setBusy(true);
-    try {
-      if (pickerMode === 'host') {
-        await add_event_hosts(eventId, [username], token);
-      } else {
-        await add_event_invites(eventId, [username], token);
-      }
-      await load();
-    } catch (err: any) {
-      appAlert('could not add', err?.message || 'try again');
-    } finally {
-      setBusy(false);
+  // Slide + fade the sheet out, THEN unmount — so the exit is animated too.
+  const closePicker = useCallback(() => {
+    Keyboard.dismiss();
+    Animated.timing(openAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(
+      ({ finished }) => {
+        if (finished) {
+          setPickerMounted(false);
+          setPickerMode(null);
+        }
+      },
+    );
+  }, [openAnim]);
+
+  // Track keyboard height to pad the sheet content up above it. The sheet's
+  // background itself always reaches the screen bottom (behind the keyboard),
+  // so only the content position depends on this — no scrim gap to animate.
+  useEffect(() => {
+    if (!pickerMounted) return;
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [pickerMounted]);
+
+  // "done": diff the staged working set against the server's current members
+  // and apply the adds/removes. Closes immediately (optimistic); errors surface
+  // via alert and a reload. "cancel" never calls this, so it changes nothing.
+  const commitPicker = () => {
+    if (!event) {
+      closePicker();
+      return;
     }
+    const mode = pickerMode;
+    const orig = mode === 'host' ? event.hosts : event.invited || [];
+    const toAdd = working.filter((u) => !orig.includes(u));
+    const toRemove = orig.filter((u) => !working.includes(u));
+    closePicker();
+    if (toAdd.length === 0 && toRemove.length === 0) return;
+    (async () => {
+      try {
+        if (mode === 'host') {
+          if (toAdd.length) await add_event_hosts(eventId, toAdd, token);
+          for (const u of toRemove) await remove_event_host(eventId, u, token);
+        } else {
+          if (toAdd.length) await add_event_invites(eventId, toAdd, token);
+          for (const u of toRemove) await remove_event_invite(eventId, u, token);
+        }
+      } catch (err: any) {
+        appAlert('could not save', err?.message || 'try again');
+      } finally {
+        await load();
+      }
+    })();
   };
 
   const removeHost = async (username: string) => {
@@ -140,14 +206,35 @@ export default function EventDetail() {
   }
 
   const canEdit = event.can_edit;
-  const already = new Set([...event.hosts, ...(event.invited || [])]);
+  // Members not selectable in this mode: those already staged (working) plus the
+  // other role (can't invite a host, can't host an invitee) — matching the
+  // prior behaviour, just measured against the staged set now.
+  const otherSet = pickerMode === 'host' ? event.invited || [] : event.hosts;
+  const excluded = new Set([...working, ...otherSet]);
   const filtered = directory.filter((m) => {
-    if (already.has(m.username)) return false;
+    if (excluded.has(m.username)) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     const name = `${m.firstname || ''} ${m.lastname || ''} ${m.username}`.toLowerCase();
     return name.includes(q);
   });
+
+  // Entrance slide only. The sheet is anchored at the SCREEN BOTTOM and its
+  // cream background runs the whole way down behind the keyboard, so there is
+  // no scrim gap or corner cut-out to patch — the content is simply padded up
+  // above the keyboard via sheetPadBottom.
+  const sheetTranslateY = openAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_HEIGHT * 0.75, 0],
+  });
+  // Constant height (independent of the keyboard) so the sheet always reaches
+  // the screen bottom; the list is flex:1 inside, so it filters within a fixed
+  // window instead of shrinking. The picker autofocuses, so pad up by an
+  // estimate before the real keyboard height lands (corrected on show).
+  const effectiveKb = kbHeight > 0 ? kbHeight : SCREEN_HEIGHT * 0.4;
+  const sheetTotalHeight = SCREEN_HEIGHT - insets.top - 24;
+  const sheetPadBottom = effectiveKb + 12;
+
 
   return (
     <View style={styles.container}>
@@ -164,12 +251,28 @@ export default function EventDetail() {
         onCancel={() => setShowDelete(false)}
       />
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+      <Animated.ScrollView
+        // +72 rather than +40 when the back button is up: it floats at
+        // bottom+16 and stands ~29pt tall, so the old padding let the last of
+        // the content slide underneath it.
+        contentContainerStyle={{ paddingBottom: insets.bottom + (navigation.canGoBack() ? 72 : 40) }}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
       >
         {event.image_path ? (
-          <Image source={{ uri: resolveImageUrl(event.image_path) }} style={styles.cover} />
+          <Animated.Image
+            source={{ uri: resolveImageUrl(event.image_path) }}
+            style={[
+              styles.cover,
+              {
+                transform: [
+                  { translateY: scrollY.interpolate({ inputRange: [-COVER_H, 0], outputRange: [-COVER_H / 2, 0], extrapolateRight: 'clamp' }) },
+                  { scale: scrollY.interpolate({ inputRange: [-COVER_H, 0], outputRange: [2, 1], extrapolateRight: 'clamp' }) },
+                ],
+              },
+            ]}
+          />
         ) : (
           <View style={[styles.cover, styles.coverBlank, event.color ? { backgroundColor: event.color } : null]} />
         )}
@@ -226,35 +329,73 @@ export default function EventDetail() {
             </>
           )}
 
-          {canEdit && (
-            <View style={styles.actions}>
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-                onPress={() => navigation.navigate('EventEdit', { eventId })}
-              >
-                <Text style={styles.actionBtnText}>edit</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: Colors.redCoral }]}
-                onPress={() => setShowDelete(true)}
-              >
-                <Text style={styles.actionBtnText}>delete</Text>
-              </Pressable>
-            </View>
-          )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Edit/delete moved into a top-right kebab overlaying the cover. */}
+      {canEdit && (
+        <>
+          {menuOpen && (
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
+          )}
+          <View style={[styles.kebabWrap, { top: insets.top + 8 }]}>
+            <Pressable
+              style={styles.kebabBtn}
+              hitSlop={8}
+              onPress={() => setMenuOpen((v) => !v)}
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color={Colors.white} />
+            </Pressable>
+            {menuOpen && (
+              <View style={styles.kebabMenu}>
+                <Pressable
+                  style={styles.kebabItem}
+                  onPress={() => {
+                    setMenuOpen(false);
+                    navigation.navigate('EventEdit', { eventId });
+                  }}
+                >
+                  <Text style={styles.kebabItemText}>edit</Text>
+                </Pressable>
+                <View style={styles.kebabDivider} />
+                <Pressable
+                  style={styles.kebabItem}
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setShowDelete(true);
+                  }}
+                >
+                  <Text style={[styles.kebabItemText, { color: Colors.redCoral }]}>delete</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </>
+      )}
 
       {/* Member picker */}
       <Modal
-        visible={pickerMode !== null}
+        visible={pickerMounted}
         transparent
-        animationType="slide"
-        onRequestClose={() => setPickerMode(null)}
+        animationType="none"
+        onRequestClose={closePicker}
       >
         <View style={styles.pickerRoot}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPickerMode(null)} />
-          <View style={[styles.pickerSheet, { paddingBottom: insets.bottom + 16 }]}>
+          {/* Backdrop fades in (opacity) instead of the whole scrim wiping up
+              the screen with the modal slide. */}
+          <Animated.View style={[StyleSheet.absoluteFill, styles.pickerBackdrop, { opacity: openAnim }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={closePicker} />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.pickerSheet,
+              {
+                height: sheetTotalHeight,
+                paddingBottom: sheetPadBottom,
+                transform: [{ translateY: sheetTranslateY }],
+              },
+            ]}
+          >
             <Text style={styles.pickerTitle}>
               {pickerMode === 'host' ? 'add a co-host' : 'invite a member'}
             </Text>
@@ -265,7 +406,34 @@ export default function EventDetail() {
               placeholder="search members"
               placeholderTextColor={Colors.textMuted}
               autoCapitalize="none"
+              autoFocus
             />
+            {working.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.invitedStrip}
+                contentContainerStyle={styles.invitedStripContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {working.map((u) => {
+                  const locked = pickerMode === 'host' && u === event.creator_username;
+                  return (
+                    <View key={u} style={styles.invitedCard}>
+                      <Text style={styles.invitedCardText} numberOfLines={1}>@{u}</Text>
+                      {!locked && (
+                        <Pressable
+                          hitSlop={6}
+                          onPress={() => setWorking((w) => w.filter((x) => x !== u))}
+                        >
+                          <Text style={styles.invitedCardX}>×</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
             <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled">
               {filtered.length === 0 ? (
                 <Text style={styles.emptyChips}>no members to add</Text>
@@ -274,8 +442,9 @@ export default function EventDetail() {
                   <Pressable
                     key={m.username}
                     style={styles.pickerRow}
-                    disabled={busy}
-                    onPress={() => addMember(m.username)}
+                    onPress={() =>
+                      setWorking((w) => (w.includes(m.username) ? w : [...w, m.username]))
+                    }
                   >
                     <Text style={styles.pickerName}>
                       {m.firstname || m.lastname
@@ -287,17 +456,49 @@ export default function EventDetail() {
                 ))
               )}
             </ScrollView>
-            <Pressable style={styles.pickerDone} onPress={() => setPickerMode(null)}>
-              <Text style={styles.pickerDoneText}>done</Text>
-            </Pressable>
-          </View>
+            <View style={styles.pickerActions}>
+              <Pressable style={[styles.pickerActionBtn, styles.pickerCancelBtn]} onPress={closePicker}>
+                <Text style={styles.pickerActionText}>cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.pickerActionBtn, styles.pickerConfirmBtn]} onPress={commitPicker}>
+                <Text style={styles.pickerActionText}>done</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
         </View>
       </Modal>
+      {/* Lower-left, per Charlie. Same look as the About page's back button;
+          floating over the content so it stays put while the detail scrolls. */}
+      {navigation.canGoBack() && (
+        <Pressable
+          style={[styles.eventBackBtn, { bottom: insets.bottom + 16 }]}
+          hitSlop={10}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.eventBackBtnText}>‹ back</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Same look as the About page's back button, pinned lower-left.
+  eventBackBtn: {
+    position: 'absolute',
+    left: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    ...Shadows.card,
+  },
+  eventBackBtnText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.mainBg,
@@ -393,26 +594,13 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.tiny,
     color: Colors.textMuted,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 32,
-  },
-  actionBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  actionBtnText: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-    color: Colors.black,
-  },
   pickerRoot: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  // Dark scrim, faded in via openAnim (see the picker Modal). Swap this View's
+  // content for an expo-blur <BlurView> to get a real blur instead of a scrim.
+  pickerBackdrop: {
     backgroundColor: Colors.overlay,
   },
   pickerSheet: {
@@ -421,7 +609,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#000',
     paddingHorizontal: 24,
     paddingTop: 18,
-    maxHeight: '70%',
   },
   pickerTitle: {
     fontFamily: Fonts.serif,
@@ -440,7 +627,70 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   pickerList: {
+    flex: 1,
+  },
+  invitedStrip: {
     flexGrow: 0,
+    marginBottom: 10,
+  },
+  invitedStripContent: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  invitedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#000',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  invitedCardText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
+    maxWidth: 140,
+  },
+  invitedCardX: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.md,
+    color: Colors.textSecondary,
+  },
+  kebabWrap: {
+    position: 'absolute',
+    right: 12,
+    alignItems: 'flex-end',
+    zIndex: 10,
+  },
+  kebabBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kebabMenu: {
+    marginTop: 6,
+    minWidth: 130,
+    backgroundColor: Colors.mainBg,
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  kebabItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  kebabItemText: {
+    fontFamily: Fonts.serif,
+    fontSize: FontSizes.base,
+    color: Colors.black,
+  },
+  kebabDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
   pickerRow: {
     flexDirection: 'row',
@@ -460,15 +710,25 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.textSecondary,
   },
-  pickerDone: {
-    marginTop: 12,
+  pickerActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  pickerActionBtn: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#000',
-    backgroundColor: Colors.primaryGold,
-    paddingVertical: 12,
+    paddingVertical: 8,
     alignItems: 'center',
   },
-  pickerDoneText: {
+  pickerCancelBtn: {
+    backgroundColor: Colors.secondary,
+  },
+  pickerConfirmBtn: {
+    backgroundColor: Colors.primaryGold,
+  },
+  pickerActionText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.base,
     color: Colors.black,

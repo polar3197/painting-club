@@ -38,13 +38,35 @@ export function BackendDownNotice() {
 }
 
 /**
- * Wrap a screen (or a whole tab's navigator) so it shows the notice while the
- * backend is unreachable and its normal content otherwise.
+ * Wrap a screen (or a whole tab's navigator); while the backend is unreachable
+ * it re-probes in the background so the app heals itself.
  */
 export function BackendGate({ children }: { children: React.ReactNode }) {
+  // No more full-screen notice: screens keep showing their cached copy (or
+  // their own layout mock-up), and this just probes until the Pi is back so
+  // they can refresh (see subscribeBackendHealth).
   const down = useBackendDown();
-  if (down) return <BackendDownNotice />;
-  return <>{children}</>;
+  return (
+    <>
+      {down && <BackendProbe />}
+      {children}
+    </>
+  );
+}
+
+function BackendProbe() {
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch(`${API_BASE}/media`);
+        if (r.ok) markBackendUp();
+      } catch {
+        // still unreachable — keep waiting
+      }
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+  return null;
 }
 
 const styles = StyleSheet.create({

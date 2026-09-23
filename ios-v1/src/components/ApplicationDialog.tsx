@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { appAlert } from './AppAlert';
 import { TextInput } from './AppTextInput';
@@ -26,6 +29,20 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
   const [knownMember, setKnownMember] = useState('');
   const [reason, setReason] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  // Cap the dialog to the space the keyboard leaves, so KeyboardAvoidingView
+  // can always fit the whole card (submit included) above it instead of
+  // pushing the bottom out of reach.
+  const { height: winH } = useWindowDimensions();
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+  const dialogMaxHeight = Math.min(winH * 0.8, winH - kbHeight - 32);
 
   const handleSubmit = async () => {
     if (!firstname.trim() || !lastname.trim() || !email.trim()) {
@@ -71,13 +88,18 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.dialog}>
+        <View style={[styles.dialog, { maxHeight: dialogMaxHeight }]}>
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Text style={styles.closeBtnText}>x</Text>
           </Pressable>
-          {/* No scroll — the form is short enough to fit, and KeyboardAvoidingView
-              lifts the whole dialog above the keyboard so submit stays visible. */}
-          <View style={styles.form}>
+          {/* Fields scroll; submit lives OUTSIDE the scroll, pinned to the
+              dialog's bottom edge, so it can never be below the fold or under
+              the keyboard. */}
+          <ScrollView
+            style={styles.form}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <TextInput
               style={styles.input}
               value={firstname}
@@ -137,10 +159,10 @@ export default function ApplicationDialog({ onClose }: ApplicationDialogProps) {
               numberOfLines={2}
               autoCapitalize="none"
             />
-            <Pressable style={styles.submitBtn} onPress={handleSubmit}>
-              <Text style={styles.submitBtnText}>submit</Text>
-            </Pressable>
-          </View>
+          </ScrollView>
+          <Pressable style={styles.submitBtn} onPress={handleSubmit}>
+            <Text style={styles.submitBtnText}>submit</Text>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -179,6 +201,7 @@ const styles = StyleSheet.create({
   },
   form: {
     marginTop: 20,
+    flexShrink: 1,
   },
   input: {
     borderBottomWidth: 1,

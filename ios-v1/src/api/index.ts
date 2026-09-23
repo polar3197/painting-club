@@ -1,5 +1,5 @@
 export * from './types';
-export { resolveImageUrl, getPortfolioUrl, getJoinUrl, thumbUrl, thumbSource, authHeaders, profileThumbUrl, profilePicSrc, setAuthToken, stableCacheKey, imageSource, artDisplaySource, artThumbSource, artTileSource, profilePicThumbSource } from './client';
+export { resolveImageUrl, imageSource, stableCacheKey, WEB_ORIGIN, getPortfolioUrl, getJoinUrl, thumbUrl, thumbSource, displayUrl, displaySource, authHeaders, profileThumbUrl, profileThumbSource, picVersion, profilePicSrc, profilePicSource, setAuthToken } from './client';
 
 import { request } from './client';
 import type {
@@ -8,6 +8,10 @@ import type {
   Profile,
   ApplicationIn,
   ApplicationOut,
+  ApplicationArtOut,
+  NotificationPrefsOut,
+  UsernameAvailableOut,
+  JoinInviteOut,
   PasswordResetOut,
   SetupAccountIn,
   SetupCodePayload,
@@ -24,8 +28,10 @@ import type {
   ArtResult,
   CommentOut,
   CommentsReceivedPage,
+  BookmarkedArtOut,
   MediaType,
   MediaTypeKind,
+  WrittenFormat,
   MediaRequest,
   FeatureRequestOut,
   FeatureRequestVoteOut,
@@ -51,7 +57,7 @@ import type {
   UsageSummary,
   TelemetrySummary,
   InfraHealthOut,
-  SignupInviteOut,
+  WipUpdateOut,
 } from './types';
 
 export function login_user(payload: LoginPayload): Promise<LoginResponse> {
@@ -154,7 +160,7 @@ export function get_blocks(token: string | null): Promise<string[]> {
   }) as Promise<string[]>;
 }
 
-import type { ReportOut } from './types';
+import type { ReportOut, SignupInviteOut } from './types';
 
 export function get_reports(token: string | null): Promise<ReportOut[]> {
   return request('/admin/reports', {
@@ -231,12 +237,26 @@ export function submit_media_request(
   name: string,
   type: MediaTypeKind,
   token: string | null,
+  format?: WrittenFormat,
 ): Promise<MediaRequest> {
   return request('/media-requests', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name, type }),
+    body: JSON.stringify({ name, type, format }),
   }) as Promise<MediaRequest>;
+}
+
+// Contributor-only: flip a shared written medium between short and long form.
+export function set_media_format(
+  medium: string,
+  written_format: WrittenFormat,
+  token: string | null,
+): Promise<MediaType> {
+  return request(`/media/${encodeURIComponent(medium)}/format`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ written_format }),
+  }) as Promise<MediaType>;
 }
 
 export function get_media_requests(token: string | null): Promise<MediaRequest[]> {
@@ -251,11 +271,12 @@ export function update_media_request(
   type: string | null,
   token: string | null,
   name: string | null = null,
+  format: WrittenFormat | null = null,
 ): Promise<MediaRequest> {
   return request(`/admin/media-requests/${id}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status, type, name }),
+    body: JSON.stringify({ status, type, name, format }),
   }) as Promise<MediaRequest>;
 }
 
@@ -320,6 +341,7 @@ export function update_visual_2d(id: string, token: string | null, payload: Visu
   if (payload.medium) fd.append('medium', payload.medium);
   if (payload.series_name != null) fd.append('series_name', payload.series_name);
   if (payload.clear_series) fd.append('clear_series', String(payload.clear_series));
+  if (payload.is_wip != null) fd.append('is_wip', String(payload.is_wip));
   if (payload.file) {
     fd.append('file', {
       uri: payload.file.uri,
@@ -332,6 +354,45 @@ export function update_visual_2d(id: string, token: string | null, payload: Visu
     headers: { Authorization: `Bearer ${token}` },
     body: fd,
   });
+}
+
+/** Post a progress update on a WIP piece: archives the current image into the
+ *  swipeable history and installs this one as the piece's face everywhere. */
+export function add_wip_update(
+  artId: string,
+  token: string | null,
+  file: { uri: string; name: string; type: string },
+) {
+  const fd = new FormData();
+  fd.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+  return request(`/art/${artId}/wip-update`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+}
+
+/** A WIP piece's archived images, oldest first (the current image is NOT
+ *  included — it's the piece's own file_path). */
+export function get_wip_updates(artId: string): Promise<WipUpdateOut[]> {
+  return request(`/art/${artId}/wip-updates`) as Promise<WipUpdateOut[]>;
+}
+
+/** Remove one archived image from a WIP piece's history (owner only). */
+export function remove_wip_update(artId: string, updateId: string, token: string | null) {
+  return request(`/art/${artId}/wip-updates/${updateId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/** Remove a WIP piece's CURRENT image — the newest archived state becomes the
+ *  face everywhere. Rejected (404) when there's no archive to fall back to. */
+export function remove_wip_current(artId: string, token: string | null): Promise<{ ok: boolean; file_path: string }> {
+  return request(`/art/${artId}/wip-current`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean; file_path: string }>;
 }
 
 export function remove_visual_2d(id: string, token: string | null) {
@@ -354,6 +415,7 @@ export function add_new_written_form(token: string | null, payload: WrittenFormI
   if (payload.keywords != null) fd.append('keywords', String(payload.keywords));
   if (payload.comments_enabled != null) fd.append('comments_enabled', String(payload.comments_enabled));
   if (payload.series_name) fd.append('series_name', payload.series_name);
+  if (payload.collection_id) fd.append('collection_id', payload.collection_id);
   if (payload.file) {
     fd.append('file', {
       uri: payload.file.uri,
@@ -362,6 +424,13 @@ export function add_new_written_form(token: string | null, payload: WrittenFormI
     } as any);
   }
   if (payload.text) fd.append('text', payload.text);
+  if (payload.cover) {
+    fd.append('cover', {
+      uri: payload.cover.uri,
+      name: payload.cover.name,
+      type: payload.cover.type,
+    } as any);
+  }
 
   return request('/art/upload/written-form', {
     method: 'POST',
@@ -394,6 +463,14 @@ export function update_written_form(id: string, token: string | null, payload: W
     } as any);
   }
   if (payload.text) fd.append('text', payload.text);
+  if (payload.cover) {
+    fd.append('cover', {
+      uri: payload.cover.uri,
+      name: payload.cover.name,
+      type: payload.cover.type,
+    } as any);
+  }
+  if (payload.clear_cover) fd.append('clear_cover', 'true');
 
   return request(`/art/written-form/${id}`, {
     method: 'PATCH',
@@ -420,6 +497,7 @@ export function add_new_audio(token: string | null, payload: AudioIn) {
   if (payload.artist) fd.append('artist', payload.artist);
   if (payload.duration_seconds != null) fd.append('duration_seconds', String(payload.duration_seconds));
   if (payload.series_name) fd.append('series_name', payload.series_name);
+  if (payload.collection_id) fd.append('collection_id', payload.collection_id);
   fd.append('file', {
     uri: payload.file.uri,
     name: payload.file.name,
@@ -528,6 +606,78 @@ export function delete_comment(art_id: string, comment_id: string, token: string
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<void>;
+}
+
+// --- Bookmarks (a member's saved collection of other people's pieces) ---------
+
+export function list_my_bookmarks(token: string | null): Promise<BookmarkedArtOut[]> {
+  return request('/members/me/bookmarks', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<BookmarkedArtOut[]>;
+}
+
+export function add_bookmark(art_id: string, token: string | null): Promise<{ ok: boolean }> {
+  return request(`/art/${art_id}/bookmark`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean }>;
+}
+
+export function remove_bookmark(art_id: string, token: string | null): Promise<{ ok: boolean }> {
+  return request(`/art/${art_id}/bookmark`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<{ ok: boolean }>;
+}
+
+/** Park the application piece ahead of submit. One slot per draft id, so a
+ *  re-pick overwrites in place instead of adding a file. `seq` rises with each
+ *  pick; the server drops a write older than what the slot holds, so a slow
+ *  upload of a replaced photo can't land on top of the chosen one. */
+/** Notification categories this member has opted into. Everything is off
+ *  until they say otherwise, and the server resolves the defaults so the app
+ *  never encodes them. */
+export function get_notification_prefs(token: string | null): Promise<NotificationPrefsOut> {
+  return request('/members/me/notification-prefs', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<NotificationPrefsOut>;
+}
+
+/** Partial update — send only what changed. */
+export function update_notification_prefs(
+  prefs: Record<string, boolean>,
+  token: string | null,
+): Promise<NotificationPrefsOut> {
+  return request('/members/me/notification-prefs', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ prefs }),
+  }) as Promise<NotificationPrefsOut>;
+}
+
+export function upload_application_art(
+  draftId: string,
+  seq: number,
+  file: { uri: string; name: string; type: string },
+  signal?: AbortSignal,
+): Promise<ApplicationArtOut> {
+  const fd = new FormData();
+  fd.append('draft_id', draftId);
+  fd.append('seq', String(seq));
+  fd.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+  return request('/join/application-art', { method: 'POST', body: fd, signal }) as Promise<ApplicationArtOut>;
+}
+
+/** Live availability behind the username field, so a clash shows up while they
+ *  type rather than at submit. */
+export function check_username_available(u: string, signal?: AbortSignal): Promise<UsernameAvailableOut> {
+  return request(`/join/username-available?u=${encodeURIComponent(u)}`, { signal }) as Promise<UsernameAvailableOut>;
+}
+
+/** Which QR was scanned: "apply" (club QR, application + review) or "instant"
+ *  (trusted QR, account on the spot). */
+export function get_join_invite(token: string): Promise<JoinInviteOut> {
+  return request(`/join/invite?i=${encodeURIComponent(token)}`) as Promise<JoinInviteOut>;
 }
 
 export function submit_application(payload: ApplicationIn): Promise<unknown> {
@@ -1013,21 +1163,49 @@ export function get_infra_health(token: string | null): Promise<InfraHealthOut> 
   }) as Promise<InfraHealthOut>;
 }
 
-// --- Signup invites (the contributor screen's standing club QR) ---------------
+// --- Portfolio (public artist site) --------------------------------------------
 
-export function get_signup_invites(token: string | null): Promise<SignupInviteOut[]> {
+export type MyPortfolio = { slug: string; published: boolean; public_url: string };
+
+export function getMyPortfolio(token: string | null): Promise<MyPortfolio> {
+  return request('/portfolio/mine', {
+    headers: { Authorization: `Bearer ${token}` },
+  }) as Promise<MyPortfolio>;
+}
+
+// --- QR signup invites (admin/contributor) -------------------------------
+// The QR onboarding flyer encodes WEB_ORIGIN + /join?i=<token>. Contributors
+// mint/list these; the public /join page redeems the token, bypassing the
+// admin-sent secret code.
+export function list_signup_invites(token: string | null): Promise<SignupInviteOut[]> {
   return request('/admin/signup-invites', {
     headers: { Authorization: `Bearer ${token}` },
   }) as Promise<SignupInviteOut[]>;
 }
 
 export function create_signup_invite(
-  payload: { label?: string; expires_in_days?: number | null; max_uses?: number | null },
   token: string | null,
+  opts: {
+    label?: string | null;
+    expires_in_days?: number | null;
+    max_uses?: number | null;
+    /** true mints the TRUSTED QR (account on the spot). Default false is the
+     *  club QR, which routes to the application queue. */
+    instant?: boolean;
+  } = {},
 ): Promise<SignupInviteOut> {
   return request('/admin/signup-invites', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
+    // JSON.stringify, not a raw object: request() does NOT serialise bodies
+    // (see client.ts), so a plain object went over the wire as the string
+    // "[object Object]" and the route answered 422. Minting an invite from the
+    // app never worked because of it.
+    body: JSON.stringify({
+      label: opts.label ?? null,
+      expires_in_days: opts.expires_in_days ?? null,
+      max_uses: opts.max_uses ?? null,
+      instant: opts.instant ?? false,
+    }),
   }) as Promise<SignupInviteOut>;
 }

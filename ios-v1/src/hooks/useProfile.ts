@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, Dispatch, SetStateAction } from 'reac
 import { get_profile, Profile } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { readCached, writeCached } from '../utils/jsonCache';
+import { isBackendDown, subscribeBackendHealth } from '../api/backendHealth';
 
 const cacheKey = (username: string) => `profile:${username.toLowerCase()}`;
 
@@ -41,6 +42,15 @@ export function useProfile(
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  // The Pi dropped and came back: refresh whatever the cached copy is showing.
+  useEffect(
+    () =>
+      subscribeBackendHealth(() => {
+        if (!isBackendDown()) fetchProfile();
+      }),
+    [fetchProfile],
+  );
 
   return [profile, setProfile, error, loading, fetchProfile];
 }

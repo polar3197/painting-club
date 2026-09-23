@@ -9,6 +9,11 @@
 import { useEffect, useState } from 'react';
 
 let _down = false;
+let _failStreak = 0;
+// Require several consecutive failures before showing the notice, so a single
+// slow/blipped request at launch (common over Tailscale before the Pi answers)
+// doesn't flash the "weak power" screen. Any success resets the streak.
+const DOWN_THRESHOLD = 3;
 const _listeners = new Set<() => void>();
 
 function notify() {
@@ -18,12 +23,16 @@ function notify() {
 // Reaching the origin at all (any real HTTP response, even a 4xx/500) means the
 // Pi is up. Only a failed connection or a gateway error means it's down.
 export function markBackendUp(): void {
+  _failStreak = 0;
   if (!_down) return;
   _down = false;
   notify();
 }
 
 export function markBackendDown(): void {
+  _failStreak += 1;
+  // Transient blip — don't declare down until it fails repeatedly.
+  if (_failStreak < DOWN_THRESHOLD) return;
   if (_down) return;
   _down = true;
   notify();

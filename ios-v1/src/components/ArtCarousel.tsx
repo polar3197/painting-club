@@ -26,27 +26,48 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { imageSource, artDisplaySource, block_user, unblock_user } from '../api';
+import { resolveImageUrl, stableCacheKey, thumbSource, displaySource, block_user, unblock_user } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ReportDialog from './ReportDialog';
 import ConfirmDialog from './ConfirmDialog';
 import ContextPopup from './ContextPopup';
 import { Colors, Fonts } from '../constants/theme';
 
-// Horizontal inset of the artwork from each screen edge (per side). Bump for
-// more margin; the page stays full-width so paging snap is unaffected.
-const IMAGE_H_PAD = 18;
+// Horizontal inset of the artwork from each screen edge (per side). 0 = the
+// piece spans the full screen width at rest (per Charlie); the page stays
+// full-width so paging snap is unaffected.
+const IMAGE_H_PAD = 0;
 
 // Vertical bands reserved (below the safe-area insets) for the caption boxes so
 // the image never reaches into them. The image is contained in the space left
 // between these bands.
-const TITLE_BAND = 80;
-const NAME_BAND = 56;
+// Reserved band below the image for the single title+creator caption box.
+const META_BAND = 68;
+
+export type CarouselPiece = { id: string; file_path: string };
+// A horizontal slot in the viewer: a single piece, or a collection you scroll
+// through vertically. Legacy callers pass `pieces` (all solo); the profile passes
+// `elements` so its series collapse into one vertical-scroll slot.
+export type CarouselElement =
+  | { kind: 'piece'; piece: CarouselPiece }
+  | {
+      kind: 'collection';
+      pieces: CarouselPiece[];
+      // Number the sub-index marker chronologically from the bottom (WIP
+      // progressions put the CURRENT image on top — it should read n/n, with
+      // scrolling down counting back through time, not 1/n).
+      reverseIndex?: boolean;
+    };
 
 interface ArtCarouselProps {
   // Minimal shape so both profile pieces (Visual2DOut) and prompt submissions
   // (ArtResult) can be passed.
-  pieces: { id: string; file_path: string; display_url?: string | null }[];
+  pieces: CarouselPiece[];
+  // When provided, drives the horizontal pager instead of `pieces`: collections
+  // become one slot rendered as a vertical sub-pager. Absent => all solo.
+  elements?: CarouselElement[];
+  // Starting piece within the initial element, when it's a collection.
+  initialPieceIndex?: number;
   initialIndex: number;
   isOwner: boolean;
   // Username of the profile these pieces belong to (used for block/unblock).
@@ -69,21 +90,33 @@ interface ArtCarouselProps {
  * panning a zoomed image stays inside that page. While any page is zoomed we
  * disable the outer paging so a pan moves the image instead of changing pages.
  */
-export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUsername, onClose, captions, hideKebab }: ArtCarouselProps) {
+export default function ArtCarousel({ pieces, elements, initialPieceIndex, initialIndex, isOwner, creatorUsername, onClose, captions, hideKebab }: ArtCarouselProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { token, currentUser, blockedUsernames, noteBlocked, noteUnblocked } = useAuth();
 
+  // Normalize to elements: legacy `pieces` become all-solo slots.
+  const els: CarouselElement[] = elements ?? pieces.map((p) => ({ kind: 'piece', piece: p }));
+
   const outerRef = useRef<ScrollView>(null);
   const didInit = useRef(false);
   const [index, setIndex] = useState(initialIndex);
+  // Active sub-piece within the current collection slot, and whether that slot is
+  // scrolled to its top (solo slots are always "at top"). These gate pull-down
+  // dismiss so it only fires from the top of a collection.
+  const [subIndex, setSubIndex] = useState(initialPieceIndex ?? 0);
+  const [atTop, setAtTop] = useState(true);
   const [zoomed, setZoomed] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [pendingBlock, setPendingBlock] = useState<string | null>(null);
   const [pendingUnblock, setPendingUnblock] = useState<string | null>(null);
   const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
 
-  const current = pieces[index];
+  const activeEl = els[index];
+  const current =
+    activeEl?.kind === 'collection'
+      ? activeEl.pieces[Math.min(subIndex, activeEl.pieces.length - 1)]
+      : activeEl?.piece;
   // The viewer is opened from someone's profile; reporting/blocking only makes
   // sense when it isn't yours and you're signed in.
   const canReport = !isOwner && !!currentUser && !!current;
@@ -93,15 +126,23 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
   // Reserve fixed top/bottom bands for the caption boxes so the image is
   // contained in the middle region and the boxes never overlap it — whatever
   // the aspect ratio. Bands are only reserved when captions are shown.
-  const imgTopInset = caption ? insets.top + TITLE_BAND : 0;
-  const imgBottomInset = caption ? insets.bottom + NAME_BAND : 0;
+  // Metadata now lives in one box below the image (not split top/bottom), so no
+  // top band is reserved; the image can use the full height above the box.
+  const imgTopInset = 0;
+  const imgBottomInset = caption ? insets.bottom + META_BAND : 0;
   const canBlock = !!blockUsername && !!currentUser;
   const isBlocked = blockUsername ? blockedUsernames.includes(blockUsername) : false;
   const showKebab = (canReport || canBlock) && !hideKebab;
 
   const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / screenW);
-    if (i !== index && i >= 0 && i < pieces.length) setIndex(i);
+    if (i !== index && i >= 0 && i < els.length) {
+      setIndex(i);
+      // Landing on a new slot: reset to its top piece so a collection opens at 1/N
+      // and pull-down dismiss is armed again.
+      setSubIndex(0);
+      setAtTop(true);
+    }
   };
 
   const dismiss = onClose;
@@ -111,7 +152,9 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
   // keeps its own vertical pan. The content slides down and the backdrop fades.
   const dragY = useSharedValue(0);
   const dismissPan = Gesture.Pan()
-    .enabled(!zoomed)
+    // Solo slots dismiss from anywhere; a collection only dismisses from its top
+    // piece (otherwise a downward drag scrolls up within the collection).
+    .enabled(!zoomed && atTop)
     // Activate as soon as the drag is even slightly downward, and bail to the
     // horizontal pager only if the movement is clearly sideways.
     .activeOffsetY(6)
@@ -139,6 +182,22 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
     .onEnd((_e, success) => {
       if (success) runOnJS(dismiss)();
     });
+
+  // Double-tap zooms the ACTIVE page (the page registers its zoom toggle in
+  // this shared ref while active — see ZoomablePage). Exclusive() makes the
+  // single-tap dismiss wait for the double-tap to fail first, so the first
+  // tap of a double can't close the carousel.
+  const zoomApiRef = useRef<{ toggle: (x: number, y: number) => void } | null>(null);
+  const handlePageDoubleTap = (x: number, y: number) => {
+    zoomApiRef.current?.toggle(x, y);
+  };
+  const zoomDoubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDelay(280)
+    .onEnd((e, success) => {
+      if (success) runOnJS(handlePageDoubleTap)(e.x, e.y);
+    });
+  const tapGestures = Gesture.Exclusive(zoomDoubleTap, dismissTap);
 
   const contentStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: dragY.value }],
@@ -181,7 +240,7 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
 
         <GestureDetector gesture={dismissPan}>
           <Animated.View style={[styles.root, contentStyle]}>
-            <GestureDetector gesture={dismissTap}>
+            <GestureDetector gesture={tapGestures}>
               <ScrollView
                 ref={outerRef}
                 horizontal
@@ -202,18 +261,43 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
                 }}
                 style={StyleSheet.absoluteFillObject}
               >
-                {pieces.map((p, i) => (
-                  <ZoomablePage
-                    key={p.id}
-                    piece={p}
-                    width={screenW}
-                    height={screenH}
-                    topInset={imgTopInset}
-                    bottomInset={imgBottomInset}
-                    active={i === index}
-                    onZoomChange={setZoomed}
-                  />
-                ))}
+                {els.map((el, i) =>
+                  el.kind === 'piece' ? (
+                    <ZoomablePage
+                      key={el.piece.id}
+                      uri={resolveImageUrl(el.piece.file_path)}
+                      // The 512px thumb is already cached from the grid/profile, so
+                      // it paints instantly as a placeholder — swiping shows the
+                      // soft thumb and sharpens to full-res instead of blank→pop.
+                      thumb={thumbSource(el.piece.id, el.piece.file_path)}
+                      display={displaySource(el.piece.id, el.piece.file_path)}
+                      width={screenW}
+                      height={screenH}
+                      topInset={imgTopInset}
+                      bottomInset={imgBottomInset}
+                      zoomApiRef={zoomApiRef}
+                      active={i === index}
+                      onZoomChange={setZoomed}
+                    />
+                  ) : (
+                    <CollectionPage
+                      key={el.pieces[0]?.id ?? `col-${i}`}
+                      pieces={el.pieces}
+                      reverseIndex={el.reverseIndex}
+                      width={screenW}
+                      height={screenH}
+                      active={i === index}
+                      initialPieceIndex={i === initialIndex ? initialPieceIndex ?? 0 : 0}
+                      onZoomChange={setZoomed}
+                      onActiveChange={(sub, top) => {
+                        if (i === index) {
+                          setSubIndex(sub);
+                          setAtTop(top);
+                        }
+                      }}
+                    />
+                  ),
+                )}
               </ScrollView>
             </GestureDetector>
 
@@ -230,14 +314,12 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
             )}
 
             {caption && !zoomed && (
-              <>
-                <View style={[styles.captionTop, { top: insets.top + 8 }]} pointerEvents="none">
-                  <Text style={styles.captionTitle} numberOfLines={2}>{caption.title}</Text>
-                </View>
-                <View style={[styles.captionBox, { bottom: insets.bottom + 8 }]} pointerEvents="none">
-                  <Text style={styles.captionCreator} numberOfLines={1}>{caption.creator}</Text>
-                </View>
-              </>
+              <View style={[styles.captionBar, { bottom: insets.bottom + 12 }]} pointerEvents="none">
+                <Text style={styles.captionBarText} numberOfLines={2}>
+                  <Text style={styles.captionBarTitle}>{caption.title || 'untitled'}</Text>
+                  {caption.creator ? `   ${caption.creator}` : ''}
+                </Text>
+              </View>
             )}
           </Animated.View>
         </GestureDetector>
@@ -319,27 +401,39 @@ export default function ArtCarousel({ pieces, initialIndex, isOwner, creatorUser
  * it stops being the active page (so a stale zoom never blocks paging).
  */
 function ZoomablePage({
-  piece,
+  uri,
+  thumb,
+  display,
   width,
   height,
   topInset = 0,
   bottomInset = 0,
   active,
   onZoomChange,
+  zoomApiRef,
 }: {
-  piece: { file_path: string; display_url?: string | null };
+  uri: string;
+  thumb?: { uri: string; headers?: Record<string, string>; cacheKey?: string };
+  // Mid-res (~1600px) display derivative — preferred over the original `uri`
+  // for normal viewing since it lands 50-100x faster. On load error (backend
+  // predates the route, gen failed) we fall back to the original, so callers
+  // can pass it unconditionally regardless of backend version.
+  display?: { uri: string; headers?: Record<string, string>; cacheKey?: string };
   width: number;
   height: number;
   topInset?: number;
   bottomInset?: number;
   active: boolean;
   onZoomChange: (zoomed: boolean) => void;
+  // Shared with the carousel's double-tap gesture: while active, this page
+  // registers its zoom toggle here (tap coords are page-content coords at 1x,
+  // which equal the viewport coords the outer gesture reports).
+  zoomApiRef?: React.MutableRefObject<{ toggle: (x: number, y: number) => void } | null>;
 }) {
   const ref = useRef<ScrollView>(null);
   const wasZoomed = useRef(false);
-  // 1x shows the ~1600px display copy (already cached from the profile); the
-  // original is only fetched once the user actually pinches in.
-  const [wantOriginal, setWantOriginal] = useState(false);
+  const [displayFailed, setDisplayFailed] = useState(false);
+  const useDisplay = !!display && !displayFailed;
 
   // When this page scrolls offscreen, snap it back to 1x.
   React.useEffect(() => {
@@ -349,6 +443,30 @@ function ZoomablePage({
       onZoomChange(false);
     }
   }, [active, width, height, onZoomChange]);
+
+  // Register this page's double-tap zoom toggle while it's the active page.
+  React.useEffect(() => {
+    if (!active || !zoomApiRef) return;
+    zoomApiRef.current = {
+      toggle: (x: number, y: number) => {
+        if (wasZoomed.current) {
+          ref.current?.scrollResponderZoomTo?.({ x: 0, y: 0, width, height, animated: true });
+          return;
+        }
+        // Zoom all the way to the pinch maximum (maximumZoomScale below),
+        // centered on the tap point, clamped inside the content bounds.
+        const targetScale = 4;
+        const w2 = width / targetScale;
+        const h2 = height / targetScale;
+        const x2 = Math.min(Math.max(x - w2 / 2, 0), width - w2);
+        const y2 = Math.min(Math.max(y - h2 / 2, 0), height - h2);
+        ref.current?.scrollResponderZoomTo?.({ x: x2, y: y2, width: w2, height: h2, animated: true });
+      },
+    };
+    return () => {
+      if (zoomApiRef.current) zoomApiRef.current = null;
+    };
+  }, [active, zoomApiRef, width, height, topInset, bottomInset]);
 
   return (
     <ScrollView
@@ -372,14 +490,18 @@ function ZoomablePage({
         if (z !== wasZoomed.current) {
           wasZoomed.current = z;
           onZoomChange(z);
-          if (z) setWantOriginal(true);
         }
       }}
     >
       <Image
-        source={wantOriginal ? imageSource(piece.file_path) : artDisplaySource(piece)}
-        placeholder={wantOriginal ? artDisplaySource(piece) : undefined}
-        cachePolicy="memory-disk"
+        source={useDisplay ? display : { uri, cacheKey: stableCacheKey(uri) }}
+        // Cached 512px thumb shows immediately under the loading image, and
+        // the crossfade (slower than the grid's) reads as a sharpen rather than a
+        // snap when the display derivative (or fallback original) lands.
+        placeholder={thumb}
+        placeholderContentFit="contain"
+        transition={450}
+        onError={useDisplay ? () => setDisplayFailed(true) : undefined}
         // Inset from the screen edges so wide pieces don't run full-bleed.
         // contentFit="contain" keeps every piece's own proportions; the page
         // itself stays screen-width so paging still snaps cleanly. Height is the
@@ -391,6 +513,113 @@ function ZoomablePage({
   );
 }
 
+/**
+ * A collection slot: its pieces stacked as a full-height vertical pager. Opens at
+ * the top (1/N), scroll down for the next; each piece keeps pinch-zoom. Reports
+ * (subIndex, atTop) up so the parent arms pull-down dismiss only at the top piece.
+ * Tap-to-dismiss (handled by the parent) stays available on every piece as a
+ * guaranteed exit.
+ */
+function CollectionPage({
+  pieces,
+  reverseIndex,
+  width,
+  height,
+  active,
+  initialPieceIndex,
+  onZoomChange,
+  onActiveChange,
+}: {
+  pieces: CarouselPiece[];
+  reverseIndex?: boolean;
+  width: number;
+  height: number;
+  active: boolean;
+  initialPieceIndex: number;
+  onZoomChange: (zoomed: boolean) => void;
+  onActiveChange: (subIndex: number, atTop: boolean) => void;
+}) {
+  const ref = useRef<ScrollView>(null);
+  const [zoomedHere, setZoomedHere] = useState(false);
+  const [sub, setSub] = useState(initialPieceIndex);
+  const didInit = useRef(false);
+
+  const scrollToInitial = () => {
+    if (didInit.current) return;
+    didInit.current = true;
+    if (initialPieceIndex > 0) {
+      ref.current?.scrollTo({ y: initialPieceIndex * height, animated: false });
+    }
+  };
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const i = Math.max(0, Math.min(pieces.length - 1, Math.round(y / height)));
+    if (i !== sub) setSub(i);
+    if (active) onActiveChange(i, y < 20);
+  };
+
+  // When this slot becomes the active one, re-report its real position (it may
+  // have been left scrolled from a previous visit).
+  React.useEffect(() => {
+    if (active) onActiveChange(sub, sub === 0);
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleZoom = (z: boolean) => {
+    setZoomedHere(z);
+    onZoomChange(z);
+  };
+
+  return (
+    <View style={{ width, height }}>
+      <ScrollView
+        ref={ref}
+        style={{ width, height }}
+        pagingEnabled
+        scrollEnabled={!zoomedHere}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+        onLayout={scrollToInitial}
+      >
+        {pieces.map((p, i) => (
+          <ZoomablePage
+            key={p.id}
+            uri={resolveImageUrl(p.file_path)}
+            thumb={thumbSource(p.id, p.file_path)}
+            display={displaySource(p.id, p.file_path)}
+            width={width}
+            height={height}
+            active={active && i === sub}
+            onZoomChange={handleZoom}
+          />
+        ))}
+      </ScrollView>
+
+      {pieces.length > 1 && !zoomedHere && (
+        <View style={styles.collMarker} pointerEvents="none">
+          <Text style={styles.collMarkerText}>
+            {reverseIndex
+              ? pieces.length - Math.min(sub, pieces.length - 1)
+              : Math.min(sub, pieces.length - 1) + 1}/{pieces.length}
+          </Text>
+        </View>
+      )}
+
+      {/* Blurred edge affordances hinting there's more of the collection above /
+          below the current piece. */}
+      {pieces.length > 1 && !zoomedHere && sub > 0 && (
+        <BlurView intensity={22} tint="dark" style={styles.collPeekTop} pointerEvents="none" />
+      )}
+      {pieces.length > 1 && !zoomedHere && sub < pieces.length - 1 && (
+        <BlurView intensity={22} tint="dark" style={styles.collPeekBottom} pointerEvents="none">
+          <Text style={styles.collPeekChevron}>⌄</Text>
+        </BlurView>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -398,6 +627,45 @@ const styles = StyleSheet.create({
   darken: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  // Collection viewer: n/N marker + blurred edge affordances.
+  collMarker: {
+    position: 'absolute',
+    top: 52,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  collMarkerText: {
+    fontFamily: Fonts.mono,
+    fontSize: 13,
+    color: '#fff',
+  },
+  collPeekTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 44,
+    overflow: 'hidden',
+  },
+  collPeekBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  collPeekChevron: {
+    fontFamily: Fonts.serif,
+    fontSize: 26,
+    lineHeight: 28,
+    color: 'rgba(255,255,255,0.85)',
   },
   pageContent: {
     flexGrow: 1,
@@ -460,5 +728,28 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  // Single full-width caption box below the image, in the bouncing-ball
+  // interior color; holds the title (bold) and the creator name.
+  captionBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.secondary,
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  captionBarText: {
+    fontFamily: Fonts.serif,
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  captionBarTitle: {
+    fontWeight: '700',
+    color: Colors.black,
   },
 });

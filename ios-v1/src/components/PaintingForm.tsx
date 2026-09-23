@@ -13,9 +13,11 @@ interface PaintingFormProps {
   // Optional node rendered on the right side of the comments-toggle row.
   // AddArtDialog uses this to inline the submit button next to the toggle.
   rightSlot?: React.ReactNode;
+  // The dialog renders toggles + submit in its pinned footer instead.
+  hideToggles?: boolean;
 }
 
-export default function PaintingForm({ onDataChange, initialData, initialSeries, rightSlot }: PaintingFormProps) {
+export default function PaintingForm({ onDataChange, initialData, initialSeries, rightSlot, hideToggles }: PaintingFormProps) {
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
     location: initialData?.location ?? '',
@@ -29,6 +31,7 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
     keywords: initialData?.keywords?.join(', ') ?? '',
     series: (initialData as any)?.series_name ?? initialSeries ?? '',
     comments_enabled: initialData?.comments_enabled ?? true,
+    is_wip: initialData?.is_wip ?? false,
   });
 
   // Seeded fields only reach the parent through onDataChange — push the
@@ -50,6 +53,13 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
     const next = !form.comments_enabled;
     Animated.timing(thumbPos, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
     update({ comments_enabled: next });
+  };
+
+  const wipThumbPos = useRef(new Animated.Value(form.is_wip ? 18 : 0)).current;
+  const toggleWip = () => {
+    const next = !form.is_wip;
+    Animated.timing(wipThumbPos, { toValue: next ? 18 : 0, duration: 200, useNativeDriver: true }).start();
+    update({ is_wip: next });
   };
 
   return (
@@ -94,14 +104,9 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
         autoCapitalize="none"
         onChangeText={(v) => update({ song: v })}
       />
-      <TextInput
-        style={styles.input}
-        value={form.song_artist}
-        placeholder="artist"
-        placeholderTextColor={Colors.textMuted}
-        autoCapitalize="none"
-        onChangeText={(v) => update({ song_artist: v })}
-      />
+      {/* song_artist stays in form state (existing values survive edits) but
+          the input is gone — "artist" on a visual piece read as the artwork's
+          artist and confused people. */}
       <TextInput
         style={styles.input}
         value={form.width != null ? String(form.width) : ''}
@@ -130,19 +135,37 @@ export default function PaintingForm({ onDataChange, initialData, initialSeries,
         />
       )}
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>comments</Text>
-        <Pressable
-          style={[
-            styles.toggleTrack,
-            { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
-          ]}
-          onPress={toggleComments}
-        >
-          <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
-        </Pressable>
-        {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
-      </View>
+      {/* WIP removed from the FE for now. */}
+      {false && !hideToggles && initialData != null && (
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>wip</Text>
+          <Pressable
+            style={[
+              styles.toggleTrack,
+              { backgroundColor: form.is_wip ? Colors.greenBright : Colors.redLight },
+            ]}
+            onPress={toggleWip}
+          >
+            <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: wipThumbPos }] }]} />
+          </Pressable>
+        </View>
+      )}
+
+      {!hideToggles && (
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>comments</Text>
+          <Pressable
+            style={[
+              styles.toggleTrack,
+              { backgroundColor: form.comments_enabled ? Colors.greenBright : Colors.redLight },
+            ]}
+            onPress={toggleComments}
+          >
+            <Animated.View style={[styles.toggleThumb, { transform: [{ translateX: thumbPos }] }]} />
+          </Pressable>
+          {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
+        </View>
+      )}
     </View>
   );
 }

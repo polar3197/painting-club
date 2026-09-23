@@ -10,10 +10,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { remove_written_form, WrittenFormOut } from '../api';
+import { Image } from 'expo-image';
+import { remove_written_form, imageSource, WrittenFormOut, WrittenFormat } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
 import AddArtDialog from './AddArtDialog';
+import BookmarkButton from './BookmarkButton';
 import ConfirmDialog from './ConfirmDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -49,23 +51,32 @@ function ThumbCell({ piece, cellW, cellH, isOwner, onOpen, onEdit, onRemove }: T
         style={({ pressed }) => [styles.tile, { width: cellW, height: cellH }, pressed && { opacity: 0.92 }]}
         onPress={onOpen}
       >
-        {isText && snippet ? (
+        {piece.cover_image_path ? (
+          <Image
+            source={imageSource(piece.cover_image_path)}
+            style={styles.tileCover}
+            contentFit="cover"
+          />
+        ) : isText && snippet ? (
           <Text style={styles.tileSnippet} numberOfLines={THUMB_PREVIEW_LINES}>{snippet}</Text>
         ) : (
           <Text style={styles.tileTitleFallback} numberOfLines={4}>{piece.title}</Text>
         )}
       </Pressable>
       <Text style={styles.cellTitle} numberOfLines={2}>{piece.title}</Text>
-      {isOwner && (
-        <View style={styles.cellButtons}>
-          <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
-            <Text style={styles.btnText}>edit</Text>
-          </Pressable>
-          <Pressable style={[styles.btn, styles.removeBtn]} onPress={onRemove}>
-            <Text style={styles.btnText}>remove</Text>
-          </Pressable>
-        </View>
-      )}
+      <View style={styles.cellFooter}>
+        {isOwner && (
+          <View style={styles.cellButtons}>
+            <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
+              <Text style={styles.btnText}>edit</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.removeBtn]} onPress={onRemove}>
+              <Text style={styles.btnText}>remove</Text>
+            </Pressable>
+          </View>
+        )}
+        <BookmarkButton artId={piece.id} size={24} style={styles.cellBookmarkBtn} />
+      </View>
     </View>
   );
 }
@@ -78,6 +89,8 @@ interface SeriesZoomInProps {
   // edits initiated from the profile screen.
   selectedMedium: string;
   username: string;
+  // The tab's short/long form, forwarded to the in-gallery reader.
+  writtenFormat?: WrittenFormat | null;
   onClose: () => void;
   // Signal to the parent to refetch written-form pieces (after add/edit/remove).
   // The fresh pieces flow back down via the `pieces` prop, so the gallery
@@ -94,6 +107,7 @@ export default function SeriesZoomIn({
   pieces,
   selectedMedium,
   username,
+  writtenFormat,
   onClose,
   onRefresh,
   onMediumMove,
@@ -136,6 +150,7 @@ export default function SeriesZoomIn({
         <WrittenFormZoomIn
           title={focused.title}
           filePath={focused.file_path}
+          format={writtenFormat}
           onClose={() => setFocused(null)}
         />
       )}
@@ -262,6 +277,14 @@ const styles = StyleSheet.create({
     lineHeight: 11,
     color: Colors.black,
   },
+  // Cover image fills the tile frame edge-to-edge (cancel the tile padding).
+  tileCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   tileTitleFallback: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.sm,
@@ -272,10 +295,17 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     marginTop: 2,
   },
+  cellFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  cellBookmarkBtn: {
+    marginLeft: 'auto',
+  },
   cellButtons: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 6,
   },
   btn: {
     borderWidth: 1,

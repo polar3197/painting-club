@@ -15,6 +15,7 @@ import {
   get_media_requests,
   update_media_request,
   MediaRequest,
+  WrittenFormat,
   get_reports,
   update_report_status,
   ReportOut,
@@ -24,10 +25,6 @@ import {
   get_active_prompt,
   PromptSuggestionOut,
   PromptOut,
-  get_admin_members,
-  set_member_role,
-  AdminMemberOut,
-  MemberRole,
 } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -74,39 +71,6 @@ function PromptSuggestionRow({
           </Pressable>
         </View>
       )}
-    </View>
-  );
-}
-
-const ROLE_TIERS: MemberRole[] = ['member', 'contributor', 'admin'];
-
-function MemberRoleRow({
-  m,
-  onSetRole,
-}: {
-  m: AdminMemberOut;
-  onSetRole: (username: string, role: MemberRole) => void;
-}) {
-  const name = [m.firstname, m.lastname].filter(Boolean).join(' ');
-  return (
-    <View style={styles.memberRow}>
-      <Text style={styles.memberName}>
-        @{m.username}
-        {name ? `  ·  ${name}` : ''}
-      </Text>
-      <View style={styles.roleChips}>
-        {ROLE_TIERS.map((r) => (
-          <Pressable
-            key={r}
-            style={[styles.roleChip, m.role === r && styles.roleChipOn]}
-            onPress={() => m.role !== r && onSetRole(m.username, r)}
-          >
-            <Text style={[styles.roleChipText, m.role === r && styles.roleChipTextOn]}>
-              {r}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
     </View>
   );
 }
@@ -209,7 +173,13 @@ function MediaRequestRow({
   onResolve,
 }: {
   req: MediaRequest;
-  onResolve: (id: string, status: 'approved' | 'rejected', type: string | null, name: string | null) => void;
+  onResolve: (
+    id: string,
+    status: 'approved' | 'rejected',
+    type: string | null,
+    name: string | null,
+    format?: WrittenFormat | null,
+  ) => void;
 }) {
   // The requester now picks the type, so the admin just confirms. Entering
   // `confirming` reveals an editable name (admin may rename before approving).
@@ -227,8 +197,13 @@ function MediaRequestRow({
     return n && n !== req.requested_name ? n : null;
   };
 
-  // Requester's chosen type (pending), or the type it was approved with (resolved).
-  const typeLabel = req.resolved_type ?? req.requested_type;
+  // Requester's chosen type (pending), or the type it was approved with
+  // (resolved) — plus the short/long pick on written requests.
+  const baseType = req.resolved_type ?? req.requested_type;
+  const typeLabel =
+    baseType === 'written_form' && req.requested_format
+      ? `${baseType} · ${req.requested_format} form`
+      : baseType;
 
   return (
     <View style={styles.row}>
@@ -288,16 +263,24 @@ function MediaRequestRow({
           </View>
         )}
         {/* Legacy fallback: requests submitted before requesters picked their
-            own type carry no requested_type, so the admin classifies them. */}
+            own type carry no requested_type, so the admin classifies them —
+            written splits into its short/long form here too. */}
         {req.status === 'pending' && confirming && !req.requested_type && (
           <View style={styles.actionBtns}>
-            {(['visual_2d', 'written_form', 'audio'] as const).map((t) => (
+            {(
+              [
+                { type: 'visual_2d', format: null, label: 'visual_2d' },
+                { type: 'audio', format: null, label: 'audio' },
+                { type: 'written_form', format: 'short', label: 'written · short' },
+                { type: 'written_form', format: 'long', label: 'written · long' },
+              ] as const
+            ).map((opt) => (
               <Pressable
-                key={t}
+                key={opt.label}
                 style={[styles.actionBtn, { backgroundColor: Colors.primaryGold }]}
-                onPress={() => onResolve(req.id, 'approved', t, finalName())}
+                onPress={() => onResolve(req.id, 'approved', opt.type, finalName(), opt.format)}
               >
-                <Text style={styles.actionBtnText}>{t}</Text>
+                <Text style={styles.actionBtnText}>{opt.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -464,9 +447,10 @@ export default function Admin() {
     status: 'approved' | 'rejected',
     type: string | null,
     name: string | null = null,
+    format: WrittenFormat | null = null,
   ) => {
     try {
-      await update_media_request(id, status, type, token, name);
+      await update_media_request(id, status, type, token, name, format);
       fetchRequests();
     } catch {
       // ignore
@@ -715,40 +699,6 @@ const styles = StyleSheet.create({
   promptBtnText: {
     fontFamily: Fonts.serif,
     fontSize: FontSizes.xs,
-  },
-  memberRow: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.white,
-    padding: 12,
-    marginBottom: 8,
-    gap: 8,
-  },
-  memberName: {
-    fontFamily: Fonts.serif,
-    fontSize: FontSizes.base,
-  },
-  roleChips: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  roleChip: {
-    borderWidth: 1,
-    borderColor: '#000',
-    backgroundColor: Colors.secondary,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  roleChipOn: {
-    backgroundColor: Colors.primaryGold,
-  },
-  roleChipText: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.xs,
-    color: Colors.textSecondary,
-  },
-  roleChipTextOn: {
-    color: '#000',
   },
   row: {
     flexDirection: 'row',

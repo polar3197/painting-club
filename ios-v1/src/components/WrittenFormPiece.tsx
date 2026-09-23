@@ -6,10 +6,12 @@ import {
   StyleSheet,
   LayoutChangeEvent,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useAuth } from '../context/AuthContext';
-import { remove_written_form, WrittenFormOut } from '../api';
+import { remove_written_form, imageSource, WrittenFormOut, WrittenFormat } from '../api';
 import { extFromPath, isTextExt, useWrittenFormText } from '../hooks';
 import WrittenFormZoomIn from './WrittenFormZoomIn';
+import BookmarkButton from './BookmarkButton';
 import ConfirmDialog from './ConfirmDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
@@ -23,6 +25,8 @@ function previewSnippet(text: string | null): string {
 interface WrittenFormPieceProps {
   isOwner: boolean;
   piece: WrittenFormOut;
+  // The tab's short/long form, forwarded to the reader (null → long).
+  writtenFormat?: WrittenFormat | null;
   onRemove: () => void;
   onEdit: () => void;
   onLayout?: (e: LayoutChangeEvent) => void;
@@ -31,6 +35,7 @@ interface WrittenFormPieceProps {
 export default function WrittenFormPiece({
   isOwner,
   piece,
+  writtenFormat,
   onRemove,
   onEdit,
   onLayout,
@@ -68,6 +73,7 @@ export default function WrittenFormPiece({
         <WrittenFormZoomIn
           title={piece.title}
           filePath={piece.file_path}
+          format={writtenFormat}
           onClose={() => setIsZoomedIn(false)}
         />
       )}
@@ -77,7 +83,13 @@ export default function WrittenFormPiece({
             style={({ pressed }) => [styles.thumb, pressed && { opacity: 0.92 }]}
             onPress={() => setIsZoomedIn(true)}
           >
-            {isText && snippet ? (
+            {piece.cover_image_path ? (
+              <Image
+                source={imageSource(piece.cover_image_path)}
+                style={styles.thumbCover}
+                contentFit="cover"
+              />
+            ) : isText && snippet ? (
               <Text style={styles.thumbSnippet} numberOfLines={THUMB_PREVIEW_LINES}>{snippet}</Text>
             ) : null}
           </Pressable>
@@ -98,16 +110,21 @@ export default function WrittenFormPiece({
                 {piece.series_name}
               </Text>
             )}
-            {isOwner && (
-              <View style={styles.buttons}>
-                <Pressable style={[styles.btn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
-                  <Text style={styles.btnText}>remove</Text>
-                </Pressable>
-                <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
-                  <Text style={styles.btnText}>edit</Text>
-                </Pressable>
-              </View>
-            )}
+            {/* Bookmark pinned to the right of the footer, always present; the
+                owner's remove/edit buttons sit to its left. */}
+            <View style={styles.footerRow}>
+              {isOwner && (
+                <View style={styles.buttons}>
+                  <Pressable style={[styles.btn, styles.removeBtn]} onPress={() => setShowRemoveConfirm(true)}>
+                    <Text style={styles.btnText}>remove</Text>
+                  </Pressable>
+                  <Pressable style={[styles.btn, styles.editBtn]} onPress={onEdit}>
+                    <Text style={styles.btnText}>edit</Text>
+                  </Pressable>
+                </View>
+              )}
+              <BookmarkButton artId={piece.id} size={30} style={styles.bookmarkBtn} />
+            </View>
           </View>
         </View>
       </View>
@@ -150,6 +167,14 @@ const styles = StyleSheet.create({
     lineHeight: 10,
     color: Colors.black,
   },
+  // Cover image fills the page frame edge-to-edge (cancel the thumb padding).
+  thumbCover: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   details: {
     flex: 1,
     alignItems: 'flex-start',
@@ -167,10 +192,18 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontWeight: '700',
   },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 'auto',
+    alignSelf: 'stretch',
+  },
   buttons: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 'auto',
+  },
+  bookmarkBtn: {
+    marginLeft: 'auto',
   },
   btn: {
     borderWidth: 1,

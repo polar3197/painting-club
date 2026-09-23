@@ -28,6 +28,7 @@ import { AudioPlayerBar } from './AudioPiece';
 import { playTrack, getActiveUri, subscribeActiveTrack } from '../audio/playback';
 import { useAuth } from '../context/AuthContext';
 import AddArtDialog from './AddArtDialog';
+import BookmarkButton from './BookmarkButton';
 import ConfirmDialog from './ConfirmDialog';
 import Spinner from './Spinner';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -65,6 +66,10 @@ interface AlbumTileProps {
   // Refetch audio pieces after any change inside the album view.
   onRefresh: () => void;
   onLayout?: (e: LayoutChangeEvent) => void;
+  // Set by the profile when a gallery tap landed on a track inside this album:
+  // opens the album automatically once the row has scrolled into view.
+  autoOpen?: boolean;
+  onAutoOpened?: () => void;
 }
 
 /**
@@ -83,8 +88,19 @@ export default function AlbumTile({
   onMediumMove,
   onRefresh,
   onLayout,
+  autoOpen,
+  onAutoOpened,
 }: AlbumTileProps) {
   const [open, setOpen] = useState(false);
+
+  // Open the album when the profile requests it (deep-link from the search
+  // gallery). Cleared via onAutoOpened so it fires once, not on every render.
+  useEffect(() => {
+    if (autoOpen) {
+      setOpen(true);
+      onAutoOpened?.();
+    }
+  }, [autoOpen]);
   // Which row shows the full player bar. Tapping a title swaps it (closing
   // the previous one); tapping the open row's title collapses it. Playback
   // keeps the open row in step — starting or auto-advancing a track opens it.
@@ -122,16 +138,20 @@ export default function AlbumTile({
         />
       )}
       <View style={styles.element} onLayout={onLayout}>
-        <Pressable
-          style={({ pressed }) => [styles.headerRow, pressed && { opacity: 0.8 }]}
-          onPress={() => setOpen(true)}
-        >
-          <Text style={styles.albumTitle} numberOfLines={2}>{albumName}</Text>
-          <Text style={styles.trackCount}>
-            {ordered.length} track{ordered.length === 1 ? '' : 's'}
-          </Text>
-          <Text style={styles.headerChevron}>›</Text>
-        </Pressable>
+        <View style={styles.headerBar}>
+          <Pressable
+            style={({ pressed }) => [styles.headerRow, pressed && { opacity: 0.8 }]}
+            onPress={() => setOpen(true)}
+          >
+            <Text style={styles.albumTitle} numberOfLines={2}>{albumName}</Text>
+            <Text style={styles.trackCount}>
+              {ordered.length} track{ordered.length === 1 ? '' : 's'}
+            </Text>
+            <Text style={styles.headerChevron}>›</Text>
+          </Pressable>
+          {/* Collection-level save: bookmarks every track on the album. */}
+          <BookmarkButton artIds={ordered.map((p) => p.id)} size={30} />
+        </View>
         <View style={styles.divider} />
 
         {AUDIO_IS_STUB && (
@@ -559,6 +579,7 @@ function AlbumZoomIn({
                           <Text style={styles.rowPlayText}>▶</Text>
                         </Pressable>
                       )}
+                      <BookmarkButton artId={p.id} size={28} />
                     </View>
                     {expanded && (
                       <View style={styles.activeBarWrap}>
@@ -603,7 +624,13 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#fff',
   },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 8,
