@@ -1125,6 +1125,7 @@ async def upload_profile_picture(
 
 @app.post("/art/upload/visual-2d")
 async def upload_visual_2d(
+    background_tasks: BackgroundTasks,
     username: str = Form(...),
     medium: str = Form(...),
     title: str = Form(...),
@@ -1211,16 +1212,23 @@ async def upload_visual_2d(
         path.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail=str(e))
 
-    # eager thumbnail + display generation for images (PDFs skip — no preview thumb)
+    # Thumbnail + display generation runs AFTER the response, not inside it.
+    # Inline, these two LANCZOS resizes are the slowest thing in the request on
+    # a Pi, and they sit *after* the DB insert — so the piece was already on the
+    # member's profile while the client still waited, and the share button span
+    # until the gateway timed out. Deferring them is BACKEND_HANDOFF.md item #1.
+    # Clients already tolerate a missing-then-appearing thumb (they fall back to
+    # the original and refetch). PDFs have no preview thumb, so they skip.
     if path.suffix.lower() != ".pdf":
-        generate_thumbnail(str(art_id), path)
-        generate_display(str(art_id), path)
+        background_tasks.add_task(generate_thumbnail, str(art_id), path)
+        background_tasks.add_task(generate_display, str(art_id), path)
 
     return {"file_path": file_path}
 
 @app.patch("/art/{art_id}")
 async def update_visual_2d(
     art_id: str,
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     date: date | None = Form(None),
     location: str | None = Form(None),
@@ -1352,14 +1360,19 @@ async def update_visual_2d(
         thumb_file(art_id).unlink(missing_ok=True)
         display_file(art_id).unlink(missing_ok=True)
         if written_path.suffix.lower() != ".pdf":
-            generate_thumbnail(str(art_id), written_path)
-            generate_display(str(art_id), written_path)
+            # Deferred like the upload path: the caller doesn't need the resized
+            # copies, and waiting on them is what makes edits feel like hangs.
+            # The old derivatives are already unlinked above, so clients fall
+            # back to the original for the moment it takes to rebuild them.
+            background_tasks.add_task(generate_thumbnail, str(art_id), written_path)
+            background_tasks.add_task(generate_display, str(art_id), written_path)
 
     return {"ok": True, "file_path": new_file_path}
 
 @app.post("/art/{art_id}/wip-update")
 async def add_wip_update(
     art_id: str,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
@@ -1421,8 +1434,10 @@ async def add_wip_update(
     # look like it never happened.
     thumb_file(art_id).unlink(missing_ok=True)
     display_file(art_id).unlink(missing_ok=True)
-    generate_thumbnail(str(art_id), path)
-    generate_display(str(art_id), path)
+    # Deferred for the same reason as upload_visual_2d above: these resizes
+    # block the response without the caller needing their result.
+    background_tasks.add_task(generate_thumbnail, str(art_id), path)
+    background_tasks.add_task(generate_display, str(art_id), path)
 
     return {"ok": True, "file_path": sign_path(new_file_path)}
 
@@ -1449,6 +1464,7 @@ async def remove_wip_update(
 @app.delete("/art/{art_id}/wip-current")
 async def remove_wip_current(
     art_id: str,
+    background_tasks: BackgroundTasks,
     current_user: Member = Depends(get_current_member),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1467,8 +1483,9 @@ async def remove_wip_current(
     display_file(art_id).unlink(missing_ok=True)
     promoted_abs = abs_path(promoted_path)
     if promoted_abs.exists():
-        generate_thumbnail(str(art_id), promoted_abs)
-        generate_display(str(art_id), promoted_abs)
+        # Deferred for the same reason as the other three sites.
+        background_tasks.add_task(generate_thumbnail, str(art_id), promoted_abs)
+        background_tasks.add_task(generate_display, str(art_id), promoted_abs)
     return {"ok": True, "file_path": sign_path(promoted_path)}
 
 
