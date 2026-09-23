@@ -169,24 +169,49 @@ export default function SwipeHub() {
       // Home cell's offset on screen (the title ball rides it)
       homeX: colX,
       homeY: rowY,
+      // Each band has TWO resting positions that mean different things: on a
+      // neighbour it covers that panel's Home-facing inset, and on Home it sits
+      // at Home's own edge as an affordance. Interpolating straight between
+      // them gave a slope of -(size-BAND)/size, while the seam it is covering
+      // moves at exactly -1 — so the band lagged the seam by up to BAND (18pt),
+      // worst right where the neighbour's inset first slides into view. That
+      // lag was the strip of empty space that opened and closed mid-swipe.
+      //
+      // The extra stop in each range fixes it: the band PARKS at its Home
+      // resting place until the seam actually reaches it, then tracks 1:1 the
+      // rest of the way. Both resting positions are unchanged; only the travel
+      // between them is corrected.
+
       // seam people|home: Home's top edge (below the notch) -> the people pane's bottom edge
       top: {
         x: colX,
-        y: scrollY.interpolate({ inputRange: [0, h, 2 * h], outputRange: [h - BAND, insets.top, insets.top - h] }),
+        y: scrollY.interpolate({
+          inputRange: [0, h - BAND - insets.top, h, 2 * h],
+          outputRange: [h - BAND, insets.top, insets.top, insets.top - h],
+        }),
       },
       // seam home|events: Home's bottom edge -> just under the notch on events
       bottom: {
         x: colX,
-        y: scrollY.interpolate({ inputRange: [0, h, 2 * h], outputRange: [2 * h, h - BAND, insets.top] }),
+        y: scrollY.interpolate({
+          inputRange: [0, h, 2 * h - BAND - insets.top, 2 * h],
+          outputRange: [2 * h, h - BAND, insets.top, insets.top],
+        }),
       },
       // seam profile|home: Home's left edge -> the profile's right edge
       left: {
-        x: scrollX.interpolate({ inputRange: [0, w, 2 * w], outputRange: [w - BAND, 0, -w] }),
+        x: scrollX.interpolate({
+          inputRange: [0, w - BAND, w, 2 * w],
+          outputRange: [w - BAND, 0, 0, -w],
+        }),
         y: rowY,
       },
       // seam home|art wall: Home's right edge -> the art wall's left edge
       right: {
-        x: scrollX.interpolate({ inputRange: [0, w, 2 * w], outputRange: [2 * w, w - BAND, 0] }),
+        x: scrollX.interpolate({
+          inputRange: [0, w, w + BAND, 2 * w],
+          outputRange: [2 * w, w - BAND, w - BAND, 0],
+        }),
         y: rowY,
       },
     };
