@@ -6,15 +6,15 @@ import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import { appAlert } from '../components/AppAlert';
-import ConfirmDialog from '../components/ConfirmDialog';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import { export_my_data } from '../api';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
 
 // Everything that acts on the account itself, in one place behind the kebab:
-// logging out, taking your data with you, and deleting. Kept off the main
-// settings list on purpose — two of these are hard to undo and one is
-// impossible, so none of them should sit a single stray tap away.
+// taking your data with you, and deleting. Kept off the main settings list
+// on purpose: one is irreversible and the other exports everything you have,
+// so neither should sit a single stray tap away. Logging out is routine, so it
+// stays on the main list.
 //
 // Deleting still goes through DeleteAccountDialog, which asks for the username
 // back before it will proceed.
@@ -23,7 +23,6 @@ export default function AccountManagement() {
   const navigation = useNavigation<any>();
   const { currentUser, currentRole, token, logout } = useAuth();
 
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -56,23 +55,6 @@ export default function AccountManagement() {
 
   return (
     <View style={styles.root}>
-      <ConfirmDialog
-        visible={showLogoutConfirm}
-        title="u sure?"
-        confirmLabel="yes"
-        cancelLabel="no. shit. stop"
-        confirmColor={Colors.redLight}
-        cancelColor={Colors.greenBright}
-        confirmTextColor={Colors.black}
-        cancelTextColor={Colors.black}
-        onConfirm={async () => {
-          setShowLogoutConfirm(false);
-          await logout();
-          navigation.navigate('LandingPage');
-        }}
-        onCancel={() => setShowLogoutConfirm(false)}
-      />
-
       <DeleteAccountDialog
         visible={showDeleteDialog}
         username={currentUser ?? ''}
@@ -107,13 +89,6 @@ export default function AccountManagement() {
           ) : (
             <Text style={styles.actionBtnText}>download your data</Text>
           )}
-        </Pressable>
-
-        <Pressable
-          style={[styles.actionBtn, { backgroundColor: 'rgb(255, 215, 0)' }]}
-          onPress={() => setShowLogoutConfirm(true)}
-        >
-          <Text style={styles.actionBtnText}>logout</Text>
         </Pressable>
 
         {canDeleteAccount && (

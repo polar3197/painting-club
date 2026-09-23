@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useAdminPending } from '../hooks';
+import ConfirmDialog from '../components/ConfirmDialog';
 import ContextPopup from '../components/ContextPopup';
 import FeaturedArtistPicker from '../components/FeaturedArtistPicker';
 import { appAlert } from '../components/AppAlert';
@@ -13,10 +14,11 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 // that used to live on the (now-removed) "more" tab: admin, delete account,
 // logout.
 export default function Settings() {
-  const { currentUser, currentRole } = useAuth();
+  const { currentUser, currentRole, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [moreAnchor, setMoreAnchor] = useState<{ x: number; y: number } | null>(null);
   // Red dot per admin row with pending work (and the gear dot upstream).
   const adminPending = useAdminPending();
@@ -74,6 +76,23 @@ export default function Settings() {
           <Text style={styles.backBtnText}>‹ back</Text>
         </Pressable>
       )}
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title="u sure?"
+        confirmLabel="yes"
+        cancelLabel="no. shit. stop"
+        confirmColor={Colors.redLight}
+        cancelColor={Colors.greenBright}
+        confirmTextColor={Colors.black}
+        cancelTextColor={Colors.black}
+        onConfirm={async () => {
+          setShowLogoutConfirm(false);
+          await logout();
+          navigation.navigate('LandingPage');
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+
       <FeaturedArtistPicker
         visible={showHighlightPicker}
         onClose={() => setShowHighlightPicker(false)}
@@ -89,6 +108,14 @@ export default function Settings() {
         onPress={() => navigation.navigate('NotificationSettings')}
       >
         <Text style={styles.actionBtnText}>notifications</Text>
+      </Pressable>
+      {/* Logging out is routine, not destructive — it belongs on the main list
+          rather than behind the kebab with the irreversible things. */}
+      <Pressable
+        style={[styles.actionBtn, { backgroundColor: Colors.secondary, marginBottom: 10 }]}
+        onPress={() => setShowLogoutConfirm(true)}
+      >
+        <Text style={styles.actionBtnText}>logout</Text>
       </Pressable>
       {(currentRole === 'admin' || currentRole === 'contributor') && (
         <>
