@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useNavPref } from '../context/NavPrefContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import { Colors, Fonts, FontSizes } from '../constants/theme';
@@ -12,6 +13,7 @@ import { Colors, Fonts, FontSizes } from '../constants/theme';
 // logout.
 export default function Settings() {
   const { logout, currentUser, currentRole } = useAuth();
+  const { navModel, setNavModel } = useNavPref();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -64,6 +66,21 @@ export default function Settings() {
           don't see them. */}
       {currentRole === 'contributor' && (
         <>
+          <View style={styles.navPrefRow}>
+            {([
+              { key: 'tabs', label: 'tabs' },
+              { key: 'swipeA', label: 'swipe A' },
+              { key: 'swipeB', label: 'swipe B' },
+            ] as const).map((m) => (
+              <Pressable
+                key={m.key}
+                style={[styles.navPrefBtn, navModel === m.key && styles.navPrefBtnActive]}
+                onPress={() => setNavModel(m.key)}
+              >
+                <Text style={styles.navPrefBtnText}>{m.label}</Text>
+              </Pressable>
+            ))}
+          </View>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: Colors.purpleDocs }]}
             onPress={() => navigation.navigate('Contributor')}
@@ -164,6 +181,27 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     padding: 14,
     marginBottom: 10,
+  },
+  navPrefRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  navPrefBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: Colors.mainBg,
+  },
+  navPrefBtnActive: {
+    backgroundColor: Colors.accentGolden,
+  },
+  navPrefBtnText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.black,
   },
   actionBtnText: {
     fontFamily: Fonts.serif,

@@ -7,6 +7,7 @@ import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from 
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { UploadProvider } from './src/context/UploadContext';
+import { NavPrefProvider } from './src/context/NavPrefContext';
 import { Colors } from './src/constants/theme';
 import { setAuthExpiredHandler } from './src/api/client';
 import { recordScreen, initDeviceTelemetry } from './src/api/observability';
@@ -65,6 +66,7 @@ export default function App() {
       <SafeAreaProvider>
         <AuthProvider>
           <UploadProvider>
+           <NavPrefProvider>
             <NavigationContainer
               theme={navTheme}
               ref={navigationRef}
@@ -82,6 +84,7 @@ export default function App() {
               <AppAlertHost />
               <StatusBar style="dark" />
             </NavigationContainer>
+           </NavPrefProvider>
           </UploadProvider>
         </AuthProvider>
       </SafeAreaProvider>

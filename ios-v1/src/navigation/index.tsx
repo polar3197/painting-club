@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useNavPref } from '../context/NavPrefContext';
 
 const tabIcons = {
   me: require('../../assets/imgs/me.png'),
@@ -20,6 +21,7 @@ import Ethos from '../screens/Ethos';
 import Portfolio from '../screens/Portfolio';
 import SearchStack from './SearchStack';
 import HomeStack from './HomeStack';
+import SwipeStack from './SwipeStack';
 import AddArt from '../screens/AddArt';
 import Settings from '../screens/Settings';
 import UserStats from '../screens/UserStats';
@@ -105,6 +107,23 @@ const MeScreenGated = () => (
     <MeScreen />
   </BackendGate>
 );
+const SwipeStackGated = () => (
+  <BackendGate>
+    <SwipeStack />
+  </BackendGate>
+);
+
+// The "Main" surface picks its shell from the nav-model preference: the shipped
+// bottom tabs by default, or a swipe prototype when a contributor has toggled
+// one on (NavPrefContext). Until the persisted value is read we render tabs so
+// there's no first-frame flash of the wrong shell for members.
+function MainShell() {
+  const { navModel, ready } = useNavPref();
+  if (ready && (navModel === 'swipeA' || navModel === 'swipeB')) {
+    return <SwipeStackGated />;
+  }
+  return <MainTabs />;
+}
 
 
 function MainTabs() {
@@ -183,7 +202,7 @@ export default function RootNavigator() {
       screenOptions={{ headerShown: false }}
       initialRouteName={currentUser ? 'Main' : 'LandingPage'}
     >
-      <RootStack.Screen name="Main" component={MainTabs} />
+      <RootStack.Screen name="Main" component={MainShell} />
       <RootStack.Screen name="LandingPage" component={LandingPage} />
       <RootStack.Screen
         name="SetupAccount"
