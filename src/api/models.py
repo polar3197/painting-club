@@ -24,6 +24,46 @@ _COLOR_VALUE_RE = re.compile(
     r"^(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\))$"
 )
 
+# Notification categories. A member is opted OUT of everything until they say
+# otherwise, so a missing key always means off — there is no "default on".
+# 'admin' is role-gated: it covers the review queues (applications, media
+# requests, reports, feature requests, prompt suggestions, password resets) and
+# is only offered to contributors and admins.
+NOTIFICATION_CATEGORIES = ("comments", "messages", "events", "announcements", "admin")
+ADMIN_ONLY_CATEGORIES = {"admin"}
+
+
+def categories_for_role(role: str) -> list[str]:
+    if role in ("admin", "contributor"):
+        return list(NOTIFICATION_CATEGORIES)
+    return [c for c in NOTIFICATION_CATEGORIES if c not in ADMIN_ONLY_CATEGORIES]
+
+
+class NotificationPrefsOut(BaseModel):
+    """Every category this member may set, resolved to an explicit bool.
+
+    Resolved server-side on purpose: clients never encode the default, and a
+    category added here shows up in both apps without a client release."""
+    prefs: dict[str, bool]
+    available: list[str]
+
+
+class NotificationPrefsIn(BaseModel):
+    """A partial update — send only the categories being changed."""
+    prefs: dict[str, bool]
+
+    @field_validator("prefs")
+    @classmethod
+    def _validate_prefs(cls, v: dict[str, bool]):
+        unknown = set(v) - set(NOTIFICATION_CATEGORIES)
+        if unknown:
+            raise ValueError(f"unknown notification categories: {sorted(unknown)}")
+        for key, value in v.items():
+            if not isinstance(value, bool):
+                raise ValueError(f"'{key}' must be true or false")
+        return v
+
+
 class MemberIn(BaseModel):
     username: str
     password: str

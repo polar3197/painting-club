@@ -606,4 +606,12 @@ async def run_migrations():
             " created_at TIMESTAMP,"
             " PRIMARY KEY (member_id, art_type))"
         ))
+        # 033: per-member notification preferences. JSONB rather than a column
+        # per category (same choice as member.profile_colors) so adding a sixth
+        # category later is a code change, not a migration. NULL means every
+        # category is off, which makes "default to off for everyone" the
+        # schema's natural state instead of five DEFAULT FALSE columns.
+        await conn.execute(text(
+            "ALTER TABLE member ADD COLUMN IF NOT EXISTS notification_prefs JSONB"
+        ))
     print("Migrations applied.")

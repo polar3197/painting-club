@@ -90,6 +90,9 @@ from api.models import (
     SetupCodeIn,
     JoinRedeemIn,
     SignupInviteCreateIn,
+    NotificationPrefsIn,
+    NotificationPrefsOut,
+    categories_for_role,
     JoinInviteOut,
     SignupInviteOut,
     ForgotPasswordIn,
@@ -538,6 +541,45 @@ async def refresh_token_endpoint(current_member: Member = Depends(get_current_me
         access_token=create_token(current_member),
         must_setup=bool(current_member.must_change_password),
     )
+
+
+def _resolved_prefs(member: Member) -> NotificationPrefsOut:
+    """Every category this member may set, each resolved to a bool.
+
+    Stored prefs are a partial map, so anything absent reads as False. That is
+    what makes "off for everyone by default" true without a backfill: a member
+    who has never opened the panel has NULL here and gets all-false."""
+    stored = member.notification_prefs or {}
+    available = categories_for_role(member.role)
+    return NotificationPrefsOut(
+        prefs={c: bool(stored.get(c, False)) for c in available},
+        available=available,
+    )
+
+
+@app.get("/members/me/notification-prefs", response_model=NotificationPrefsOut)
+async def get_notification_prefs(current_member: Member = Depends(get_current_member)):
+    return _resolved_prefs(current_member)
+
+
+@app.patch("/members/me/notification-prefs", response_model=NotificationPrefsOut)
+async def update_notification_prefs(
+    payload: NotificationPrefsIn,
+    db: AsyncSession = Depends(get_db),
+    current_member: Member = Depends(get_current_member),
+):
+    """Merge a partial update. Categories the member's role can't set are
+    dropped rather than refused — a plain member sending 'admin' simply has no
+    effect, instead of a 403 the UI would never surface."""
+    allowed = set(categories_for_role(current_member.role))
+    merged = dict(current_member.notification_prefs or {})
+    merged.update({k: v for k, v in payload.prefs.items() if k in allowed})
+    # Reassign rather than mutate: SQLAlchemy doesn't track in-place edits to a
+    # JSONB dict, so mutating it would commit nothing.
+    current_member.notification_prefs = merged
+    await db.commit()
+    await db.refresh(current_member)
+    return _resolved_prefs(current_member)
 
 
 @app.post("/members/setup-account", response_model=MemberOut)

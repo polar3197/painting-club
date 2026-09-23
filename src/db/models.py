@@ -35,6 +35,10 @@ class Member(Base):
     # color string ('#rrggbb'). NULL = never customized; clients fall back to
     # the app-default palette.
     profile_colors = Column(JSONB)
+    # Which notification categories this member has opted INTO:
+    # category-key -> bool. NULL or a missing key means off, so nobody is
+    # notified until they ask to be. See NOTIFICATION_CATEGORIES in api/models.
+    notification_prefs = Column(JSONB)
 
     # favorite piece you made
     # favorite medium
