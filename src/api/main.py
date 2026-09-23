@@ -432,7 +432,7 @@ async def login_member_endpoint(payload: MemberIn, db: AsyncSession = Depends(ge
     if member.must_change_password:
         from datetime import datetime as _dt
         if member.temp_password_expires_at and member.temp_password_expires_at < _dt.utcnow():
-            raise HTTPException(status_code=401, detail="Temporary password has expired — contact an admin")
+            raise HTTPException(status_code=401, detail="Temporary password has expired. Contact an admin")
     token = create_token(member)
     return Token(access_token=token, must_setup=bool(member.must_change_password))
 
@@ -476,7 +476,7 @@ async def redeem_signup_invite_endpoint(payload: JoinRedeemIn, db: AsyncSession 
     try:
         member = await db_redeem_invite(db, payload.token, payload.firstname, payload.lastname, payload.email)
     except InviteDead:
-        raise HTTPException(status_code=410, detail="This invite is no longer valid — ask a member for a fresh QR")
+        raise HTTPException(status_code=410, detail="This invite is no longer valid. Ask a member for a fresh QR")
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     return Token(access_token=create_token(member), must_setup=True)
@@ -2736,7 +2736,7 @@ def _check_application_art_quota(request: Request) -> None:
     now = time.time()
     hits = [t for t in _APPLICATION_ART_HITS.get(ip, []) if now - t < 3600]
     if len(hits) >= APPLICATION_ART_PER_IP_HOURLY:
-        raise HTTPException(status_code=429, detail="Too many uploads — try again shortly")
+        raise HTTPException(status_code=429, detail="Too many uploads. Try again shortly")
     hits.append(now)
     _APPLICATION_ART_HITS[ip] = hits
     # Opportunistic prune so the dict can't grow without bound.
@@ -2937,7 +2937,7 @@ async def submit_application(
             art_aspect_ratio=payload.art_aspect_ratio,
         )
     except UsernameTaken as e:
-        raise HTTPException(status_code=409, detail=f"username '{e}' is taken — pick another")
+        raise HTTPException(status_code=409, detail=f"username '{e}' is taken. Pick another")
     background_tasks.add_task(sweep_application_art_drafts)
     return {"ok": True}
 
@@ -3011,7 +3011,7 @@ async def update_application_status(
             # account is NOT created; the applicant has to pick another name.
             raise HTTPException(
                 status_code=409,
-                detail=f"the username '{e}' was taken since they applied — they'll need to pick another",
+                detail=f"the username '{e}' was taken since they applied. They'll need to pick another",
             )
         except ValueError as e:
             # "already exists" = a completed member owns this email → 409 so the

@@ -108,10 +108,10 @@ export default function Contributor() {
       )}
 
       <section className="tools-section">
-        <h2 className="tools-section-title">club QR — scan to apply</h2>
+        <h2 className="tools-section-title">club QR: scan to apply</h2>
         <p className="tools-note">
           the one to hold up at a meeting. they fill in an application and pick their own
-          username and password; a member approves it and they're in — no code to send.
+          username and password; a member approves it and they're in, no code to send.
         </p>
         {clubQr
           ? <img className="tools-qr" src={clubQr} alt="scan to apply to painting club" />
@@ -119,7 +119,7 @@ export default function Contributor() {
       </section>
 
       <section className="tools-section">
-        <h2 className="tools-section-title">trusted QR — instant account, no review</h2>
+        <h2 className="tools-section-title">trusted QR: instant account, no review</h2>
         <p className="tools-note tools-note-warn">
           skips the queue entirely: whoever scans this has an account before anyone sees it.
           only for someone standing in front of you. hidden by default so it can't be
@@ -127,7 +127,7 @@ export default function Contributor() {
         </p>
         {showTrusted ? (
           trustedQr
-            ? <img className="tools-qr tools-qr-trusted" src={trustedQr} alt="trusted QR — creates an account immediately" />
+            ? <img className="tools-qr tools-qr-trusted" src={trustedQr} alt="trusted QR: creates an account immediately" />
             : <p className="tools-empty">{qrError ? "couldn't load the QR" : "minting…"}</p>
         ) : (
           <button className="tools-btn tools-btn-gold" onClick={revealTrusted}>

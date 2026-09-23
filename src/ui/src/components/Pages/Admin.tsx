@@ -144,7 +144,7 @@ const ApplicationRow = ({
                     <TempCreds password={app.temp_password} />
                 )}
                 {app.status === "approved" && app.username && (
-                    <p className="application-ready">account is live — they can log in as @{app.username}</p>
+                    <p className="application-ready">account is live. they can log in as @{app.username}</p>
                 )}
             </div>
             <div className="application-row-actions">
@@ -328,7 +328,7 @@ const Admin = () => {
         } catch (err) {
             alert(
                 `${status === "approved" ? "Couldn't approve" : "Couldn't update"}: ` +
-                ((err as Error).message || "something went wrong — try again."),
+                ((err as Error).message || "something went wrong, try again."),
             );
             return;
         }

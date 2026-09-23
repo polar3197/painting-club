@@ -190,7 +190,7 @@ export default function ApplicationFlow({
       return;
     }
     if (!artRef.current && !preview) {
-      setError("add a piece — anything at all");
+      setError("add a piece, anything at all");
       return;
     }
     setError(null);
@@ -250,7 +250,7 @@ export default function ApplicationFlow({
     } catch (err) {
       const msg = (err as Error).message || "something went wrong";
       if (msg === "art_missing") {
-        setError("your piece didn't finish uploading — go back and re-add it");
+        setError("your piece didn't finish uploading. go back and re-add it");
       } else if (/is taken/.test(msg)) {
         setUnameState("taken");
         setError(msg);
@@ -269,7 +269,7 @@ export default function ApplicationFlow({
           <p className="flow-done-title">you're in the queue, @{username.trim().toLowerCase()}.</p>
           <p className="flow-done-sub">
             A member reads every application. Once you're approved, log in with the username and
-            password you just picked — there's no code to wait for.
+            password you just picked. There's no code to wait for.
           </p>
           {onClose && (
             <button className="flow-done-close" onClick={onClose}>

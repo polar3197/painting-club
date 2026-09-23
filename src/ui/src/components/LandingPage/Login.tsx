@@ -107,7 +107,7 @@ export default function Login(
       <SecretPanel label="still under review" onClose={() => setUnderReview(false)}>
         <p className="forgot-body">
           Your application hasn't been looked at yet. A member reads every one. Once you're
-          approved, this same username and password will just work — there's nothing else to do
+          approved, this same username and password will just work. There's nothing else to do
           and no code to wait for. Try again in a day.
         </p>
       </SecretPanel>
