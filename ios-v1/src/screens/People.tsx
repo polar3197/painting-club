@@ -155,25 +155,69 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
     );
   };
 
-  // Sideways mode: columns of `rows` cards, card size from the space available.
+  // Sideways mode: a grid of `rows` rows that scrolls sideways, card size from
+  // the space available.
   const [stripH, setStripH] = useState(0);
+  const [stripW, setStripW] = useState(0);
+
+  // Card size comes from the height; the number of columns that fit comes from
+  // the width. Both are needed before the grid can be filled, so they are
+  // computed here rather than inside the render branch below.
+  const sizeRows = rows ? rows + 1 : 1;
+  const cellH = rows && stripH > 0 ? (stripH - STRIP_PAD * 2 - COLUMN_GAP * (sizeRows - 1)) / sizeRows : 0;
+  const side = Math.max(0, cellH - NAME_H);
+  const gap = rows && rows > 1 ? COLUMN_GAP + (cellH + COLUMN_GAP) / 4 / (rows - 1) : COLUMN_GAP;
+  // The row length nothing used to define: how many columns actually fit.
+  const colsPerScreen =
+    side > 0 && stripW > 0
+      ? Math.max(1, Math.floor((stripW - LIST_PAD * 2 + gap) / (side + gap)))
+      : 1;
+
   const columns = useMemo(() => {
     if (!rows) return [];
+    // ROW-major, not column-major. Filling down each column first meant that
+    // narrowing a search stacked the survivors down the left edge; filling
+    // across means a short result set lands in the top row, read left to right.
+    //
+    // Row-major needs a row length, and the honest one is the number of columns
+    // that fit on screen. Once `rows * colsPerScreen` slots are used the next
+    // screenful fills the same way, so the reading order is the same everywhere
+    // rather than changing once you scroll.
+    const C = colsPerScreen;
+    const perScreen = rows * C;
     const out: Profile[][] = [];
-    for (let i = 0; i < filtered.length; i += rows) out.push(filtered.slice(i, i + rows));
+    for (let start = 0; start < filtered.length; start += perScreen) {
+      const page = filtered.slice(start, start + perScreen);
+      for (let c = 0; c < C; c++) {
+        const col: Profile[] = [];
+        for (let r = 0; r < rows; r++) {
+          const j = r * C + c;
+          if (j < page.length) col.push(page[j]);
+        }
+        // A partial last row leaves trailing columns empty; drop them rather
+        // than rendering blanks.
+        if (col.length) out.push(col);
+      }
+    }
     return out;
-  }, [filtered, rows]);
+  }, [filtered, rows, colsPerScreen]);
+
   if (rows && !loading) {
     // Cards are sized as if the strip held one more row than it shows; a
     // quarter of the freed row widens the gaps, and rows and columns share
-    // that one gap. The remaining slack is split above and below the grid
-    // (stripCol centres it), so the block sits in the middle of the strip.
-    const sizeRows = rows + 1;
-    const cellH = stripH > 0 ? (stripH - STRIP_PAD * 2 - COLUMN_GAP * (sizeRows - 1)) / sizeRows : 0;
-    const side = Math.max(0, cellH - NAME_H);
-    const gap = rows > 1 ? COLUMN_GAP + (cellH + COLUMN_GAP) / 4 / (rows - 1) : COLUMN_GAP;
+    // that one gap. Sizing happens above, since the grid needs it to fill.
+    // Each column is a FIXED-height grid of `rows` slots, so a short column
+    // keeps its cards in their slots from the top instead of floating them to
+    // the middle of the strip.
+    const gridH = rows * cellH + (rows - 1) * gap;
     return (
-      <View style={styles.container} onLayout={(e) => setStripH(e.nativeEvent.layout.height)}>
+      <View
+        style={styles.container}
+        onLayout={(e) => {
+          setStripH(e.nativeEvent.layout.height);
+          setStripW(e.nativeEvent.layout.width);
+        }}
+      >
         {side > 0 && (
           <FlatList
             horizontal
@@ -182,7 +226,7 @@ export default function People({ query, onResetFilters, onListScroll, onVertical
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={[styles.strip, { gap }]}
             renderItem={({ item: col }) => (
-              <View style={[styles.stripCol, { width: side, gap }]}>
+              <View style={[styles.stripCol, { width: side, height: gridH, gap }]}>
                 {col.map((m) => (
                   <Pressable
                     key={m.username}
@@ -270,15 +314,15 @@ const styles = StyleSheet.create({
   },
   stripCol: {
     gap: COLUMN_GAP,
-    // Cards are sized for one more row than is shown, which leaves a row's
-    // worth of slack. Centring puts that slack above and below the block
-    // instead of all of it underneath — the gaps themselves are untouched,
-    // the whole group just sits in the middle of the strip.
-    justifyContent: 'center',
-    // ...then sits a little above true centre, which reads better than dead
-    // centre against the label above it. Padding rather than a negative
-    // offset, so nothing can overflow the strip.
-    paddingBottom: 22,
+    // The column is given an explicit height of `rows` slots, and its cards
+    // fill from the TOP of that grid. A short column therefore keeps its cards
+    // in their grid positions instead of floating them to the middle, which is
+    // what centring inside a stretched column used to do.
+    justifyContent: 'flex-start',
+    // The grid as a whole still sits just above the strip's centre — that is
+    // the block being placed, not the cards being redistributed inside it.
+    alignSelf: 'center',
+    marginBottom: 44,
   },
   stripName: {
     height: NAME_H,
