@@ -22,12 +22,20 @@ class UsernameTaken(Exception):
     application — the route answers 409 so the form can ask for another."""
 
 
-async def db_username_available(db: AsyncSession, username: str) -> bool:
-    """Free = no member owns it AND no other pending application claims it.
+async def db_username_available(
+    db: AsyncSession, username: str, exclude_application_id=None
+) -> bool:
+    """Free = no member owns it AND no OTHER pending application claims it.
 
     Checking pending applications too is what stops two people at the same
     meeting picking 'sam' and only discovering the clash at approval time,
     when one of them has already been told they're in.
+
+    `exclude_application_id` is not optional in spirit: approval re-checks the
+    name, and at that moment the application being approved is itself still
+    'pending' with that exact username. Without excluding it, every self-serve
+    application matched itself and approval raised UsernameTaken 100% of the
+    time — the approve button did nothing at all.
     """
     uname = (username or "").strip().lower()
     if not uname:
@@ -37,12 +45,13 @@ async def db_username_available(db: AsyncSession, username: str) -> bool:
     )).scalar_one_or_none()
     if owned is not None:
         return False
-    claimed = (await db.execute(
-        select(Application.id).filter(
-            Application.username == uname,
-            Application.status == "pending",
-        )
-    )).scalar_one_or_none()
+    q = select(Application.id).filter(
+        Application.username == uname,
+        Application.status == "pending",
+    )
+    if exclude_application_id is not None:
+        q = q.filter(Application.id != exclude_application_id)
+    claimed = (await db.execute(q)).scalar_one_or_none()
     return claimed is None
 
 
@@ -275,7 +284,7 @@ async def db_approve_application(db: AsyncSession, application_id: str) -> tuple
         # The username was free at submit, but anyone could have taken it in the
         # meantime — re-check here, because member.username is UNIQUE and losing
         # this race would otherwise surface as a 500 at the worst moment.
-        if not await db_username_available(db, app.username):
+        if not await db_username_available(db, app.username, exclude_application_id=app.id):
             raise UsernameTaken(app.username)
         member = Member(
             id=member_id,

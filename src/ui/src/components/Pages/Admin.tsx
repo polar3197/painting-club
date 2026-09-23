@@ -318,13 +318,26 @@ const Admin = () => {
     };
 
     const handleStatusChange = async (id: string, status: string) => {
-        const res = await update_application_status(id, status, token);
+        // Surface the failure instead of swallowing it. Without this the call
+        // could reject (e.g. the email already belongs to a member, or the
+        // username got taken since they applied) and the button would simply
+        // appear to do nothing, with the reason only visible in the console.
+        let res;
+        try {
+            res = await update_application_status(id, status, token);
+        } catch (err) {
+            alert(
+                `${status === "approved" ? "Couldn't approve" : "Couldn't update"}: ` +
+                ((err as Error).message || "something went wrong — try again."),
+            );
+            return;
+        }
         const isApproval = (r: unknown): r is ApplicationApproveOut =>
             !!r && typeof r === "object" && "temp_password" in (r as object);
 
         if (status === "approved" && isApproval(res)) {
             setApplications(apps => apps.map(a => a.id === id
-                ? { ...a, status: res.status, temp_password: res.temp_password }
+                ? { ...a, status: res.status, temp_password: res.temp_password, username: res.username ?? a.username }
                 : a));
         } else {
             setApplications(apps => apps.map(a => a.id === id ? { ...a, status } : a));
